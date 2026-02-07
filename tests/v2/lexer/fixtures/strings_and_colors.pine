@@ -1,0 +1,5 @@
+s1 = "hello"
+s2 = 'world'
+s3 = "escaped \" quote"
+c1 = #ff0000
+c2 = #00ff00ff

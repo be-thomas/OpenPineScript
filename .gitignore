@@ -1,2 +1,5 @@
 
 node_modules/
+parser/v2/generated/
+.DS_Store
+

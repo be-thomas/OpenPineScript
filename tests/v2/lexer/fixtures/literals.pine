@@ -1,0 +1,5 @@
+n = 42
+f = 3.14
+s = "hello"
+b = true
+c = #ff0000

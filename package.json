@@ -1,12 +1,23 @@
 {
+  "name": "open-pinescript",
+  "version": "0.0.1",
+  "scripts": {
+    "generate:parser": "antlr-ng -Dlanguage=TypeScript -o parser/v2/generated -l false -v true grammar/v2/PineScriptLexer.g4 grammar/v2/PineScriptParser.g4 && node scripts/patch-visitor.js",
+    "postinstall": "npm run generate:parser",
+    "build": "npm run generate:parser",
+    "parse": "tsx parser/v2/run_antlr.ts",
+    "repl": "tsx repl/v2/index.ts",
+    "test": "node --import tsx --test tests/v2/lexer/lexer.test.ts tests/v2/parser/parser.test.ts tests/v2/transpiler/transpiler.test.ts"
+  },
   "dependencies": {
-    "chalk": "^5.4.1",
-    "chevrotain": "^10.5.0",
-    "fs": "^0.0.1-security",
-    "path": "^0.12.7"
+    "antlr4ng": "^1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "antlr-ng": "^1.0.0",
     "tsx": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

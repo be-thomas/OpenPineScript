@@ -1,0 +1,2 @@
+[a,b]=pair()
+[x,y,z]=triple(1,2,3)
