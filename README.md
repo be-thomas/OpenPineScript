@@ -34,7 +34,7 @@ OpenPineScript replicates the core functionality of Pine Script, making it acces
 ### Install and build
 
 ```bash
-git clone https://github.com/yourusername/OpenPineScript.git
+git clone https://github.com/be-thomas/OpenPineScript.git
 cd OpenPineScript
 npm install
 ```
