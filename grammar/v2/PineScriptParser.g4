@@ -2,24 +2,22 @@ parser grammar PineScriptParser;
 
 options { tokenVocab = PineScriptLexer; }
 
-// Entry point
+// --- Entry Point ---
+// A script is a list of statements separated by LEND.
 tvscript
-  : ( stmt )+ EOF
+  : ( stmt LEND? )+ EOF
   ;
 
 stmt
   : fun_def_stmt
-  | global_stmt_or_multistmt
+  | global_stmt
   ;
 
-global_stmt_or_multistmt
-  : BEGIN global_stmt_or_multistmt END
-  | global_stmt_or_multistmt2
-  | EMPTY_LINE
-  ;
-
-global_stmt_or_multistmt2
-  : ( LBEG )? global_stmt_content ( COMMA global_stmt_content )* ( COMMA )? ( LEND | PLEND )
+// Formerly: global_stmt_or_multistmt2
+// Note: We removed the explicit LBEG/LEND wrappers here.
+// The parent 'tvscript' rule handles the LEND separators.
+global_stmt
+  : global_stmt_content ( COMMA global_stmt_content )*
   ;
 
 global_stmt_content
@@ -31,19 +29,24 @@ global_stmt_content
   | for_expr
   | loop_break
   | loop_continue
+  | arith_expr
   ;
 
+// --- Function Definitions ---
+
 fun_def_stmt
-  : ( LBEG )? fun_def_singleline LEND
-  | ( LBEG )? fun_def_multiline PLEND
+  : fun_def_singleline
+  | fun_def_multiline
   ;
 
 fun_def_singleline
   : id fun_head ARROW fun_body_singleline
   ;
 
+// Multiline: '=>' is immediately followed by Indent (BEGIN)
+// Removed: explicit LEND before the body
 fun_def_multiline
-  : id fun_head ARROW ( LEND )? fun_body_multiline
+  : id fun_head ARROW fun_body_multiline
   ;
 
 fun_head
@@ -55,12 +58,7 @@ fun_body_singleline
   ;
 
 local_stmt_singleline
-  : BEGIN local_stmt_singleline END
-  | local_stmt_singleline2
-  ;
-
-local_stmt_singleline2
-  : local_stmt_content ( COMMA local_stmt_content )* ( COMMA )?
+  : local_stmt_content ( COMMA local_stmt_content )*
   ;
 
 local_stmt_content
@@ -73,25 +71,30 @@ local_stmt_content
   | loop_continue
   ;
 
-loop_break  : BREAK ;
+loop_break    : BREAK ;
 loop_continue : CONTINUE ;
+
+// --- Multiline Bodies (Blocks) ---
 
 fun_body_multiline
   : local_stmts_multiline
   ;
 
+// Block: BEGIN (indent) ... statements ... END (dedent)
 local_stmts_multiline
-  : ( EMPTY_LINE )* BEGIN local_stmts_multiline2 END
+  : BEGIN local_stmts_list END
   ;
 
-local_stmts_multiline2
-  : ( local_stmt_multiline )+
+// List of statements separated by LEND
+local_stmts_list
+  : local_stmt_multiline ( LEND local_stmt_multiline )* LEND?
   ;
 
 local_stmt_multiline
-  : LBEG local_stmt_content ( COMMA local_stmt_content )* ( COMMA )? ( LEND | PLEND )
-  | EMPTY_LINE
+  : local_stmt_content ( COMMA local_stmt_content )*
   ;
+
+// --- Variable Definitions ---
 
 var_def
   : id DEFINE arith_expr
@@ -119,19 +122,23 @@ arith_expr
   | for_expr
   ;
 
+// --- Control Flow ---
+
+// Note: Removed LEND/PLEND/LBEG tokens that surrounded the blocks.
+// The TokenSource emits BEGIN immediately after the condition if there is an indent.
 if_expr
-  : IF_COND ternary_expr LEND stmts_block PLEND LBEG IF_COND_ELSE LEND stmts_block
-  | IF_COND ternary_expr LEND stmts_block
+  : IF_COND ternary_expr stmts_block ( IF_COND_ELSE stmts_block )?
   ;
 
 for_expr
-  : FOR_STMT var_def FOR_STMT_TO ternary_expr FOR_STMT_BY ternary_expr LEND stmts_block
-  | FOR_STMT var_def FOR_STMT_TO ternary_expr LEND stmts_block
+  : FOR_STMT var_def FOR_STMT_TO ternary_expr ( FOR_STMT_BY ternary_expr )? stmts_block
   ;
 
 stmts_block
-  : fun_body_multiline
+  : fun_body_multiline // Reuses the BEGIN...END logic
   ;
+
+// --- Expressions (Unchanged) ---
 
 ternary_expr
   : or_expr ( COND ternary_expr2 )?
@@ -223,3 +230,4 @@ other_literal
 id
   : ID
   ;
+  

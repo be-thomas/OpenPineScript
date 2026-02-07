@@ -109,7 +109,7 @@ describe("parser v2 (ANTLR)", () => {
     });
 
     // ANTLR lexer does not emit BEGIN/END for indentation; grammar expects <BEGIN>/<END>
-    it.skip("parses func_multiline.pine (add(a,b)=> body)", () => {
+    it("parses func_multiline.pine (add(a,b)=> body)", () => {
       const { tree, errorCount } = parse(loadFixture("func_multiline.pine"));
       assert.ok(tree);
       assert.strictEqual(errorCount, 0);
@@ -118,26 +118,27 @@ describe("parser v2 (ANTLR)", () => {
 
   describe("control flow (if, for)", () => {
     // ANTLR lexer does not emit BEGIN/END for indentation
-    it.skip("parses if_then.pine", () => {
+    it("parses if_then.pine", () => {
       const { tree, errorCount } = parse(loadFixture("if_then.pine"));
       assert.ok(tree);
       assert.strictEqual(errorCount, 0);
     });
 
-    it.skip("parses for_loop.pine", () => {
+    it("parses for_loop.pine", () => {
       const { tree, errorCount } = parse(loadFixture("for_loop.pine"));
       assert.ok(tree);
       assert.strictEqual(errorCount, 0);
     });
 
-    it.skip("parses for_loop_by.pine", () => {
+    it("parses for_loop_by.pine", () => {
       const { tree, errorCount } = parse(loadFixture("for_loop_by.pine"));
       assert.ok(tree);
       assert.strictEqual(errorCount, 0);
     });
 
-    it.skip("parses break_continue.pine", () => {
+    it("parses break_continue.pine", () => {
       const { tree, errorCount } = parse(loadFixture("break_continue.pine"));
+      console.error("tree: ", tree);
       assert.ok(tree);
       assert.strictEqual(errorCount, 0);
     });

@@ -1,6 +1,14 @@
 lexer grammar PineScriptLexer;
 
-// ----- Keywords (must appear before ID) -----
+// 1. DEFINE VIRTUAL TOKENS
+// These are injected by the TokenSource logic.
+tokens {
+  BEGIN,
+  END,
+  LEND
+}
+
+// ----- Keywords -----
 IF_COND     : 'if' ;
 IF_COND_ELSE: 'else' ;
 FOR_STMT    : 'for' ;
@@ -36,28 +44,28 @@ RPAR        : ')' ;
 LSQBR       : '[' ;
 RSQBR       : ']' ;
 
-// ----- Indentation / line structure -----
-// LBEG only at line start (column 0) so mid-line spaces are WS
-LBEG        : { getCharPositionInLine() == 0 }? [ \t]+ ;
-LEND        : '\r'? '\n' ;
-EMPTY_LINE  : '\r'? '\n' [ \t]* '\r'? '\n' ;
-BEGIN       : '<BEGIN>' ;
-END         : '<END>' ;
-PLEND       : '<PLEND>' ;
+// ----- Indentation / Line Structure -----
+// Matches ANY newline sequence + indentation spaces.
+// The TokenSource analyzes this to generate BEGIN/END/LEND.
+LBEG : ('\r'? '\n' | '\r')+ [ \t]* ;
 
 // ----- Literals -----
 INT_LITERAL   : [0-9]+ ;
 FLOAT_LITERAL : [0-9]+ '.' [0-9]* ([eE] [+-]? [0-9]+)?
-               | '.' [0-9]+ ([eE] [+-]? [0-9]+)?
-               | [0-9]+ [eE] [+-]? [0-9]+
-               ;
+              | '.' [0-9]+ ([eE] [+-]? [0-9]+)?
+              | [0-9]+ [eE] [+-]? [0-9]+
+              ;
 STR_LITERAL   : '"' ( ~["\r\n\\] | '\\' . )* '"'
-               | '\'' ( ~['\r\n\\] | '\\' . )* '\''
-               ;
+              | '\'' ( ~['\r\n\\] | '\\' . )* '\''
+              ;
 COLOR_LITERAL : '#' [0-9a-fA-F]{6} | '#' [0-9a-fA-F]{8} ;
 
 // ----- Identifier -----
 ID          : [a-zA-Z_][a-zA-Z0-9_]* ;
 
-// ----- Skip (mid-line spaces; line-start spaces are LBEG) -----
+// ----- Skip (Mid-line whitespace) -----
 WS          : [ \t]+ -> skip ;
+
+// ----- Comments -----
+LINE_COMMENT  : '//' ~[\r\n]* -> skip ;
+BLOCK_COMMENT : '/*' .*? '*/' -> skip ;

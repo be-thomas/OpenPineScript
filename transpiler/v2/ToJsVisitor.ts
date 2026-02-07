@@ -7,8 +7,7 @@ import type { TerminalNode } from "antlr4ng";
 import {
   TvscriptContext,
   StmtContext,
-  Global_stmt_or_multistmtContext,
-  Global_stmt_or_multistmt2Context,
+  Global_stmtContext,
   Global_stmt_contentContext,
   Fun_def_stmtContext,
   Fun_def_singlelineContext,
@@ -16,13 +15,12 @@ import {
   Fun_headContext,
   Fun_body_singlelineContext,
   Local_stmt_singlelineContext,
-  Local_stmt_singleline2Context,
   Local_stmt_contentContext,
   Loop_breakContext,
   Loop_continueContext,
   Fun_body_multilineContext,
   Local_stmts_multilineContext,
-  Local_stmts_multiline2Context,
+  Local_stmts_listContext,
   Local_stmt_multilineContext,
   Var_defContext,
   Var_defsContext,
@@ -69,43 +67,51 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return node.getText();
   }
 
+  // --- Entry Point ---
   visitTvscript(ctx: TvscriptContext): string {
+    // Visits all top-level statements
     const stmts = ctx.stmt().map((s) => this.visit(s)).filter(Boolean);
     return stmts.join("\n");
   }
 
   visitStmt(ctx: StmtContext): string {
     if (ctx.fun_def_stmt()) return this.visit(ctx.fun_def_stmt()!);
-    if (ctx.global_stmt_or_multistmt()) return this.visit(ctx.global_stmt_or_multistmt()!);
+    if (ctx.global_stmt()) return this.visit(ctx.global_stmt()!);
     return "";
   }
 
-  visitGlobal_stmt_or_multistmt(ctx: Global_stmt_or_multistmtContext): string {
-    if (ctx.global_stmt_or_multistmt2()) return this.visit(ctx.global_stmt_or_multistmt2()!);
-    if (ctx.BEGIN()) {
-      const inner = this.visit(ctx.global_stmt_or_multistmt()!);
-      return inner;
-    }
-    return "";
-  }
-
-  visitGlobal_stmt_or_multistmt2(ctx: Global_stmt_or_multistmt2Context): string {
+  // --- Global Statements ---
+  visitGlobal_stmt(ctx: Global_stmtContext): string {
     const parts = ctx.global_stmt_content().map((c) => this.visit(c));
     return parts.filter(Boolean).join("\n");
   }
 
   visitGlobal_stmt_content(ctx: Global_stmt_contentContext): string {
-    if (ctx.var_def()) return this.visit(ctx.var_def()!) + "\n";
-    if (ctx.var_defs()) return this.visit(ctx.var_defs()!) + "\n";
-    if (ctx.fun_call()) return this.visit(ctx.fun_call()!) + "\n";
-    if (ctx.if_expr()) return this.visit(ctx.if_expr()!) + "\n";
-    if (ctx.var_assign()) return this.visit(ctx.var_assign()!) + "\n";
-    if (ctx.for_expr()) return this.visit(ctx.for_expr()!) + "\n";
+    const result = this.visitContent(ctx);
+    // Ensure we don't double-semicolon if the result handles it, 
+    // but usually in JS top-level, newlines are enough.
+    return result + ";"; 
+  }
+
+  // Helper to dispatch content visits (shared by global and local singleline)
+  private visitContent(ctx: Global_stmt_contentContext | Local_stmt_contentContext): string {
+    if (ctx.var_def()) return this.visit(ctx.var_def()!);
+    if (ctx.var_defs()) return this.visit(ctx.var_defs()!);
+    if (ctx.var_assign()) return this.visit(ctx.var_assign()!);
     if (ctx.loop_break()) return this.visit(ctx.loop_break()!);
     if (ctx.loop_continue()) return this.visit(ctx.loop_continue()!);
+    
+    // Some only exist in global or local, check existence:
+    if ((ctx as any).fun_call && (ctx as any).fun_call()) return this.visit((ctx as any).fun_call()!);
+    if ((ctx as any).if_expr && (ctx as any).if_expr()) return this.visit((ctx as any).if_expr()!);
+    if ((ctx as any).for_expr && (ctx as any).for_expr()) return this.visit((ctx as any).for_expr()!);
+    if ((ctx as any).arith_expr && (ctx as any).arith_expr()) return this.visit((ctx as any).arith_expr()!);
+    if ((ctx as any).arith_exprs && (ctx as any).arith_exprs()) return this.visit((ctx as any).arith_exprs()!);
+    
     return "";
   }
 
+  // --- Functions ---
   visitFun_def_stmt(ctx: Fun_def_stmtContext): string {
     if (ctx.fun_def_singleline()) return this.visit(ctx.fun_def_singleline()!) + "\n";
     if (ctx.fun_def_multiline()) return this.visit(ctx.fun_def_multiline()!) + "\n";
@@ -123,10 +129,12 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     const name = this.visit(ctx.id());
     const params = this.visit(ctx.fun_head());
     const body = this.visit(ctx.fun_body_multiline());
+    // Body already includes { } from visitLocal_stmts_multiline
     return `function ${name}${params} ${body}`;
   }
 
   visitFun_head(ctx: Fun_headContext): string {
+    if (!ctx.id()) return "()";
     const ids = ctx.id();
     const params = ids.map((id) => this.visit(id)).join(", ");
     return `(${params})`;
@@ -137,53 +145,70 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   visitLocal_stmt_singleline(ctx: Local_stmt_singlelineContext): string {
-    if (ctx.local_stmt_singleline2()) return this.visit(ctx.local_stmt_singleline2()!);
-    return this.visit(ctx.local_stmt_singleline()!);
-  }
-
-  visitLocal_stmt_singleline2(ctx: Local_stmt_singleline2Context): string {
     const contents = ctx.local_stmt_content().map((c) => this.visit(c));
-    return contents[contents.length - 1] ?? "";
+    // Single line function body usually returns the LAST expression
+    return contents.join(", "); 
   }
 
   visitLocal_stmt_content(ctx: Local_stmt_contentContext): string {
-    if (ctx.var_def()) return this.visit(ctx.var_def()!);
-    if (ctx.var_defs()) return this.visit(ctx.var_defs()!);
-    if (ctx.arith_expr()) return this.visit(ctx.arith_expr()!);
-    if (ctx.arith_exprs()) return this.visit(ctx.arith_exprs()!);
-    if (ctx.var_assign()) return this.visit(ctx.var_assign()!);
-    if (ctx.loop_break()) return this.visit(ctx.loop_break()!);
-    if (ctx.loop_continue()) return this.visit(ctx.loop_continue()!);
-    return "";
+    return this.visitContent(ctx);
   }
 
   visitLoop_break(_ctx: Loop_breakContext): string {
-    return "break;";
+    return "break";
   }
 
   visitLoop_continue(_ctx: Loop_continueContext): string {
-    return "continue;";
+    return "continue";
   }
 
+  // --- Multiline Bodies (Blocks) ---
   visitFun_body_multiline(ctx: Fun_body_multilineContext): string {
     return this.visit(ctx.local_stmts_multiline());
   }
 
   visitLocal_stmts_multiline(ctx: Local_stmts_multilineContext): string {
-    return this.visit(ctx.local_stmts_multiline2());
+    // Grammar: BEGIN local_stmts_list END
+    return "{\n" + this.visit(ctx.local_stmts_list()) + "\n}";
   }
 
-  visitLocal_stmts_multiline2(ctx: Local_stmts_multiline2Context): string {
-    const lines = ctx.local_stmt_multiline().map((s) => this.visit(s)).filter(Boolean);
-    return "{\n  " + lines.join("\n  ") + "\n}";
+  visitLocal_stmts_list(ctx: Local_stmts_listContext): string {
+    const stmts = ctx.local_stmt_multiline();
+    
+    const lines = stmts.map((stmt, index) => {
+        let js = this.visit(stmt);
+        
+        // If this is the LAST statement in the block
+        if (index === stmts.length - 1) {
+             // Check the content of the statement to see if it's an expression
+             // (We look at the first content item, assuming homogenous comma lists or valid single items)
+             const content = stmt.local_stmt_content(0);
+             if (content) {
+                 // Check if it is NOT a variable definition, assignment, or flow control
+                 const isExpression = 
+                    content.arith_expr() || 
+                    content.arith_exprs() || 
+                    (content as any).fun_call?.() || // Check if rule exists
+                    (content as any).if_expr?.() ||
+                    (content as any).for_expr?.();
+
+                 if (isExpression) {
+                     return "return " + js;
+                 }
+             }
+        }
+        return js;
+    });
+    return lines.join(";\n") + ";";
   }
 
   visitLocal_stmt_multiline(ctx: Local_stmt_multilineContext): string {
-    if (ctx.EMPTY_LINE()) return "";
+    // Grammar: local_stmt_content (COMMA local_stmt_content)*
     const parts = ctx.local_stmt_content().map((c) => this.visit(c));
-    return parts.filter(Boolean).join(" ") + ";";
+    return parts.join(", ");
   }
 
+  // --- Variables ---
   visitVar_def(ctx: Var_defContext): string {
     const name = this.visit(ctx.id());
     const value = this.visit(ctx.arith_expr());
@@ -212,6 +237,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return `[${exprs}]`;
   }
 
+  // --- Control Flow Expressions ---
   visitArith_expr(ctx: Arith_exprContext): string {
     if (ctx.ternary_expr()) return this.visit(ctx.ternary_expr()!);
     if (ctx.if_expr()) return this.visit(ctx.if_expr()!);
@@ -222,29 +248,42 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   visitIf_expr(ctx: If_exprContext): string {
     const cond = this.visit(ctx.ternary_expr());
     const thenBlock = this.visit(ctx.stmts_block(0));
+    
+    // Determine if it's an IIFE (expression) or Statement. 
+    // For simplicity in this visitor, we often emit IIFEs for everything in Pine.
+    // However, pure statements are cleaner. Let's assume IIFE for safety in 'expr' contexts.
+    
+    let result = `if (${cond}) ${thenBlock}`;
     if (ctx.IF_COND_ELSE()) {
       const elseBlock = this.visit(ctx.stmts_block(1));
-      return `if (${cond}) ${thenBlock} else ${elseBlock}`;
+      result += ` else ${elseBlock}`;
     }
-    return `if (${cond}) ${thenBlock}`;
+    
+    // To allow usage as expression: (() => { if... })()
+    return `(() => { ${result} })()`;
   }
 
   visitFor_expr(ctx: For_exprContext): string {
     const init = this.visit(ctx.var_def());
     const varName = this.visit(ctx.var_def().id());
-    const end = this.visit(ctx.ternary_expr(0));
+    const end = this.visit(ctx.ternary_expr(0)); // 'to' value
     const body = this.visit(ctx.stmts_block());
+    
+    let step = "1";
     if (ctx.FOR_STMT_BY()) {
-      const step = this.visit(ctx.ternary_expr(1));
-      return `for (${init}; ${varName} <= ${end}; ${varName} += ${step}) ${body}`;
+      step = this.visit(ctx.ternary_expr(1));
     }
-    return `for (${init}; ${varName} <= ${end}; ${varName}++) ${body}`;
+
+    const loop = `for (${init}; ${varName} <= ${end}; ${varName} += ${step}) ${body}`;
+    return `(() => { ${loop} })()`;
   }
 
   visitStmts_block(ctx: Stmts_blockContext): string {
+    // Reuses fun_body_multiline (which handles BEGIN/END -> { })
     return this.visit(ctx.fun_body_multiline());
   }
 
+  // --- Ternary & Math ---
   visitTernary_expr(ctx: Ternary_exprContext): string {
     const cond = this.visit(ctx.or_expr());
     if (ctx.ternary_expr2()) {
@@ -330,6 +369,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return base;
   }
 
+  // --- Atoms ---
   visitAtom(ctx: AtomContext): string {
     if (ctx.fun_call()) return this.visit(ctx.fun_call()!);
     if (ctx.id()) return this.visit(ctx.id()!);

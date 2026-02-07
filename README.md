@@ -59,17 +59,7 @@ npm run repl
 
 Example session:
 
-```
-OpenPineScript REPL (type .exit to quit)
-  Up/Down: history  |  Multi-line: continuation with indent
-
-> x = 1 + 2 * 3
-  → x=7
-> double(n) => n * 2
-> y = double(10)
-  → y=20
-> .exit
-```
+![OpenPineScript REPL](/images/repl-1.png)
 
 The REPL supports **Up/Down** for command history and **multi-line input** with a 4-space continuation prompt (Python-style) when the parser expects more input (e.g. unclosed brackets).
 

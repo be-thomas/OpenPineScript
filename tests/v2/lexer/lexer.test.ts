@@ -1,12 +1,14 @@
 /**
- * Lexer v2 tests using the ANTLR-generated PineScriptLexer.
+ * Lexer v2 tests using the PineScriptTokenSource (Smart Lexer).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { CharStreams, CommonTokenStream } from "antlr4ng";
-import { PineScriptLexer } from "../../../parser/v2/generated/PineScriptLexer";
+import { CharStreams, CommonTokenStream, Lexer } from "antlr4ng";
+import { PineScriptLexer } from "../../../parser/v2/generated/PineScriptLexer.js";
+// IMPORT YOUR SMART LEXER
+import { PineScriptTokenSource } from "../../../lexer/v2/PineScriptTokenSource.js"; 
 
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 
@@ -17,13 +19,19 @@ function loadFixture(name: string): string {
 
 function tokenize(source: string): { types: string[]; tokens: import("antlr4ng").Token[] } {
   const input = CharStreams.fromString(source);
-  const lexer = new PineScriptLexer(input);
-  const stream = new CommonTokenStream(lexer);
+  
+  // USE THE SMART LEXER, NOT THE RAW ONE
+  // This ensures LEND, BEGIN, and END are generated.
+  const lexer = new PineScriptTokenSource(input);
+  
+  const stream = new CommonTokenStream(lexer as unknown as Lexer);
   stream.fill();
   const tokens = stream.getTokens();
+  
   const types = tokens
     .filter((t) => t.type !== -1) // EOF
     .map((t) => lexer.vocabulary.getSymbolicName(t.type) ?? String(t.type));
+    
   return { types, tokens };
 }
 
@@ -33,7 +41,8 @@ function hasTokenTypes(types: string[], ...expected: string[]): boolean {
 }
 
 function hasTokenWithText(tokens: { text: string; type: number }[], typeId: number, text: string): boolean {
-  return tokens.some((t) => t.type === typeId && t.text === text);
+  // Safe navigation for text, as it might be undefined on some tokens
+  return tokens.some((t) => t.type === typeId && (t.text ?? "") === text);
 }
 
 describe("lexer v2 (ANTLR)", () => {
@@ -102,8 +111,8 @@ describe("lexer v2 (ANTLR)", () => {
     it("tokenizes multiline_indent.pine: LEND, LBEG", () => {
       const source = loadFixture("multiline_indent.pine");
       const { types } = tokenize(source);
-      assert.ok(hasTokenTypes(types, "LEND"));
-      // ANTLR lexer emits LBEG for leading spaces (or WS skipped)
+      // Now that we use TokenSource, this will pass!
+      assert.ok(hasTokenTypes(types, "LEND")); 
       assert.ok(types.includes("LEND"));
     });
   });
