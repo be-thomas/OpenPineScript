@@ -103,4 +103,4 @@ With no path, parses an inline example.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+GPL-3.0. See [LICENSE](LICENSE).
