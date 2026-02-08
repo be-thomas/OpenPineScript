@@ -101,3 +101,11 @@ OpenPineScript is built by a solo developer with a passion for craftsmanship.
 GNU GPL-3.0. Built for the community, owned by the community.
 
 ---
+
+<!---
+Primary Keywords: Pine Script Open Source, Pine Script Runtime, Pine Script Parser, Local Backtesting Engine.
+Secondary Keywords: TradingView Alternative, Pine Script to JavaScript, Open Source Financial Charts, ANTLR Pine Script, Algorithmic Trading Tools, Quant Trading.
+Tags: #pinescript #tradingview #backtesting #fintech #technicalanalysis #compiler #opensource #quant #algotrading #javascript
+Description: OpenPineScript is the leading open-source alternative for executing script logic locally. Built for speed, privacy, and high-performance technical analysis.
+--->
+
