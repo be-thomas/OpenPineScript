@@ -103,4 +103,20 @@ With no path, parses an inline example.
 
 ## License
 
-GPL-3.0. See [LICENSE](LICENSE).
+GNU GPL-3.0. See [LICENSE](LICENSE).
+
+
+## Contributing
+
+OpenchartingView is a solo pursuit of the 'Perfect Charting Engine.' To ensure the highest level of speed, security, and architectural consistency, I am currently the sole maintainer and contributor to the codebase.
+
+How you can help:
+
+Bug Reports: If the Pine v2/v3 parser trips up, I want to know exactly where.
+
+Feature Requests: Tell me what TradingView paywalls are bothering you most.
+
+Discussion: Join the community to talk about the best ways to optimize local execution.
+
+Note: I am not accepting Pull Requests at this time to keep the development cycle fast and the engine lean. If you find a bug, report it, and I’ll aim to ship a fix within 24 hours.
+
