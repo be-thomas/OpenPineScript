@@ -54,7 +54,7 @@ npm test
 ### Try the REPL
 
 ```bash
-npm run repl
+npm run replv2
 ```
 
 Example session:
@@ -66,7 +66,7 @@ The REPL supports **Up/Down** for command history and **multi-line input** with 
 To also print **lexer** and **parser** output for each line, use the `-v` flag:
 
 ```bash
-npm run repl -- -v
+npm run replv2 -- -v
 ```
 
 Example with verbose output:
@@ -76,7 +76,7 @@ OpenPineScript REPL (type .exit to quit) [verbose: lexer + parser]
 
 > a = 1
   [lexer] ID "a" DEFINE "=" INT_LITERAL "1" LEND "\n"
-  [parser] (tvscript (stmt (global_stmt_or_multistmt ... ) \n) <EOF>)
+  [parser] (opsv2_script (stmt (global_stmt_or_multistmt ... ) \n) <EOF>)
   → a=1
 > .exit
 ```

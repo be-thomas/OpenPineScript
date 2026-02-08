@@ -1,9 +1,16 @@
 import { CharStreams, CommonTokenStream, BaseErrorListener, RecognitionException, Recognizer } from "antlr4ng";
 import { PineScriptParser } from "./generated/PineScriptParser.js";
-import { PineScriptTokenSource } from "../../lexer/v2/PinescriptTokenSource.js";
+import { PineScriptTokenSource } from "../../lexer/v2/PineScriptTokenSource"; 
+
+
+export interface ParserError {
+    line: number;
+    column: number;
+    message: string;
+}
 
 class ErrorCollector extends BaseErrorListener<any> {
-    errors: string[] = [];
+    errors: ParserError[] = [];
     
     override syntaxError(
         recognizer: Recognizer<any>, 
@@ -11,21 +18,27 @@ class ErrorCollector extends BaseErrorListener<any> {
         line: number, 
         charPositionInLine: number, 
         msg: string, 
-        e: RecognitionException | null
+        e: RecognitionException | undefined
     ): void {
-        this.errors.push(`line ${line}:${charPositionInLine} ${msg}`);
+        this.errors.push({ 
+            line, 
+            column: charPositionInLine, 
+            message: msg 
+        });
     }
 }
 
 export function parse(source: string): {
-  tree: ReturnType<PineScriptParser["tvscript"]>;
+  tree: ReturnType<PineScriptParser["opsv2_script"]>; 
   errorCount: number;
-  firstError: string | null;
+  errors: ParserError[]; 
 } {
   const inputStream = CharStreams.fromString(source);
+  
+  // 3. USE YOUR CUSTOM TOKEN SOURCE (Instead of PineScriptLexer)
+  // This wraps the lexer and handles the indentation logic.
   const lexer = new PineScriptTokenSource(inputStream);
   
-  // Capture Lexer Errors
   lexer.removeErrorListeners();
   const lexerListener = new ErrorCollector();
   lexer.addErrorListener(lexerListener);
@@ -33,18 +46,19 @@ export function parse(source: string): {
   const tokenStream = new CommonTokenStream(lexer);
   const parser = new PineScriptParser(tokenStream);
 
-  // Capture Parser Errors
   parser.removeErrorListeners();
   const parserListener = new ErrorCollector();
   parser.addErrorListener(parserListener);
 
-  const tree = parser.tvscript();
+  // Execute Parse
+  const tree = parser.opsv2_script();
   
+  // Combine errors from both Lexer and Parser
   const allErrors = [...lexerListener.errors, ...parserListener.errors];
 
   return { 
       tree, 
       errorCount: allErrors.length,
-      firstError: allErrors.length > 0 ? allErrors[0] : null
+      errors: allErrors 
   };
 }

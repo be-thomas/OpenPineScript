@@ -1,0 +1,6 @@
+// Simple SMA Script
+len = 14
+src = close
+mySma = sma(src, len)
+
+plot(mySma)

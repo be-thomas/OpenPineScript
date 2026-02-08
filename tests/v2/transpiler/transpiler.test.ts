@@ -6,7 +6,7 @@ import assert from "node:assert";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import * as vm from "node:vm";
-import { transpile } from "../../../transpiler/v2/transpile";
+import { transpile } from "../../../transpiler/v2";
 
 /** Must match prefix in ToJsVisitor (opsv2_ = openpinescript v2). */
 const OPSV2 = "opsv2_";

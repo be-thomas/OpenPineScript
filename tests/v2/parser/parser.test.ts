@@ -6,7 +6,7 @@ import assert from "node:assert";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { PineScriptParser } from "../../../parser/v2/generated/PineScriptParser";
-import { parse } from "../../../parser/v2/parse";
+import { parse } from "../../../parser/v2";
 
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 

@@ -16,7 +16,7 @@ function parse(source: string) {
   const lexer = new PineScriptLexer(inputStream);
   const tokenStream = new CommonTokenStream(lexer);
   const parser = new PineScriptParser(tokenStream);
-  return parser.tvscript();
+  return parser.opsv2_script();
 }
 
 function main() {

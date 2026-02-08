@@ -8,6 +8,11 @@ tokens {
   LEND
 }
 
+// ----- Indentation / Line Structure -----
+// Matches ANY newline sequence + indentation spaces.
+// The TokenSource analyzes this to generate BEGIN/END/LEND.
+LBEG : ('\r'? '\n' | '\r')+ [ \t]* ;
+
 // ----- Keywords -----
 IF_COND     : 'if' ;
 IF_COND_ELSE: 'else' ;
@@ -44,10 +49,6 @@ RPAR        : ')' ;
 LSQBR       : '[' ;
 RSQBR       : ']' ;
 
-// ----- Indentation / Line Structure -----
-// Matches ANY newline sequence + indentation spaces.
-// The TokenSource analyzes this to generate BEGIN/END/LEND.
-LBEG : ('\r'? '\n' | '\r')+ [ \t]* ;
 
 // ----- Literals -----
 INT_LITERAL   : [0-9]+ ;
@@ -69,3 +70,5 @@ WS          : [ \t]+ -> skip ;
 // ----- Comments -----
 LINE_COMMENT  : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT : '/*' .*? '*/' -> skip ;
+
+DOT : '.' ;

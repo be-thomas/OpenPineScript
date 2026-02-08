@@ -2,7 +2,7 @@
 taken from: (tradingview)[https://www.tradingview.com/pine-script-docs/v3/appendix/pine-script-v2-lexer-grammar/]
 
 ```
-tvscript : ( stmt )+ ;
+opsv2_script : ( stmt )+ ;
 stmt : ( fun_def_stmt | global_stmt_or_multistmt );
 global_stmt_or_multistmt : ( BEGIN global_stmt_or_multistmt END | global_stmt_or_multistmt2 | EMPTY_LINE ->);
 global_stmt_or_multistmt2 : LBEG global_stmt_content ( COMMA global_stmt_content )* ( COMMA )? ( LEND | PLEND ) -> ( global_stmt_content )+ ;
@@ -50,6 +50,6 @@ literal : ( num_literal | other_literal );
 num_literal : ( INT_LITERAL | FLOAT_LITERAL );
 other_literal : ( STR_LITERAL | BOOL_LITERAL | COLOR_LITERAL );
 id returns [text] : ID ->;
-synpred1_TVScriptParserMain_v2 : IF_COND ternary_expr LEND stmts_block PLEND LBEG IF_COND_ELSE ;
-synpred2_TVScriptParserMain_v2 : FOR_STMT var_def FOR_STMT_TO ternary_expr FOR_STMT_BY ;
+synpred1_OPSV2ParserMain_v2 : IF_COND ternary_expr LEND stmts_block PLEND LBEG IF_COND_ELSE ;
+synpred2_OPSV2ParserMain_v2 : FOR_STMT var_def FOR_STMT_TO ternary_expr FOR_STMT_BY ;
 ```

@@ -5,7 +5,7 @@
 import { ParseTreeVisitor } from "antlr4ng";
 import type { TerminalNode } from "antlr4ng";
 import {
-  TvscriptContext,
+  Opsv2_scriptContext,
   StmtContext,
   Global_stmtContext,
   Global_stmt_contentContext,
@@ -68,7 +68,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   // --- Entry Point ---
-  visitTvscript(ctx: TvscriptContext): string {
+  visitOpsv2_script(ctx: Opsv2_scriptContext): string {
     // Visits all top-level statements
     const stmts = ctx.stmt().map((s) => this.visit(s)).filter(Boolean);
     return stmts.join("\n");
@@ -428,7 +428,14 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return text;
   }
 
-  visitId(ctx: IdContext): string {
-    return PREFIX + ctx.ID().getText();
+  visitId = (ctx: IdContext): string => {
+    // Input: "strategy.entry"
+    // Output: "opsv2_strategy.opsv2_entry"
+    // Input: "close"
+    // Output: "opsv2_close"
+    return ctx.getText()
+        .split('.')
+        .map(part => `opsv2_${part}`)
+        .join('.');
   }
 }

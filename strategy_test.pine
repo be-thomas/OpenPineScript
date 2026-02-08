@@ -1,0 +1,16 @@
+// Simple Moving Average Crossover Strategy
+len = 14
+src = close
+mySma = sma(src, len)
+
+plot(mySma, "SMA")
+
+// Logic
+longCondition = crossover(close, mySma)
+shortCondition = crossunder(close, mySma)
+
+if (longCondition)
+    strategy.entry("Long", strategy.long, 100)
+
+if (shortCondition)
+    strategy.close("Long")

@@ -6,8 +6,9 @@
     "postinstall": "npm run generate:parser",
     "build": "npm run generate:parser",
     "parse": "tsx parser/v2/run_antlr.ts",
-    "repl": "tsx repl/v2/index.ts",
-    "test": "node --import tsx --test tests/v2/lexer/lexer.test.ts tests/v2/parser/parser.test.ts tests/v2/transpiler/transpiler.test.ts"
+    "replv2": "tsx repl/v2/index.ts",
+    "opsv2": "tsx mock_run/v2/run.ts",
+    "test": "node --import tsx --test tests/v2/lexer/lexer.test.ts tests/v2/parser/parser.test.ts tests/v2/transpiler/transpiler.test.ts tests/v2/ta/ta.test.ts"
   },
   "dependencies": {
     "antlr4ng": "^1.0.0"
