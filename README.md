@@ -59,6 +59,10 @@ npm run replv2
 
 ```
 
+Example session:
+
+![OpenPineScript REPL](/images/repl-1.png)
+
 ---
 
 ## 🧪 Proven Accuracy
