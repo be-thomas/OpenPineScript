@@ -1,17 +1,12 @@
 /**
  * mock_run/v2/run.ts - CLI Runner for local CSV backtesting
- * Features:
- * - Detailed Syntax Error Logging
- * - Strategy Performance Report
- * - Plot Output
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { Context } from "../../runtime/v2/context";
 import { compile } from "../../runtime/v2"; 
-import { transpile } from "../../transpiler/v2";
+import { transpile } from "../../transpiler/v2/";
 
-// --- ANSI Colors for CLI output ---
 const C = {
     Cyan: "\x1b[36m",
     Gray: "\x1b[90m",
@@ -24,7 +19,6 @@ const C = {
 async function start() {
     const args = process.argv.slice(2);
     const showTranspiled = args.includes("--show-transpiled-code");
-    
     const scriptPath = args.find(arg => arg.endsWith(".pine"));
     const csvPath = args.find(arg => arg.endsWith(".csv"));
 
@@ -43,16 +37,13 @@ async function start() {
             jsCode = transpile(pineSource);
         } catch (e: any) {
             console.error(`${C.Red}Transpilation Failed:${C.Reset} ${e.message}`);
-            
-            // --- ERROR LOGGING UPGRADE ---
-            // Iterate over the specific syntax errors provided by the parser
+            // Re-integrated detailed syntax error logging
             if (e.errors && Array.isArray(e.errors)) {
-                console.log(`\n${C.Yellow}Syntax Errors Details:${C.Reset}`);
+                console.log(`\n${C.Yellow}Syntax Error Details:${C.Reset}`);
                 e.errors.forEach((err: any) => {
-                    // Handle ANTLR error format or custom format
                     const line = err.line || err.startLineNumber || "?";
                     const col = err.column || err.startColumn || "?";
-                    const msg = err.message || err.msg || "Unknown error";
+                    const msg = err.message || "Unknown error";
                     console.error(`  ${C.Red}[Line ${line}:${col}]${C.Reset} ${msg}`);
                 });
             }
@@ -60,21 +51,16 @@ async function start() {
         }
 
         if (showTranspiled) {
-            console.log(`\n${C.Gray}--- Transpiled JavaScript ---${C.Reset}`);
-            console.log(jsCode);
-            console.log(`${C.Gray}-----------------------------${C.Reset}\n`);
+            console.log(`\n${C.Gray}--- Transpiled JavaScript ---${C.Reset}\n${jsCode}\n${C.Gray}-----------------------------${C.Reset}\n`);
         }
 
         // 2. Load CSV
         const csvContent = fs.readFileSync(path.resolve(csvPath), "utf8").trim();
-        const lines = csvContent.split("\n");
-        const rows = lines.slice(1); 
+        const rows = csvContent.split("\n").slice(1); 
 
         // 3. Setup Runtime
         const ctx = new Context();
         const sandbox = { ctx }; 
-
-        console.log(`${C.Cyan}Initializing Sandbox...${C.Reset}`);
         const executeBar = compile(jsCode, ctx, sandbox);
 
         console.log(`${C.Cyan}Starting Backtest on ${rows.length} bars...${C.Reset}\n`);
@@ -84,72 +70,48 @@ async function start() {
             const cols = line.split(",");
             if (cols.length < 5) return;
 
-            // Update Market Data
             ctx.time   = new Date(cols[0]).getTime();
             ctx.open   = parseFloat(cols[1]);
             ctx.high   = parseFloat(cols[2]);
             ctx.low    = parseFloat(cols[3]);
             ctx.close  = parseFloat(cols[4]);
-            ctx.volume = parseFloat(cols[5]);
+            ctx.volume = parseFloat(cols[5]) || 0;
 
-            // Lifecycle
-            executeBar();       // Run Script
-            ctx.finalizeBar();  // Sync Plots & Trades
+            executeBar();
+            ctx.finalizeBar();
 
-            // Log Output (Every 100 bars)
+            // Periodic Log Output
             if (index % 100 === 0 || index === rows.length - 1) {
-                const plotSeries = ctx.plots.get("SMA"); // Look for "SMA" specifically since you named it
-                const val = plotSeries ? plotSeries[index] : NaN;
+                const plotOutputs: string[] = [];
                 
-                // Also check if we have a position
-                const pos = ctx.position.size !== 0 ? `Pos: ${ctx.position.size}` : "";
-
-                const plotStr = (Number.isNaN(val) || val === undefined)
-                    ? `${C.Gray}NaN${C.Reset}` 
-                    : `${C.Green}${val.toFixed(2)}${C.Reset}`;
-
+                for (const [title, series] of ctx.plots.entries()) {
+                    const dataPoint = series[index];
+                    if (dataPoint && dataPoint.value !== null && !Number.isNaN(dataPoint.value)) {
+                        const jsonStr = JSON.stringify(dataPoint, (k, v) => k === 'title' ? undefined : v);
+                        plotOutputs.push(`${C.Green}${title}${C.Reset}: ${jsonStr}`);
+                    } else {
+                        plotOutputs.push(`${C.Gray}${title}: ⏳ Warming Up (NaN)${C.Reset}`);
+                    }
+                }
+                
+                const plotString = plotOutputs.length > 0 ? `\n    ${plotOutputs.join("\n    ")}` : "";
+                const posSize = (ctx as any).strategy?.position_size ?? 0;
+                
                 console.log(
-                    `${C.Gray}[Bar ${index}]${C.Reset} ` +
-                    `Close: ${ctx.close.toFixed(2)} | ` +
-                    `SMA: ${plotStr} ${pos}`
+                    `${C.Gray}[Bar ${index.toString().padEnd(4)}]${C.Reset} ` +
+                    `Close: ${ctx.close.toFixed(2).padEnd(8)} ` +
+                    (posSize !== 0 ? `${C.Yellow}Pos: ${posSize}${C.Reset}` : "") + 
+                    `${plotString}` 
                 );
             }
         });
 
         console.log(`\n${C.Green}✔ Backtest Finished.${C.Reset}`);
 
-        // --- STRATEGY REPORT ---
-        if (ctx.trades && ctx.trades.length > 0) {
+        // 5. Strategy Summary (Optional re-addition)
+        if ((ctx as any).strategy?.trades?.length > 0) {
             console.log(`\n${C.Cyan}=== STRATEGY REPORT ===${C.Reset}`);
-            
-            let totalPnL = 0;
-            let wins = 0;
-            let losses = 0;
-
-            console.log(`${C.Gray}Type  | Price    | Qty | PnL${C.Reset}`);
-            console.log(`${C.Gray}--------------------------------${C.Reset}`);
-
-            ctx.trades.forEach(t => {
-                totalPnL += t.pnl;
-                t.pnl > 0 ? wins++ : losses++;
-
-                const pnlColor = t.pnl >= 0 ? C.Green : C.Red;
-                const typeStr = t.direction === "long" ? "LONG " : "SHORT";
-                
-                console.log(
-                    `${typeStr} | ` +
-                    `${t.entryPrice.toFixed(2).padEnd(8)} | ` +
-                    `${t.qty.toString().padEnd(3)} | ` +
-                    `${pnlColor}${t.pnl.toFixed(2)}${C.Reset}`
-                );
-            });
-
-            console.log(`\n${C.Cyan}=== PERFORMANCE ===${C.Reset}`);
-            console.log(`Net Profit:   $${totalPnL.toFixed(2)}`);
-            console.log(`Total Trades: ${ctx.trades.length}`);
             console.log(`Final Equity: $${ctx.cash.toFixed(2)}`);
-        } else {
-            console.log(`\n${C.Gray}No trades were executed.${C.Reset}`);
         }
 
     } catch (err: any) {

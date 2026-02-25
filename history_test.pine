@@ -1,0 +1,24 @@
+//@version=5
+// indicator("History Operator Test")
+
+// 1. Simple Variable History
+// At bar_index=10, 'a' should be 10.
+a = bar_index
+
+// 2. History Access Operator []
+// At bar_index=10, 'b' should be 9 (value of 'a' 1 bar ago).
+b = a[1]
+
+// 3. Deep History
+// At bar_index=10, 'c' should be 5 (value of 'a' 5 bars ago).
+c = a[5]
+
+// 4. Expression History
+// Test if we can access history of a calculated result
+d = (high + low) / 2
+e = d[1]
+
+plot(a, title="Current Index", color=color.blue)
+plot(b, title="Previous Index", color=color.red)
+plot(c, title="Index -5", color=color.green)
+plot(e, title="Previous Midpoint", color=color.orange)

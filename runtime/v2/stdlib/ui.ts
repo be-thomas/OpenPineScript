@@ -1,76 +1,142 @@
+/**
+ * runtime/v2/stdlib/ui.ts
+ * Implements "Full" Plotting Support (Colors, Styles, Shapes, Fills)
+ */
 import { Context } from "../context";
 
-/**
- * ui.ts - Open Pine Script v2 UI and Plotting Functions
- * Connects directly to the Context to store data series.
- */
-
 // --- Colors (Pine Script Standard) ---
-export const color_red = "#FF0000";
-export const color_green = "#00FF00";
-export const color_blue = "#0000FF";
-export const color_orange = "#FFA500";
-export const color_teal = "#008080";
-export const color_navy = "#000080";
-export const color_white = "#FFFFFF";
-export const color_black = "#000000";
-export const color_gray = "#808080";
+export const color_red    = "#FF5252";
+export const color_green  = "#4CAF50";
+export const color_blue   = "#2196F3";
+export const color_orange = "#FF9800";
+export const color_teal   = "#009688";
+export const color_navy   = "#3F51B5";
+export const color_white  = "#FFFFFF";
+export const color_black  = "#000000";
+export const color_gray   = "#9E9E9E";
+export const color_purple = "#9C27B0";
 
-// --- Inputs ---
-export function input(ctx: Context, defval: any, title?: string, type?: string, minval?: number, maxval?: number): any {
-    // In a real UI, this would read from a config object. 
-    // For the backtester, we simply return the default value.
-    return defval;
+// --- Inputs (Mock for now) ---
+export function input(ctx: Context, defval: any, title?: string): any {
+    // In a real UI, this would read from a config object.
+    return defval; 
 }
 
 // --- Outputs ---
 
-/**
- * Plots a series of data to the chart/context.
- */
-export function plot(ctx: Context, series: number, title: string = "Plot", color?: string, linewidth?: number, style?: any): void {
+export function plot(
+    ctx: Context, 
+    series: number, 
+    title: string = "Plot", 
+    color?: string, 
+    linewidth: number = 1, 
+    style?: number
+): string { 
     // Register the value to the Context's storage.
-    // The Context handles alignment, gaps, and synchronization.
-    ctx.registerPlot(series, title);
+    ctx.registerPlot(series, title, { 
+        color, 
+        linewidth, 
+        style, 
+        type: 'line' 
+    });
+    // Return the ID (title) so it can be used by fill()
+    return title; 
 }
 
-/**
- * Plots a shape (signal) on the chart.
- * For the CLI Backtester, we map:
- * - True/Truthy -> 1 (Signal)
- * - False/Falsy -> NaN (No Signal)
- */
-export function plotshape(ctx: Context, series: any, title: string = "Shape", style?: any, location?: any, color?: string): void {
-    const val = series ? 1 : NaN;
-    ctx.registerPlot(val, title);
+export function plotshape(
+    ctx: Context, 
+    series: boolean | number, 
+    title: string = "Shape", 
+    style?: string, 
+    location?: string, 
+    color?: string
+): void {
+    // 1. Convert to Number (Boolean true becomes 1, false becomes 0)
+    let val = Number(series);
+
+    // 2. Pine Rule: 0 means "False" (Don't Plot). 
+    // We convert 0 to NaN so the chart ignores it.
+    if (val === 0) {
+        val = NaN;
+    }
+
+    ctx.registerPlot(val, title, { 
+        color, 
+        style, 
+        type: 'shape' 
+    });
 }
 
-/**
- * Plots a character on the chart.
- */
-export function plotchar(ctx: Context, series: any, title: string = "Char", char?: string, location?: any, color?: string): void {
-    const val = series ? 1 : NaN;
-    ctx.registerPlot(val, title);
+export function plotchar(
+    ctx: Context, 
+    series: boolean | number, 
+    title: string = "Char", 
+    char: string = "★", 
+    location?: string, 
+    color?: string
+): void {
+    let val = Number(series);
+
+    // Same rule: 0 means don't plot.
+    if (val === 0) {
+        val = NaN;
+    }
+
+    ctx.registerPlot(val, title, { 
+        color, 
+        style: char, 
+        type: 'char' 
+    });
 }
 
-/**
- * Plots a horizontal line.
- * We register this as a constant series (repeats the value every bar).
- */
-export function hline(ctx: Context, price: number, title: string = "HLine", color?: string): void {
-    ctx.registerPlot(price, title);
+export function hline(
+    ctx: Context, 
+    price: number, 
+    title: string = "HLine", 
+    color?: string, 
+    linestyle?: number, 
+    linewidth?: number
+): string { 
+    // Treat hline as a constant plot.
+    // Note: In a real chart, hlines are often horizontal rays, 
+    // but plotting them as a line series works for the Backtester.
+    ctx.registerPlot(price, title, { 
+        color, 
+        linewidth, 
+        style: linestyle, 
+        type: 'line' 
+    });
+    return title; 
 }
 
-// --- Visual-Only Functions (No-Op for Data Backtester) ---
+// --- Visual Layers ---
 
 export function bgcolor(ctx: Context, color: string, transp?: number): void {
-    // Context doesn't support visual layers yet.
+    // We use a reserved prefix for background colors so they don't clash with user plots
+    // We plot '1' to indicate "Active" for this bar, with the specific color.
+    ctx.registerPlot(1, `_BGCOLOR_${color}`, { color, type: 'bar' }); 
 }
 
 export function barcolor(ctx: Context, color: string): void {
-    // Context doesn't support visual layers yet.
+    ctx.registerPlot(1, "_BARCOLOR_", { color, type: 'bar' });
 }
 
-export function fill(ctx: Context, plot1: any, plot2: any, color?: string): void {
-    // Context doesn't support visual layers yet.
+export function fill(
+    ctx: Context, 
+    plotId1: string, // Receives the ID string returned by plot()/hline()
+    plotId2: string, 
+    color?: string, 
+    title?: string, 
+    editable?: boolean, 
+    fillgaps?: boolean
+): void {
+    // Register the visual instruction to the context
+    // This tells the frontend: "Draw color between Line A and Line B"
+    ctx.registerFill(plotId1, plotId2, { color, title });
+}
+
+
+export const __CONTEXT_AWARE__: string[] = [];
+export const __SIGNATURES__: Record<string, string[]> = {
+    
 }

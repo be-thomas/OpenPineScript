@@ -1,65 +1,145 @@
-import { core } from "./core";
+import * as core from "./core";
+import time from "./time";
 import * as ta from "./ta";
-import { time } from "./time";
 import * as ui from "./ui";
+import color from "./color";
 import { Context } from "../context";
 import * as strategy from "./strategy";
 
+
+
+function build_signatures_and_context_awares() {
+  const __CONTEXT_AWARE__: string[] = [];
+  const __SIGNATURES__: Record<string, string[]> = {};
+
+  /**
+   * Helper to merge module metadata into the global registry.
+   * @param prefix The namespace prefix (e.g. "ta."). Empty string for globals.
+   * @param signatures The SIGNATURES export from the module.
+   * @param contextAware The CONTEXT_AWARE export from the module.
+   */
+  function register(name:string, signatures: Record<string, string[]> | undefined, contextAware: string[] | undefined) {
+      // 1. Merge Signatures
+      if (signatures) {
+          for (const [name, args] of Object.entries(signatures)) {
+              __SIGNATURES__[`${name}${name}`] = args;
+          }
+      }
+      // 2. Merge Context Flags
+      if (contextAware) {
+          for (const name of contextAware) {
+              __CONTEXT_AWARE__.push(`${name}${name}`);
+          }
+      }
+  }
+
+  register("", core.__SIGNATURES__, core.__CONTEXT_AWARE__);
+  register("", time.__SIGNATURES__, time.__CONTEXT_AWARE__);
+  register("", ui.__SIGNATURES__, ui.__CONTEXT_AWARE__);
+  register("", ta.__SIGNATURES__, ta.__CONTEXT_AWARE__);
+  register("strategy.", strategy.__SIGNATURES__, strategy.__CONTEXT_AWARE__);
+  return { __SIGNATURES__, __CONTEXT_AWARE__ };
+}
+
+export const { __SIGNATURES__, __CONTEXT_AWARE__ } = build_signatures_and_context_awares();
+
+
 export function createStdlib(ctx: Context) {
   return {
-    ...core,
-    ...time,
-    
-    // ui functions
-    "input": (defval: any, title?: string, type?: string, minval?: number, maxval?: number) => ui.input(ctx, defval, title, type, minval, maxval),
-    "plot": (series: number, title: string = "Plot", color?: string, linewidth?: number, style?: any) => ui.plot(ctx, series, title, color, linewidth, style),
-    "plotshape": (series: any, title: string = "Shape", style?: any, location?: any, color?: string) => ui.plotshape(ctx, series, title, style, location, color),
-    "plotchar": (series: any, title: string = "Char", char?: string, location?: any, color?: string) => ui.plotchar(ctx, series, title, char, location, color),
-    "hline": (price: number, title: string = "HLine", color?: string) => ui.hline(ctx, price, title, color),
-    "bgcolor": (color: string, transp?: number) => ui.bgcolor(ctx, color, transp),
-    "barcolor": (color: string) => ui.barcolor(ctx, color),
-    "fill": (plot1: any, plot2: any, color?: string) => ui.fill(ctx, plot1, plot2, color),
-    
-    // ta functions
-    "sma": (source: number, length: number) => ta.sma(ctx, source, length),
-    "ema": (source: number, length: number) => ta.ema(ctx, source, length),
-    "wma": (source: number, length: number) => ta.wma(ctx, source, length),
-    "vwma": (source: number, length: number) => ta.vwma(ctx, source, length),
-    "swma": (source: number) => ta.swma(ctx, source),
-    "rma": (source: number, length: number) => ta.rma(ctx, source, length),
-    "rsi": (x: number, y: number) => ta.rsi(ctx, x, y),
-    "macd": (source: number, fast: number, slow: number, signal: number) => ta.macd(ctx, source, fast, slow, signal),
-    "cci": (source: number, length: number) => ta.cci(ctx, source, length),
-    "mom": (source: number, length: number) => ta.mom(ctx, source, length),
-    "stoch": (source: number, high: number, low: number, length: number) => ta.stoch(ctx, source, high, low, length),
 
-    "trix": (source: number, length: number) => ta.trix(ctx, source, length),
-    "bb": (source: number, length: number, mult: number) => ta.bb(ctx, source, length, mult),
-    "cross": (x: number, y: number) => ta.cross(ctx, x, y),
-    "crossover": (x: number, y: number) => ta.crossover(ctx, x, y),
-    "crossunder": (x: number, y: number) => ta.crossunder(ctx, x, y),
-    "highest": (source: number, length: number) => ta.highest(ctx, source, length),
-    "lowest": (source: number, length: number) => ta.lowest(ctx, source, length),
-    "highestbars": (source: number, length: number) => ta.highestbars(ctx, source, length),
-    "lowestbars": (source: number, length: number) => ta.lowestbars(ctx, source, length),
+    // --- Core Functions ---
+    "na": core.na,
+    "nz": core.nz,
+    "iff": core.iff,
+    "tostring": core.tostring,
+    "abs": core.abs,
+    "acos": core.acos,
+    "asin": core.asin,
+    "atan": core.atan,
+    "ceil": core.ceil,
+    "cos": core.cos,
+    "exp": core.exp,
+    "floor": core.floor,
+    "log": core.log,
+    "log10": core.log10,
+    "max": core.max,
+    "min": core.min,
+    "pow": core.pow,
+    "round": core.round,
+    "sign": core.sign,
+    "sin": core.sin,
+    "sqrt": core.sqrt,
+    "tan": core.tan,
+    "avg": core.avg,
 
+    // --- Time Functions ---
+    "year": time.year,
+    "month": time.month,
+    "weekofyear": time.weekofyear,
+    "dayofmonth": time.dayofmonth,
+    "dayofweek": time.dayofweek,
+    "hour": time.hour,
+    "minute": time.minute,
+    "second": time.second,
+    "time": time.time,
+    
+    // --- UI Functions ---
+    // NO WRAPPERS! ctx.call will inject 'ctx' as the first argument automatically.
+    "input": ui.input,
+    "plot": ui.plot,
+    "plotshape": ui.plotshape,
+    "plotchar": ui.plotchar,
+    "hline": ui.hline,
+    "bgcolor": ui.bgcolor,
+    "barcolor": ui.barcolor,
+    "fill": ui.fill,
+    
+    // --- TA Functions ---
+    "sma": ta.sma,
+    "ema": ta.ema,
+    "wma": ta.wma,
+    "vwma": ta.vwma,
+    "swma": ta.swma,
+    "rma": ta.rma,
+    "rsi": ta.rsi,
+    "macd": ta.macd,
+    "cci": ta.cci,
+    "mom": ta.mom,
+    "stoch": ta.stoch,
+
+    "trix": ta.trix,
+    "bb": ta.bb,
+    "cross": ta.cross,
+    "crossover": ta.crossover,
+    "crossunder": ta.crossunder,
+    "highest": ta.highest,
+    "lowest": ta.lowest,
+    "highestbars": ta.highestbars,
+    "lowestbars": ta.lowestbars,
 
     // --- Strategy Namespace ---
     "strategy": {
-      "entry": (id: string, dir: string, qty: number) => strategy.entry(ctx, id, dir, qty),
-      "close": (id: string) => strategy.close(ctx, id),
-      "close_all": () => strategy.close_all(ctx),
+      "entry": strategy.entry,
+      "close": strategy.close,
+      "close_all": strategy.close_all,
       
-      // Constants
+      // Constants are fine (no function call involved)
       "long": strategy.direction.long,
       "short": strategy.direction.short,
       
-      // Helper to get current position size (for scripts)
-      "position_size": () => ctx.position.size,
-      "opentrades": () => ctx.position.size !== 0 ? 1 : 0,
-      "equity": () => ctx.cash + (ctx.position.size * (ctx.close - ctx.position.avgPrice)),
-    }
+      // Getters: These are called via ctx.call too, but since they ignore arguments
+      // and use the 'ctx' from the closure, they usually work fine. 
+      // Ideally, specific strategy functions should also be raw functions accepting (ctx),
+      // but keeping these as arrow functions is safe for simple getters.
+      "position_size": (/* ctx ignored */) => ctx.position.size,
+      "opentrades": (/* ctx ignored */) => ctx.position.size !== 0 ? 1 : 0,
+      "equity": (/* ctx ignored */) => ctx.cash + (ctx.position.size * (ctx.close - ctx.position.avgPrice)),
+    },
 
+    // -- Color --
+    "color": color,
   }
+
 };
+
 

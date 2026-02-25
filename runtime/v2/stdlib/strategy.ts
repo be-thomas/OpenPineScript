@@ -105,3 +105,8 @@ export function equity(ctx: Context): number {
     }
     return ctx.cash + unrealized;
 }
+
+export const __CONTEXT_AWARE__: string[] = [];
+export const __SIGNATURES__: Record<string, string[]> = {
+    
+}

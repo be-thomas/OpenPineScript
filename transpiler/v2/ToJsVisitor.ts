@@ -1,9 +1,10 @@
 /**
  * ANTLR parse-tree visitor that emits JavaScript.
+ * Target: OpenPineScript v2 Runtime (Series Object Architecture)
  */
 
 import { ParseTreeVisitor } from "antlr4ng";
-import type { TerminalNode } from "antlr4ng";
+import type { TerminalNode, ParserRuleContext } from "antlr4ng";
 import {
   Opsv2_scriptContext,
   StmtContext,
@@ -53,10 +54,15 @@ import {
   IdContext,
 } from "../../parser/v2/generated/PineScriptParser";
 
-/** Prefix for all emitted identifiers to avoid sandbox name clashes (openpinescript v2). */
-const PREFIX = "opsv2_";
-
 export class ToJsVisitor extends ParseTreeVisitor<string> {
+  // Prefix for all emitted identifiers to avoid sandbox name clashes
+  private readonly PREFIX = "opsv2_";
+
+  private readonly BUILT_INS = new Set([
+      "open", "high", "low", "close", "volume", "time", "bar_index", 
+      "na", "nz", "ta", "math", "strategy", "request", 'tostring'
+  ]);
+
   protected override defaultResult(): string {
     return "";
   }
@@ -67,9 +73,17 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return node.getText();
   }
 
+  /** * Helper: Generates a Deterministic ID based on Source Location.
+   * Example: "_L10_C5" (Line 10, Column 5)
+   */
+  private getLocId(ctx: ParserRuleContext): string {
+    const line = ctx.start?.line || 0;
+    const col = ctx.start?.column || 0;
+    return `@L${line}:C${col}`;
+  }
+
   // --- Entry Point ---
   visitOpsv2_script(ctx: Opsv2_scriptContext): string {
-    // Visits all top-level statements
     const stmts = ctx.stmt().map((s) => this.visit(s)).filter(Boolean);
     return stmts.join("\n");
   }
@@ -88,12 +102,9 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
 
   visitGlobal_stmt_content(ctx: Global_stmt_contentContext): string {
     const result = this.visitContent(ctx);
-    // Ensure we don't double-semicolon if the result handles it, 
-    // but usually in JS top-level, newlines are enough.
     return result + ";"; 
   }
 
-  // Helper to dispatch content visits (shared by global and local singleline)
   private visitContent(ctx: Global_stmt_contentContext | Local_stmt_contentContext): string {
     if (ctx.var_def()) return this.visit(ctx.var_def()!);
     if (ctx.var_defs()) return this.visit(ctx.var_defs()!);
@@ -101,11 +112,12 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     if (ctx.loop_break()) return this.visit(ctx.loop_break()!);
     if (ctx.loop_continue()) return this.visit(ctx.loop_continue()!);
     
-    // Some only exist in global or local, check existence:
+    // Check for expressions acting as statements
     if ((ctx as any).fun_call && (ctx as any).fun_call()) return this.visit((ctx as any).fun_call()!);
     if ((ctx as any).if_expr && (ctx as any).if_expr()) return this.visit((ctx as any).if_expr()!);
     if ((ctx as any).for_expr && (ctx as any).for_expr()) return this.visit((ctx as any).for_expr()!);
     if ((ctx as any).arith_expr && (ctx as any).arith_expr()) return this.visit((ctx as any).arith_expr()!);
+    // Added back as requested
     if ((ctx as any).arith_exprs && (ctx as any).arith_exprs()) return this.visit((ctx as any).arith_exprs()!);
     
     return "";
@@ -129,7 +141,6 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     const name = this.visit(ctx.id());
     const params = this.visit(ctx.fun_head());
     const body = this.visit(ctx.fun_body_multiline());
-    // Body already includes { } from visitLocal_stmts_multiline
     return `function ${name}${params} ${body}`;
   }
 
@@ -146,7 +157,6 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
 
   visitLocal_stmt_singleline(ctx: Local_stmt_singlelineContext): string {
     const contents = ctx.local_stmt_content().map((c) => this.visit(c));
-    // Single line function body usually returns the LAST expression
     return contents.join(", "); 
   }
 
@@ -162,13 +172,12 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return "continue";
   }
 
-  // --- Multiline Bodies (Blocks) ---
+  // --- Multiline Bodies ---
   visitFun_body_multiline(ctx: Fun_body_multilineContext): string {
     return this.visit(ctx.local_stmts_multiline());
   }
 
   visitLocal_stmts_multiline(ctx: Local_stmts_multilineContext): string {
-    // Grammar: BEGIN local_stmts_list END
     return "{\n" + this.visit(ctx.local_stmts_list()) + "\n}";
   }
 
@@ -178,17 +187,14 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     const lines = stmts.map((stmt, index) => {
         let js = this.visit(stmt);
         
-        // If this is the LAST statement in the block
+        // Return logic for last statement
         if (index === stmts.length - 1) {
-             // Check the content of the statement to see if it's an expression
-             // (We look at the first content item, assuming homogenous comma lists or valid single items)
              const content = stmt.local_stmt_content(0);
              if (content) {
-                 // Check if it is NOT a variable definition, assignment, or flow control
                  const isExpression = 
                     content.arith_expr() || 
                     content.arith_exprs() || 
-                    (content as any).fun_call?.() || // Check if rule exists
+                    (content as any).fun_call?.() || 
                     (content as any).if_expr?.() ||
                     (content as any).for_expr?.();
 
@@ -203,28 +209,41 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   visitLocal_stmt_multiline(ctx: Local_stmt_multilineContext): string {
-    // Grammar: local_stmt_content (COMMA local_stmt_content)*
     const parts = ctx.local_stmt_content().map((c) => this.visit(c));
     return parts.join(", ");
   }
 
-  // --- Variables ---
+  // --- Variables (Series Architecture) ---
+
+  // Handle: x = 1
   visitVar_def(ctx: Var_defContext): string {
     const name = this.visit(ctx.id());
     const value = this.visit(ctx.arith_expr());
-    return `let ${name} = ${value}`;
+    // Use 'let' to create a new variable in the current scope (Shadowing allowed)
+    return `let ${name} = ctx.new_var("${name}", ${value})`;
   }
 
+  // Handle: [a, b] = myFunc()
   visitVar_defs(ctx: Var_defsContext): string {
-    const ids = this.visit(ctx.ids_array());
+    const ids = ctx.ids_array().id().map(i => this.visit(i)); 
+    // JS: ["opsv2_a", "opsv2_b"]
+    const idsArrayJs = `[${ids.join(", ")}]`; 
+    // Strings: ["opsv2_a", "opsv2_b"] (For Context Keys)
+    const idsStringsJs = `[${ids.map(id => `"${id}"`).join(", ")}]`;
+    
     const value = this.visit(ctx.arith_expr());
-    return `let ${ids} = ${value}`;
+
+    // Use 'let' for tuple declaration
+    return `let ${idsArrayJs} = ctx.new_vars(${idsStringsJs}, ${value})`;
   }
 
+  // Handle: x := 1
   visitVar_assign(ctx: Var_assignContext): string {
     const name = this.visit(ctx.id());
     const value = this.visit(ctx.arith_expr());
-    return `${name} = ${value}`;
+    // No 'let'. Updates the existing variable in the parent scope.
+    // Note: ctx.new_var updates the internal Series and returns it.
+    return `${name} = ctx.new_var("${name}", ${value})`;
   }
 
   visitIds_array(ctx: Ids_arrayContext): string {
@@ -237,7 +256,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return `[${exprs}]`;
   }
 
-  // --- Control Flow Expressions ---
+  // --- Expressions ---
   visitArith_expr(ctx: Arith_exprContext): string {
     if (ctx.ternary_expr()) return this.visit(ctx.ternary_expr()!);
     if (ctx.if_expr()) return this.visit(ctx.if_expr()!);
@@ -248,42 +267,34 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   visitIf_expr(ctx: If_exprContext): string {
     const cond = this.visit(ctx.ternary_expr());
     const thenBlock = this.visit(ctx.stmts_block(0));
-    
-    // Determine if it's an IIFE (expression) or Statement. 
-    // For simplicity in this visitor, we often emit IIFEs for everything in Pine.
-    // However, pure statements are cleaner. Let's assume IIFE for safety in 'expr' contexts.
-    
     let result = `if (${cond}) ${thenBlock}`;
     if (ctx.IF_COND_ELSE()) {
       const elseBlock = this.visit(ctx.stmts_block(1));
       result += ` else ${elseBlock}`;
     }
-    
-    // To allow usage as expression: (() => { if... })()
     return `(() => { ${result} })()`;
   }
 
   visitFor_expr(ctx: For_exprContext): string {
-    const init = this.visit(ctx.var_def());
+    const init = this.visit(ctx.var_def()); // "let opsv2_i = ctx.new_var..."
     const varName = this.visit(ctx.var_def().id());
-    const end = this.visit(ctx.ternary_expr(0)); // 'to' value
+    const end = this.visit(ctx.ternary_expr(0));
     const body = this.visit(ctx.stmts_block());
-    
     let step = "1";
     if (ctx.FOR_STMT_BY()) {
       step = this.visit(ctx.ternary_expr(1));
     }
-
-    const loop = `for (${init}; ${varName} <= ${end}; ${varName} += ${step}) ${body}`;
+    
+    // Loop variable MUST be a series to persist/update correctly
+    const loop = `for (${init}; ${varName} <= ${end}; ${varName} = ctx.new_var("${varName}", ${varName} + ${step})) ${body}`;
     return `(() => { ${loop} })()`;
   }
 
   visitStmts_block(ctx: Stmts_blockContext): string {
-    // Reuses fun_body_multiline (which handles BEGIN/END -> { })
     return this.visit(ctx.fun_body_multiline());
   }
 
-  // --- Ternary & Math ---
+  // --- Math ---
   visitTernary_expr(ctx: Ternary_exprContext): string {
     const cond = this.visit(ctx.or_expr());
     if (ctx.ternary_expr2()) {
@@ -360,11 +371,18 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return inner;
   }
 
+  // --- Series Access with ID Tagging ---
   visitSqbr_expr(ctx: Sqbr_exprContext): string {
     const base = this.visit(ctx.atom());
     const idxExpr = ctx.arith_expr(0);
+
     if (idxExpr) {
-      return `${base}[${this.visit(idxExpr)}]`;
+      const index = this.visit(idxExpr);
+      // Generate ID Tag: e.g. "opsv2_close_L10_C4"
+      const locId = `${base}${this.getLocId(ctx)}`; 
+      
+      // Emit: ctx.get(base, index, "TAG")
+      return `ctx.get(${base}, ${index}, "${locId}")`;
     }
     return base;
   }
@@ -378,10 +396,32 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return "";
   }
 
+  // --- Function Calls with ID Tagging ---
   visitFun_call(ctx: Fun_callContext): string {
-    const name = this.visit(ctx.id());
-    const args = ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
-    return `${name}(${args})`;
+    const originalName = ctx.id().getText(); 
+    const transpiledName = this.visit(ctx.id());
+    let args = ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
+    
+    // 1. Identify context-aware built-ins
+    const needsCtx = 
+        ["plot", "plotshape", "plotchar", "hline", "bgcolor", "barcolor", "fill", "input"].includes(originalName) ||
+        originalName.startsWith("ta.") ||
+        originalName.startsWith("strategy.") ||
+        originalName.startsWith("request.");
+
+    // 2. Build the parameter string for the target function
+    if (needsCtx) {
+        args = args ? `ctx, ${args}` : "ctx";
+    }
+    
+    // 3. Generate Deterministic ID
+    const callId = `"${originalName}${this.getLocId(ctx)}"`;
+
+    // 4. Construct the ctx.call wrapper
+    // We only add the comma after transpiledName if there are actually arguments to pass.
+    const finalArgsPart = args ? `, ${args}` : "";
+
+    return `ctx.call(${callId}, ${transpiledName}${finalArgsPart})`;
   }
 
   visitFun_actual_args(ctx: Fun_actual_argsContext): string {
@@ -429,13 +469,28 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   visitId = (ctx: IdContext): string => {
-    // Input: "strategy.entry"
-    // Output: "opsv2_strategy.opsv2_entry"
-    // Input: "close"
-    // Output: "opsv2_close"
-    return ctx.getText()
-        .split('.')
-        .map(part => `opsv2_${part}`)
-        .join('.');
+    const text = ctx.getText();
+    
+    // 1. Handle Dot Notation (e.g. "ta.sma")
+    if (text.includes('.')) {
+        const parts = text.split('.');
+        const transformed = parts.map(p => `${this.PREFIX}${p}`).join('.');
+        
+        // If the namespace (e.g. "ta") is a built-in, prefix with "ctx."
+        if (this.BUILT_INS.has(parts[0])) {
+             return `ctx.${transformed}`;
+        }
+        return transformed;
+    }
+
+    // 2. Handle Simple IDs (e.g. "close", "bar_index")
+    // If it's a known built-in, it lives on Context.
+    if (this.BUILT_INS.has(text)) {
+        return `ctx.${this.PREFIX}${text}`;
+    }
+    
+    // 3. Default: User Variable (Local Scope)
+    // e.g. "a" -> "opsv2_a" (matches "let opsv2_a = ...")
+    return `${this.PREFIX}${text}`;
   }
 }

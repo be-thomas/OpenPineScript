@@ -17,3 +17,4 @@ export function transpile(source: string): string {
   const visitor = new ToJsVisitor();
   return visitor.visit(tree);
 }
+
