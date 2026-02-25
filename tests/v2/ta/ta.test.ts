@@ -60,13 +60,13 @@ function runStressTest(mode: "STABLE" | "INCREASING" | "DECREASING" | "OSCILLATI
         // We must call ctx.reset() before calling functions for this bar!
         ctx.reset(); 
 
-        const resSMA = ta.sma(ctx, ctx.close, len);
-        const resWMA = ta.wma(ctx, ctx.close, len);
-        const resBB = ta.bb(ctx, ctx.close, len, 2.0);
-        const resHigh = ta.highest(ctx, ctx.close, len);
-        const resLow = ta.lowest(ctx, ctx.close, len);
-        const resHighBar = ta.highestbars(ctx, ctx.close, len);
-        const resLowBar = ta.lowestbars(ctx, ctx.close, len);
+        const resSMA = ctx.call("ta.sma@test", ta.sma, ctx, ctx.close, len);
+        const resWMA = ctx.call("ta.wma@test", ta.wma, ctx, ctx.close, len);
+        const resBB = ctx.call("ta.bb@test", ta.bb, ctx, ctx.close, len, 2.0);
+        const resHigh = ctx.call("ta.highest@test", ta.highest, ctx, ctx.close, len);
+        const resLow = ctx.call("ta.lowest@test", ta.lowest, ctx, ctx.close, len);
+        const resHighBar = ctx.call("ta.highestbars@test", ta.highestbars, ctx, ctx.close, len);
+        const resLowBar = ctx.call("ta.lowestbars@test", ta.lowestbars, ctx, ctx.close, len);
 
         // 4. EXECUTE NAIVE
         const refSMA = naive.sma(len);
