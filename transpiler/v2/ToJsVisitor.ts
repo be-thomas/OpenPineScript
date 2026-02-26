@@ -324,7 +324,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      const op = ctx.EQ(i - 1) ? "===" : "!==";
+      const op = ctx.EQ(i - 1) ? "==" : "!=";
       out = `(${out} ${op} ${parts[i]})`;
     }
     return out;

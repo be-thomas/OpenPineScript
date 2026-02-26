@@ -169,22 +169,15 @@ export class Context {
             this.vars.set(name, series);
         }
 
-        // FIX: Check if 'val' is a Series Object (Duck Typing)
-        // If so, grab its current value (.value property or valueOf() result)
-        // We assume your Series class has a .value property for the current bar.
-        // If not, we rely on standard JS conversion or we need to add a check.
-        
-        let numericVal: number;
+        let resolvedVal: any;
         
         if (val && typeof val.get === 'function' && typeof val.valueOf === 'function') {
-             // It's a Series! Get the primitive value.
-             numericVal = val.valueOf();
+             resolvedVal = val.valueOf();
         } else {
-             // It's a number (or NaN)
-             numericVal = Number(val);
+             resolvedVal = val;
         }
 
-        return series.update(numericVal);
+        return series.update(resolvedVal);
     }
 
     /**

@@ -138,7 +138,6 @@ describe("parser v2 (ANTLR)", () => {
 
     it("parses break_continue.pine", () => {
       const { tree, errorCount } = parse(loadFixture("break_continue.pine"));
-      console.error("tree: ", tree);
       assert.ok(tree);
       assert.strictEqual(errorCount, 0);
     });
