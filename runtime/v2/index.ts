@@ -49,6 +49,27 @@ function isPlainObject(val: any) {
  * 2. Wraps the User Code in a Function
  * 3. Returns an Executor Function
  */
+/**
+ * One-shot execute: injects stdlib then runs code directly in the sandbox
+ * (no function wrapper). Variables persist on the sandbox across calls.
+ * Used by the REPL.
+ */
+export function run(jsCode: string, ctx: Context, sandbox: any): any {
+    if (!sandbox.__opsv2_initialized) {
+        sandbox.ctx = ctx;
+        const lib = createStdlib(ctx);
+        injectStdlib(sandbox, lib, PREFIX);
+        Object.defineProperty(sandbox, '__opsv2_initialized', {
+            value: true, writable: true, enumerable: false
+        });
+    }
+
+    ctx.reset();
+
+    const vmContext = vm.isContext(sandbox) ? sandbox : vm.createContext(sandbox);
+    return vm.runInContext(jsCode, vmContext);
+}
+
 export function compile(jsCode: string, ctx: Context, sandbox: any) {
   
     // 1. ONE-TIME INITIALIZATION (Standard Library Injection)

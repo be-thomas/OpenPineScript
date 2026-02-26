@@ -110,7 +110,10 @@ function main(): void {
                           
                           // FIX: Use runInContext to get the value of 'let' variables
                           try {
-                              const val = vm.runInContext(internalName, sandboxContext);
+                              let val = vm.runInContext(internalName, sandboxContext);
+                              if (val && typeof val === 'object' && typeof val.valueOf === 'function') {
+                                  val = val.valueOf();
+                              }
                               outputResult = `${name}=${JSON.stringify(val)}`;
                           } catch (e) {
                               // Fallback if variable wasn't actually created
