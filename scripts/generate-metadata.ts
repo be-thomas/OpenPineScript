@@ -2,6 +2,28 @@ import { Project, Node, SyntaxKind } from "ts-morph";
 import * as fs from "fs";
 import * as path from "path";
 
+/**
+ * Helper: Parses the @returns JSDoc string into a structured PineType object.
+ */
+function parseReturnType(raw: string): any {
+    const text = raw.trim();
+    // Handle Tuples: [float, float]
+    if (text.startsWith("[") && text.endsWith("]")) {
+        const inner = text.slice(1, -1);
+        const parts = inner.split(",").map(p => p.trim());
+        return {
+            kind: "tuple",
+            itemTypes: parts.map(p => ({ kind: "series", type: p }))
+        };
+    }
+    // Handle Series
+    if (text.startsWith("series")) {
+        return { kind: "series", type: text.replace("series", "").trim() || "any" };
+    }
+    // Default to Scalar
+    return { kind: "scalar", type: text || "any" };
+}
+
 function generateConfig(stdlibPath: string) {
     const project = new Project({ compilerOptions: { allowJs: true } });
     const absolutePath = path.resolve(stdlibPath);
@@ -23,14 +45,12 @@ function generateConfig(stdlibPath: string) {
 
         const ext = path.extname(file);
         const moduleName = path.basename(file, ext);
-        
         imports.push(`import * as ${moduleName} from "./${moduleName}";`);
         
-        // PURE ARCHITECTURE: It only namespaces if YOU tell it to.
         const hasNamespaceFlag = sourceFile.getVariableDeclaration("__IS_NAMESPACE__")?.isExported();
         const prefix = hasNamespaceFlag ? `${moduleName}.` : "";
 
-        // --- 1. Standard Functions ---
+        // --- PHASE 1: Standard Functions ---
         sourceFile.getFunctions().forEach(fn => {
             if (!fn.isExported()) return;
 
@@ -41,27 +61,31 @@ function generateConfig(stdlibPath: string) {
             const isContextAware = params[0] === "ctx";
             const args = isContextAware ? params.slice(1) : params;
             
-            const isGetter = fn.getJsDocs().some(doc => 
+            const jsDocs = fn.getJsDocs();
+            const isGetter = jsDocs.some(doc => 
                 doc.getTags().some(tag => tag.getTagName() === "getter")
             );
+
+            // Extract @returns
+            const returnsTag = jsDocs.flatMap(d => d.getTags()).find(t => t.getTagName() === "returns");
+            const returnsObj = parseReturnType(returnsTag ? returnsTag.getCommentText()?.trim() || "any" : "any");
 
             registryEntries.push(`      "${fullKey}": {`);
             registryEntries.push(`          uses_context: ${isContextAware},`);
             registryEntries.push(`          args: ${JSON.stringify(args)},`);
             registryEntries.push(`          is_getter: ${isGetter},`);
+            registryEntries.push(`          returns: ${JSON.stringify(returnsObj)},`);
             registryEntries.push(`          is_value: false,`);
             registryEntries.push(`          ref: ${moduleName}.${funcName}`);
             registryEntries.push(`      },`);
         });
 
-        // --- 2. Object Literals ---
+        // --- PHASE 2: Object Literals (e.g., color.red) ---
         sourceFile.getVariableDeclarations().forEach(varDecl => {
             const init = varDecl.getInitializer();
-            
             if (init && Node.isObjectLiteralExpression(init)) {
                 const isDefault = sourceFile.getStatementByKind(SyntaxKind.ExportAssignment)?.getExpression().getText() === varDecl.getName();
                 const isExported = varDecl.isExported() || isDefault;
-
                 if (!isExported) return;
 
                 const varName = varDecl.getName();
@@ -70,8 +94,6 @@ function generateConfig(stdlibPath: string) {
                 init.getProperties().forEach(prop => {
                     if (Node.isPropertyAssignment(prop)) {
                         const propName = prop.getName().replace(/['"]/g, '');
-                        
-                        // FIX: Ignore internal namespace flag if it's inside an object
                         if (propName === "__IS_NAMESPACE__") return; 
 
                         const fullKey = `${prefix}${propName}`;
@@ -89,10 +111,15 @@ function generateConfig(stdlibPath: string) {
                             args = isContextAware ? params.slice(1) : params;
                         }
 
+                        // Determine return type for values
+                        const type = moduleName === 'color' ? 'color' : 'any';
+                        const returnsObj = { kind: "scalar", type };
+
                         registryEntries.push(`      "${fullKey}": {`);
                         registryEntries.push(`          uses_context: ${isContextAware},`);
                         registryEntries.push(`          args: ${JSON.stringify(args)},`);
                         registryEntries.push(`          is_getter: ${isGetter},`); 
+                        registryEntries.push(`          returns: ${JSON.stringify(returnsObj)},`);
                         registryEntries.push(`          is_value: ${isValue},`);
                         registryEntries.push(`          ref: ${accessorBase}["${propName}"]`);
                         registryEntries.push(`      },`);
@@ -101,27 +128,27 @@ function generateConfig(stdlibPath: string) {
             }
         });
 
-        // --- 3. Flat Exported Constants (e.g., export const red = "#FF5252") ---
+        // --- PHASE 3: Flat Exported Constants (e.g., export const red = "#FF5252") ---
         sourceFile.getVariableDeclarations().forEach(varDecl => {
             if (!varDecl.isExported()) return;
 
             const init = varDecl.getInitializer();
-            
             if (init && (Node.isObjectLiteralExpression(init) || Node.isArrowFunction(init) || Node.isFunctionExpression(init))) {
                 return; 
             }
 
             const varName = varDecl.getName();
-            
-            // FIX: Ignore internal namespace flag if it's exported flat
             if (varName === "__IS_NAMESPACE__") return; 
 
             const fullKey = `${prefix}${varName}`;
+            const type = moduleName === 'color' ? 'color' : 'any';
+            const returnsObj = { kind: "scalar", type };
 
             registryEntries.push(`      "${fullKey}": {`);
             registryEntries.push(`          uses_context: false,`);
             registryEntries.push(`          args: [],`);
             registryEntries.push(`          is_getter: false,`); 
+            registryEntries.push(`          returns: ${JSON.stringify(returnsObj)},`);
             registryEntries.push(`          is_value: true,`); 
             registryEntries.push(`          ref: ${moduleName}.${varName}`);
             registryEntries.push(`      },`);
@@ -131,10 +158,17 @@ function generateConfig(stdlibPath: string) {
     const content = `// This file is AUTO-GENERATED. Do not edit manually.
 ${imports.join("\n")}
 
+export interface PineType {
+    kind: "scalar" | "series" | "tuple";
+    type?: string;
+    itemTypes?: PineType[];
+}
+
 export interface StdlibEntry {
     uses_context: boolean;
     args: string[];
     is_getter: boolean;
+    returns: PineType;
     is_value: boolean;
     ref: any;
 }
@@ -148,7 +182,7 @@ ${registryEntries.join("\n")}
 
     const outputFile = path.join(absolutePath, "metadata.ts");
     fs.writeFileSync(outputFile, content);
-    console.log(`✅ Registry generated at: ${outputFile}`);
+    console.log(`✅ Registry generated with structured types at: ${outputFile}`);
 }
 
 generateConfig("./runtime/v2/stdlib");

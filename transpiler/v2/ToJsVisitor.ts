@@ -132,6 +132,13 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   visitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
     const name = this.visit(ctx.id());
     const params = this.visit(ctx.fun_head());
+
+    // V2 Constraint: Check if returning a tuple [x, y]
+    const content = ctx.fun_body_singleline().local_stmt_singleline().local_stmt_content(0);
+    if (content?.arith_exprs()) {
+        throw new Error(`Syntax Error at ${this.getLocId(ctx)}: User-defined functions cannot return tuples in Pine Script v2.`);
+    }
+
     const body = this.visit(ctx.fun_body_singleline());
     return `function ${name}${params} {\n  return ${body};\n}`;
   }
@@ -139,6 +146,14 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
     const name = this.visit(ctx.id());
     const params = this.visit(ctx.fun_head());
+
+    // V2 Constraint: Check last statement of multiline block for tuple return
+    const stmts = ctx.fun_body_multiline().local_stmts_multiline().local_stmts_list().local_stmt_multiline();
+    const lastContent = stmts[stmts.length - 1]?.local_stmt_content(0);
+    if (lastContent?.arith_exprs()) {
+        throw new Error(`Syntax Error at ${this.getLocId(ctx)}: User-defined functions cannot return tuples in Pine Script v2.`);
+    }
+
     const body = this.visit(ctx.fun_body_multiline());
     return `function ${name}${params} ${body}`;
   }
@@ -225,14 +240,50 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   // Handle: [a, b] = myFunc()
   visitVar_defs(ctx: Var_defsContext): string {
     const ids = ctx.ids_array().id().map(i => this.visit(i)); 
-    // JS: ["opsv2_a", "opsv2_b"]
-    const idsArrayJs = `[${ids.join(", ")}]`; 
-    // Strings: ["opsv2_a", "opsv2_b"] (For Context Keys)
-    const idsStringsJs = `[${ids.map(id => `"${id}"`).join(", ")}]`;
     
+    // V2 Constraint: Multi-variable assignment MUST originate from an authorized built-in tuple return
+    const arith = ctx.arith_expr();
+    
+    // Recursive helper to find the first fun_call in an expression tree
+    const findFunCall = (node: any): Fun_callContext | null => {
+        if (!node) return null;
+        if (node instanceof Fun_callContext) return node;
+        if (node.children) {
+            for (const child of node.children) {
+                const found = findFunCall(child);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+
+    const funCall = findFunCall(arith);
+    
+    if (funCall) {
+        const funcName = funCall.id().getText();
+        const entry = REGISTRY[funcName];
+
+        // If it's a built-in, check the registry for tuple return
+        if (entry) {
+            if (entry.returns.kind !== "tuple") {
+                throw new Error(`Pine Script v2 Error at ${this.getLocId(ctx)}: '${funcName}' does not return a tuple. Multi-variable assignment is only allowed for specific built-in functions.`);
+            }
+            if (entry.returns.itemTypes && entry.returns.itemTypes.length !== ids.length) {
+                throw new Error(`Type Error at ${this.getLocId(ctx)}: '${funcName}' returns ${entry.returns.itemTypes.length} values, but you provided ${ids.length} variables.`);
+            }
+        } 
+        // If it's not in registry, it's a user-defined function (Forbidden in v2)
+        else {
+            throw new Error(`Pine Script v2 Error at ${this.getLocId(ctx)}: User-defined functions cannot return tuples. Multi-variable assignment is only allowed for specific built-in functions.`);
+        }
+    } else {
+        throw new Error(`Syntax Error at ${this.getLocId(ctx)}: Multi-variable assignment in v2 must originate directly from a supported built-in function call.`);
+    }
+
+    const idsArrayJs = `[${ids.join(", ")}]`; 
+    const idsStringsJs = `[${ids.map(id => `"${id}"`).join(", ")}]`;
     const value = this.visit(ctx.arith_expr());
 
-    // Use 'let' for tuple declaration
     return `let ${idsArrayJs} = ctx.new_vars(${idsStringsJs}, ${value})`;
   }
 

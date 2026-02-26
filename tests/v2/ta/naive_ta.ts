@@ -81,30 +81,36 @@ export class NaiveTA {
         return Math.min(...slice);
     }
     
-    // Returns OFFSET (0-based from current)
+    // Returns OFFSET (negative value representing bars back from current)
     highestbars(length: number): number {
-        const slice = this.getSlice(length);
-        if (slice.length < length) return NaN;
-        let max = -Infinity;
-        let maxIdx = -1;
-        // Search backwards to match Pine
-        for(let i=slice.length-1; i>=0; i--) {
-            if (slice[i] > max) { max = slice[i]; maxIdx = i; }
+        if (this.history.length < length) return NaN;
+        const startIdx = this.history.length - length;
+        let maxVal = -Infinity;
+        let maxAt = -1;
+
+        // Search the window [history.length - length ... history.length - 1]
+        for (let i = this.history.length - 1; i >= startIdx; i--) {
+            if (this.history[i] > maxVal) {
+                maxVal = this.history[i];
+                maxAt = i;
+            }
         }
-        // slice[slice.length-1] is current (offset 0)
-        // maxIdx is index within slice.
-        // offset = maxIdx - (length - 1)
-        return maxIdx - (length - 1);
+        // Offset is: index found - current index (always 0 or negative)
+        return maxAt - (this.history.length - 1);
     }
 
     lowestbars(length: number): number {
-        const slice = this.getSlice(length);
-        if (slice.length < length) return NaN;
-        let min = Infinity;
-        let minIdx = -1;
-        for(let i=slice.length-1; i>=0; i--) {
-            if (slice[i] < min) { min = slice[i]; minIdx = i; }
+        if (this.history.length < length) return NaN;
+        const startIdx = this.history.length - length;
+        let minVal = Infinity;
+        let minAt = -1;
+
+        for (let i = this.history.length - 1; i >= startIdx; i--) {
+            if (this.history[i] < minVal) {
+                minVal = this.history[i];
+                minAt = i;
+            }
         }
-        return minIdx - (length - 1);
+        return minAt - (this.history.length - 1);
     }
 }

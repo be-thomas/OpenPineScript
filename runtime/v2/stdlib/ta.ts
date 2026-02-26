@@ -29,6 +29,10 @@ interface CrossState { prevX: number; prevY: number; }
 
 // --- Moving Averages ---
 
+/**
+ * Simple Moving Average
+ * @returns series float
+ */
 export function sma(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = Math.floor(val(lengthInput));
@@ -76,6 +80,10 @@ export function sma(ctx: Context, sourceInput: any, lengthInput: any): number {
     return state.sum / length;
 }
 
+/**
+ * Exponential Moving Average
+ * @returns series float
+ */
 export function ema(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
@@ -92,6 +100,10 @@ export function ema(ctx: Context, sourceInput: any, lengthInput: any): number {
     return currentEma;
 }
 
+/**
+ * Rolling Moving Average (Used in RSI)
+ * @returns series float
+ */
 export function rma(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
@@ -103,6 +115,10 @@ export function rma(ctx: Context, sourceInput: any, lengthInput: any): number {
     return currentRma;
 }
 
+/**
+ * Weighted Moving Average
+ * @returns series float
+ */
 export function wma(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = Math.floor(val(lengthInput));
@@ -152,6 +168,10 @@ export function wma(ctx: Context, sourceInput: any, lengthInput: any): number {
     return state.numerator / (length * (length + 1) / 2);
 }
 
+/**
+ * Volume Weighted Moving Average
+ * @returns series float
+ */
 export function vwma(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
@@ -160,6 +180,10 @@ export function vwma(ctx: Context, sourceInput: any, lengthInput: any): number {
     return num / denom;
 }
 
+/**
+ * Symmetrically Weighted Moving Average
+ * @returns series float
+ */
 export function swma(ctx: Context, sourceInput: any): number {
     const source = val(sourceInput);
     const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
@@ -169,6 +193,10 @@ export function swma(ctx: Context, sourceInput: any): number {
     return (state.buffer[0] * 1 + state.buffer[1] * 2 + state.buffer[2] * 2 + state.buffer[3] * 1) / 6;
 }
 
+/**
+ * TRIX Oscillator
+ * @returns series float
+ */
 export function trix(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
@@ -184,6 +212,10 @@ export function trix(ctx: Context, sourceInput: any, lengthInput: any): number {
 
 // --- Oscillators ---
 
+/**
+ * Relative Strength Index
+ * @returns series float
+ */
 export function rsi(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
@@ -201,6 +233,10 @@ export function rsi(ctx: Context, sourceInput: any, lengthInput: any): number {
     return 100 - (100 / (1 + (avgGain / avgLoss)));
 }
 
+/**
+ * Calculates MACD
+ * @returns [series float, series float, series float]
+ */
 export function macd(ctx: Context, sourceInput: any, fastLenInput: any, slowLenInput: any, sigLenInput: any): [number, number, number] {
     const source = val(sourceInput);
     const fast = ema(ctx, source, val(fastLenInput));
@@ -210,6 +246,10 @@ export function macd(ctx: Context, sourceInput: any, fastLenInput: any, slowLenI
     return [macdLine, signalLine, macdLine - signalLine];
 }
 
+/**
+ * Momentum
+ * @returns series float
+ */
 export function mom(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = Math.floor(val(lengthInput));
@@ -225,6 +265,10 @@ export function mom(ctx: Context, sourceInput: any, lengthInput: any): number {
 
 // --- Bounds / Extremes ---
 
+/**
+ * Bollinger Bands
+ * @returns [series float, series float, series float]
+ */
 export function bb(ctx: Context, sourceInput: any, lengthInput: any, multInput: any): [number, number, number] {
     const source = val(sourceInput);
     const length = Math.floor(val(lengthInput));
@@ -277,6 +321,10 @@ export function bb(ctx: Context, sourceInput: any, lengthInput: any, multInput: 
     return [mean, mean + dev * mult, mean - dev * mult];
 }
 
+/**
+ * Commodity Channel Index
+ * @returns series float
+ */
 export function cci(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = Math.floor(val(lengthInput));
@@ -295,6 +343,10 @@ export function cci(ctx: Context, sourceInput: any, lengthInput: any): number {
 }
 
 // --- Cross Logic ---
+/**
+ * Cross
+ * @returns bool
+ */
 export function cross(ctx: Context, xInput: any, yInput: any): boolean {
     const x = val(xInput); const y = val(yInput);
     const state = ctx.getPersistentState<CrossState>(() => ({ prevX: NaN, prevY: NaN }));
@@ -303,6 +355,10 @@ export function cross(ctx: Context, xInput: any, yInput: any): boolean {
     state.prevX = x; state.prevY = y;
     return result;
 }
+/**
+ * Crossover
+ * @returns bool
+ */
 export function crossover(ctx: Context, xInput: any, yInput: any): boolean {
     const x = val(xInput); const y = val(yInput);
     const state = ctx.getPersistentState<CrossState>(() => ({ prevX: NaN, prevY: NaN }));
@@ -311,6 +367,10 @@ export function crossover(ctx: Context, xInput: any, yInput: any): boolean {
     state.prevX = x; state.prevY = y;
     return result;
 }
+/**
+ * Crossunder
+ * @returns bool
+ */
 export function crossunder(ctx: Context, xInput: any, yInput: any): boolean {
     const x = val(xInput); const y = val(yInput);
     const state = ctx.getPersistentState<CrossState>(() => ({ prevX: NaN, prevY: NaN }));
@@ -365,30 +425,50 @@ function updateMonotonicDeque(state: DequeState, sourceInput: any, lengthInput: 
     }
 }
 
+/**
+ * Highest value in window
+ * @returns series float
+ */
 export function highest(ctx: Context, source: any, length: any): number {
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false); 
     return state.dequeVals[0];
 }
 
+/**
+ * Lowest value in window
+ * @returns series float
+ */
 export function lowest(ctx: Context, source: any, length: any): number {
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true); 
     return state.dequeVals[0];
 }
 
+/**
+ * Offset to highest value
+ * @returns series int
+ */
 export function highestbars(ctx: Context, source: any, length: any): number {
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false);
     return state.dequeIdxs[0] - (state.globalIdx - 1);
 }
 
+/**
+ * Offset to lowest value
+ * @returns series int
+ */
 export function lowestbars(ctx: Context, source: any, length: any): number {
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true);
     return state.dequeIdxs[0] - (state.globalIdx - 1);
 }
 
+/**
+ * Stochastic
+ * @returns series float
+ */
 export function stoch(ctx: Context, sourceInput: any, highInput: any, lowInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const l = lowest(ctx, lowInput, lengthInput);
