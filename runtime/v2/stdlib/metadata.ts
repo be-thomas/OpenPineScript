@@ -58,13 +58,6 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["t"]
       },
-      "color.__IS_NAMESPACE__": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.__IS_NAMESPACE__
-      },
       "na": {
           uses_context: false,
           args: ["x"],
@@ -369,21 +362,21 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       "strategy.position_size": {
           uses_context: true,
           args: [],
-          is_getter: false,
+          is_getter: true,
           is_value: false,
           ref: strategy.position_size
       },
       "strategy.opentrades": {
           uses_context: true,
           args: [],
-          is_getter: false,
+          is_getter: true,
           is_value: false,
           ref: strategy.opentrades
       },
       "strategy.equity": {
           uses_context: true,
           args: [],
-          is_getter: false,
+          is_getter: true,
           is_value: false,
           ref: strategy.equity
       },
@@ -400,13 +393,6 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_getter: false,
           is_value: true,
           ref: strategy.direction["short"]
-      },
-      "strategy.__IS_NAMESPACE__": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: strategy.__IS_NAMESPACE__
       },
       "sma": {
           uses_context: true,

@@ -7,58 +7,46 @@
 import * as vm from "node:vm";
 import { createStdlib } from "./stdlib"; 
 import { Context } from "./context";
-
+import { PREFIX } from "../../utils/v2/common";
 export { Context };
-
-// Prefix used by Transpiler
-const PREFIX = "opsv2_";
 
 /**
  * Helper: Recursively injects standard library functions with prefixes.
- * Handles:
- * 1. Global Functions: plot() -> opsv2_plot()
- * 2. Namespaces: ta.sma() -> opsv2_ta.opsv2_sma()
  */
 function injectStdlib(target: any, lib: any, prefix: string) {
     for (const [key, val] of Object.entries(lib)) {
-        // If it's a Namespace (Object containing functions)
         if (isPlainObject(val)) {
             const namespaceObj: any = {};
-            // Recursively prefix the inner keys (sma -> opsv2_sma)
             for (const [innerKey, innerVal] of Object.entries(val as any)) {
                 namespaceObj[prefix + innerKey] = innerVal;
             }
-            // Assign the namespace itself (ta -> opsv2_ta)
             target[prefix + key] = namespaceObj;
-        } 
-        // If it's a direct function or value (plot, close, NaN)
-        else {
+        } else {
             target[prefix + key] = val;
         }
     }
 }
 
-// Helper to detect plain objects (excludes Arrays, null, Dates, etc.)
 function isPlainObject(val: any) {
     return typeof val === 'object' && val !== null && !Array.isArray(val) && val.constructor === Object;
 }
 
-/**
- * COMPILER
- * 1. Prepares the Sandbox with Standard Library
- * 2. Wraps the User Code in a Function
- * 3. Returns an Executor Function
- */
-/**
- * One-shot execute: injects stdlib then runs code directly in the sandbox
- * (no function wrapper). Variables persist on the sandbox across calls.
- * Used by the REPL.
- */
 export function run(jsCode: string, ctx: Context, sandbox: any): any {
     if (!sandbox.__opsv2_initialized) {
         sandbox.ctx = ctx;
         const lib = createStdlib(ctx);
         injectStdlib(sandbox, lib, PREFIX);
+        
+        // Inject Core Series Variables
+        sandbox[`${PREFIX}open`] = ctx.vars.get(`${PREFIX}open`);
+        sandbox[`${PREFIX}high`] = ctx.vars.get(`${PREFIX}high`);
+        sandbox[`${PREFIX}low`] = ctx.vars.get(`${PREFIX}low`);
+        sandbox[`${PREFIX}close`] = ctx.vars.get(`${PREFIX}close`);
+        sandbox[`${PREFIX}volume`] = ctx.vars.get(`${PREFIX}volume`);
+        sandbox[`${PREFIX}time`] = ctx.vars.get(`${PREFIX}time`);
+        sandbox[`${PREFIX}bar_index`] = ctx.vars.get(`${PREFIX}bar_index`);
+        sandbox[`${PREFIX}na`] = ctx.opsv2_na;
+
         Object.defineProperty(sandbox, '__opsv2_initialized', {
             value: true, writable: true, enumerable: false
         });
@@ -71,29 +59,30 @@ export function run(jsCode: string, ctx: Context, sandbox: any): any {
 }
 
 export function compile(jsCode: string, ctx: Context, sandbox: any) {
-  
-    // 1. ONE-TIME INITIALIZATION (Standard Library Injection)
-    // We check a hidden flag so we don't re-inject stdlib on every re-compile of the same sandbox
+    // 1. ONE-TIME INITIALIZATION
     if (!sandbox.__opsv2_initialized) {
-        
-        // Ensure Context is available globally for ctx.call()
         sandbox.ctx = ctx;
 
         // Create & Inject Library
         const lib = createStdlib(ctx); 
         injectStdlib(sandbox, lib, PREFIX);
 
-        // Mark as initialized
+        // Inject Core Series Variables (Pointers to the arrays in Context)
+        sandbox[`${PREFIX}open`] = ctx.vars.get(`${PREFIX}open`);
+        sandbox[`${PREFIX}high`] = ctx.vars.get(`${PREFIX}high`);
+        sandbox[`${PREFIX}low`] = ctx.vars.get(`${PREFIX}low`);
+        sandbox[`${PREFIX}close`] = ctx.vars.get(`${PREFIX}close`);
+        sandbox[`${PREFIX}volume`] = ctx.vars.get(`${PREFIX}volume`);
+        sandbox[`${PREFIX}time`] = ctx.vars.get(`${PREFIX}time`);
+        sandbox[`${PREFIX}bar_index`] = ctx.vars.get(`${PREFIX}bar_index`);
+        sandbox[`${PREFIX}na`] = ctx.opsv2_na;
+
         Object.defineProperty(sandbox, '__opsv2_initialized', {
-            value: true,
-            writable: true,
-            enumerable: false
+            value: true, writable: true, enumerable: false
         });
     }
 
     // 2. WRAP SCRIPT IN A FUNCTION
-    // The transpiler emits "opsv2_plot(...)", so we just need a function wrapper.
-    // We name it "opsv2_main" so we can call it easily.
     const wrappedCode = `
         ${PREFIX}main = function() {
             ${jsCode}
@@ -109,21 +98,11 @@ export function compile(jsCode: string, ctx: Context, sandbox: any) {
     }
 
     // 4. RETURN THE EXECUTOR
-    // This function is called for EVERY BAR in the backtest loop.
     return () => {
-        // A. Sync Data (Bridge Context -> Sandbox variables)
-        // These match the transpiled variable names (opsv2_open, etc.)
-        sandbox[PREFIX + "open"]   = ctx.open;
-        sandbox[PREFIX + "high"]   = ctx.high;
-        sandbox[PREFIX + "low"]    = ctx.low;
-        sandbox[PREFIX + "close"]  = ctx.close;
-        sandbox[PREFIX + "volume"] = ctx.volume;
-        sandbox[PREFIX + "time"]   = ctx.time;
-
-        // B. Reset Context State (Call Stack, etc.)
+        // Because sandbox.opsv2_close points to the Series object in memory,
+        // and ctx.setBar() updates that exact object, we no longer need to 
+        // manually sync primitives here!
         ctx.reset();
-
-        // C. Execute the compiled function
-        return sandbox[PREFIX + "main"]();
+        return sandbox[`${PREFIX}main`]();
     };
 }

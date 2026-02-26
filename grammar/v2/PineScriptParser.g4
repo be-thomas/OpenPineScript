@@ -63,8 +63,7 @@ for_expr
 stmts_block : fun_body_multiline ;
 
 // Expressions (Standard)
-ternary_expr : or_expr ( COND ternary_expr2 )? ;
-ternary_expr2: ternary_expr COND_ELSE ternary_expr ;
+ternary_expr : or_expr ( COND ternary_expr COND_ELSE ternary_expr )? ;
 or_expr      : and_expr ( OR and_expr )* ;
 and_expr     : eq_expr ( AND eq_expr )* ;
 eq_expr      : cmp_expr ( ( EQ | NEQ ) cmp_expr )* ;

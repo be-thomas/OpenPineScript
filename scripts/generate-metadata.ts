@@ -70,7 +70,11 @@ function generateConfig(stdlibPath: string) {
                 init.getProperties().forEach(prop => {
                     if (Node.isPropertyAssignment(prop)) {
                         const propName = prop.getName().replace(/['"]/g, '');
-                        const fullKey = `${prefix}${propName}`; // No more hacks!
+                        
+                        // FIX: Ignore internal namespace flag if it's inside an object
+                        if (propName === "__IS_NAMESPACE__") return; 
+
+                        const fullKey = `${prefix}${propName}`;
                         const initializer = prop.getInitializer();
 
                         let isContextAware = false;
@@ -99,24 +103,26 @@ function generateConfig(stdlibPath: string) {
 
         // --- 3. Flat Exported Constants (e.g., export const red = "#FF5252") ---
         sourceFile.getVariableDeclarations().forEach(varDecl => {
-            // Must be exported
             if (!varDecl.isExported()) return;
 
             const init = varDecl.getInitializer();
             
-            // Skip object literals and functions (already handled by other blocks)
             if (init && (Node.isObjectLiteralExpression(init) || Node.isArrowFunction(init) || Node.isFunctionExpression(init))) {
                 return; 
             }
 
             const varName = varDecl.getName();
+            
+            // FIX: Ignore internal namespace flag if it's exported flat
+            if (varName === "__IS_NAMESPACE__") return; 
+
             const fullKey = `${prefix}${varName}`;
 
             registryEntries.push(`      "${fullKey}": {`);
             registryEntries.push(`          uses_context: false,`);
             registryEntries.push(`          args: [],`);
             registryEntries.push(`          is_getter: false,`); 
-            registryEntries.push(`          is_value: true,`); // It's a static value
+            registryEntries.push(`          is_value: true,`); 
             registryEntries.push(`          ref: ${moduleName}.${varName}`);
             registryEntries.push(`      },`);
         });

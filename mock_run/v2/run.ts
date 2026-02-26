@@ -71,14 +71,26 @@ async function start() {
             const cols = line.split(",");
             if (cols.length < 5) return;
 
-            ctx.time   = new Date(cols[0]).getTime();
-            ctx.open   = parseFloat(cols[1]);
-            ctx.high   = parseFloat(cols[2]);
-            ctx.low    = parseFloat(cols[3]);
-            ctx.close  = parseFloat(cols[4]);
-            ctx.volume = parseFloat(cols[5]) || 0;
+            const time   = new Date(cols[0]).getTime();
+            const open   = parseFloat(cols[1]);
+            const high   = parseFloat(cols[2]);
+            const low    = parseFloat(cols[3]);
+            const close  = parseFloat(cols[4]);
+            const volume = parseFloat(cols[5]) || 0;
 
+            // A. Update Barstate Flags
+            ctx.is_new = true;
+            ctx.is_last = (index === rows.length - 1);
+            ctx.is_history = !ctx.is_last;
+            ctx.is_realtime = ctx.is_last;
+
+            // B. Push Data into Context (Updates Primitives AND Series Histories)
+            ctx.setBar(time, open, high, low, close, volume);
+
+            // C. Execute the transcompiled script
             executeBar();
+            
+            // D. Close the bar
             ctx.finalizeBar();
 
             // Periodic Log Output
@@ -96,7 +108,7 @@ async function start() {
                 }
                 
                 const plotString = plotOutputs.length > 0 ? `\n    ${plotOutputs.join("\n    ")}` : "";
-                const posSize = (ctx as any).strategy?.position_size ?? 0;
+                const posSize = ctx.position?.size ?? 0;
                 
                 console.log(
                     `${C.Gray}[Bar ${index.toString().padEnd(4)}]${C.Reset} ` +

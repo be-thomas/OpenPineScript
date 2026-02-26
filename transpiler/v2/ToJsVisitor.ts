@@ -34,7 +34,6 @@ import {
   For_exprContext,
   Stmts_blockContext,
   Ternary_exprContext,
-  Ternary_expr2Context,
   Or_exprContext,
   And_exprContext,
   Eq_exprContext,
@@ -54,6 +53,9 @@ import {
   Other_literalContext,
   IdContext,
 } from "../../parser/v2/generated/PineScriptParser";
+import { getGeneratedRegistry } from "../../runtime/v2/stdlib/metadata";
+
+const REGISTRY = getGeneratedRegistry();
 
 export class ToJsVisitor extends ParseTreeVisitor<string> {
   // Prefix for all emitted identifiers to avoid sandbox name clashes
@@ -292,18 +294,18 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   // --- Math ---
+// --- Math ---
   visitTernary_expr(ctx: Ternary_exprContext): string {
     const cond = this.visit(ctx.or_expr());
-    if (ctx.ternary_expr2()) {
-      const t2 = this.visit(ctx.ternary_expr2()!);
-      return `(${cond} ? ${t2})`;
+    
+    // Check if the COND ('?') token exists
+    if (ctx.COND()) {
+      const trueBranch = this.visit(ctx.ternary_expr(0));
+      const falseBranch = this.visit(ctx.ternary_expr(1));
+      return `(${cond} ? ${trueBranch} : ${falseBranch})`;
     }
+    
     return cond;
-  }
-
-  visitTernary_expr2(ctx: Ternary_expr2Context): string {
-    const t = ctx.ternary_expr().map((e) => this.visit(e));
-    return t[0] + " : " + t[1];
   }
 
   visitOr_expr(ctx: Or_exprContext): string {
@@ -469,12 +471,23 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   visitId = (ctx: IdContext): string => {
     const text = ctx.getText();
     
-    // 1. Handle Dot Notation (e.g. "ta.sma" -> "opsv2_ta.opsv2_sma")
+    // 1. Handle Transpilation (Prefixing)
+    let transpiledName = text;
     if (text.includes('.')) {
-        return text.split('.').map(p => `${this.PREFIX}${p}`).join('.');
+        transpiledName = text.split('.').map(p => `${this.PREFIX}${p}`).join('.');
+    } else {
+        transpiledName = `${this.PREFIX}${text}`;
     }
 
-    // 2. Simple IDs (e.g. "close" -> "opsv2_close", "a" -> "opsv2_a")
-    return `${this.PREFIX}${text}`;
+    // 2. THE GETTER CHECK
+    // If the standard library registry marks this identifier as a getter,
+    // we must transpile it into an execution call instead of a static reference!
+    const entry = REGISTRY[text];
+    if (entry && entry.is_getter) {
+        const callId = `"${text}${this.getLocId(ctx)}"`;
+        return `ctx.call(${callId}, ${transpiledName})`;
+    }
+
+    return transpiledName;
   }
 }

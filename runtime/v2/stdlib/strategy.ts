@@ -89,14 +89,26 @@ export function close_all(ctx: Context, comment: string = "") {
     ctx.position.avgPrice = 0;
 }
 
+/**
+ * Returns the current position size.
+ * @getter
+ */
 export function position_size(ctx: Context): number {
     return ctx.position.size;
 }
 
+/**
+ * Returns 1 if there are open trades, 0 otherwise.
+ * @getter
+ */
 export function opentrades(ctx: Context): number {
     return ctx.position.size !== 0 ? 1 : 0;
 }
 
+/**
+ * Returns the current equity (cash + unrealized PnL).
+ * @getter
+ */
 export function equity(ctx: Context): number {
     // Cash + Unrealized PnL
     let unrealized = 0;

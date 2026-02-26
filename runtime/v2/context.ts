@@ -42,9 +42,9 @@ export class Context {
 
     // 2. Series Registry
     // Key = Variable Name (e.g. "opsv2_close", "opsv2_myVar")
-    private vars: Map<string, Series> = new Map();
+    public vars: Map<string, Series> = new Map(); // Changed to public so the runner can extract them!
 
-    // 3. Market Data (Public)
+    // 3. Market Data (Public primitives for internal engine use)
     public time: number = 0;
     public open: number = 0;
     public high: number = 0;
@@ -57,6 +57,12 @@ export class Context {
     public plots: Map<string, (PlotData | null)[]> = new Map(); 
     public fills: Map<string, (FillData | null)[]> = new Map();
 
+    // NEW: Barstate Flags (Required for barstate.ts getters)
+    public is_history: boolean = true;
+    public is_realtime: boolean = false;
+    public is_new: boolean = true;
+    public is_last: boolean = false;
+
     // 5. Strategy State (Public)
     public position: Position = { size: 0, avgPrice: 0 };
     public cash: number = 100000; 
@@ -66,16 +72,18 @@ export class Context {
     // 6. Built-in Constants
     public opsv2_na: number = NaN;
 
-    constructor() {}
-
-    // --- BUILT-IN GETTERS ---
-    public get opsv2_open(): number { return this.open; }
-    public get opsv2_high(): number { return this.high; }
-    public get opsv2_low(): number { return this.low; }
-    public get opsv2_close(): number { return this.close; }
-    public get opsv2_volume(): number { return this.volume; }
-    public get opsv2_time(): number { return this.time; }
-    public get opsv2_bar_index(): number { return this.currentBarIndex; }
+    constructor() {
+        // PRE-REGISTER BUILT-IN SERIES
+        // This ensures they exist in the vars map as true Series objects 
+        // before the script ever starts executing!
+        this.new_var("opsv2_open", NaN);
+        this.new_var("opsv2_high", NaN);
+        this.new_var("opsv2_low", NaN);
+        this.new_var("opsv2_close", NaN);
+        this.new_var("opsv2_volume", NaN);
+        this.new_var("opsv2_time", NaN);
+        this.new_var("opsv2_bar_index", 0);
+    }
 
     public reset() {
         this.callStack = [];
@@ -232,6 +240,7 @@ export class Context {
         this.new_var("opsv2_low", low);
         this.new_var("opsv2_close", close);
         this.new_var("opsv2_volume", volume);
+        this.new_var("opsv2_bar_index", this.currentBarIndex);
     }
 
     // --- Plotting ---
