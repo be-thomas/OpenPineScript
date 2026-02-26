@@ -20,24 +20,6 @@ function toHex(n: number): string {
 
 
 const color = {
-    // --- Standard Pine Palette (Material Design-ish) ---
-    "red":     "#FF5252",
-    "green":   "#4CAF50",
-    "blue":    "#2196F3",
-    "orange":  "#FF9800",
-    "teal":    "#009688",
-    "navy":    "#3F51B5",
-    "white":   "#FFFFFF",
-    "black":   "#000000",
-    "gray":    "#9E9E9E",
-    "purple":  "#9C27B0",
-    "yellow":  "#FFEB3B",
-    "lime":    "#CDDC39",
-    "aqua":    "#00BCD4",
-    "fuchsia": "#E040FB",
-    "olive":   "#808000",
-    "maroon":  "#800000",
-    "silver":  "#C0C0C0",
 
     // --- Functions ---
 
@@ -119,5 +101,7 @@ const color = {
         return 0; // Default to opaque (transp 0)
     }
 };
+
+export const __IS_NAMESPACE__ = true;
 
 export default color;

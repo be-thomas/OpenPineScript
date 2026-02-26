@@ -5,6 +5,7 @@
 
 import { ParseTreeVisitor } from "antlr4ng";
 import type { TerminalNode, ParserRuleContext } from "antlr4ng";
+import * as common from "../../utils/v2/common";
 import {
   Opsv2_scriptContext,
   StmtContext,
@@ -56,7 +57,8 @@ import {
 
 export class ToJsVisitor extends ParseTreeVisitor<string> {
   // Prefix for all emitted identifiers to avoid sandbox name clashes
-  private readonly PREFIX = "opsv2_";
+  private readonly PREFIX = common.PREFIX;
+  private anonCounter = 0;
 
   protected override defaultResult(): string {
     return "";
@@ -373,11 +375,21 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
 
     if (idxExpr) {
       const index = this.visit(idxExpr);
-      // Generate ID Tag: e.g. "opsv2_close_L10_C4"
-      const locId = `${base}${this.getLocId(ctx)}`; 
       
-      // Emit: ctx.get(base, index, "TAG")
-      return `ctx.get(${base}, ${index}, "${locId}")`;
+      // 1. Check if the base is a simple identifier (e.g. 'close', 'myVar')
+      const isSimpleId = ctx.atom().id() != null;
+
+      if (isSimpleId) {
+        // Standard variable history lookup: close[1]
+        // We pass the base string as the exact key (e.g., "opsv2_close") 
+        // because Context.vars registers them under this exact name.
+        return `ctx.get(${base}, ${index}, "${base}")`;
+      } else {
+        // Complex expression history lookup: (close > open)[1] or sma(close, 14)[1]
+        // We use the Inline Hook strategy to evaluate, store, and fetch in one line!
+        const anonId = `"opsv2_anon_expr_${this.anonCounter++}"`;
+        return `ctx.get(ctx.new_var(${anonId}, ${base}), ${index}, ${anonId})`;
+      }
     }
     return base;
   }

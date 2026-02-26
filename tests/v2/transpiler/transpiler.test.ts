@@ -6,11 +6,11 @@ import assert from "node:assert";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import * as vm from "node:vm";
+import { PREFIX as OPSV2 } from "../../../utils/v2/common";
 import { transpile } from "../../../transpiler/v2";
 import { compile, Context } from "../../../runtime/v2";
 
 /** Must match prefix in ToJsVisitor (opsv2_ = openpinescript v2). */
-const OPSV2 = "opsv2_";
 
 const PARSER_FIXTURES = path.join(__dirname, "../parser/fixtures");
 

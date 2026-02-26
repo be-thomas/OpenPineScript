@@ -16,166 +16,54 @@ export interface StdlibEntry {
 
 export function getGeneratedRegistry(): Record<string, StdlibEntry> {
     return {
-      "color.red": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["red"]
-      },
-      "color.green": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["green"]
-      },
-      "color.blue": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["blue"]
-      },
-      "color.orange": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["orange"]
-      },
-      "color.teal": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["teal"]
-      },
-      "color.navy": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["navy"]
-      },
-      "color.white": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["white"]
-      },
-      "color.black": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["black"]
-      },
-      "color.gray": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["gray"]
-      },
-      "color.purple": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["purple"]
-      },
-      "color.yellow": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["yellow"]
-      },
-      "color.lime": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["lime"]
-      },
-      "color.aqua": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["aqua"]
-      },
-      "color.fuchsia": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["fuchsia"]
-      },
-      "color.olive": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["olive"]
-      },
-      "color.maroon": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["maroon"]
-      },
-      "color.silver": {
-          uses_context: false,
-          args: [],
-          is_getter: false,
-          is_value: true,
-          ref: color.default["silver"]
-      },
       "color.new": {
           uses_context: false,
           args: ["colorStr","transp"],
           is_getter: false,
           is_value: false,
-          ref: color.default["new"]
+          ref: (color.default || color)["new"]
       },
       "color.rgb": {
           uses_context: false,
           args: ["r","g","b","transp"],
           is_getter: false,
           is_value: false,
-          ref: color.default["rgb"]
+          ref: (color.default || color)["rgb"]
       },
       "color.r": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
           is_value: false,
-          ref: color.default["r"]
+          ref: (color.default || color)["r"]
       },
       "color.g": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
           is_value: false,
-          ref: color.default["g"]
+          ref: (color.default || color)["g"]
       },
       "color.b": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
           is_value: false,
-          ref: color.default["b"]
+          ref: (color.default || color)["b"]
       },
       "color.t": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
           is_value: false,
-          ref: color.default["t"]
+          ref: (color.default || color)["t"]
+      },
+      "color.__IS_NAMESPACE__": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: color.__IS_NAMESPACE__
       },
       "na": {
           uses_context: false,
@@ -338,6 +226,125 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: core.avg
       },
+      "red": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.red
+      },
+      "green": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.green
+      },
+      "blue": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.blue
+      },
+      "orange": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.orange
+      },
+      "teal": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.teal
+      },
+      "navy": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.navy
+      },
+      "white": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.white
+      },
+      "black": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.black
+      },
+      "gray": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.gray
+      },
+      "purple": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.purple
+      },
+      "yellow": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.yellow
+      },
+      "lime": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.lime
+      },
+      "aqua": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.aqua
+      },
+      "fuchsia": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.fuchsia
+      },
+      "olive": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.olive
+      },
+      "maroon": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.maroon
+      },
+      "silver": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: core.silver
+      },
       "strategy.entry": {
           uses_context: true,
           args: ["id","dir","qty"],
@@ -393,6 +400,13 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_getter: false,
           is_value: true,
           ref: strategy.direction["short"]
+      },
+      "strategy.__IS_NAMESPACE__": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: strategy.__IS_NAMESPACE__
       },
       "sma": {
           uses_context: true,
@@ -539,63 +553,63 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           args: ["t"],
           is_getter: false,
           is_value: false,
-          ref: time.time["year"]
+          ref: (time.default || time)["year"]
       },
       "month": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
           is_value: false,
-          ref: time.time["month"]
+          ref: (time.default || time)["month"]
       },
       "weekofyear": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
           is_value: false,
-          ref: time.time["weekofyear"]
+          ref: (time.default || time)["weekofyear"]
       },
       "dayofmonth": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
           is_value: false,
-          ref: time.time["dayofmonth"]
+          ref: (time.default || time)["dayofmonth"]
       },
       "dayofweek": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
           is_value: false,
-          ref: time.time["dayofweek"]
+          ref: (time.default || time)["dayofweek"]
       },
       "hour": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
           is_value: false,
-          ref: time.time["hour"]
+          ref: (time.default || time)["hour"]
       },
       "minute": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
           is_value: false,
-          ref: time.time["minute"]
+          ref: (time.default || time)["minute"]
       },
       "second": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
           is_value: false,
-          ref: time.time["second"]
+          ref: (time.default || time)["second"]
       },
       "time": {
           uses_context: true,
           args: [],
           is_getter: false,
           is_value: false,
-          ref: time.time["time"]
+          ref: (time.default || time)["time"]
       },
       "input": {
           uses_context: true,
@@ -652,6 +666,76 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_getter: false,
           is_value: false,
           ref: ui.fill
+      },
+      "color_red": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_red
+      },
+      "color_green": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_green
+      },
+      "color_blue": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_blue
+      },
+      "color_orange": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_orange
+      },
+      "color_teal": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_teal
+      },
+      "color_navy": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_navy
+      },
+      "color_white": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_white
+      },
+      "color_black": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_black
+      },
+      "color_gray": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_gray
+      },
+      "color_purple": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          is_value: true,
+          ref: ui.color_purple
       },
     };
 }

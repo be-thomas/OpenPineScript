@@ -38,7 +38,5 @@ export const time = {
 };
 
 
-export default {
-    ...time,
-}
+export default time;
 

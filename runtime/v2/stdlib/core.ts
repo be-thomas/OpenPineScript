@@ -127,3 +127,21 @@ export function avg(...args: any[]): number {
     return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
+// --- Standard Pine Palette (Material Design-ish) ---
+export const red =     "#FF5252";
+export const green = "#4CAF50";
+export const blue =    "#2196F3";
+export const orange = "#FF9800";
+export const teal = "#009688";
+export const navy = "#3F51B5";
+export const white = "#FFFFFF";
+export const black = "#000000";
+export const gray = "#9E9E9E";
+export const purple = "#9C27B0";
+export const yellow = "#FFEB3B";
+export const lime = "#CDDC39";
+export const aqua = "#00BCD4";
+export const fuchsia = "#E040FB";
+export const olive = "#808000";
+export const maroon = "#800000";
+export const silver = "#C0C0C0";
