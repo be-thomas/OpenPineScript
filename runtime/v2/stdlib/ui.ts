@@ -16,12 +16,6 @@ export const color_black  = "#000000";
 export const color_gray   = "#9E9E9E";
 export const color_purple = "#9C27B0";
 
-// --- Inputs (Mock for now) ---
-export function input(ctx: Context, defval: any, title?: string): any {
-    // In a real UI, this would read from a config object.
-    return defval; 
-}
-
 // --- Outputs ---
 
 export function plot(

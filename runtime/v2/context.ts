@@ -35,6 +35,13 @@ export interface FillData {
     title: string;
 }
 
+export interface InputDef {
+    id: string;      // Internal sequential ID
+    defval: any;     // Default value
+    title: string;   // Display name for UI
+    type: string;    // 'integer', 'float', 'bool', 'string', 'source'
+}
+
 export class Context {
     // 1. Internal Execution State (Private)
     protected callStack: string[] = [];
@@ -68,14 +75,20 @@ export class Context {
     public cash: number = 100000; 
     public trades: Trade[] = [];
     public orders: any[] = [];
+
+    // --- INPUT SYSTEM ---
+    public inputDefs: InputDef[] = []; 
+    public userInputs: Record<string, any> = {}; 
+    private inputCounter: number = 0; // Tracks input execution order
     
     // 6. Built-in Constants
     public opsv2_na: number = NaN;
 
     constructor() {
-        // PRE-REGISTER BUILT-IN SERIES
-        // This ensures they exist in the vars map as true Series objects 
-        // before the script ever starts executing!
+        this.initBaseSeries();
+    }
+
+    private initBaseSeries() {
         this.new_var("opsv2_open", NaN);
         this.new_var("opsv2_high", NaN);
         this.new_var("opsv2_low", NaN);
@@ -85,9 +98,59 @@ export class Context {
         this.new_var("opsv2_bar_index", 0);
     }
 
+    /**
+     * Resets the entire execution environment for a new pass.
+     * Crucially, preserves `inputDefs` and `userInputs`.
+     */
     public reset() {
+        // 1. Reset Execution State
         this.callStack = [];
-        // Note: 'vars' persists across bars.
+        this.states.clear();
+        this.inputCounter = 0;
+
+        // 2. Reset Registry & Re-initialize built-ins
+        this.vars.clear();
+        this.initBaseSeries();
+
+        // 3. Reset Market Data
+        this.time = 0;
+        this.open = 0;
+        this.high = 0;
+        this.low = 0;
+        this.close = 0;
+        this.volume = 0;
+
+        // 4. Reset Engine Output State
+        this.currentBarIndex = 0;
+        this.plots.clear();
+        this.fills.clear();
+
+        // 5. Reset Strategy State
+        this.position = { size: 0, avgPrice: 0 };
+        this.cash = 100000;
+        this.trades = [];
+        this.orders = [];
+    }
+
+    // Helper to register an input during dry_run and retrieve value during real run
+    public registerInput(defval: any, title: string = "", type: string = "float"): any {
+        const currentId = `input_${this.inputCounter++}`;
+        
+        // If it's the dry run (first time seeing this), save the definition
+        if (this.inputDefs.length < this.inputCounter) {
+            this.inputDefs.push({
+                id: currentId,
+                defval,
+                title: title || currentId,
+                type
+            });
+        }
+
+        // Return user override if it exists, otherwise return the default
+        if (currentId in this.userInputs) {
+            return this.userInputs[currentId];
+        }
+        return defval;
     }
 
     /**

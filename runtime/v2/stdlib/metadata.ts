@@ -2,6 +2,7 @@
 import * as barstate from "./barstate";
 import * as color from "./color";
 import * as core from "./core";
+import * as input from "./input";
 import * as strategy from "./strategy";
 import * as ta from "./ta";
 import * as time from "./time";
@@ -424,6 +425,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: core.silver
       },
+      "input": {
+          uses_context: true,
+          args: ["defval","title","type"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float (or int/bool depending on type)"},
+          is_value: false,
+          ref: input.input
+      },
       "strategy.entry": {
           uses_context: true,
           args: ["id","dir","qty"],
@@ -719,14 +728,6 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: (time.default || time)["time"]
-      },
-      "input": {
-          uses_context: true,
-          args: ["defval","title"],
-          is_getter: false,
-          returns: {"kind":"scalar","type":"any"},
-          is_value: false,
-          ref: ui.input
       },
       "plot": {
           uses_context: true,

@@ -58,7 +58,7 @@ function runStressTest(mode: "STABLE" | "INCREASING" | "DECREASING" | "OSCILLATI
 
         // 3. EXECUTE OPTIMIZED
         // We must call ctx.reset() before calling functions for this bar!
-        ctx.reset(); 
+        // ctx.reset(); 
 
         const resSMA = ctx.call("ta.sma@test", ta.sma, ctx, ctx.close, len);
         const resWMA = ctx.call("ta.wma@test", ta.wma, ctx, ctx.close, len);

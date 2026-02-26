@@ -102,7 +102,6 @@ export function compile(jsCode: string, ctx: Context, sandbox: any) {
         // Because sandbox.opsv2_close points to the Series object in memory,
         // and ctx.setBar() updates that exact object, we no longer need to 
         // manually sync primitives here!
-        ctx.reset();
         return sandbox[`${PREFIX}main`]();
     };
 }

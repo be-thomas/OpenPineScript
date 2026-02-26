@@ -11,14 +11,9 @@ function fix(val: any): number | null {
     return isNaN(raw) ? null : parseFloat(Number(raw).toFixed(6));
 }
 
-/**
- * Custom runner for TA tests that ensures variables are visible on the sandbox.
- */
-function runBarTA(js: string, ctx: Context, sandbox: any) {
-    // We strip 'let ' so variables like 'opsv2_res' become global on the sandbox
-    const globalJs = js.replace(/\blet\b/g, ""); 
-    sandbox.ctx = ctx;
-    return compile(globalJs, ctx, sandbox);
+function setupEngine(pine: string, ctx: Context) {
+    const sandbox: any = Object.create(null);
+    return compile(transpile(pine), ctx, sandbox);
 }
 
 describe("transpiler ta differential testing", () => {
@@ -26,10 +21,8 @@ describe("transpiler ta differential testing", () => {
 
     it("matches Naive SMA calculation (Post-Warmup)", () => {
         const len = 5;
-        const pine = `res = sma(close, ${len})`;
         const ctx = new Context();
-        const sandbox: any = Object.create(null);
-        const exec = runBarTA(transpile(pine), ctx, sandbox);
+        const exec = setupEngine(`res = sma(close, ${len})`.trim(), ctx);
         const naive = new NaiveTA();
 
         prices.forEach((p, i) => {
@@ -38,9 +31,8 @@ describe("transpiler ta differential testing", () => {
             naive.add(p, 100);
 
             if (i >= len - 1) {
-                // Now opsv2_res exists on the sandbox
-                const engineVal = sandbox[`${OPSV2}res`];
-                assert.strictEqual(fix(engineVal), fix(naive.sma(len)), `SMA Mismatch at bar ${i}`);
+                // Read directly from the Engine's Series memory! Offset 0 = current bar.
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}res`, 0)), fix(naive.sma(len)), `SMA Mismatch at bar ${i}`);
             }
             ctx.finalizeBar();
         });
@@ -48,10 +40,8 @@ describe("transpiler ta differential testing", () => {
 
     it("matches Naive Highest/Lowest calculation (Post-Warmup)", () => {
         const len = 3;
-        const pine = `hi = highest(close, ${len})\nlo = lowest(close, ${len})`;
         const ctx = new Context();
-        const sandbox: any = Object.create(null);
-        const exec = runBarTA(transpile(pine), ctx, sandbox);
+        const exec = setupEngine(`hi = highest(close, ${len})\nlo = lowest(close, ${len})`.trim(), ctx);
         const naive = new NaiveTA();
 
         prices.forEach((p, i) => {
@@ -60,8 +50,8 @@ describe("transpiler ta differential testing", () => {
             naive.add(p, 100);
 
             if (i >= len - 1) {
-                assert.strictEqual(fix(sandbox[`${OPSV2}hi`]), fix(naive.highest(len)), `Hi mismatch at bar ${i}`);
-                assert.strictEqual(fix(sandbox[`${OPSV2}lo`]), fix(naive.lowest(len)), `Lo mismatch at bar ${i}`);
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}hi`, 0)), fix(naive.highest(len)), `Hi mismatch at bar ${i}`);
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}lo`, 0)), fix(naive.lowest(len)), `Lo mismatch at bar ${i}`);
             }
             ctx.finalizeBar();
         });
@@ -69,10 +59,8 @@ describe("transpiler ta differential testing", () => {
 
     it("matches Naive HighestBars/LowestBars offsets (Post-Warmup)", () => {
         const len = 4;
-        const pine = `hib = highestbars(close, ${len})\nlob = lowestbars(close, ${len})`;
         const ctx = new Context();
-        const sandbox: any = Object.create(null);
-        const exec = runBarTA(transpile(pine), ctx, sandbox);
+        const exec = setupEngine(`hib = highestbars(close, ${len})\nlob = lowestbars(close, ${len})`.trim(), ctx);
         const naive = new NaiveTA();
 
         prices.forEach((p, i) => {
@@ -81,8 +69,8 @@ describe("transpiler ta differential testing", () => {
             naive.add(p, 100);
 
             if (i >= len - 1) {
-                assert.strictEqual(fix(sandbox[`${OPSV2}hib`]), fix(naive.highestbars(len)), `HiBars mismatch at bar ${i}`);
-                assert.strictEqual(fix(sandbox[`${OPSV2}lob`]), fix(naive.lowestbars(len)), `LoBars mismatch at bar ${i}`);
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}hib`, 0)), fix(naive.highestbars(len)), `HiBars mismatch at bar ${i}`);
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}lob`, 0)), fix(naive.lowestbars(len)), `LoBars mismatch at bar ${i}`);
             }
             ctx.finalizeBar();
         });
@@ -90,10 +78,8 @@ describe("transpiler ta differential testing", () => {
 
     it("matches Naive BB (Tuple) destructuring (Post-Warmup)", () => {
         const len = 5;
-        const pine = `[basis, upper, lower] = bb(close, ${len}, 2)`;
         const ctx = new Context();
-        const sandbox: any = Object.create(null);
-        const exec = runBarTA(transpile(pine), ctx, sandbox);
+        const exec = setupEngine(`[basis, upper, lower] = bb(close, ${len}, 2)`.trim(), ctx);
         const naive = new NaiveTA();
 
         prices.forEach((p, i) => {
@@ -103,9 +89,9 @@ describe("transpiler ta differential testing", () => {
 
             if (i >= len - 1) {
                 const [nBasis, nUpper, nLower] = naive.bb(len, 2);
-                assert.strictEqual(fix(sandbox[`${OPSV2}basis`]), fix(nBasis), `Basis mismatch at bar ${i}`);
-                assert.strictEqual(fix(sandbox[`${OPSV2}upper`]), fix(nUpper), `Upper mismatch at bar ${i}`);
-                assert.strictEqual(fix(sandbox[`${OPSV2}lower`]), fix(nLower), `Lower mismatch at bar ${i}`);
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}basis`, 0)), fix(nBasis), `Basis mismatch at bar ${i}`);
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}upper`, 0)), fix(nUpper), `Upper mismatch at bar ${i}`);
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}lower`, 0)), fix(nLower), `Lower mismatch at bar ${i}`);
             }
             ctx.finalizeBar();
         });
