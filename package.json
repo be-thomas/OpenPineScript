@@ -4,6 +4,7 @@
   "scripts": {
     "generate:parser": "antlr-ng -Dlanguage=TypeScript -o parser/v2/generated -l false -v true grammar/v2/PineScriptLexer.g4 grammar/v2/PineScriptParser.g4 && node scripts/patch-visitor.js",
     "postinstall": "npm run generate:parser",
+    "prebuild": "ts-node scripts/generate-metadata.ts",
     "build": "npm run generate:parser",
     "parse": "tsx parser/v2/run_antlr.ts",
     "replv2": "tsx repl/v2/index.ts",
@@ -16,6 +17,8 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "antlr-ng": "^1.0.0",
+    "ts-morph": "^27.0.2",
+    "ts-node": "^10.9.2",
     "tsx": "^4.21.0"
   },
   "engines": {

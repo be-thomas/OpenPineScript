@@ -38,14 +38,7 @@ export const time = {
 };
 
 
-export const __CONTEXT_AWARE__: string[] = [];
-export const __SIGNATURES__: Record<string, string[]> = {
-    
-}
-
 export default {
     ...time,
-    __CONTEXT_AWARE__,
-    __SIGNATURES__,
 }
 

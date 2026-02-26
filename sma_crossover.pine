@@ -3,4 +3,4 @@ len = 14
 src = close
 mySma = sma(src, len)
 
-plot(mySma)
+plot(mySma, color=red)

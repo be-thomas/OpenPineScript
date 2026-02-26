@@ -17,8 +17,9 @@ const C = {
 };
 
 async function start() {
-    const args = process.argv.slice(2);
-    const showTranspiled = args.includes("--show-transpiled-code");
+    const args = process.argv;
+    console.log("args: ", args);
+    const showTranspiled = true; // args.includes("--show-transpiled-code");
     const scriptPath = args.find(arg => arg.endsWith(".pine"));
     const csvPath = args.find(arg => arg.endsWith(".csv"));
 

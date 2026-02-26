@@ -399,7 +399,3 @@ export function stoch(ctx: Context, sourceInput: any, highInput: any, lowInput: 
 
 
 
-export const __CONTEXT_AWARE__: string[] = [];
-export const __SIGNATURES__: Record<string, string[]> = {
-    
-}

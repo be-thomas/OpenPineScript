@@ -127,7 +127,3 @@ export function avg(...args: any[]): number {
     return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
-export const __CONTEXT_AWARE__: string[] = [];
-export const __SIGNATURES__: Record<string, string[]> = {
-
-}

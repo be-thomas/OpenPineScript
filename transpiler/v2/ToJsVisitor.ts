@@ -58,11 +58,6 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   // Prefix for all emitted identifiers to avoid sandbox name clashes
   private readonly PREFIX = "opsv2_";
 
-  private readonly BUILT_INS = new Set([
-      "open", "high", "low", "close", "volume", "time", "bar_index", 
-      "na", "nz", "ta", "math", "strategy", "request", 'tostring'
-  ]);
-
   protected override defaultResult(): string {
     return "";
   }
@@ -396,28 +391,19 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return "";
   }
 
+
   // --- Function Calls with ID Tagging ---
   visitFun_call(ctx: Fun_callContext): string {
     const originalName = ctx.id().getText(); 
     const transpiledName = this.visit(ctx.id());
-    let args = ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
     
-    // 1. Identify context-aware built-ins
-    const needsCtx = 
-        ["plot", "plotshape", "plotchar", "hline", "bgcolor", "barcolor", "fill", "input"].includes(originalName) ||
-        originalName.startsWith("ta.") ||
-        originalName.startsWith("strategy.") ||
-        originalName.startsWith("request.");
-
-    // 2. Build the parameter string for the target function
-    if (needsCtx) {
-        args = args ? `ctx, ${args}` : "ctx";
-    }
+    // 1. Just parse the arguments normally. NO manual 'ctx' injection!
+    const args = ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
     
-    // 3. Generate Deterministic ID
+    // 2. Generate Deterministic ID (e.g., "sma@L4:C8")
     const callId = `"${originalName}${this.getLocId(ctx)}"`;
 
-    // 4. Construct the ctx.call wrapper
+    // 3. Construct the ctx.call wrapper
     // We only add the comma after transpiledName if there are actually arguments to pass.
     const finalArgsPart = args ? `, ${args}` : "";
 
@@ -471,26 +457,12 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   visitId = (ctx: IdContext): string => {
     const text = ctx.getText();
     
-    // 1. Handle Dot Notation (e.g. "ta.sma")
+    // 1. Handle Dot Notation (e.g. "ta.sma" -> "opsv2_ta.opsv2_sma")
     if (text.includes('.')) {
-        const parts = text.split('.');
-        const transformed = parts.map(p => `${this.PREFIX}${p}`).join('.');
-        
-        // If the namespace (e.g. "ta") is a built-in, prefix with "ctx."
-        if (this.BUILT_INS.has(parts[0])) {
-             return `ctx.${transformed}`;
-        }
-        return transformed;
+        return text.split('.').map(p => `${this.PREFIX}${p}`).join('.');
     }
 
-    // 2. Handle Simple IDs (e.g. "close", "bar_index")
-    // If it's a known built-in, it lives on Context.
-    if (this.BUILT_INS.has(text)) {
-        return `ctx.${this.PREFIX}${text}`;
-    }
-    
-    // 3. Default: User Variable (Local Scope)
-    // e.g. "a" -> "opsv2_a" (matches "let opsv2_a = ...")
+    // 2. Simple IDs (e.g. "close" -> "opsv2_close", "a" -> "opsv2_a")
     return `${this.PREFIX}${text}`;
   }
 }

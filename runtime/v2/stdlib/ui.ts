@@ -136,7 +136,3 @@ export function fill(
 }
 
 
-export const __CONTEXT_AWARE__: string[] = [];
-export const __SIGNATURES__: Record<string, string[]> = {
-    
-}
