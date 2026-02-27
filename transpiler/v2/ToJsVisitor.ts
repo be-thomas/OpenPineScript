@@ -326,18 +326,74 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   visitFor_expr(ctx: For_exprContext): string {
-    const init = this.visit(ctx.var_def()); // "let opsv2_i = ctx.new_var..."
     const varName = this.visit(ctx.var_def().id());
-    const end = this.visit(ctx.ternary_expr(0));
-    const body = this.visit(ctx.stmts_block());
-    let step = "1";
+    const startVal = this.visit(ctx.var_def().arith_expr());
+    const endVal = this.visit(ctx.ternary_expr(0));
+    const rawBody = this.visit(ctx.stmts_block());
+
+    let stepVal = "1";
     if (ctx.FOR_STMT_BY()) {
-      step = this.visit(ctx.ternary_expr(1));
+      stepVal = this.visit(ctx.ternary_expr(1));
     }
+
+    this.anonCounter = this.anonCounter || 0;
+    const id = this.anonCounter++;
+    const res = `_res${id}`;
+
+    // Forward lexical scanner to safely find the top-level 'return' statement
+    let nesting = 0;
+    let inString = false;
+    let stringChar = '';
+    const returns: { index: number, nesting: number }[] = [];
+
+    for (let i = 0; i < rawBody.length; i++) {
+        const char = rawBody[i];
+        
+        // Skip through strings safely
+        if (inString) {
+            if (char === stringChar && rawBody[i - 1] !== '\\') inString = false;
+            continue;
+        }
+        if (char === '"' || char === "'" || char === '`') {
+            inString = true;
+            stringChar = char;
+            continue;
+        }
+
+        // Track block nesting depths
+        if (char === '{' || char === '(' || char === '[') nesting++;
+        if (char === '}' || char === ')' || char === ']') nesting--;
+
+        // Check for 'return ' keyword
+        if (rawBody.substring(i, i + 7) === "return ") {
+            const prev = i === 0 ? ' ' : rawBody[i - 1];
+            // Must be preceded by space, newline, semicolon, or block boundary
+            if (/[ \n;{}]/.test(prev)) {
+                returns.push({ index: i, nesting: nesting });
+            }
+        }
+    }
+
+    let safeBody = rawBody;
+    if (returns.length > 0) {
+        // Find the absolute shallowest nesting level where a 'return' exists
+        const minNesting = Math.min(...returns.map(r => r.nesting));
+        const topLevelReturns = returns.filter(r => r.nesting === minNesting);
+        
+        // The last return at this shallowest level is the one injected by stmts_block
+        const target = topLevelReturns[topLevelReturns.length - 1];
+        safeBody = rawBody.substring(0, target.index) + `${res} = ` + rawBody.substring(target.index + 7);
+    }
+
+    const s = `_s${id}`, e = `_e${id}`, st = `_st${id}`, up = `_up${id}`;
     
-    // Loop variable MUST be a series to persist/update correctly
-    const loop = `for (${init}; ${varName} <= ${end}; ${varName} = ctx.new_var("${varName}", ${varName} + ${step})) ${body}`;
-    return `(() => { ${loop} })()`;
+    // Pure primitive loop execution
+    const loopDef = `for (let ${s} = ${startVal}, ${e} = ${endVal}, ${st} = Math.abs(${stepVal}), ${up} = ${s} <= ${e}, ${varName} = ${s}; ${up} ? ${varName} <= ${e} : ${varName} >= ${e}; ${varName} += (${up} ? ${st} : -${st}))`;
+
+    // Wrap it all together. Explicitly ensures `break` and `continue` work natively.
+    const loop = `let ${res};\n  ${loopDef} {\n    ${safeBody}\n  }\n  return ${res};`;
+
+    return `(() => {\n  ${loop}\n})()`;
   }
 
   visitStmts_block(ctx: Stmts_blockContext): string {
@@ -394,11 +450,21 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   visitAdd_expr(ctx: Add_exprContext): string {
     const parts = ctx.mult_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
+    
     let out = parts[0];
+    
+    // In ANTLR, children alternate: Expr(0), Op(1), Expr(2), Op(3), Expr(4)...
+    // This guarantees we process operators in exact visual left-to-right order.
     for (let i = 1; i < parts.length; i++) {
-      const op = ctx.PLUS(i - 1) ? "+" : "-";
-      out = `(${out} ${op} ${parts[i]})`;
+      const op = ctx.getChild(i * 2 - 1).getText();
+      
+      if (op === "+") {
+        out = `opsv2_safe_add(${out}, ${parts[i]})`;
+      } else {
+        out = `opsv2_safe_sub(${out}, ${parts[i]})`;
+      }
     }
+    
     return out;
   }
 

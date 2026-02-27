@@ -31,35 +31,11 @@ function isPlainObject(val: any) {
     return typeof val === 'object' && val !== null && !Array.isArray(val) && val.constructor === Object;
 }
 
-export function run(jsCode: string, ctx: Context, sandbox: any): any {
-    if (!sandbox.__opsv2_initialized) {
-        sandbox.ctx = ctx;
-        const lib = createStdlib(ctx);
-        injectStdlib(sandbox, lib, PREFIX);
-        
-        // Inject Core Series Variables
-        sandbox[`${PREFIX}open`] = ctx.vars.get(`${PREFIX}open`);
-        sandbox[`${PREFIX}high`] = ctx.vars.get(`${PREFIX}high`);
-        sandbox[`${PREFIX}low`] = ctx.vars.get(`${PREFIX}low`);
-        sandbox[`${PREFIX}close`] = ctx.vars.get(`${PREFIX}close`);
-        sandbox[`${PREFIX}volume`] = ctx.vars.get(`${PREFIX}volume`);
-        sandbox[`${PREFIX}time`] = ctx.vars.get(`${PREFIX}time`);
-        sandbox[`${PREFIX}bar_index`] = ctx.vars.get(`${PREFIX}bar_index`);
-        sandbox[`${PREFIX}na`] = ctx.opsv2_na;
-
-        Object.defineProperty(sandbox, '__opsv2_initialized', {
-            value: true, writable: true, enumerable: false
-        });
-    }
-
-    ctx.reset();
-
-    const vmContext = vm.isContext(sandbox) ? sandbox : vm.createContext(sandbox);
-    return vm.runInContext(jsCode, vmContext);
-}
-
-export function compile(jsCode: string, ctx: Context, sandbox: any) {
-    // 1. ONE-TIME INITIALIZATION
+/**
+ * Initializes the sandbox environment, injecting the stdlib, 
+ * series pointers, and legacy variables exactly once.
+ */
+function initializeSandbox(sandbox: any, ctx: Context) {
     if (!sandbox.__opsv2_initialized) {
         sandbox.ctx = ctx;
 
@@ -74,16 +50,38 @@ export function compile(jsCode: string, ctx: Context, sandbox: any) {
         sandbox[`${PREFIX}close`] = ctx.vars.get(`${PREFIX}close`);
         sandbox[`${PREFIX}volume`] = ctx.vars.get(`${PREFIX}volume`);
         sandbox[`${PREFIX}time`] = ctx.vars.get(`${PREFIX}time`);
-        sandbox[`${PREFIX}bar_index`] = ctx.vars.get(`${PREFIX}bar_index`);
+        
+        // LEGACY v2 MAPPING: 'n' replaces 'bar_index' as the chronological series
+        sandbox[`${PREFIX}n`] = ctx.vars.get(`${PREFIX}bar_index`);
         sandbox[`${PREFIX}na`] = ctx.opsv2_na;
 
         Object.defineProperty(sandbox, '__opsv2_initialized', {
             value: true, writable: true, enumerable: false
         });
     }
+}
 
-    // 2. WRAP SCRIPT IN A FUNCTION
+export function run(jsCode: string, ctx: Context, sandbox: any): any {
+    initializeSandbox(sandbox, ctx);
+
+    ctx.reset();
+
+    const vmContext = vm.isContext(sandbox) ? sandbox : vm.createContext(sandbox);
+    
+    // POISON PILL: Injected directly into the VM to bypass Contextification stripping
+    const poisonJS = `Object.defineProperty(this, '${PREFIX}bar_index', { get: function() { throw new Error("bar_index is strictly prohibited in v2. Use 'n' instead."); }, configurable: true });\n`;
+
+    return vm.runInContext(poisonJS + jsCode, vmContext);
+}
+
+export function compile(jsCode: string, ctx: Context, sandbox: any) {
+    // 1. ONE-TIME INITIALIZATION
+    initializeSandbox(sandbox, ctx);
+
+    // 2. WRAP SCRIPT IN A FUNCTION WITH POISON PILL INJECTED
     const wrappedCode = `
+        Object.defineProperty(this, '${PREFIX}bar_index', { get: function() { throw new Error("bar_index is strictly prohibited in v2. Use 'n' instead."); }, configurable: true });
+
         ${PREFIX}main = function() {
             ${jsCode}
         };

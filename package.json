@@ -12,7 +12,8 @@
     "test": "node --import tsx --test tests/v2/lexer/lexer.test.ts tests/v2/parser/parser.test.ts tests/v2/ta/ta.test.ts tests/v2/transpiler/*.test.ts"
   },
   "dependencies": {
-    "antlr4ng": "^1.0.0"
+    "antlr4ng": "^1.0.0",
+    "vitest": "^4.0.18"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

@@ -129,6 +129,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: core.iff
       },
+      "safe_add": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_add
+      },
+      "safe_sub": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_sub
+      },
       "tostring": {
           uses_context: false,
           args: ["x"],
@@ -456,6 +472,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: strategy.close_all
+      },
+      "strategy.exit": {
+          uses_context: true,
+          args: ["id","from_entry","qty","profit","limit","loss","stop"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.exit
+      },
+      "strategy.processPendingOrders": {
+          uses_context: true,
+          args: ["high","low"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.processPendingOrders
       },
       "strategy.position_size": {
           uses_context: true,

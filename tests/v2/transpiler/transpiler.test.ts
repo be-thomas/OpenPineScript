@@ -34,7 +34,12 @@ function runPine(pineSource: string): Record<string, unknown> {
   js = js.replace(/\blet\b/g, "var");
   const ctx = new Context();
   const sandbox: Record<string, unknown> = Object.create(null);
+  
+  // Inject Context and safe math wrappers into the mock VM sandbox
   sandbox.ctx = ctx;
+  sandbox.opsv2_safe_add = (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) + (Number.isNaN(Number(b)) ? 0 : Number(b));
+  sandbox.opsv2_safe_sub = (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) - (Number.isNaN(Number(b)) ? 0 : Number(b));
+
   vm.createContext(sandbox);
   vm.runInContext(js, sandbox);
   return sandbox;
@@ -69,6 +74,10 @@ function runInSandbox(pineSource: string, extra: Record<string, unknown>): Recor
     [`${OPSV2}open`]: ctx.vars.get(`${OPSV2}open`),
     [`${OPSV2}high`]: ctx.vars.get(`${OPSV2}high`),
     [`${OPSV2}low`]: ctx.vars.get(`${OPSV2}low`),
+
+    // Inject the math wrappers for the mock VM
+    opsv2_safe_add: (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) + (Number.isNaN(Number(b)) ? 0 : Number(b)),
+    opsv2_safe_sub: (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) - (Number.isNaN(Number(b)) ? 0 : Number(b)),
   };
   
   vm.createContext(sandbox);

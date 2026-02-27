@@ -4,3 +4,4 @@ parser/v2/generated/
 .DS_Store
 
 *.dev.md
+feed.sh

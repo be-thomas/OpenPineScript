@@ -9,6 +9,29 @@ export const direction = {
     short: "short"
 };
 
+// --- NEW: Pending Order Queue Interfaces & Helpers ---
+
+export interface PendingExit {
+    id: string;
+    from_entry: string;
+    qty: number;
+    limit: number;
+    stop: number;
+}
+
+/**
+ * Helper to dynamically attach and retrieve the pending exits queue 
+ * without requiring modifications to the base Context class.
+ */
+function getPendingExits(ctx: Context): Map<string, PendingExit> {
+    if (!(ctx as any)._pendingExits) {
+        (ctx as any)._pendingExits = new Map<string, PendingExit>();
+    }
+    return (ctx as any)._pendingExits;
+}
+
+// --- CORE EXECUTIONS ---
+
 /**
  * Enters a position.
  * If we are in the opposite position, it closes it first (reverses).
@@ -60,8 +83,6 @@ export function close_all(ctx: Context, comment: string = "") {
     const isLong = ctx.position.size > 0;
 
     // Calculate PnL
-    // Long: (Exit - Entry) * Qty
-    // Short: (Entry - Exit) * Qty
     let pnl = 0;
     if (isLong) {
         pnl = (currentPrice - ctx.position.avgPrice) * qty;
@@ -72,7 +93,7 @@ export function close_all(ctx: Context, comment: string = "") {
     // Record Trade
     const trade: Trade = {
         id: comment || "Close",
-        entryTime: 0, // We don't track exact entry time in this simple version
+        entryTime: 0, 
         entryPrice: ctx.position.avgPrice,
         exitTime: ctx.time,
         exitPrice: currentPrice,
@@ -84,10 +105,103 @@ export function close_all(ctx: Context, comment: string = "") {
     ctx.trades.push(trade);
     ctx.cash += pnl; // Update Equity
     
-    // Reset Position
+    // Reset Position & Purge Pending Exits (OCA behavior)
     ctx.position.size = 0;
     ctx.position.avgPrice = 0;
+    getPendingExits(ctx).clear();
 }
+
+// --- NEW: ASYNCHRONOUS EXITS & MATCHING ENGINE ---
+
+/**
+ * Registers a Take Profit / Stop Loss bracket order into the pending queue.
+ */
+export function exit(
+    ctx: Context,
+    id: string,
+    from_entry: string = "",
+    qty: number = Number.NaN,
+    profit: number = Number.NaN, // Distance (not implemented here, requires mintick)
+    limit: number = Number.NaN,  // Absolute price Take Profit
+    loss: number = Number.NaN,   // Distance 
+    stop: number = Number.NaN    // Absolute price Stop Loss
+): void {
+    const exits = getPendingExits(ctx);
+    exits.set(id, {
+        id,
+        from_entry,
+        qty: Number.isNaN(qty) ? Math.abs(ctx.position.size) : qty,
+        limit,
+        stop
+    });
+}
+
+/**
+ * Processes pending orders against the current bar's High and Low.
+ * MUST be called dynamically by the runtime engine after script evaluation.
+ */
+export function processPendingOrders(ctx: Context, high: number, low: number): void {
+    if (ctx.position.size === 0) return;
+    
+    const exits = getPendingExits(ctx);
+    if (exits.size === 0) return;
+
+    const isLong = ctx.position.size > 0;
+
+    for (const [exitId, order] of exits.entries()) {
+        let executedPrice = Number.NaN;
+
+        if (isLong) {
+            // Check Take Profit (Limit) - Hit high
+            if (!Number.isNaN(order.limit) && high >= order.limit) {
+                executedPrice = order.limit;
+            }
+            // Check Stop Loss (Stop) - Hit low
+            else if (!Number.isNaN(order.stop) && low <= order.stop) {
+                executedPrice = order.stop;
+            }
+        } 
+        else { // Short
+            // Check Take Profit (Limit) - Hit low
+            if (!Number.isNaN(order.limit) && low <= order.limit) {
+                executedPrice = order.limit;
+            }
+            // Check Stop Loss (Stop) - Hit high
+            else if (!Number.isNaN(order.stop) && high >= order.stop) {
+                executedPrice = order.stop;
+            }
+        }
+
+        // Execution Triggered
+        if (!Number.isNaN(executedPrice)) {
+            const qty = Number.isNaN(order.qty) ? Math.abs(ctx.position.size) : order.qty;
+            const pnl = isLong ? (executedPrice - ctx.position.avgPrice) * qty : (ctx.position.avgPrice - executedPrice) * qty;
+
+            ctx.trades.push({
+                id: `Exit ${exitId}`,
+                entryTime: 0,
+                entryPrice: ctx.position.avgPrice,
+                exitTime: ctx.time,
+                exitPrice: executedPrice,
+                qty: qty,
+                pnl: pnl,
+                direction: isLong ? "long" : "short"
+            });
+            
+            ctx.cash += pnl;
+            
+            // Simplified: Closes full position on any exit trigger
+            ctx.position.size = 0;
+            ctx.position.avgPrice = 0;
+            
+            // OCA: Clear this exit, and since position is 0, clear everything
+            exits.clear();
+            break; 
+        }
+    }
+}
+
+// --- STATE GETTERS ---
 
 /**
  * Returns the current position size.

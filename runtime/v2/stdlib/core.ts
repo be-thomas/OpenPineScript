@@ -15,7 +15,7 @@ function val(x: any): any {
 
 
 // --- Polymorphic Null Checks ---
-    
+
 
 // na(x): Returns true if x is NaN (number) or null/undefined (string/bool)
 export function na(x: any): boolean {
@@ -35,12 +35,29 @@ export function nz(x: any, y?: any): any {
 
 // iff(cond, trueVal, falseVal): Functional ternary operator
 export function iff(cond: any, t: any, f: any): any {
-    return val(cond) ? t : f;
+    return val(cond) ? val(t) : val(f);
 }
 
+// --- Pine v2 Arithmetic Anomaly Wrappers ---
+
+// safe_add: Coerces NaN ('na') to 0 to prevent logical counting from poisoning the series.
+// Implicitly casts booleans (true=1, false=0).
+export function safe_add(a: any, b: any): number {
+    const nA = Number(val(a));
+    const nB = Number(val(b));
+    return (Number.isNaN(nA) ? 0 : nA) + (Number.isNaN(nB) ? 0 : nB);
+}
+
+// safe_sub: Coerces NaN ('na') to 0 to prevent logical counting from poisoning the series.
+// Implicitly casts booleans (true=1, false=0).
+export function safe_sub(a: any, b: any): number {
+    const nA = Number(val(a));
+    const nB = Number(val(b));
+    return (Number.isNaN(nA) ? 0 : nA) - (Number.isNaN(nB) ? 0 : nB);
+}
 
 // --- Type Conversion (v2 Only) ---
-    
+
 // tostring(x): The ONLY casting function in v2
 export function tostring(x: any): string {
     const v = val(x);
@@ -49,6 +66,8 @@ export function tostring(x: any): string {
     }
     return String(v);
 }
+
+// --- Core Math ---
 
 export function abs(x: any): number {
     return Math.abs(val(x));
@@ -128,9 +147,9 @@ export function avg(...args: any[]): number {
 }
 
 // --- Standard Pine Palette (Material Design-ish) ---
-export const red =     "#FF5252";
+export const red = "#FF5252";
 export const green = "#4CAF50";
-export const blue =    "#2196F3";
+export const blue = "#2196F3";
 export const orange = "#FF9800";
 export const teal = "#009688";
 export const navy = "#3F51B5";
