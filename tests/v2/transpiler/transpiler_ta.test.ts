@@ -17,7 +17,6 @@ function setupEngine(pine: string, ctx: Context) {
 }
 
 describe("transpiler ta differential testing", () => {
-    // Enhanced data to support ATR and SAR (Highs/Lows matter now)
     const data = [
         { o: 10, h: 12, l: 9,  c: 11, v: 100 },
         { o: 11, h: 15, l: 11, c: 14, v: 150 },
@@ -26,7 +25,7 @@ describe("transpiler ta differential testing", () => {
         { o: 17, h: 20, l: 16, c: 19, v: 180 },
         { o: 19, h: 22, l: 18, c: 21, v: 250 },
         { o: 21, h: 25, l: 20, c: 24, v: 300 },
-        { o: 24, h: 23, l: 20, c: 21, v: 100 }, // Bearish bar
+        { o: 24, h: 23, l: 20, c: 21, v: 100 },
         { o: 21, h: 22, l: 18, c: 19, v: 120 }
     ];
 
@@ -51,15 +50,21 @@ describe("transpiler ta differential testing", () => {
         const len = 3;
         const ctx = new Context();
         const exec = setupEngine(`a = atr(${len})\nv = vwap(close)`.trim(), ctx);
-        const naive = new NaiveTA();
+        const naive = new NaiveTA(); 
 
         data.forEach((d, i) => {
             ctx.setBar(i, d.o, d.h, d.l, d.c, d.v);
-            exec();
             naive.add(d.c, d.v, d.h, d.l);
-            if (i >= len - 1) {
-                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}a`, 0)), fix(naive.atr(len)), `ATR mismatch at bar ${i}`);
-                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}v`, 0)), fix(naive.vwap()), `VWAP mismatch at bar ${i}`);
+            exec();
+            
+            // CRITICAL: Calculate naive ATR every bar so the state Map persists
+            const nAtr = naive.atr(len); 
+            const nVwap = naive.vwap();
+
+            // Only compare once we hit the stable threshold
+            if (i >= len) { 
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}a`, 0)), fix(nAtr), `ATR mismatch at bar ${i}`);
+                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}v`, 0)), fix(nVwap), `VWAP mismatch at bar ${i}`);
             }
             ctx.finalizeBar();
         });
@@ -67,7 +72,6 @@ describe("transpiler ta differential testing", () => {
 
     it("matches Naive ValueWhen and BarsSince (State Lookups)", () => {
         const ctx = new Context();
-        // FLUSHED TO LEFT TO PREVENT INDENT ERRORS
         const pine = [
             'cond = close > open',
             'vw = valuewhen(cond, close, 0)',

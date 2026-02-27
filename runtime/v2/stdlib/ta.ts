@@ -115,11 +115,6 @@ export function rma(ctx: Context, sourceInput: any, lengthInput: any): number {
     
     // Uses whatever is on the stack (e.g., ".../ta.atr/internal_rma")
     const state = ctx.getPersistentState<EmaState>(() => ({ prev: undefined }));
-
-    // Inside rma
-    if (ctx.currentBarIndex < 3) {
-        console.log(`[ENGINE] Bar ${ctx.currentBarIndex} | Source: ${source} | Prev: ${state.prev}`);
-    }
     
     if (isNaN(source)) return NaN;
 

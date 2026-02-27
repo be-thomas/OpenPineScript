@@ -122,3 +122,86 @@ describe("Broker Emulator: Asynchronous Strategy Exits", () => {
     });
 
 });
+
+// --- NEW: PENDING ENTRY AND CANCELLATION TESTS ---
+
+describe("Broker Emulator: Asynchronous Strategy Entries & Cancellation", () => {
+
+    it("should execute a Long Limit Entry when price drops to limit level", () => {
+        const pine = [
+            'if n == 0',
+            '    strategy.order("BuyLimit", strategy.long, 1, 90)' // limit=90
+        ].join('\n');
+
+        const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 }, // No fill (low 95 > limit 90)
+            { o: 100, h: 105, l: 85, c: 95 }   // Fill (low 85 <= limit 90)
+        ]);
+
+        assert.strictEqual(ctx.position.size, 1, "Should have entered long");
+        assert.strictEqual(ctx.position.avgPrice, 90, "Should fill at limit price");
+    });
+
+    it("should execute a Long Stop Entry when price rises to stop level", () => {
+        const pine = [
+            'if n == 0',
+            '    strategy.order("BuyStop", strategy.long, 1, na, 110)' // stop=110
+        ].join('\n');
+
+        const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 }, // No fill (high 105 < stop 110)
+            { o: 100, h: 115, l: 100, c: 105 } // Fill (high 115 >= stop 110)
+        ]);
+
+        assert.strictEqual(ctx.position.size, 1);
+        assert.strictEqual(ctx.position.avgPrice, 110);
+    });
+
+    it("should execute a Short Limit Entry when price rises to limit level", () => {
+        const pine = [
+            'if n == 0',
+            '    strategy.order("SellLimit", strategy.short, 1, 110)' // limit=110
+        ].join('\n');
+
+        const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 },
+            { o: 100, h: 115, l: 100, c: 105 }
+        ]);
+
+        assert.strictEqual(ctx.position.size, -1);
+        assert.strictEqual(ctx.position.avgPrice, 110);
+    });
+
+    it("should execute a Short Stop Entry when price drops to stop level", () => {
+        const pine = [
+            'if n == 0',
+            '    strategy.order("SellStop", strategy.short, 1, na, 90)' // stop=90
+        ].join('\n');
+
+        const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 },
+            { o: 100, h: 105, l: 85, c: 95 }
+        ]);
+
+        assert.strictEqual(ctx.position.size, -1);
+        assert.strictEqual(ctx.position.avgPrice, 90);
+    });
+
+    it("should remove a pending order when strategy.cancel is called", () => {
+        const pine = [
+            'if n == 0',
+            '    strategy.order("Order1", strategy.long, 1, 90)',
+            'if n == 1',
+            '    strategy.cancel("Order1")'
+        ].join('\n');
+
+        const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 }, // n=0: Order placed
+            { o: 100, h: 105, l: 95, c: 100 }, // n=1: Order cancelled
+            { o: 100, h: 105, l: 80, c: 95 }   // n=2: Price drops to 80, but order is gone
+        ]);
+
+        assert.strictEqual(ctx.position.size, 0, "Order should have been cancelled");
+        assert.strictEqual((ctx as any)._pendingEntries.size, 0);
+    });
+});

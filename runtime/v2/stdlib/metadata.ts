@@ -449,6 +449,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: input.input
       },
+      "strategy.order": {
+          uses_context: true,
+          args: ["id","dir","qty","limit","stop"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.order
+      },
       "strategy.entry": {
           uses_context: true,
           args: ["id","dir","qty"],
@@ -472,6 +480,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: strategy.close_all
+      },
+      "strategy.cancel": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.cancel
+      },
+      "strategy.cancel_all": {
+          uses_context: true,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.cancel_all
       },
       "strategy.exit": {
           uses_context: true,

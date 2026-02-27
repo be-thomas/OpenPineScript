@@ -24,6 +24,15 @@ export interface PendingExit {
     stop: number;
 }
 
+// NEW: Pending Entry interface for strategy.order
+export interface PendingEntry {
+    id: string;
+    dir: string;
+    qty: number;
+    limit: number;
+    stop: number;
+}
+
 /**
  * Helper to dynamically attach and retrieve the pending exits queue 
  * without requiring modifications to the base Context class.
@@ -35,34 +44,71 @@ function getPendingExits(ctx: Context): Map<string, PendingExit> {
     return (ctx as any)._pendingExits;
 }
 
+/**
+ * Helper to dynamically attach and retrieve the pending entries queue.
+ */
+function getPendingEntries(ctx: Context): Map<string, PendingEntry> {
+    if (!(ctx as any)._pendingEntries) {
+        (ctx as any)._pendingEntries = new Map<string, PendingEntry>();
+    }
+    return (ctx as any)._pendingEntries;
+}
+
 // --- CORE EXECUTIONS ---
+
+/**
+ * Registers a pending entry order (Limit or Stop).
+ */
+export function order(
+    ctx: Context,
+    id: string,
+    dir: string,
+    qty: any = 1,
+    limit: any = Number.NaN,
+    stop: any = Number.NaN
+): void {
+    const lim = val(limit);
+    const stp = val(stop);
+
+    // If no limit/stop is provided, it's effectively a market order; execute immediately.
+    if (Number.isNaN(lim) && Number.isNaN(stp)) {
+        return entry(ctx, id, dir, qty);
+    }
+
+    const entries = getPendingEntries(ctx);
+    entries.set(id, {
+        id,
+        dir,
+        qty: val(qty),
+        limit: lim,
+        stop: stp
+    });
+}
 
 /**
  * Enters a position.
  * If we are in the opposite position, it closes it first (reverses).
  */
-export function entry(ctx: Context, id: string, dir: string, qty: any = 1) {
+export function entry(ctx: Context, id: string, dir: string, qty: any = 1, overridePrice?: number) {
     const isLong = dir === direction.long;
-    const currentPrice = ctx.close;
+    // Use overridePrice (Limit/Stop level) if provided, otherwise fallback to ctx.close (Market)
+    const currentPrice = overridePrice !== undefined ? overridePrice : ctx.close;
     const numQty = val(qty);
     
     // 1. Check if we need to reverse (Close opposite position)
     if (ctx.position.size !== 0) {
         const isCurrentLong = ctx.position.size > 0;
-        // If direction is different, close existing first
         if (isLong !== isCurrentLong) {
             close_all(ctx, `Reverse for ${id}`);
         }
     }
 
-    // 2. Execute Entry (Market Order at Close)
-    // Update Average Price (Weighted Average)
+    // 2. Execute Entry
     const newQty = isLong ? numQty : -numQty;
     const currentVal = Math.abs(ctx.position.size) * ctx.position.avgPrice;
     const newVal = Math.abs(newQty) * currentPrice;
     const totalQty = Math.abs(ctx.position.size + newQty);
     
-    // Avoid divide by zero
     if (totalQty !== 0) {
         ctx.position.avgPrice = (currentVal + newVal) / totalQty;
     } else {
@@ -117,6 +163,22 @@ export function close_all(ctx: Context, comment: string = "") {
     getPendingExits(ctx).clear();
 }
 
+/**
+ * Cancels a pending order by ID.
+ */
+export function cancel(ctx: Context, id: string): void {
+    getPendingEntries(ctx).delete(id);
+    getPendingExits(ctx).delete(id);
+}
+
+/**
+ * Cancels all pending orders.
+ */
+export function cancel_all(ctx: Context): void {
+    getPendingEntries(ctx).clear();
+    getPendingExits(ctx).clear();
+}
+
 // --- NEW: ASYNCHRONOUS EXITS & MATCHING ENGINE ---
 
 /**
@@ -147,6 +209,26 @@ export function exit(
  * MUST be called dynamically by the runtime engine after script evaluation.
  */
 export function processPendingOrders(ctx: Context, high: number, low: number): void {
+    // 1. Process Pending Entries (strategy.order)
+    const entries = getPendingEntries(ctx);
+    for (const [id, ord] of entries.entries()) {
+        let price = Number.NaN;
+        if (ord.dir === direction.long) {
+            if (!Number.isNaN(ord.limit) && low <= ord.limit) price = ord.limit;
+            else if (!Number.isNaN(ord.stop) && high >= ord.stop) price = ord.stop;
+        } else {
+            if (!Number.isNaN(ord.limit) && high >= ord.limit) price = ord.limit;
+            else if (!Number.isNaN(ord.stop) && low <= ord.stop) price = ord.stop;
+        }
+
+        if (!Number.isNaN(price)) {
+            // PASS THE TRIGGER PRICE to entry() so avgPrice is calculated correctly
+            entry(ctx, id, ord.dir, ord.qty, price);
+            entries.delete(id);
+        }
+    }
+
+    // 2. Process Pending Exits (strategy.exit)
     if (ctx.position.size === 0) return;
     
     const exits = getPendingExits(ctx);
