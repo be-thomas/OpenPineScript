@@ -9,6 +9,11 @@ export const direction = {
     short: "short"
 };
 
+// Helper to safely unwrap Series objects into primitive numbers
+function val(x: any): number {
+    return (x !== null && x !== undefined && typeof x.valueOf === 'function') ? Number(x.valueOf()) : Number(x);
+}
+
 // --- NEW: Pending Order Queue Interfaces & Helpers ---
 
 export interface PendingExit {
@@ -36,9 +41,10 @@ function getPendingExits(ctx: Context): Map<string, PendingExit> {
  * Enters a position.
  * If we are in the opposite position, it closes it first (reverses).
  */
-export function entry(ctx: Context, id: string, dir: string, qty: number = 1) {
+export function entry(ctx: Context, id: string, dir: string, qty: any = 1) {
     const isLong = dir === direction.long;
     const currentPrice = ctx.close;
+    const numQty = val(qty);
     
     // 1. Check if we need to reverse (Close opposite position)
     if (ctx.position.size !== 0) {
@@ -51,7 +57,7 @@ export function entry(ctx: Context, id: string, dir: string, qty: number = 1) {
 
     // 2. Execute Entry (Market Order at Close)
     // Update Average Price (Weighted Average)
-    const newQty = isLong ? qty : -qty;
+    const newQty = isLong ? numQty : -numQty;
     const currentVal = Math.abs(ctx.position.size) * ctx.position.avgPrice;
     const newVal = Math.abs(newQty) * currentPrice;
     const totalQty = Math.abs(ctx.position.size + newQty);
@@ -120,19 +126,19 @@ export function exit(
     ctx: Context,
     id: string,
     from_entry: string = "",
-    qty: number = Number.NaN,
-    profit: number = Number.NaN, // Distance (not implemented here, requires mintick)
-    limit: number = Number.NaN,  // Absolute price Take Profit
-    loss: number = Number.NaN,   // Distance 
-    stop: number = Number.NaN    // Absolute price Stop Loss
+    qty: any = Number.NaN,
+    profit: any = Number.NaN, // Distance (not implemented here, requires mintick)
+    limit: any = Number.NaN,  // Absolute price Take Profit
+    loss: any = Number.NaN,   // Distance 
+    stop: any = Number.NaN    // Absolute price Stop Loss
 ): void {
     const exits = getPendingExits(ctx);
     exits.set(id, {
         id,
         from_entry,
-        qty: Number.isNaN(qty) ? Math.abs(ctx.position.size) : qty,
-        limit,
-        stop
+        qty: Number.isNaN(val(qty)) ? Math.abs(ctx.position.size) : val(qty),
+        limit: val(limit),
+        stop: val(stop)
     });
 }
 
