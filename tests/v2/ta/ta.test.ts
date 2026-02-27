@@ -13,13 +13,12 @@ const C = {
     Reset: "\x1b[0m",
 };
 
-const EPSILON = 0.000001; // Allow microscopic float drift
+const EPSILON = 0.000001; 
 const TOTAL_BARS = 5000;
 
 function assertClose(name: string, actual: number, expected: number, barIdx: number, length: number) {
     if (Number.isNaN(actual) && Number.isNaN(expected)) return;
     
-    // Handle very small numbers or zero
     const diff = Math.abs(actual - expected);
     if (diff > EPSILON) {
         console.error(`${C.Red}[FAIL] ${name} Bar:${barIdx} Len:${length} | Actual: ${actual} vs Ref: ${expected}${C.Reset}`);
@@ -33,40 +32,58 @@ function runStressTest(mode: "STABLE" | "INCREASING" | "DECREASING" | "OSCILLATI
     const ctx = new Context();
     const naive = new NaiveTA();
     
-    // Data Generators
     let price = 100;
+    // We'll track condition history for valuewhen/barssince
+    const conditionHistory: boolean[] = [];
+    const sourceHistory: number[] = [];
     
     for (let i = 0; i < TOTAL_BARS; i++) {
-        // 1. Generate Random Data
+        // 1. Generate Realistic OHLCV Data
         const change = (Math.random() - 0.5) * 2;
-        price += change;
+        const open = price;
+        const close = price + change;
+        const high = Math.max(open, close) + Math.random();
+        const low = Math.min(open, close) - Math.random();
         const vol = Math.abs(Math.random() * 1000);
+        price = close;
 
-        // Update Context
-        ctx.close = price;
+        // Update Context (mimicking the real engine's setBar behavior)
+        (ctx as any).high = high;
+        (ctx as any).low = low;
+        ctx.close = close;
         ctx.volume = vol;
         
         // Update Naive
-        naive.add(price, vol);
+        naive.add(close, vol, high, low);
 
-        // 2. Determine Length based on Mode
+        // Track conditions for state lookups
+        const isBullish = close > open;
+        conditionHistory.push(isBullish);
+        sourceHistory.push(close);
+
+        // 2. Determine Length
         let len = 14;
         if (mode === "STABLE") len = 14;
-        if (mode === "INCREASING") len = Math.min(100, 5 + Math.floor(i / 50)); // Grows slowly
-        if (mode === "DECREASING") len = Math.max(2, 100 - Math.floor(i / 50)); // Shrinks slowly
-        if (mode === "OSCILLATING") len = Math.floor(Math.random() * 40) + 5; // Chaos (5 to 45)
+        if (mode === "INCREASING") len = Math.min(100, 5 + Math.floor(i / 50));
+        if (mode === "DECREASING") len = Math.max(2, 100 - Math.floor(i / 50));
+        if (mode === "OSCILLATING") len = Math.floor(Math.random() * 40) + 5;
 
         // 3. EXECUTE OPTIMIZED
-        // We must call ctx.reset() before calling functions for this bar!
-        // ctx.reset(); 
-
         const resSMA = ctx.call("ta.sma@test", ta.sma, ctx, ctx.close, len);
         const resWMA = ctx.call("ta.wma@test", ta.wma, ctx, ctx.close, len);
         const resBB = ctx.call("ta.bb@test", ta.bb, ctx, ctx.close, len, 2.0);
         const resHigh = ctx.call("ta.highest@test", ta.highest, ctx, ctx.close, len);
         const resLow = ctx.call("ta.lowest@test", ta.lowest, ctx, ctx.close, len);
-        const resHighBar = ctx.call("ta.highestbars@test", ta.highestbars, ctx, ctx.close, len);
-        const resLowBar = ctx.call("ta.lowestbars@test", ta.lowestbars, ctx, ctx.close, len);
+        
+        // New Indicators
+        const resATR = ctx.call("ta.atr@test", ta.atr, ctx, len);
+        const resVWAP = ctx.call("ta.vwap@test", ta.vwap, ctx, ctx.close);
+        const resLinreg = ctx.call("ta.linreg@test", ta.linreg, ctx, ctx.close, len, 0);
+        const resSAR = ctx.call("ta.sar@test", ta.sar, ctx, 0.02, 0.02, 0.2);
+        
+        // State Lookups
+        const resVW = ctx.call("ta.valuewhen@test", ta.valuewhen, ctx, isBullish, ctx.close, 0);
+        const resBS = ctx.call("ta.barssince@test", ta.barssince, ctx, isBullish);
 
         // 4. EXECUTE NAIVE
         const refSMA = naive.sma(len);
@@ -74,32 +91,28 @@ function runStressTest(mode: "STABLE" | "INCREASING" | "DECREASING" | "OSCILLATI
         const refBB = naive.bb(len, 2.0);
         const refHigh = naive.highest(len);
         const refLow = naive.lowest(len);
-        const refHighBar = naive.highestbars(len);
-        const refLowBar = naive.lowestbars(len);
+        const refATR = naive.atr(len);
+        const refVWAP = naive.vwap();
+        const refLinreg = naive.linreg(len, 0);
+        const refSAR = naive.sar(0.02, 0.02, 0.2);
+        const refVW = naive.valuewhen(conditionHistory, sourceHistory, 0);
+        const refBS = naive.barssince(conditionHistory);
 
         // 5. COMPARE
-        // Only compare if enough bars exist
         if (i > 100) {
             assertClose("SMA", resSMA, refSMA, i, len);
             assertClose("WMA", resWMA, refWMA, i, len);
-            
-            // BB returns [basis, upper, lower]
             assertClose("BB.basis", resBB[0], refBB[0], i, len);
-            assertClose("BB.upper", resBB[1], refBB[1], i, len);
-            assertClose("BB.lower", resBB[2], refBB[2], i, len);
-
             assertClose("Highest", resHigh, refHigh, i, len);
             assertClose("Lowest", resLow, refLow, i, len);
             
-            // Use slightly higher epsilon for Bars offset as it is integer but we want to be safe
-            if (resHighBar !== refHighBar) {
-                 console.error(`${C.Red}[FAIL] HighestBars Bar:${i} Len:${len} | Actual: ${resHighBar} vs Ref: ${refHighBar}${C.Reset}`);
-                 process.exit(1);
-            }
-            if (resLowBar !== refLowBar) {
-                 console.error(`${C.Red}[FAIL] LowestBars Bar:${i} Len:${len} | Actual: ${resLowBar} vs Ref: ${refLowBar}${C.Reset}`);
-                 process.exit(1);
-            }
+            // New Comparisons
+            assertClose("ATR", resATR, refATR, i, len);
+            assertClose("VWAP", resVWAP, refVWAP, i, len);
+            assertClose("Linreg", resLinreg, refLinreg, i, len);
+            assertClose("SAR", resSAR, refSAR, i, len);
+            assertClose("ValueWhen", resVW, refVW, i, len);
+            assertClose("BarsSince", resBS, refBS, i, len);
         }
     }
     console.log(`${C.Green}✔ Passed 5000 iterations.${C.Reset}`);

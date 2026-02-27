@@ -26,6 +26,11 @@ interface WmaState { buffer: number[]; sum: number; numerator: number; counter: 
 interface DequeState { buffer: number[]; dequeVals: number[]; dequeIdxs: number[]; globalIdx: number; prevLength: number; }
 interface EmaState { prev: number | undefined; }
 interface CrossState { prevX: number; prevY: number; }
+interface BarsSinceState { counter: number; }
+interface ValueWhenState { history: number[]; }
+interface AtrState { prevClose: number; }
+interface VwapState { sumVol: number; sumSrcVol: number; }
+interface SarState { isLong: boolean; af: number; ep: number; sar: number; initialized: boolean; }
 
 // --- Moving Averages ---
 
@@ -107,9 +112,23 @@ export function ema(ctx: Context, sourceInput: any, lengthInput: any): number {
 export function rma(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
+    
+    // Uses whatever is on the stack (e.g., ".../ta.atr/internal_rma")
     const state = ctx.getPersistentState<EmaState>(() => ({ prev: undefined }));
+
+    // Inside rma
+    if (ctx.currentBarIndex < 3) {
+        console.log(`[ENGINE] Bar ${ctx.currentBarIndex} | Source: ${source} | Prev: ${state.prev}`);
+    }
+    
+    if (isNaN(source)) return NaN;
+
+    if (state.prev === undefined || isNaN(state.prev)) { 
+        state.prev = source; 
+        return source; 
+    }
+    
     const alpha = 1 / length;
-    if (state.prev === undefined) { state.prev = source; return source; }
     const currentRma = (source * alpha) + (state.prev * (1 - alpha));
     state.prev = currentRma;
     return currentRma;
@@ -477,5 +496,181 @@ export function stoch(ctx: Context, sourceInput: any, highInput: any, lowInput: 
     return 100 * (source - l) / (h - l);
 }
 
+// --- Legacy State Lookups & Math ---
 
+/**
+ * valuewhen: Returns the value of 'source' when 'condition' was true on the nth occurrence.
+ * @returns series float
+ */
+export function valuewhen(ctx: Context, conditionInput: any, sourceInput: any, occurrenceInput: any): number {
+    const condition = val(conditionInput);
+    const source = val(sourceInput);
+    const occurrence = Math.floor(val(occurrenceInput));
+    
+    const state = ctx.getPersistentState<ValueWhenState>(() => ({ history: [] }));
 
+    if (condition) {
+        state.history.unshift(source); // Prepend so index 0 is the most recent
+        if (state.history.length > MAX_BUFFER_SIZE) {
+            state.history.pop();
+        }
+    }
+
+    if (occurrence < 0 || occurrence >= state.history.length) return NaN;
+    return state.history[occurrence];
+}
+
+/**
+ * barssince: Returns the number of bars since the condition last evaluated to true.
+ * @returns series int
+ */
+export function barssince(ctx: Context, conditionInput: any): number {
+    const condition = val(conditionInput);
+    const state = ctx.getPersistentState<BarsSinceState>(() => ({ counter: NaN }));
+    
+    if (condition) {
+        state.counter = 0;
+    } else if (!isNaN(state.counter)) {
+        state.counter++;
+    }
+    
+    return state.counter;
+}
+
+/**
+ * atr: Average True Range (requires contextual high/low/close data)
+ * @returns series float
+ */
+export function atr(ctx: Context, lengthInput: any): number {
+    const length = val(lengthInput);
+    const state = ctx.getPersistentState<AtrState>(() => ({ prevClose: NaN }));
+    
+    const currentHigh = ctx.high;
+    const currentLow = ctx.low;
+    const currentClose = ctx.close;
+
+    const prevC = isNaN(state.prevClose) ? currentClose : state.prevClose;
+    const trueRange = Math.max(
+        currentHigh - currentLow,
+        Math.abs(currentHigh - prevC),
+        Math.abs(currentLow - prevC)
+    );
+    
+    state.prevClose = currentClose;
+    
+    // MANUAL STACK PUSH: Ensures isolation without triggering registry-based injection
+    (ctx as any).callStack.push("internal_rma");
+    const result = rma(ctx, trueRange, length);
+    (ctx as any).callStack.pop();
+    
+    return result;
+}
+
+/**
+ * vwap: Cumulative Volume Weighted Average Price (Sessionless)
+ * @returns series float
+ */
+export function vwap(ctx: Context, sourceInput: any): number {
+    const source = val(sourceInput);
+    const volume = (ctx as any).volume !== undefined ? val((ctx as any).volume) : 0;
+    
+    const state = ctx.getPersistentState<VwapState>(() => ({ sumVol: 0, sumSrcVol: 0 }));
+    
+    state.sumVol += volume;
+    state.sumSrcVol += source * volume;
+    
+    if (state.sumVol === 0) return NaN;
+    return state.sumSrcVol / state.sumVol;
+}
+
+/**
+ * linreg: Linear Regression Curve
+ * @returns series float
+ */
+export function linreg(ctx: Context, sourceInput: any, lengthInput: any, offsetInput: any = 0): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const offset = Math.floor(val(offsetInput));
+    
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    
+    if (state.buffer.length < length) return NaN;
+    
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    const start = state.buffer.length - length;
+    
+    for (let i = 0; i < length; i++) {
+        const y = state.buffer[start + i];
+        const x = i;
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumX2 += x * x;
+    }
+    
+    const slope = (length * sumXY - sumX * sumY) / (length * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / length;
+    
+    return intercept + slope * (length - 1 - offset);
+}
+
+/**
+ * sar: Parabolic SAR (Simplified mathematical emulator)
+ * @returns series float
+ */
+export function sar(ctx: Context, startInput: any, incInput: any, maxInput: any): number {
+    const start = val(startInput);
+    const inc = val(incInput);
+    const max = val(maxInput);
+
+    const high = (ctx as any).high !== undefined ? val((ctx as any).high) : 0;
+    const low = (ctx as any).low !== undefined ? val((ctx as any).low) : 0;
+
+    const state = ctx.getPersistentState<SarState>(() => ({
+        isLong: true, af: start, ep: 0, sar: 0, initialized: false
+    }));
+
+    if (!state.initialized) {
+        state.sar = low;
+        state.ep = high;
+        state.initialized = true;
+        return state.sar;
+    }
+
+    let nextSar = state.sar + state.af * (state.ep - state.sar);
+
+    if (state.isLong) {
+        if (low < nextSar) {
+            state.isLong = false;
+            nextSar = Math.max(state.ep, high); // Switch to short
+            state.ep = low;
+            state.af = start;
+        } else {
+            if (high > state.ep) {
+                state.ep = high;
+                state.af = Math.min(state.af + inc, max);
+            }
+        }
+    } else {
+        if (high > nextSar) {
+            state.isLong = true;
+            nextSar = Math.min(state.ep, low); // Switch to long
+            state.ep = high;
+            state.af = start;
+        } else {
+            if (low < state.ep) {
+                state.ep = low;
+                state.af = Math.min(state.af + inc, max);
+            }
+        }
+    }
+    
+    state.sar = nextSar;
+    return state.sar;
+}

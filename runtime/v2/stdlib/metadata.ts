@@ -689,6 +689,54 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: ta.stoch
       },
+      "valuewhen": {
+          uses_context: true,
+          args: ["conditionInput","sourceInput","occurrenceInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.valuewhen
+      },
+      "barssince": {
+          uses_context: true,
+          args: ["conditionInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"int"},
+          is_value: false,
+          ref: ta.barssince
+      },
+      "atr": {
+          uses_context: true,
+          args: ["lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.atr
+      },
+      "vwap": {
+          uses_context: true,
+          args: ["sourceInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.vwap
+      },
+      "linreg": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput","offsetInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.linreg
+      },
+      "sar": {
+          uses_context: true,
+          args: ["startInput","incInput","maxInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.sar
+      },
       "year": {
           uses_context: false,
           args: ["t"],
