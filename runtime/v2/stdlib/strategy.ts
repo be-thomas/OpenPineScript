@@ -119,11 +119,28 @@ export function order(
 }
 
 /**
+ * 1. Ensure this helper is available to both entry and matching engine
+ */
+function syncRiskState(ctx: Context) {
+    const riskState = getRiskState(ctx);
+    const date = new Date(ctx.time);
+    const day = date.getUTCDate();
+    
+    if (day !== riskState.last_day) {
+        riskState.last_day = day;
+        riskState.start_equity = equity(ctx);
+        riskState.is_halted = false; // Reset the circuit breaker
+    }
+    return riskState;
+}
+
+/**
  * Enters a position.
  * If we are in the opposite position, it closes it first (reverses).
  */
 export function entry(ctx: Context, id: string, dir: string, qty: any = 1, overridePrice?: number) {
-    if (getRiskState(ctx).is_halted) return; // Risk circuit breaker
+    const riskState = syncRiskState(ctx);
+    if (riskState.is_halted) return;
 
     const isLong = dir === direction.long;
     // Use overridePrice (Limit/Stop level) if provided, otherwise fallback to ctx.close (Market)
@@ -244,15 +261,31 @@ export function exit(
  * MUST be called dynamically by the runtime engine after script evaluation.
  */
 export function processPendingOrders(ctx: Context, high: number, low: number): void {
-    const riskState = getRiskState(ctx);
-    
-    // NEW: Handle Intraday Reset & Loss Check
-    const date = new Date(ctx.time);
-    const day = date.getUTCDate();
-    if (day !== riskState.last_day) {
-        riskState.last_day = day;
-        riskState.start_equity = equity(ctx);
-        riskState.is_halted = false;
+    const riskState = syncRiskState(ctx);
+
+    // Check for Max Intraday Loss breach BEFORE processing new orders
+    if (!riskState.is_halted && !Number.isNaN(riskState.max_intraday_loss)) {
+        // Calculate worst-case equity for this bar to see if we hit the limit mid-bar
+        const worstPrice = ctx.position.size > 0 ? low : high;
+        const unrealized = (worstPrice - ctx.position.avgPrice) * ctx.position.size;
+        const currentEquity = ctx.cash + unrealized;
+
+        if ((riskState.start_equity - currentEquity) >= riskState.max_intraday_loss) {
+            riskState.is_halted = true;
+            
+            // Exact liquidation price calculation: Equity = Start - MaxLoss
+            const targetEquity = riskState.start_equity - riskState.max_intraday_loss;
+            const liquidationPrice = ctx.position.avgPrice + (targetEquity - ctx.cash) / ctx.position.size;
+            
+            // Temporarily set ctx.close so close_all uses the threshold price
+            const originalClose = ctx.close;
+            ctx.close = liquidationPrice;
+            close_all(ctx, "Max Intraday Loss Breach");
+            ctx.close = originalClose;
+
+            cancel_all(ctx);
+            return;
+        }
     }
 
     // If halted, clear all and return
@@ -260,17 +293,6 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
         cancel_all(ctx);
         if (ctx.position.size !== 0) close_all(ctx, "Risk Halt");
         return;
-    }
-
-    // Check for Max Intraday Loss breach
-    if (!Number.isNaN(riskState.max_intraday_loss)) {
-        const currentEquity = equity(ctx);
-        if ((riskState.start_equity - currentEquity) >= riskState.max_intraday_loss) {
-            riskState.is_halted = true;
-            close_all(ctx, "Max Intraday Loss Breach");
-            cancel_all(ctx);
-            return;
-        }
     }
 
     // 1. Process Pending Entries (strategy.order)

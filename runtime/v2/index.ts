@@ -11,18 +11,22 @@ import { PREFIX } from "../../utils/v2/common";
 export { Context };
 
 /**
- * Helper: Recursively injects standard library functions with prefixes.
+ * Helper: Recursively injects standard library functions with prefixes at EVERY level.
  */
 function injectStdlib(target: any, lib: any, prefix: string) {
     for (const [key, val] of Object.entries(lib)) {
+        // 1. Identify the new key with the prefix
+        const prefixedKey = prefix + key;
+
         if (isPlainObject(val)) {
+            // 2. If it's a namespace/object, create a new target object
             const namespaceObj: any = {};
-            for (const [innerKey, innerVal] of Object.entries(val as any)) {
-                namespaceObj[prefix + innerKey] = innerVal;
-            }
-            target[prefix + key] = namespaceObj;
+            // 3. RECURSE: Dig deeper into the object to prefix its children
+            injectStdlib(namespaceObj, val, prefix);
+            target[prefixedKey] = namespaceObj;
         } else {
-            target[prefix + key] = val;
+            // 4. It's a function or primitive, just assign it
+            target[prefixedKey] = val;
         }
     }
 }

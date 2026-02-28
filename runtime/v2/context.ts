@@ -161,22 +161,30 @@ export class Context {
      * 3. Keyword Argument Resolution (kwargs)
      */
     public call(id: string, fn: Function, ...args: any[]) {
+        // DIAGNOSTIC: If this triggers, the transpiler passed a null function reference
+        if (typeof fn !== 'function') {
+            throw new TypeError(`[Context.call] Execution error for ID "${id}": The provided reference is not a function. Check if the function exists in the stdlib.`);
+        }
+
         const identity = id; 
         this.callStack.push(identity);
         
         try {
-            // 1. Extract Function Name from ID (e.g. "ta.sma_L10_C4" -> "ta.sma")
             const fname = removePrefix(extractFunctionName(id)); 
-            
-            // 2. Fast O(1) Registry Lookup
             const entry = REGISTRY[fname];
 
-            // 3. Protect Static Values
-            if (entry && entry.is_value) {
+            // 1. Check if the entry exists. If not, we default to standard call (fail-safe)
+            if (!entry) {
+                // If we don't have metadata, we assume it's a standard JS function call
+                return fn(...args);
+            }
+
+            // 2. Protect Static Values
+            if (entry.is_value) {
                 throw new Error(`TypeError: '${fname}' is a value, not a function. You cannot call it.`);
             }
 
-            // 4. Handle Keyword Arguments
+            // 3. Handle Keyword Arguments
             const lastArg = args[args.length - 1];
             const hasKwargs = lastArg && typeof lastArg === 'object' && !Array.isArray(lastArg) 
                             && !(lastArg instanceof Series) && lastArg.constructor === Object;
@@ -187,12 +195,11 @@ export class Context {
                 const positionalArgs = args.slice(0, -1);
                 const kwargs = lastArg;
 
-                if (entry && entry.args.length > 0) {
+                if (entry.args.length > 0) {
                     finalArgs = [...positionalArgs];
-                    const params = entry.args; // e.g., ["series", "title", "color"]
+                    const params = entry.args; 
                     
                     for (const [_key, val] of Object.entries(kwargs)) {
-                        // _key is "opsv2_color". We strip it to match "color" in the registry.
                         const cleanKey = removePrefix(_key); 
                         const index = params.indexOf(cleanKey);
                         
@@ -208,11 +215,13 @@ export class Context {
                 }
             }
 
-            // 5. Execute with Context Injection check
-            if (entry && entry.uses_context) {
-                return fn(this, ...finalArgs); // Inject 'this' as the first parameter
+            // 4. Execute with Context Injection
+            // We use the entry's 'ref' as a backup if 'fn' passed from the VM is wonky,
+            // but primarily we use the 'fn' passed by the transpiled code.
+            if (entry.uses_context) {
+                return fn(this, ...finalArgs); 
             } else {
-                return fn(...finalArgs); // Standard call
+                return fn(...finalArgs);
             }
 
         } finally {

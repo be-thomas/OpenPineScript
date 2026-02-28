@@ -68,6 +68,16 @@ export class NaiveTA {
         return this.rma('atr_exclusive_key', tr, length);
     }
 
+    wma(src: number[], len: number): number {
+        let sum = 0, weightSum = 0;
+        for (let i = 0; i < len; i++) {
+            const weight = len - i;
+            sum += src[src.length - 1 - i] * weight;
+            weightSum += weight;
+        }
+        return sum / weightSum;
+    }
+
     // --- STANDARD METHODS (Untouched) ---
 
     sma(length: number): number {

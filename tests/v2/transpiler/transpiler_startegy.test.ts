@@ -233,11 +233,9 @@ describe("Broker Emulator: Asynchronous Strategy Entries & Cancellation", () => 
     });
 
     it("should reset the intraday loss halt on a new day", () => {
-        // Pine Script defines "intraday" by UTC day flips. 
-        // We simulate a day flip by jumping the timestamp in the loop.
         const js = transpile([
             'strategy.risk.max_intraday_loss(50)',
-            'if n == 0 or n == 1',
+            'if n == 0 or n == 1 or n == 2',
             '    strategy.entry("Entry", strategy.long)'
         ].join('\n')).replace(/\blet\b/g, "var ");
 
