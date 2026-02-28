@@ -122,15 +122,20 @@ function main(): void {
                       }
                   }
               }
-          } else {
-              // Check if it's a simple variable access (single ID token)
-              const meaningful = tokens.filter(t => ![PineScriptLexer.LEND, PineScriptLexer.BEGIN, PineScriptLexer.END, PineScriptLexer.WS].includes(t.type));
-              if (meaningful.length === 1 && meaningful[0].type === PineScriptLexer.ID) {
-                  const name = meaningful[0].text;
-                  // If resultValue is just the value, label it for clarity
-                  outputResult = typeof resultValue === 'function' ? `${name}=[function]` : `${name}=${JSON.stringify(resultValue)}`;
-              }
-          }
+            } else {
+                // --- NEW: Safely unwrap Series objects ---
+                if (outputResult !== null && typeof outputResult === 'object' && typeof outputResult.valueOf === 'function') {
+                    outputResult = outputResult.valueOf();
+                }
+  
+                // Check if it's a simple variable access (single ID token)
+                const meaningful = tokens.filter(t => ![PineScriptLexer.LEND, PineScriptLexer.BEGIN, PineScriptLexer.END, PineScriptLexer.WS].includes(t.type));
+                if (meaningful.length === 1 && meaningful[0].type === PineScriptLexer.ID) {
+                    const name = meaningful[0].text;
+                    // If resultValue is just the value, label it for clarity
+                    outputResult = typeof resultValue === 'function' ? `${name}=[function]` : `${name}=${JSON.stringify(outputResult)}`;
+                }
+            }
 
           callback(null, outputResult);
 

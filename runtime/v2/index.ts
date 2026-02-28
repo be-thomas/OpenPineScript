@@ -72,8 +72,8 @@ export function run(jsCode: string, ctx: Context, sandbox: any): any {
 
     const vmContext = vm.isContext(sandbox) ? sandbox : vm.createContext(sandbox);
     
-    // POISON PILL: Injected directly into the VM to bypass Contextification stripping
-    const poisonJS = `Object.defineProperty(this, '${PREFIX}bar_index', { get: function() { throw new Error("bar_index is strictly prohibited in v2. Use 'n' instead."); }, configurable: true });\n`;
+    // POISON PILL: Injected directly into the VM to bypass Contextification stripping 
+    const poisonJS = `Object.defineProperty(this, '${PREFIX}bar_index', { get: function() { throw new Error("bar_index is strictly prohibited in v2. Use 'n' instead."); }, configurable: true }); void 0;\n`;
 
     return vm.runInContext(poisonJS + jsCode, vmContext);
 }
