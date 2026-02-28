@@ -57,7 +57,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: barstate.islast
       },
-      "color.new": {
+      "color.color.new": {
           uses_context: false,
           args: ["colorStr","transp"],
           is_getter: false,
@@ -65,7 +65,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["new"]
       },
-      "color.rgb": {
+      "color.color.rgb": {
           uses_context: false,
           args: ["r","g","b","transp"],
           is_getter: false,
@@ -73,7 +73,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["rgb"]
       },
-      "color.r": {
+      "color.color.r": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
@@ -81,7 +81,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["r"]
       },
-      "color.g": {
+      "color.color.g": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
@@ -89,7 +89,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["g"]
       },
-      "color.b": {
+      "color.color.b": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
@@ -97,7 +97,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["b"]
       },
-      "color.t": {
+      "color.color.t": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
@@ -459,7 +459,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.entry": {
           uses_context: true,
-          args: ["id","dir","qty"],
+          args: ["id","dir","qty","overridePrice"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -537,7 +537,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: strategy.equity
       },
-      "strategy.long": {
+      "strategy.direction.long": {
           uses_context: false,
           args: [],
           is_getter: false,
@@ -545,13 +545,37 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: strategy.direction["long"]
       },
-      "strategy.short": {
+      "strategy.direction.short": {
           uses_context: false,
           args: [],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: true,
           ref: strategy.direction["short"]
+      },
+      "strategy.risk.max_intraday_loss": {
+          uses_context: true,
+          args: ["value","type"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.risk["max_intraday_loss"]
+      },
+      "strategy.long": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: strategy.long
+      },
+      "strategy.short": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: strategy.short
       },
       "sma": {
           uses_context: true,
@@ -761,7 +785,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: ta.sar
       },
-      "year": {
+      "time.year": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
@@ -769,7 +793,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (time.default || time)["year"]
       },
-      "month": {
+      "time.month": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
@@ -777,7 +801,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (time.default || time)["month"]
       },
-      "weekofyear": {
+      "time.weekofyear": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
@@ -785,7 +809,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (time.default || time)["weekofyear"]
       },
-      "dayofmonth": {
+      "time.dayofmonth": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
@@ -793,7 +817,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (time.default || time)["dayofmonth"]
       },
-      "dayofweek": {
+      "time.dayofweek": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
@@ -801,7 +825,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (time.default || time)["dayofweek"]
       },
-      "hour": {
+      "time.hour": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
@@ -809,7 +833,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (time.default || time)["hour"]
       },
-      "minute": {
+      "time.minute": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
@@ -817,7 +841,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (time.default || time)["minute"]
       },
-      "second": {
+      "time.second": {
           uses_context: false,
           args: ["t"],
           is_getter: false,
@@ -825,7 +849,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (time.default || time)["second"]
       },
-      "time": {
+      "time.time": {
           uses_context: true,
           args: [],
           is_getter: false,

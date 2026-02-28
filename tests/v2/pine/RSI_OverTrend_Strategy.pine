@@ -1,0 +1,30 @@
+//@version=2
+strategy("RSI OverTrend Strategy (by Marcoweb) v1.0", shorttitle="RSI_L_30_Strat_v1.0", overlay=true, default_qty_value=100000, initial_capital=25000, currency=currency.USD)
+///////////// RSI
+RSIlength = input(14, minval=1, title="RSI Period Length")
+RSIoverSold = 30
+RSIoverBought = 70
+RSITriggerLine = 30
+RSI = rsi(close, RSIlength)
+price = close
+vrsi = rsi(price, RSIlength)
+source = close
+buyEntry = crossover(source, RSITriggerLine)
+sellEntry = crossunder(source, RSITriggerLine)
+plot(RSI, color=red, title="RSI")
+p1 = plot(RSIoverSold, color=green, title="30")
+p2 = plot(RSIoverBought, color=green, title="70")
+p3 = plot(RSITriggerLine, color=green, title="30")
+///////////// RSI Level 30 v1.0 Strategy
+if (not na(vrsi))
+    if (crossover(RSI, RSITriggerLine))
+        strategy.entry("RSI_L", strategy.long, oca_type=strategy.oca.cancel, comment="RSI_L")
+    else
+        strategy.cancel(id="RSI_L")
+
+    if (crossunder(RSI, RSIoverBought))
+        strategy.entry("RSI_S", strategy.short, oca_type=strategy.oca.cancel, comment="RSI_S")
+    else
+        strategy.cancel(id="RSI_S")
+
+//plot(strategy.equity, title="equity", color=red, linewidth=2, style=areabr)

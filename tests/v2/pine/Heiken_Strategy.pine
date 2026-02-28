@@ -1,0 +1,70 @@
+//@version=2
+strategy("Heikin Strategy",shorttitle="HeikStrat",overlay=true,max_bars_back=50,default_qty_type=strategy.cash,initial_capital=100,currency=currency.USD)
+
+res1 = input(title="Heikin Ashi EMA Time Frame", type=resolution, defval="D")
+
+test = input(1,"Heikin Ashi EMA Shift")
+
+sloma = input(20,"Slow EMA Period")
+
+// MA (Kaufman)
+
+Length = input(5, minval=1)
+
+xPrice = input(hlc3)
+
+xvnoise = abs(xPrice - xPrice[1])
+
+Fastend = input(2.5,step=.5)
+
+Slowend = input(20)
+
+nfastend = 2/(Fastend + 1)
+
+nslowend = 2/(Slowend + 1)
+
+nsignal = abs(xPrice - xPrice[Length])
+
+nnoise = sum(xvnoise, Length)
+
+nefratio = iff(nnoise != 0, nsignal / nnoise, 0)
+
+nsmooth = pow(nefratio * (nfastend - nslowend) + nslowend, 2)
+
+nAMA = nz(nAMA[1]) + nsmooth * (xPrice - nz(nAMA[1]))
+
+//Heikin Ashi Open and Close Price
+
+ha_t = heikinashi(tickerid)
+
+ha_close = security(ha_t, period, nAMA)
+
+mha_close = security(ha_t, res1, hlc3)
+
+//Moving Average
+
+fma = ema(mha_close[test],1)
+
+sma = ema(ha_close,sloma)
+
+plot(fma,title="MA",color=yellow,linewidth=2,style=line)
+
+plot(sma,title="SMA",color=red,linewidth=2,style=line)
+
+//Strategy longs
+
+golong = crossover(fma,sma)
+
+longexit = crossunder(fma,sma)
+
+goshort = crossunder(fma,sma)
+
+shortexit = crossover(fma,sma)
+
+strategy.entry("Buy",strategy.long,when = golong)
+
+strategy.close("Buy",when = longexit)
+
+strategy.entry("Sell", strategy.short, when = goshort)
+
+strategy.close("Sell",when = shortexit)

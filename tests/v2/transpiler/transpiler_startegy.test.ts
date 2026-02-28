@@ -204,4 +204,62 @@ describe("Broker Emulator: Asynchronous Strategy Entries & Cancellation", () => 
         assert.strictEqual(ctx.position.size, 0, "Order should have been cancelled");
         assert.strictEqual((ctx as any)._pendingEntries.size, 0);
     });
+
+    it("should halt the strategy if max_intraday_loss is breached", () => {
+        const pine = [
+            'strategy.risk.max_intraday_loss(50)', // Halt if loss >= $50
+            'if n == 0',
+            '    strategy.entry("Long", strategy.long)',
+            'if n == 2',
+            '    strategy.entry("Long2", strategy.long)' // This should be blocked
+        ].join('\n');
+
+        const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 }, // n=0: Enter Long @ 100
+            { o: 100, h: 105, l: 40, c: 45 },  // n=1: Low hits 40. Loss = 60 (> 50 limit). HALT.
+            { o: 45,  h: 60,  l: 40, c: 55 }   // n=2: Entry should be ignored
+        ]);
+
+        // Position should be closed by the circuit breaker at the limit price (loss of 50)
+        assert.strictEqual(ctx.position.size, 0, "Strategy should have flattened");
+        assert.strictEqual(ctx.trades.length, 1, "Should only have the forced liquidation trade");
+        
+        const trade = ctx.trades[0];
+        assert.strictEqual(trade.exitPrice, 50, "Should have exited exactly at the risk limit price");
+        
+        // Check internal halt state
+        const riskState = (ctx as any)._riskState;
+        assert.strictEqual(riskState.is_halted, true, "Strategy should remain in halted state");
+    });
+
+    it("should reset the intraday loss halt on a new day", () => {
+        // Pine Script defines "intraday" by UTC day flips. 
+        // We simulate a day flip by jumping the timestamp in the loop.
+        const js = transpile([
+            'strategy.risk.max_intraday_loss(50)',
+            'if n == 0 or n == 1',
+            '    strategy.entry("Entry", strategy.long)'
+        ].join('\n')).replace(/\blet\b/g, "var ");
+
+        const ctx = new Context();
+        const sandbox: any = Object.create(null);
+        const exec = compile(js, ctx, sandbox);
+
+        // Bar 0: Day 1 - Normal Entry
+        ctx.setBar(Date.UTC(2026, 1, 1, 10, 0), 100, 105, 95, 100, 1000);
+        exec(); processPendingOrders(ctx, 105, 95); ctx.finalizeBar();
+
+        // Bar 1: Day 1 - Huge crash triggers halt
+        ctx.setBar(Date.UTC(2026, 1, 1, 11, 0), 100, 105, 20, 25, 1000);
+        exec(); processPendingOrders(ctx, 105, 20); ctx.finalizeBar();
+        
+        assert.strictEqual((ctx as any)._riskState.is_halted, true, "Should be halted on Day 1");
+
+        // Bar 2: Day 2 - UTC Midnight has passed. Should reset and allow entry.
+        ctx.setBar(Date.UTC(2026, 1, 2, 0, 0), 100, 105, 95, 100, 1000);
+        exec(); processPendingOrders(ctx, 105, 95);
+
+        assert.strictEqual((ctx as any)._riskState.is_halted, false, "Halt should reset on Day 2");
+        assert.strictEqual(ctx.position.size, 1, "Should be allowed to enter on the new day");
+    });
 });

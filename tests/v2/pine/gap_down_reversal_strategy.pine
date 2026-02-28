@@ -1,0 +1,32 @@
+//@version=2
+strategy(title="Gap Down reversal strat", overlay=true, pyramiding=1, default_qty_type=strategy.cash, default_qty_value=10000, initial_capital=10000)
+/// Start date
+startDate = input(title="Start Date", defval=1, minval=1, maxval=31)
+startMonth = input(title="Start Month", defval=1, minval=1, maxval=12)
+startYear = input(title="Start Year", defval=2009, minval=1800, maxval=2100)
+// See if this bar's time happened on/after start date
+afterStartDate = (time >= timestamp(syminfo.timezone, startYear, startMonth, startDate, 0, 0))
+// Configure trail stop level with input options (optional)
+longTrailPerc = input(title="Trail Long Loss (%)", type=float, minval=0.0, step=0.1, defval=5.0) * 0.01
+// Calculate trading conditions
+gap_d_r = close[1] < open[1] and open < low[1] and close > open
+// Plot Shapes
+plotshape(gap_d_r, style=shape.triangleup, location=location.belowbar)
+///plotshape(gap_u_r, style=shape.triangledown, location=location.abovebar)
+// Determine trail stop loss prices
+longStopPrice = 0.0
+longStopPrice := if (strategy.position_size > 0)
+    stopValue = open * (1 - longTrailPerc)
+    max(stopValue, longStopPrice[1])
+else
+    0
+// Plot stop loss values for confirmation
+plot(series=(strategy.position_size > 0) ? longStopPrice : na,
+     color=red, style=circles,
+     linewidth=1, title="Long Trail Stop")
+// Entry orders
+if (afterStartDate and gap_d_r)
+    strategy.entry(id="EL", long=true)
+// Exit orders for trail stop loss price
+if (strategy.position_size > 0)
+    strategy.exit(id="Stop out", stop=longStopPrice)

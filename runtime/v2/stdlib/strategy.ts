@@ -1,12 +1,17 @@
-import { Context, Trade } from "../context";
+import type { Context, Trade } from "../context";
 
 /**
  * strategy.ts - Backtesting Engine Logic
  */
 
+// --- EXPORT FLAT CONSTANTS FOR PINE SCRIPT ---
+export const long = "long";
+export const short = "short";
+
+// Keep this so your internal logic (dir === direction.long) doesn't break
 export const direction = {
-    long: "long",
-    short: "short"
+    long: long,
+    short: short
 };
 
 // Helper to safely unwrap Series objects into primitive numbers
@@ -54,6 +59,34 @@ function getPendingEntries(ctx: Context): Map<string, PendingEntry> {
     return (ctx as any)._pendingEntries;
 }
 
+// --- NEW: RISK MANAGEMENT HELPERS ---
+
+/**
+ * Internal state for risk limits.
+ */
+function getRiskState(ctx: Context) {
+    if (!(ctx as any)._riskState) {
+        (ctx as any)._riskState = {
+            max_intraday_loss: Number.NaN,
+            start_equity: ctx.cash,
+            last_day: -1,
+            is_halted: false
+        };
+    }
+    return (ctx as any)._riskState;
+}
+
+/**
+ * strategy.risk namespace
+ */
+export const risk = {
+    max_intraday_loss: (ctx: Context, value: any, type: string = "cash") => {
+        const state = getRiskState(ctx);
+        state.max_intraday_loss = val(value);
+        // Note: type "percent" would require additional logic based on state.start_equity
+    }
+};
+
 // --- CORE EXECUTIONS ---
 
 /**
@@ -90,6 +123,8 @@ export function order(
  * If we are in the opposite position, it closes it first (reverses).
  */
 export function entry(ctx: Context, id: string, dir: string, qty: any = 1, overridePrice?: number) {
+    if (getRiskState(ctx).is_halted) return; // Risk circuit breaker
+
     const isLong = dir === direction.long;
     // Use overridePrice (Limit/Stop level) if provided, otherwise fallback to ctx.close (Market)
     const currentPrice = overridePrice !== undefined ? overridePrice : ctx.close;
@@ -209,6 +244,35 @@ export function exit(
  * MUST be called dynamically by the runtime engine after script evaluation.
  */
 export function processPendingOrders(ctx: Context, high: number, low: number): void {
+    const riskState = getRiskState(ctx);
+    
+    // NEW: Handle Intraday Reset & Loss Check
+    const date = new Date(ctx.time);
+    const day = date.getUTCDate();
+    if (day !== riskState.last_day) {
+        riskState.last_day = day;
+        riskState.start_equity = equity(ctx);
+        riskState.is_halted = false;
+    }
+
+    // If halted, clear all and return
+    if (riskState.is_halted) {
+        cancel_all(ctx);
+        if (ctx.position.size !== 0) close_all(ctx, "Risk Halt");
+        return;
+    }
+
+    // Check for Max Intraday Loss breach
+    if (!Number.isNaN(riskState.max_intraday_loss)) {
+        const currentEquity = equity(ctx);
+        if ((riskState.start_equity - currentEquity) >= riskState.max_intraday_loss) {
+            riskState.is_halted = true;
+            close_all(ctx, "Max Intraday Loss Breach");
+            cancel_all(ctx);
+            return;
+        }
+    }
+
     // 1. Process Pending Entries (strategy.order)
     const entries = getPendingEntries(ctx);
     for (const [id, ord] of entries.entries()) {
@@ -321,3 +385,4 @@ export function equity(ctx: Context): number {
 }
 
 export const __IS_NAMESPACE__ = true;
+

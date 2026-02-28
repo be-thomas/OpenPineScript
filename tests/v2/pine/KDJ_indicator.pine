@@ -1,0 +1,35 @@
+//@version=2
+study("KDJ Indicator", shorttitle="V2_KDJ")
+ilong = input(9, title="period")
+isig = input(3, title="signal")
+
+bcwsma(s,l,m) => 
+    _s = s
+    _l = l
+    _m = m
+    _bcwsma = (_m*_s+(_l-_m)*nz(_bcwsma[1]))/_l
+    _bcwsma
+
+c = close
+h = highest(high, ilong)
+l = lowest(low,ilong)
+RSV = 100*((c-l)/(h-l))
+pK = bcwsma(RSV, isig, 1)
+pD = bcwsma(pK, isig, 1)
+pJ = 3 * pK-2 * pD
+
+plot(pJ, color=#4caf50, transp=0)
+plot(pK, color=#e91e63, transp=0)
+plot(pD, color=#2962ff, transp=0)
+
+
+bgcolor(pJ>pD? green : red, transp=90)
+
+//h0 = hline(80, color=blue)
+//h1 = hline(20, color=red)
+h2 = hline(50, color=white)
+
+bullcond = (pJ > 50) and ((crossover(pJ, pK) and pK > pD) or (crossover(pK, pD) and pJ > pK))
+alertcondition(bullcond, title = '▲Bullish', message = '▲Bullish')
+bearcond = (pJ < 50) and ((crossunder(pJ, pK) and pK < pD) or (crossunder(pK, pD) and pJ < pK))
+alertcondition(bearcond, title = '▼Bearish', message = '▼Bearish')

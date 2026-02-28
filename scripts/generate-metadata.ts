@@ -80,15 +80,22 @@ function generateConfig(stdlibPath: string) {
             registryEntries.push(`      },`);
         });
 
-        // --- PHASE 2: Object Literals (e.g., color.red) ---
+        // --- PHASE 2: Object Literals (e.g., strategy.risk.max_intraday_loss) ---
         sourceFile.getVariableDeclarations().forEach(varDecl => {
             const init = varDecl.getInitializer();
             if (init && Node.isObjectLiteralExpression(init)) {
-                const isDefault = sourceFile.getStatementByKind(SyntaxKind.ExportAssignment)?.getExpression().getText() === varDecl.getName();
+                const varName = varDecl.getName();
+                
+                // Skip the internal namespace flag itself
+                if (varName === "__IS_NAMESPACE__") return;
+
+                const isDefault = sourceFile.getStatementByKind(SyntaxKind.ExportAssignment)?.getExpression().getText() === varName;
                 const isExported = varDecl.isExported() || isDefault;
                 if (!isExported) return;
 
-                const varName = varDecl.getName();
+                // If the file is a namespace (e.g. strategy.), and we found an object (e.g. risk)
+                // The new prefix for properties inside should be "strategy.risk."
+                const nestedPrefix = `${prefix}${varName}.`;
                 const accessorBase = isDefault ? `(${moduleName}.default || ${moduleName})` : `${moduleName}.${varName}`;
 
                 init.getProperties().forEach(prop => {
@@ -96,7 +103,8 @@ function generateConfig(stdlibPath: string) {
                         const propName = prop.getName().replace(/['"]/g, '');
                         if (propName === "__IS_NAMESPACE__") return; 
 
-                        const fullKey = `${prefix}${propName}`;
+                        // FIXED: Use nestedPrefix instead of prefix
+                        const fullKey = `${nestedPrefix}${propName}`;
                         const initializer = prop.getInitializer();
 
                         let isContextAware = false;
@@ -111,7 +119,7 @@ function generateConfig(stdlibPath: string) {
                             args = isContextAware ? params.slice(1) : params;
                         }
 
-                        // Determine return type for values
+                        // Determine return type logic
                         const type = moduleName === 'color' ? 'color' : 'any';
                         const returnsObj = { kind: "scalar", type };
 

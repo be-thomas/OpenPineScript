@@ -1,0 +1,34 @@
+//@version=2
+strategy("AM_ZLWMA Crossover_x", overlay=true)
+
+nPeriod = input(title="ZLWMA Period", type=integer, defval=8, minval=1)
+xPrice = close
+xLag = floor(sqrt(nPeriod))
+xWMAData = (xPrice + (xPrice - xPrice[xLag]))
+xZLWMA = wma(xWMAData, nPeriod)
+
+wmalength = input(21)
+emalength1 = input(20)
+emalength2 = input(50)
+src = close
+
+ema1 = ema(src, emalength1)
+ema2 = ema(src, emalength2)
+short_ma = wma(src, wmalength)
+long_ma = xZLWMA
+
+co = crossover(long_ma, short_ma)
+cu = crossunder(long_ma, short_ma)
+
+if (not na(xLag))
+    if (co)
+        strategy.entry("Long", strategy.long, comment="buy")
+    if (cu)
+        strategy.entry("Short", strategy.short, comment="sell")
+
+plot(cross(short_ma, long_ma) ? short_ma : na, style=cross, linewidth=3)
+
+p1 = plot(short_ma, title="short", linewidth=2, color=red)
+p2 = plot(long_ma, title="Long", linewidth=2, color=blue)
+p3 = plot(ema1, title="EMA20", linewidth=3, color=green)
+p4 = plot(ema2, title="EMA50", linewidth=3, color=yellow)
