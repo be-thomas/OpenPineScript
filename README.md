@@ -82,23 +82,6 @@ npm test
 
 ---
 
-## 📂 Project Roadmap
-
-* `grammar/` - The DNA of the engine.
-* `transpiler/` - The "Magic" that turns scripts into high-performance code.
-* `tests/` - Where we break things so your trades don't.
-* [ ] 100% v2 Coverage: Finalizing the last 5% of core library functions.
-* [ ] CSV Exporting: Capability to dump engine results to CSV for external backtesting.
-
-
-It’s confusing because it mixes **folder descriptions** with **task lists**. A good roadmap should tell a story: where you started, what’s happening now, and where you're going.
-
-Since you're at 95%, you should highlight the "Final Stretch" to show how close it is to being a "Production-Ready" tool.
-
-Replace your current Roadmap section with this structured version:
-
----
-
 ## 🗺️ Project Roadmap
 
 ### 📍 Current Phase: V2 Core Completion (95%)
