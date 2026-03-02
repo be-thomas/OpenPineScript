@@ -129,6 +129,23 @@ OpenPineScript is built by a solo developer with a passion for craftsmanship.
 
 ---
 
+### ⚠️ Technical Limitations (By Design)
+
+Unlike the TradingView cloud environment, `OpenPineScript` is a local-first engine. We have intentionally deviated from standard Pine Script limits to allow for high-performance research:
+
+* **No Loop Timeouts:** We do not enforce the 500ms loop limit. Your local CPU can handle complex iterative logic that would normally crash a TradingView chart.
+* **Infinite Plotting:** The 64-plot limit is removed. You can generate hundreds of data streams for deep analysis.
+* **Deep Historical Buffer:** We bypass the 5,000-bar `max_bars_back` limit. Your lookback depth is limited only by your system's RAM.
+* **AST-Based Compilation:** We do not use "tokens." Even massive 10,000+ line scripts will compile as long as they follow the v2 grammar.
+
+---
+
+### What's next?
+
+You are sitting on a very cool piece of tech—a local Pine v2 engine is rare. **Would you like me to help you draft the specific "Ground Truth" comparison script?** (Basically a small script that reads your engine's output and the TradingView CSV to tell you exactly where the numbers differ).
+
+---
+
 ## ⚖️ License
 
 GNU GPL-3.0. Built for the community, owned by the community.
