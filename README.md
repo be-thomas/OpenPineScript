@@ -96,7 +96,7 @@ OpenPineScript is built by a solo developer with a passion for craftsmanship.
 
 * **Found a bug?** Open an Issue.
 * **Have an idea?** Start a Discussion.
-* **Want to help?** Check out [CONTRIBUTING.md](https://www.google.com/search?q=CONTRIBUTING.md).
+* **Want to help?** Check out [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
