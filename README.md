@@ -99,11 +99,13 @@ We are in the "Last Mile" of the Pine Script v2 implementation. Our focus is on 
 * [ ] **The Ground Truth Suite:** Automated comparison engine to test `OpenPineScript` outputs against TradingView CSV exports.
 * [ ] **CSV Exporting:** Native capability to dump indicator results to CSV for external analysis.
 * [ ] **CLI Backtester:** An interactive shell to test Pine v2 snippets instantly.
-
-### 🔭 Future Horizons
-
+* [ ] **UI based charting support** A UI for running pinescript code so we can compare it side-by-side with tradingview!
 * [ ] Support for running OpenPinescript in Python
 * [ ] **Version 3 Migration:** Adding support for the `//@version=3` syntax.
+
+### 🔭 Future Horizons (Late Q2 2026)
+
+* [ ] **Version 4 Migration:** Adding support for the `//@version=4` syntax.
 
 ---
 
