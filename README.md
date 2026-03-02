@@ -127,6 +127,7 @@ OpenPineScript is built by a solo developer with a passion for craftsmanship.
 * **Have an idea?** Start a Discussion.
 * **Want to help?** Check out [CONTRIBUTING.md](CONTRIBUTING.md).
 * [Code of Conduct](CODE_OF_CONDUCT.md)
+* [Security Policy](SECURITY.md)
 
 ---
 
