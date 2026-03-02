@@ -87,6 +87,50 @@ npm test
 * `grammar/` - The DNA of the engine.
 * `transpiler/` - The "Magic" that turns scripts into high-performance code.
 * `tests/` - Where we break things so your trades don't.
+* [ ] 100% v2 Coverage: Finalizing the last 5% of core library functions.
+* [ ] CSV Exporting: Capability to dump engine results to CSV for external backtesting.
+
+
+It’s confusing because it mixes **folder descriptions** with **task lists**. A good roadmap should tell a story: where you started, what’s happening now, and where you're going.
+
+Since you're at 95%, you should highlight the "Final Stretch" to show how close it is to being a "Production-Ready" tool.
+
+Replace your current Roadmap section with this structured version:
+
+---
+
+## 🗺️ Project Roadmap
+
+### 📍 Current Phase: V2 Core Completion (95%)
+
+We are in the "Last Mile" of the Pine Script v2 implementation. Our focus is on mathematical parity with TradingView.
+
+* [x] **Foundation:** Lexer/Parser for v2 grammar.
+* [x] **Core Math:** Implementation of `sma`, `ema`, `rsi`, and `macd`.
+* [ ] **Final 5%:** * [ ] Refined `security()` function logic for multi-timeframe data.
+* [ ] Implicit variable reassignment edge cases (The `:=` behavior in v2).
+* [ ] Support for `fill()` and basic `plotshape()` constants.
+
+### 🔜 Next: Validation & Tooling (Q2 2026)
+
+* [ ] **The Ground Truth Suite:** Automated comparison engine to test `OpenPineScript` outputs against TradingView CSV exports.
+* [ ] **CSV Exporting:** Native capability to dump indicator results to CSV for external analysis.
+* [ ] **CLI Backtester:** An interactive shell to test Pine v2 snippets instantly.
+
+### 🔭 Future Horizons
+
+* [ ] Support for running OpenPinescript in Python
+* [ ] **Version 3 Migration:** Adding support for the `//@version=3` syntax.
+
+---
+
+### 📂 Repository Architecture
+
+* `grammar/` — The AST and Lexer (The DNA of the engine).
+* `transpiler/` — Logic that converts Pine into high-performance executable code.
+* `tests/` — Comprehensive test suites to ensure zero logic-drift.
+* `validation/` — *[NEW]* Real-world scripts and CSVs used for "Ground Truth" testing.
+
 
 ---
 
