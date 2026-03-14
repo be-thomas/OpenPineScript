@@ -75,27 +75,26 @@ npm run opsv2 -- <script.pine> --data <data.csv>
 
 If no output flags are given, a formatted performance summary is printed directly to the terminal:
 
-```ansi
-[36mCompiling:[0m strategy.pine...
-[36mRunning backtest:[0m 506 bars...
-[32m✔ Done.[0m
+```diff
+  Compiling: strategy.pine...
+  Running backtest: 506 bars...
 
-[1m[36m=== strategy.pine — Summary ===[0m
-[90mBars processed : 506[0m
-[90mPlots recorded : 2[0m
+  === strategy.pine — Summary ===
+  Bars processed : 506
+  Plots recorded : 2
 
-[1mPerformance:[0m
-  Net Profit         [32m+$4,821.00 (+4.82%)[0m
-  Total Trades       38
-  Win Rate           63.2%  (24W / 14L)
-  Profit Factor      2.341
-  Max Drawdown       3.17%
-  Avg Win / Avg Loss $312.50 / $198.20
+  Performance:
++   Net Profit         +$4,821.00 (+4.82%)
+    Total Trades       38
+    Win Rate           63.2%  (24W / 14L)
+    Profit Factor      2.341
+    Max Drawdown       3.17%
+    Avg Win / Avg Loss $312.50 / $198.20
 
-[1mScript Inputs:[0m
-  [36minput_0[0m  "Fast Length"  [integer]  = 9 [90m(default)[0m
-  [36minput_1[0m  "Slow Length"  [integer]  = 21 [90m(default)[0m
-  [90mTip: override with --input input_0=<value>[0m
+  Script Inputs:
+    input_0  "Fast Length"  [integer]  = 9 (default)
+    input_1  "Slow Length"  [integer]  = 21 (default)
+    Tip: override with --input input_0=<value>
 ```
 
 ---
@@ -106,13 +105,13 @@ If no output flags are given, a formatted performance summary is printed directl
 npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results
 ```
 
-```ansi
-[36mCompiling:[0m strategy.pine...
-[36mRunning backtest:[0m 506 bars...
-[32m✔ Done.[0m
-[32m✔[0m Chart    → ./results/chart.csv
-[32m✔[0m Trades   → ./results/trades.csv  (38 trades)
-[32m✔[0m Summary  → ./results/summary.json
+```diff
+  Compiling: strategy.pine...
+  Running backtest: 506 bars...
++ ✔ Done.
++ ✔ Chart    → ./results/chart.csv
++ ✔ Trades   → ./results/trades.csv  (38 trades)
++ ✔ Summary  → ./results/summary.json
 ```
 
 ```
@@ -147,32 +146,31 @@ results/             ← opsv2 writes its output + the report here
 └── comparison_report.json
 ```
 
-```ansi
-[36mCompiling:[0m strategy.pine...
-[36mRunning backtest:[0m 506 bars...
-[32m✔ Done.[0m
-[32m✔[0m Chart    → ./results/chart.csv
-[32m✔[0m Trades   → ./results/trades.csv  (38 trades)
-[32m✔[0m Summary  → ./results/summary.json
+When all outputs match TradingView:
 
-[1m[36m=== Comparison Report ===[0m
-  Overall:   [32mPASS[0m
-  Tolerance: 0.0001
+```diff
+  === Comparison Report ===
+  Overall: PASS    Tolerance: 0.0001
 
-[1mChart Data:[0m [32mPASS[0m
-  Rows compared : 506
-  Mismatched    : 0
-  Max deviation :
-    [32mSMA_20↔SMA_20[0m: 2.910e-5
++ Chart Data: PASS  (506 rows compared, 0 mismatches, max Δ 2.9e-5)
++ Trades:     PASS  (38 tv / 38 opsv2)
++ Summary:    PASS  (net profit Δ 0.0000%)
 
-[1mTrades:[0m [32mPASS[0m
-  TV trades    : 38
-  opsv2 trades : 38
++ Report written: ./results/comparison_report.json
+```
 
-[1mSummary:[0m [32mPASS[0m
-  Net profit Δ% : [32m0.0000[0m
+When there is a discrepancy:
 
-[36mReport written:[0m ./results/comparison_report.json
+```diff
+  === Comparison Report ===
+  Overall: PARTIAL    Tolerance: 0.0001
+
++ Chart Data: PASS  (506 rows compared, 0 mismatches)
+- Trades:     FAIL  (38 tv / 37 opsv2 — 1 discrepancy)
+-   Trade #42: exit_price_mismatch  tv=45000.5000  opsv2=45001.0000  Δ=0.5
++ Summary:    PASS  (net profit Δ 0.05%)
+
+  Report written: ./results/comparison_report.json
 ```
 
 For granular flags (`--out-chart`, `--out-trades`, `--compare-chart`, `--tolerance`, etc.) see the full [CLI Usage Guide](CLI-Usage.md).
