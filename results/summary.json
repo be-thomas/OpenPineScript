@@ -1,0 +1,14 @@
+{
+  "net_profit": 0,
+  "net_profit_percent": 0,
+  "gross_profit": 0,
+  "gross_loss": 0,
+  "total_closed_trades": 506,
+  "winning_trades": 48,
+  "losing_trades": 52,
+  "win_rate": 9.49,
+  "avg_win": 0,
+  "avg_loss": 0,
+  "profit_factor": 0.923,
+  "max_drawdown_percent": 0
+}

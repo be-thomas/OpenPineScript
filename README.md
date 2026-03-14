@@ -65,6 +65,36 @@ Example session:
 
 ---
 
+## 💻 CLI Usage (`opsv2`)
+
+Run a Pine Script against a local CSV data file:
+
+```bash
+npm run opsv2 -- <script.pine> --data <data.csv>
+```
+
+If no output flags are given, a formatted performance summary is printed to the terminal.
+
+### Export results to a folder
+
+```bash
+npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results
+```
+
+Writes `chart.csv`, `trades.csv`, and `summary.json` into `./results/`.
+
+### Validate against a TradingView export
+
+```bash
+npm run opsv2 -- strategy.pine --data data.csv --compare-dir ./tv_exports
+```
+
+Expects `chart_data.csv`, `trades.csv`, and `summary.json` inside `./tv_exports/`. Prints a color-coded pass/fail report and writes `comparison_report.json` to `--out-dir` (if specified).
+
+For granular flags (`--out-chart`, `--out-trades`, `--compare-chart`, `--tolerance`, etc.) see the full [CLI Usage Guide](CLI-Usage.md).
+
+---
+
 ## 🧪 Proven Accuracy
 
 We don't guess; we test. The engine has passed extensive stress tests, including:
