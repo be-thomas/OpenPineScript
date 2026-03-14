@@ -73,23 +73,87 @@ Run a Pine Script against a local CSV data file:
 npm run opsv2 -- <script.pine> --data <data.csv>
 ```
 
-If no output flags are given, a formatted performance summary is printed to the terminal.
+If no output flags are given, a formatted performance summary is printed directly to the terminal:
 
-### Export results to a folder
+```
+=== strategy.pine — Summary ===
+Bars processed : 506
+Plots recorded : 2
+
+Performance:
+  Net Profit         +$4,821.00 (+4.82%)
+  Total Trades       38
+  Win Rate           63.2%  (24W / 14L)
+  Profit Factor      2.341
+  Max Drawdown       3.17%
+  Avg Win / Avg Loss $312.50 / $198.20
+
+Script Inputs:
+  input_0  "Fast Length"  [integer]  = 9 (default)
+  input_1  "Slow Length"  [integer]  = 21 (default)
+  Tip: override with --input input_0=<value>
+```
+
+---
+
+### 📁 Export results to a folder
 
 ```bash
 npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results
 ```
 
-Writes `chart.csv`, `trades.csv`, and `summary.json` into `./results/`.
-
-### Validate against a TradingView export
-
-```bash
-npm run opsv2 -- strategy.pine --data data.csv --compare-dir ./tv_exports
+```
+results/
+├── chart.csv       ← OHLCV + one column per plot()
+├── trades.csv      ← Entry & exit rows for every trade
+└── summary.json    ← Full performance metrics
 ```
 
-Expects `chart_data.csv`, `trades.csv`, and `summary.json` inside `./tv_exports/`. Prints a color-coded pass/fail report and writes `comparison_report.json` to `--out-dir` (if specified).
+---
+
+### 🔬 Validate against a TradingView export
+
+Point `--compare-dir` at a folder containing your TradingView CSV exports:
+
+```bash
+npm run opsv2 -- strategy.pine --data data.csv \
+  --out-dir ./results \
+  --compare-dir ./tv_exports
+```
+
+```
+tv_exports/          ← your TradingView exports go here
+├── chart_data.csv
+├── trades.csv
+└── summary.json
+
+results/             ← opsv2 writes its output + the report here
+├── chart.csv
+├── trades.csv
+├── summary.json
+└── comparison_report.json
+```
+
+The comparison prints a live pass/fail breakdown in the terminal:
+
+```
+=== Comparison Report ===
+  Overall:    PASS
+  Tolerance:  0.0001
+
+Chart Data:  PASS
+  Rows compared : 506
+  Mismatched    : 0
+  Max deviation :
+    SMA_20↔SMA_20: 2.910e-5
+
+Trades:  PASS
+  TV trades    : 38
+  opsv2 trades : 38
+
+Summary:  PASS
+  Net profit Δ% : 0.0000
+```
 
 For granular flags (`--out-chart`, `--out-trades`, `--compare-chart`, `--tolerance`, etc.) see the full [CLI Usage Guide](CLI-Usage.md).
 
