@@ -70,31 +70,47 @@ Example session:
 Run a Pine Script against a local CSV data file:
 
 ```bash
-npm run opsv2 -- <script.pine> --data <data.csv>
+npm run opsv2 -- <script.pine> --data <data.csv> [flags]
 ```
 
-If no output flags are given, a formatted performance summary is printed directly to the terminal:
+---
 
-```diff
-  Compiling: strategy.pine...
-  Running backtest: 506 bars...
+### 🔍 Discover script inputs (`--dry-run`)
 
-  === strategy.pine — Summary ===
-  Bars processed : 506
-  Plots recorded : 2
+Use `--dry-run` to execute a single bar and discover all `input()` variables without running a full backtest. The output is a **strict JSON document on stdout**, ready to pipe into other tools.
 
-  Performance:
-+   Net Profit         +$4,821.00 (+4.82%)
-    Total Trades       38
-    Win Rate           63.2%  (24W / 14L)
-    Profit Factor      2.341
-    Max Drawdown       3.17%
-    Avg Win / Avg Loss $312.50 / $198.20
+```bash
+npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null
+```
 
-  Script Inputs:
-    input_0  "Fast Length"  [integer]  = 9 (default)
-    input_1  "Slow Length"  [integer]  = 21 (default)
-    Tip: override with --input input_0=<value>
+```json
+{
+  "script": "strategy.pine",
+  "bars_processed": 1,
+  "inputs": [
+    { "id": "input_0", "title": "Fast Length", "type": "integer", "default": 9,  "current": 9,  "overridden": false },
+    { "id": "input_1", "title": "Slow Length", "type": "integer", "default": 21, "current": 21, "overridden": false }
+  ],
+  "performance": null
+}
+```
+
+This makes it trivial to pipe into other tools:
+
+```bash
+# Extract just the inputs for a UI to render
+npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null | jq '.inputs'
+
+# Feed straight into a Python optimizer
+npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null | python3 optimizer.py
+```
+
+Override inputs on the next run with `--input`:
+
+```bash
+npm run opsv2 -- strategy.pine --data data.csv \
+  --input input_0=20 --input input_1=50 \
+  --out-dir ./results
 ```
 
 ---

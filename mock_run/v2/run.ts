@@ -23,6 +23,7 @@
  *
  * Debug:
  *   --show-transpiled      Print the compiled JavaScript before running
+ *   --dry-run              Run one bar only, emit inputs JSON, then exit
  */
 
 import * as fs from "node:fs";
@@ -62,6 +63,7 @@ interface CliArgs {
     // Misc
     inputs: Record<string, string>;
     showTranspiled: boolean;
+    dryRun: boolean;
 }
 
 function getFlag(args: string[], flag: string): string | null {
@@ -123,6 +125,7 @@ function parseArgs(argv: string[]): CliArgs {
         tolerance,
         inputs,
         showTranspiled: args.includes("--show-transpiled"),
+        dryRun:         args.includes("--dry-run"),
     };
 }
 
@@ -153,6 +156,7 @@ ${C.Bold}Input overrides:${C.Reset}
 
 ${C.Bold}Debug:${C.Reset}
   --show-transpiled      Print the compiled JavaScript before running
+  --dry-run              Run one bar only, emit inputs JSON to stdout, then exit
 `);
 }
 
@@ -324,14 +328,15 @@ function generateSummary(ctx: Context): Record<string, number | null> {
     };
 }
 
-// --- Console Summary ---
+// --- Console Summary (stderr — human-readable, safe to pipe away) ---
 function printConsoleSummary(ctx: Context, totalBars: number, scriptName: string) {
     const isStrategy = ctx.trades.length > 0 || ctx.position.size !== 0;
     const plotCount  = ctx.plots.size;
+    const err = (s: string) => process.stderr.write(s + "\n");
 
-    console.log(`\n${C.Bold}${C.Cyan}=== ${path.basename(scriptName)} — Summary ===${C.Reset}`);
-    console.log(`${C.Gray}Bars processed : ${totalBars}${C.Reset}`);
-    console.log(`${C.Gray}Plots recorded : ${plotCount}${C.Reset}`);
+    err(`\n${C.Bold}${C.Cyan}=== ${path.basename(scriptName)} — Summary ===${C.Reset}`);
+    err(`${C.Gray}Bars processed : ${totalBars}${C.Reset}`);
+    err(`${C.Gray}Plots recorded : ${plotCount}${C.Reset}`);
 
     if (isStrategy) {
         const s = generateSummary(ctx);
@@ -340,29 +345,51 @@ function printConsoleSummary(ctx: Context, totalBars: number, scriptName: string
         const pc     = s.net_profit_percent as number;
         const col    = profit >= 0 ? C.Green : C.Red;
 
-        console.log(`\n${C.Bold}Performance:${C.Reset}`);
-        console.log(`  Net Profit         ${col}${sign}$${profit.toFixed(2)} (${sign}${pc.toFixed(2)}%)${C.Reset}`);
-        console.log(`  Total Trades       ${s.total_closed_trades}`);
-        console.log(`  Win Rate           ${(s.win_rate as number).toFixed(1)}%  (${s.winning_trades}W / ${s.losing_trades}L)`);
-        console.log(`  Profit Factor      ${s.profit_factor ?? "N/A"}`);
-        console.log(`  Max Drawdown       ${(s.max_drawdown_percent as number).toFixed(2)}%`);
-        console.log(`  Avg Win / Avg Loss $${(s.avg_win as number).toFixed(2)} / $${(s.avg_loss as number).toFixed(2)}`);
+        err(`\n${C.Bold}Performance:${C.Reset}`);
+        err(`  Net Profit         ${col}${sign}$${profit.toFixed(2)} (${sign}${pc.toFixed(2)}%)${C.Reset}`);
+        err(`  Total Trades       ${s.total_closed_trades}`);
+        err(`  Win Rate           ${(s.win_rate as number).toFixed(1)}%  (${s.winning_trades}W / ${s.losing_trades}L)`);
+        err(`  Profit Factor      ${s.profit_factor ?? "N/A"}`);
+        err(`  Max Drawdown       ${(s.max_drawdown_percent as number).toFixed(2)}%`);
+        err(`  Avg Win / Avg Loss $${(s.avg_win as number).toFixed(2)} / $${(s.avg_loss as number).toFixed(2)}`);
     }
 
-    // Print input definitions so users know what --input flags to use
     if (ctx.inputDefs.length > 0) {
-        console.log(`\n${C.Bold}Script Inputs:${C.Reset}`);
+        err(`\n${C.Bold}Script Inputs:${C.Reset}`);
         ctx.inputDefs.forEach(def => {
             const override = ctx.userInputs[def.id];
             const valStr   = override !== undefined
                 ? `${override} ${C.Gray}(overridden from ${def.defval})${C.Reset}`
                 : `${def.defval} ${C.Gray}(default)${C.Reset}`;
-            console.log(`  ${C.Cyan}${def.id}${C.Reset}  "${def.title}"  [${def.type}]  = ${valStr}`);
+            err(`  ${C.Cyan}${def.id}${C.Reset}  "${def.title}"  [${def.type}]  = ${valStr}`);
         });
         if (Object.keys(ctx.userInputs).length === 0) {
-            console.log(`  ${C.Gray}Tip: override with --input input_0=<value>${C.Reset}`);
+            err(`  ${C.Gray}Tip: override with --input input_0=<value>${C.Reset}`);
         }
     }
+}
+
+// --- Structured Output (stdout — strict JSON, designed to be piped/parsed) ---
+function outputStructured(ctx: Context, totalBars: number, scriptName: string) {
+    const isStrategy = ctx.trades.length > 0 || ctx.position.size !== 0;
+
+    const inputs = ctx.inputDefs.map(def => ({
+        id:         def.id,
+        title:      def.title,
+        type:       def.type,
+        default:    def.defval,
+        current:    ctx.userInputs[def.id] ?? def.defval,
+        overridden: def.id in ctx.userInputs,
+    }));
+
+    const output = {
+        script:          path.basename(scriptName),
+        bars_processed:  totalBars,
+        inputs,
+        performance:     isStrategy ? generateSummary(ctx) : null,
+    };
+
+    process.stdout.write(JSON.stringify(output, null, 2) + "\n");
 }
 
 // --- Main ---
@@ -423,6 +450,17 @@ async function main() {
 
     const sandbox = { ctx };
     const executeBar = compile(jsCode, ctx, sandbox);
+
+    if (cli.dryRun) {
+        process.stderr.write(`${C.Cyan}Dry run:${C.Reset} executing 1 bar to discover inputs...\n`);
+        const bar = bars[0];
+        ctx.is_new = true; ctx.is_last = true; ctx.is_history = false; ctx.is_realtime = true;
+        ctx.setBar(bar.time, bar.open, bar.high, bar.low, bar.close, bar.volume);
+        executeBar();
+        ctx.finalizeBar();
+        outputStructured(ctx, 1, cli.scriptPath);
+        process.exit(0);
+    }
 
     process.stderr.write(`${C.Cyan}Running backtest:${C.Reset} ${bars.length} bars...\n`);
 
@@ -513,7 +551,12 @@ async function main() {
         );
     }
 
-    // 8. Console summary (always printed last)
+    // 8. Output results
+    // No file/dir flags → strict JSON to stdout (pipeable) + human summary to stderr.
+    // File flags set    → human summary to stderr only (stdout carries file confirmations).
+    if (!hasOutputFlag && !hasCompareFlag) {
+        outputStructured(ctx, bars.length, cli.scriptPath);
+    }
     printConsoleSummary(ctx, bars.length, cli.scriptPath);
 }
 

@@ -1,0 +1,30 @@
+// input_test.pine
+// SMA Crossover Strategy with fully configurable inputs.
+// Used to verify the structured JSON output (inputs[] array) when
+// the CLI is run with no --out-* flags.
+//
+// Discover inputs (1 bar only, fast):
+//   npm run opsv2 -- input_test.pine --data mock_data/AAPL_mock.csv --dry-run 2>/dev/null
+//
+// Full backtest:
+//   npm run opsv2 -- input_test.pine --data mock_data/AAPL_mock.csv --out-dir ./results
+//
+// Override an input then backtest:
+//   npm run opsv2 -- input_test.pine --data mock_data/AAPL_mock.csv --input input_0=20 --out-dir ./results
+
+fast_len  = input(9,    "Fast MA Length")
+slow_len  = input(21,   "Slow MA Length")
+qty       = input(100,  "Order Quantity")
+use_ema   = input(0,    "Use EMA instead of SMA")
+
+fast_ma = use_ema ? ema(close, fast_len) : sma(close, fast_len)
+slow_ma = use_ema ? ema(close, slow_len) : sma(close, slow_len)
+
+plot(fast_ma, "Fast MA")
+plot(slow_ma, "Slow MA")
+
+if (crossover(fast_ma, slow_ma))
+    strategy.entry("Long", strategy.long, qty)
+
+if (crossunder(fast_ma, slow_ma))
+    strategy.close("Long")
