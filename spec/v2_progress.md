@@ -64,15 +64,15 @@ Checklist mapped against [spec/v2.md](v2.md).
 | `strategy.cancel_all()` | ✅ | |
 | Order matching between bars (fill on next bar H/L) | ✅ | `processPendingOrders()` |
 | Duplicate order ID → modify existing | ⚠️ | Not verified |
-| OCA groups: `oca.cancel` | ✅ | Implicit on position close |
-| OCA groups: `oca.reduce` | ❌ | |
-| OCA groups: `oca.none` | ❌ | |
-| `strategy.risk.max_intraday_loss` | ✅ | With circuit breaker (`is_halted`) |
-| `strategy.risk.max_intraday_filled_orders` | ❌ | |
-| `strategy.risk.max_drawdown` | ❌ | |
-| `strategy.risk.max_cons_loss_days` | ❌ | |
-| `strategy.risk.max_position_size` | ❌ | |
-| `strategy.risk.allow_entry_in` | ❌ | |
+| OCA groups: `oca.cancel` | ✅ | Cancels sibling orders in same group on fill |
+| OCA groups: `oca.reduce` | ✅ | Reduces sibling order qty by filled amount |
+| OCA groups: `oca.none` | ✅ | Orders operate independently |
+| `strategy.risk.max_intraday_loss` | ✅ | With circuit breaker (`is_halted`), supports cash & percent |
+| `strategy.risk.max_intraday_filled_orders` | ✅ | Daily fill counter, resets on day change |
+| `strategy.risk.max_drawdown` | ✅ | From peak equity, supports cash & percent |
+| `strategy.risk.max_cons_loss_days` | ✅ | Tracks consecutive losing days |
+| `strategy.risk.max_position_size` | ✅ | Clamps entry qty, blocks when at limit |
+| `strategy.risk.allow_entry_in` | ✅ | Restricts to long-only, short-only, or both |
 | `strategy.position_size` | ✅ | |
 | `strategy.opentrades` | ✅ | |
 | `strategy.equity` | ✅ | |
@@ -234,18 +234,16 @@ Checklist mapped against [spec/v2.md](v2.md).
 | Lexer/Preprocessor | 9 | 0 | 0 |
 | Parser/AST | 8 | 1 | 0 |
 | Execution Model | 4 | 0 | 4 |
-| Broker Emulator | 10 | 1 | 6 |
+| Broker Emulator | 17 | 1 | 0 |
 | Type System | 11 | 1 | 1 |
 | Control Flow | 6 | 2 | 2 |
 | Standard Library | ~45 | ~2 | ~25 |
 | Metadata Annotations | 0 | 0 | 6 |
-| **Totals** | **~93** | **~7** | **~44** |
+| **Totals** | **~100** | **~7** | **~37** |
 
 ### Biggest Gaps
 
 1. **Metadata directive enforcement** — `study()` / `strategy()` not parsed or enforced
 2. **`security()`** — multi-timeframe data, major feature
 3. **TA indicators** — alma, cog, correlation, cum, dev, falling, mfi, percentrank, pivothigh/low, roc, tsi, variance, wpr
-4. **`strategy.risk.*`** — only `max_intraday_loss` implemented; 5 others missing
-5. **OCA groups** — only `oca.cancel` (implicit); `oca.reduce` and `oca.none` missing
-6. **Chart type constructors** — heikinashi, kagi, linebreak, pointfigure, renko
+4. **Chart type constructors** — heikinashi, kagi, linebreak, pointfigure, renko

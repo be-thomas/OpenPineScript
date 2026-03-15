@@ -451,7 +451,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.order": {
           uses_context: true,
-          args: ["id","dir","qty","limit","stop"],
+          args: ["id","dir","qty","limit","stop","oca_name","oca_type"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -499,7 +499,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.exit": {
           uses_context: true,
-          args: ["id","from_entry","qty","profit","limit","loss","stop"],
+          args: ["id","from_entry","qty","profit","limit","loss","stop","oca_name"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -560,6 +560,70 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: strategy.risk["max_intraday_loss"]
+      },
+      "strategy.risk.max_intraday_filled_orders": {
+          uses_context: true,
+          args: ["count"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.risk["max_intraday_filled_orders"]
+      },
+      "strategy.risk.max_drawdown": {
+          uses_context: true,
+          args: ["value","type"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.risk["max_drawdown"]
+      },
+      "strategy.risk.max_cons_loss_days": {
+          uses_context: true,
+          args: ["count"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.risk["max_cons_loss_days"]
+      },
+      "strategy.risk.max_position_size": {
+          uses_context: true,
+          args: ["size"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.risk["max_position_size"]
+      },
+      "strategy.risk.allow_entry_in": {
+          uses_context: true,
+          args: ["dir"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.risk["allow_entry_in"]
+      },
+      "strategy.oca.cancel": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"string"},
+          is_value: true,
+          ref: strategy.oca["cancel"]
+      },
+      "strategy.oca.reduce": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"string"},
+          is_value: true,
+          ref: strategy.oca["reduce"]
+      },
+      "strategy.oca.none": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"string"},
+          is_value: true,
+          ref: strategy.oca["none"]
       },
       "strategy.long": {
           uses_context: false,
