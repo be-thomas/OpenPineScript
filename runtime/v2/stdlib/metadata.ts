@@ -849,6 +849,190 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: ta.sar
       },
+      "cum": {
+          uses_context: true,
+          args: ["sourceInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.cum
+      },
+      "roc": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.roc
+      },
+      "change": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.change
+      },
+      "falling": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"bool"},
+          is_value: false,
+          ref: ta.falling
+      },
+      "rising": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"bool"},
+          is_value: false,
+          ref: ta.rising
+      },
+      "dev": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.dev
+      },
+      "variance": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.variance
+      },
+      "stdev": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.stdev
+      },
+      "correlation": {
+          uses_context: true,
+          args: ["source1Input","source2Input","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.correlation
+      },
+      "percentrank": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.percentrank
+      },
+      "wpr": {
+          uses_context: true,
+          args: ["lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.wpr
+      },
+      "mfi": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.mfi
+      },
+      "alma": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput","offsetInput","sigmaInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.alma
+      },
+      "cog": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.cog
+      },
+      "tsi": {
+          uses_context: true,
+          args: ["sourceInput","longLenInput","shortLenInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.tsi
+      },
+      "pivothigh": {
+          uses_context: true,
+          args: ["sourceInput","leftbarsInput","rightbarsInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.pivothigh
+      },
+      "pivotlow": {
+          uses_context: true,
+          args: ["sourceInput","leftbarsInput","rightbarsInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.pivotlow
+      },
+      "tr": {
+          uses_context: true,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.tr
+      },
+      "sum": {
+          uses_context: true,
+          args: ["sourceInput","lengthInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.sum
+      },
+      "fixnan": {
+          uses_context: true,
+          args: ["xInput"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.fixnan
+      },
+      "plotbar": {
+          uses_context: true,
+          args: ["open","high","low","close","title","color"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: ui.plotbar
+      },
+      "plotcandle": {
+          uses_context: true,
+          args: ["open","high","low","close","title","color"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: ui.plotcandle
+      },
+      "plotarrow": {
+          uses_context: true,
+          args: ["series","title","colorup","colordown","minheight","maxheight"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: ui.plotarrow
+      },
       "time.year": {
           uses_context: false,
           args: ["t"],

@@ -669,3 +669,482 @@ export function sar(ctx: Context, startInput: any, incInput: any, maxInput: any)
     state.sar = nextSar;
     return state.sar;
 }
+
+// --- Quick-win TA indicators ---
+
+/**
+ * cum: Cumulative sum of source over all bars.
+ * @returns series float
+ */
+export function cum(ctx: Context, sourceInput: any): number {
+    const source = val(sourceInput);
+    const state = ctx.getPersistentState<{ total: number }>(() => ({ total: 0 }));
+    state.total += isNaN(source) ? 0 : source;
+    return state.total;
+}
+
+/**
+ * roc: Rate of Change. 100 * (source - source[length]) / source[length]
+ * @returns series float
+ */
+export function roc(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length <= length) return NaN;
+    const prev = state.buffer[state.buffer.length - 1 - length];
+    if (prev === 0) return NaN;
+    return 100 * (source - prev) / prev;
+}
+
+/**
+ * change: Difference between current value and value N bars ago.
+ * @returns series float
+ */
+export function change(ctx: Context, sourceInput: any, lengthInput: any = 1): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length <= length) return NaN;
+    return source - state.buffer[state.buffer.length - 1 - length];
+}
+
+/**
+ * falling: True if source has been falling (decreasing) for `length` consecutive bars.
+ * @returns series bool
+ */
+export function falling(ctx: Context, sourceInput: any, lengthInput: any): boolean {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length <= length) return false;
+    const start = state.buffer.length - length - 1;
+    for (let i = start + 1; i < state.buffer.length; i++) {
+        if (state.buffer[i] >= state.buffer[i - 1]) return false;
+    }
+    return true;
+}
+
+/**
+ * rising: True if source has been rising (increasing) for `length` consecutive bars.
+ * @returns series bool
+ */
+export function rising(ctx: Context, sourceInput: any, lengthInput: any): boolean {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length <= length) return false;
+    const start = state.buffer.length - length - 1;
+    for (let i = start + 1; i < state.buffer.length; i++) {
+        if (state.buffer[i] <= state.buffer[i - 1]) return false;
+    }
+    return true;
+}
+
+/**
+ * dev: Deviation. Mean absolute deviation of source over length bars.
+ * @returns series float
+ */
+export function dev(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length < length) return NaN;
+    const start = state.buffer.length - length;
+    let sum = 0;
+    for (let i = start; i < state.buffer.length; i++) sum += state.buffer[i];
+    const mean = sum / length;
+    let devSum = 0;
+    for (let i = start; i < state.buffer.length; i++) devSum += Math.abs(state.buffer[i] - mean);
+    return devSum / length;
+}
+
+/**
+ * variance: Variance of source over length bars.
+ * @returns series float
+ */
+export function variance(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<StdDevState>(() => ({
+        buffer: [], sum: 0, sumSq: 0, prevLength: 0, counter: 0
+    }));
+    state.buffer.push(source);
+    if (length !== state.prevLength) {
+        state.sum = 0; state.sumSq = 0;
+        const start = Math.max(0, state.buffer.length - length);
+        for (let i = start; i < state.buffer.length; i++) {
+            state.sum += state.buffer[i]; state.sumSq += state.buffer[i] * state.buffer[i];
+        }
+        state.prevLength = length; state.counter = 0;
+    } else {
+        state.sum += source; state.sumSq += source * source;
+        if (state.buffer.length > length) {
+            const removed = state.buffer[state.buffer.length - 1 - length];
+            state.sum -= removed; state.sumSq -= removed * removed;
+        }
+        if (++state.counter >= HEAL_VAR_INTERVAL) {
+            state.sum = 0; state.sumSq = 0;
+            const start = Math.max(0, state.buffer.length - length);
+            for (let i = start; i < state.buffer.length; i++) {
+                state.sum += state.buffer[i]; state.sumSq += state.buffer[i] * state.buffer[i];
+            }
+            state.counter = 0;
+        }
+    }
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length < length) return NaN;
+    const mean = state.sum / length;
+    return (state.sumSq / length) - (mean * mean);
+}
+
+/**
+ * stdev: Standard Deviation of source over length bars.
+ * @returns series float
+ */
+export function stdev(ctx: Context, sourceInput: any, lengthInput: any): number {
+    return Math.sqrt(Math.max(0, variance(ctx, sourceInput, lengthInput)));
+}
+
+/**
+ * correlation: Pearson correlation coefficient between two series over length bars.
+ * @returns series float
+ */
+export function correlation(ctx: Context, source1Input: any, source2Input: any, lengthInput: any): number {
+    const s1 = val(source1Input);
+    const s2 = val(source2Input);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<{ buf1: number[]; buf2: number[] }>(() => ({ buf1: [], buf2: [] }));
+    state.buf1.push(s1); state.buf2.push(s2);
+    if (state.buf1.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buf1.length > keep) { state.buf1.splice(0, state.buf1.length - keep); state.buf2.splice(0, state.buf2.length - keep); }
+    }
+    if (state.buf1.length < length) return NaN;
+    const start = state.buf1.length - length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+    for (let i = start; i < state.buf1.length; i++) {
+        const x = state.buf1[i], y = state.buf2[i];
+        sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x; sumY2 += y * y;
+    }
+    const num = length * sumXY - sumX * sumY;
+    const den = Math.sqrt((length * sumX2 - sumX * sumX) * (length * sumY2 - sumY * sumY));
+    return den === 0 ? 0 : num / den;
+}
+
+/**
+ * percentrank: Percent rank. Percentage of past `length` values that are <= current value.
+ * @returns series float
+ */
+export function percentrank(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length <= length) return NaN;
+    const start = state.buffer.length - 1 - length;
+    let count = 0;
+    for (let i = start; i < state.buffer.length - 1; i++) {
+        if (state.buffer[i] <= source) count++;
+    }
+    return (count / length) * 100;
+}
+
+/**
+ * wpr: Williams %R
+ * @returns series float
+ */
+export function wpr(ctx: Context, lengthInput: any): number {
+    const length = val(lengthInput);
+    const h = highest(ctx, ctx.high, length);
+    const l = lowest(ctx, ctx.low, length);
+    if (h === l) return 0;
+    return -100 * (h - ctx.close) / (h - l);
+}
+
+/**
+ * mfi: Money Flow Index
+ * @returns series float
+ */
+export function mfi(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<{ prevSrc: number; posBuf: number[]; negBuf: number[]; posSum: number; negSum: number }>(() => ({
+        prevSrc: NaN, posBuf: [], negBuf: [], posSum: 0, negSum: 0
+    }));
+
+    const volume = ctx.volume;
+    const mf = source * volume;
+
+    let pos = 0, neg = 0;
+    if (isNaN(state.prevSrc)) {
+        // first bar — neutral
+    } else if (source > state.prevSrc) {
+        pos = mf;
+    } else if (source < state.prevSrc) {
+        neg = mf;
+    }
+    state.prevSrc = source;
+
+    state.posBuf.push(pos);
+    state.negBuf.push(neg);
+    state.posSum += pos;
+    state.negSum += neg;
+    if (state.posBuf.length > length) {
+        state.posSum -= state.posBuf[state.posBuf.length - 1 - length];
+        state.negSum -= state.negBuf[state.negBuf.length - 1 - length];
+    }
+
+    if (state.posBuf.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.posBuf.length > keep) {
+            state.posBuf.splice(0, state.posBuf.length - keep);
+            state.negBuf.splice(0, state.negBuf.length - keep);
+        }
+    }
+
+    if (state.posBuf.length < length) return NaN;
+    if (state.negSum === 0) return 100;
+    const ratio = state.posSum / state.negSum;
+    return 100 - (100 / (1 + ratio));
+}
+
+/**
+ * alma: Arnaud Legoux Moving Average
+ * @returns series float
+ */
+export function alma(ctx: Context, sourceInput: any, lengthInput: any, offsetInput: any = 0.85, sigmaInput: any = 6): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const offset = val(offsetInput);
+    const sigma = val(sigmaInput);
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length < length) return NaN;
+    const m = offset * (length - 1);
+    const s = length / sigma;
+    let weightSum = 0, valueSum = 0;
+    const start = state.buffer.length - length;
+    for (let i = 0; i < length; i++) {
+        const w = Math.exp(-((i - m) * (i - m)) / (2 * s * s));
+        weightSum += w;
+        valueSum += state.buffer[start + i] * w;
+    }
+    return valueSum / weightSum;
+}
+
+/**
+ * cog: Center of Gravity oscillator
+ * @returns series float
+ */
+export function cog(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length < length) return NaN;
+    let num = 0, den = 0;
+    const start = state.buffer.length - length;
+    for (let i = 0; i < length; i++) {
+        const v = state.buffer[start + i];
+        num += v * (i + 1);
+        den += v;
+    }
+    return den === 0 ? 0 : -num / den;
+}
+
+/**
+ * tsi: True Strength Index
+ * @returns series float
+ */
+export function tsi(ctx: Context, sourceInput: any, longLenInput: any, shortLenInput: any): number {
+    const source = val(sourceInput);
+    const longLen = val(longLenInput);
+    const shortLen = val(shortLenInput);
+    const state = ctx.getPersistentState<{ prevSrc: number | undefined }>(() => ({ prevSrc: undefined }));
+
+    if (state.prevSrc === undefined) {
+        state.prevSrc = source;
+        // Seed all 4 internal EMAs
+        (ctx as any).callStack.push("tsi_dbl_smooth_pc");
+        ema(ctx, 0, longLen); ema(ctx, 0, shortLen);
+        (ctx as any).callStack.pop();
+        (ctx as any).callStack.push("tsi_dbl_smooth_apc");
+        ema(ctx, 0, longLen); ema(ctx, 0, shortLen);
+        (ctx as any).callStack.pop();
+        return 0;
+    }
+
+    const pc = source - state.prevSrc;
+    state.prevSrc = source;
+
+    (ctx as any).callStack.push("tsi_dbl_smooth_pc");
+    const pcSmooth = ema(ctx, ema(ctx, pc, longLen), shortLen);
+    (ctx as any).callStack.pop();
+
+    (ctx as any).callStack.push("tsi_dbl_smooth_apc");
+    const apcSmooth = ema(ctx, ema(ctx, Math.abs(pc), longLen), shortLen);
+    (ctx as any).callStack.pop();
+
+    return apcSmooth === 0 ? 0 : 100 * pcSmooth / apcSmooth;
+}
+
+/**
+ * pivothigh: Pivot High. Returns the value of the pivot high point, NaN otherwise.
+ * Looks for a high that is higher than `leftbars` bars to the left and `rightbars` bars to the right.
+ * @returns series float
+ */
+export function pivothigh(ctx: Context, sourceInput: any, leftbarsInput: any, rightbarsInput: any): number {
+    const source = val(sourceInput);
+    const leftbars = Math.floor(val(leftbarsInput));
+    const rightbars = Math.floor(val(rightbarsInput));
+    const totalLen = leftbars + rightbars + 1;
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = totalLen + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length < totalLen) return NaN;
+    const pivotIdx = state.buffer.length - 1 - rightbars;
+    const pivotVal = state.buffer[pivotIdx];
+    for (let i = pivotIdx - leftbars; i < pivotIdx; i++) {
+        if (state.buffer[i] >= pivotVal) return NaN;
+    }
+    for (let i = pivotIdx + 1; i <= pivotIdx + rightbars; i++) {
+        if (state.buffer[i] >= pivotVal) return NaN;
+    }
+    return pivotVal;
+}
+
+/**
+ * pivotlow: Pivot Low. Returns the value of the pivot low point, NaN otherwise.
+ * @returns series float
+ */
+export function pivotlow(ctx: Context, sourceInput: any, leftbarsInput: any, rightbarsInput: any): number {
+    const source = val(sourceInput);
+    const leftbars = Math.floor(val(leftbarsInput));
+    const rightbars = Math.floor(val(rightbarsInput));
+    const totalLen = leftbars + rightbars + 1;
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = totalLen + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length < totalLen) return NaN;
+    const pivotIdx = state.buffer.length - 1 - rightbars;
+    const pivotVal = state.buffer[pivotIdx];
+    for (let i = pivotIdx - leftbars; i < pivotIdx; i++) {
+        if (state.buffer[i] <= pivotVal) return NaN;
+    }
+    for (let i = pivotIdx + 1; i <= pivotIdx + rightbars; i++) {
+        if (state.buffer[i] <= pivotVal) return NaN;
+    }
+    return pivotVal;
+}
+
+/**
+ * tr: True Range (standalone, not wrapped in RMA like atr)
+ * @returns series float
+ */
+export function tr(ctx: Context): number {
+    const state = ctx.getPersistentState<{ prevClose: number }>(() => ({ prevClose: NaN }));
+    const prevC = isNaN(state.prevClose) ? ctx.close : state.prevClose;
+    state.prevClose = ctx.close;
+    return Math.max(
+        ctx.high - ctx.low,
+        Math.abs(ctx.high - prevC),
+        Math.abs(ctx.low - prevC)
+    );
+}
+
+/**
+ * sum: Rolling sum of source over length bars. (Equivalent to sma * length.)
+ * @returns series float
+ */
+export function sum(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+    const state = ctx.getPersistentState<SumState>(() => ({
+        buffer: [], sum: 0, prevLength: 0, counter: 0
+    }));
+    state.buffer.push(source);
+    if (length !== state.prevLength) {
+        state.sum = 0;
+        const start = Math.max(0, state.buffer.length - length);
+        for (let i = start; i < state.buffer.length; i++) state.sum += state.buffer[i];
+        state.prevLength = length; state.counter = 0;
+    } else {
+        state.sum += source;
+        if (state.buffer.length > length) {
+            state.sum -= state.buffer[state.buffer.length - 1 - length];
+        }
+        if (++state.counter >= HEAL_SMA_INTERVAL) {
+            state.sum = 0;
+            const start = Math.max(0, state.buffer.length - length);
+            for (let i = start; i < state.buffer.length; i++) state.sum += state.buffer[i];
+            state.counter = 0;
+        }
+    }
+    if (state.buffer.length > MAX_BUFFER_SIZE) {
+        const keep = length + 500;
+        if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
+    }
+    if (state.buffer.length < length) return NaN;
+    return state.sum;
+}
+
+/**
+ * fixnan: Replaces NaN with the last non-NaN value (per call site).
+ * @returns series float
+ */
+export function fixnan(ctx: Context, xInput: any): number {
+    const x = val(xInput);
+    const state = ctx.getPersistentState<{ last: number }>(() => ({ last: NaN }));
+    if (!isNaN(x)) {
+        state.last = x;
+        return x;
+    }
+    return state.last;
+}
