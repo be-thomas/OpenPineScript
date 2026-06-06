@@ -81,7 +81,22 @@ export const time = {
      * * @param {Context} ctx - The current execution context.
      * @returns {number} The current bar's UNIX timestamp in milliseconds.
      */
-    "time": (ctx: Context): number => ctx.time
+    "time": (ctx: Context): number => ctx.time,
+
+    /**
+     * Constructs a UNIX timestamp (ms) from calendar components (UTC).
+     * Pine months are 1-indexed (January = 1); JS Date.UTC expects 0-indexed.
+     * @returns {number} UNIX timestamp in milliseconds.
+     */
+    "timestamp": (
+        year: number,
+        month: number,
+        day: number,
+        hour: number = 0,
+        minute: number = 0,
+        second: number = 0
+    ): number =>
+        Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second))
 };
 
 export default time;

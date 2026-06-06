@@ -1105,6 +1105,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (time.default || time)["time"]
       },
+      "timestamp": {
+          uses_context: false,
+          args: ["year","month","day","hour","minute","second"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: (time.default || time)["timestamp"]
+      },
       "plot": {
           uses_context: true,
           args: ["series","title","color","linewidth","style"],
