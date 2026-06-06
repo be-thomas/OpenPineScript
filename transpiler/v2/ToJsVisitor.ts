@@ -4,7 +4,7 @@
  */
 
 import { ParseTreeVisitor } from "antlr4ng";
-import type { TerminalNode, ParserRuleContext } from "antlr4ng";
+import type { TerminalNode, ParserRuleContext, ParseTree } from "antlr4ng";
 import * as common from "../../utils/v2/common";
 import {
   Opsv2_scriptContext,
@@ -61,6 +61,11 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   // Prefix for all emitted identifiers to avoid sandbox name clashes
   private readonly PREFIX = common.PREFIX;
   private anonCounter = 0;
+  // Depth of for-loop bodies currently being visited. v2 keeps variables
+  // immutable globally but permits ':=' on loop accumulators (see enforceNoReassignment).
+  protected loopDepth = 0;
+  // Script kind from the study()/strategy() directive; drives strategy.* enforcement.
+  protected scriptKind: 'study' | 'strategy' | undefined = undefined;
 
   protected override defaultResult(): string {
     return "";
@@ -81,10 +86,103 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     return `@L${line}:C${col}`;
   }
 
+  // ───────────────────────────────────────────────────────────────────────
+  // Pine Script v2 language restrictions
+  //
+  // v2 is intentionally stricter than later versions. Every restriction lives
+  // in its own `protected enforce*` method and is invoked only from the
+  // relevant visit* method — the emit logic itself stays version-agnostic.
+  // A future v3 visitor can lift any restriction by overriding its guard to a
+  // no-op, without touching the transpilation code:
+  //
+  //   class V3ToJsVisitor extends ToJsVisitor {
+  //     protected enforceNoReassignment() {}  // v3 allows ':='
+  //     protected enforceNaComparison() {}    // v3 relaxes na comparisons
+  //     protected enforceNoRecursion() {}     // v3 allows recursion
+  //   }
+  // ───────────────────────────────────────────────────────────────────────
+
+  /**
+   * v2: variables are immutable within a bar — reject ':=' reassignment at the
+   * global/script scope. It remains valid for accumulators inside a for-loop
+   * body, which is the only place v2 mutation is supported.
+   */
+  protected enforceNoReassignment(ctx: Var_assignContext): void {
+    if (this.loopDepth > 0) return; // loop accumulator — allowed
+    throw new Error(
+      `Pine Script v2 Error at ${this.getLocId(ctx)}: reassignment with ':=' is not allowed outside a for-loop (variables are immutable within a bar). Bind a new variable with '=' instead.`
+    );
+  }
+
+  /** v2: '==' / '!=' against 'na' silently misbehaves — require the na(x) function. */
+  protected enforceNaComparison(ctx: Eq_exprContext): void {
+    if (ctx.cmp_expr().length < 2) return; // a single operand is not a comparison
+    for (const operand of ctx.cmp_expr()) {
+      if (operand.getText() === "na") {
+        throw new Error(
+          `Pine Script v2 Error at ${this.getLocId(ctx)}: cannot compare to 'na' with '==' or '!=' (it does not behave as expected). Use the na(x) function instead.`
+        );
+      }
+    }
+  }
+
+  /** v2: user-defined functions cannot recurse — reject direct self-reference. */
+  protected enforceNoRecursion(name: string, body: ParserRuleContext, ctx: ParserRuleContext): void {
+    if (this.callsFunction(body, name)) {
+      throw new Error(
+        `Pine Script v2 Error at ${this.getLocId(ctx)}: recursion is not allowed; function '${name}' refers to itself.`
+      );
+    }
+  }
+
+  /**
+   * v2: a study() script is in indicator mode — the broker emulator is disabled,
+   * so any strategy.* order/state call is a fatal error. Allowed under strategy()
+   * or when no directive is declared (permissive default).
+   */
+  protected enforceStrategyContext(name: string, ctx: ParserRuleContext): void {
+    if (this.scriptKind === 'study') {
+      throw new Error(
+        `Pine Script v2 Error at ${this.getLocId(ctx)}: '${name}' is unavailable in a study() script (indicator mode). Declare strategy(...) to use the broker emulator.`
+      );
+    }
+  }
+
+  /** Recursively scan a subtree for a call to the named function. */
+  private callsFunction(node: ParseTree, name: string): boolean {
+    if (node instanceof Fun_callContext && node.id().getText() === name) return true;
+    const count = node.getChildCount();
+    for (let i = 0; i < count; i++) {
+      const child = node.getChild(i);
+      if (child && this.callsFunction(child, name)) return true;
+    }
+    return false;
+  }
+
   // --- Entry Point ---
   visitOpsv2_script(ctx: Opsv2_scriptContext): string {
+    // Determine the script kind from its study()/strategy() directive up front,
+    // so strategy.* enforcement is independent of statement visit order.
+    this.scriptKind = this.detectDirective(ctx);
     const stmts = ctx.stmt().map((s) => this.visit(s)).filter(Boolean);
     return stmts.join("\n");
+  }
+
+  /** Find the first study()/strategy() directive call in the script, if any. */
+  private detectDirective(node: ParseTree): 'study' | 'strategy' | undefined {
+    if (node instanceof Fun_callContext) {
+      const name = node.id().getText();
+      if (name === "study" || name === "strategy") return name;
+    }
+    const count = node.getChildCount();
+    for (let i = 0; i < count; i++) {
+      const child = node.getChild(i);
+      if (child) {
+        const found = this.detectDirective(child);
+        if (found) return found;
+      }
+    }
+    return undefined;
   }
 
   visitStmt(ctx: StmtContext): string {
@@ -132,6 +230,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   visitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
     const name = this.visit(ctx.id());
     const params = this.visit(ctx.fun_head());
+    this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_singleline(), ctx);
 
     // V2 Constraint: Check if returning a tuple [x, y]
     const content = ctx.fun_body_singleline().local_stmt_singleline().local_stmt_content(0);
@@ -146,6 +245,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
     const name = this.visit(ctx.id());
     const params = this.visit(ctx.fun_head());
+    this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_multiline(), ctx);
 
     // V2 Constraint: Check last statement of multiline block for tuple return
     const stmts = ctx.fun_body_multiline().local_stmts_multiline().local_stmts_list().local_stmt_multiline();
@@ -289,6 +389,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
 
   // Handle: x := 1
   visitVar_assign(ctx: Var_assignContext): string {
+    this.enforceNoReassignment(ctx);
     const name = this.visit(ctx.id());
     const value = this.visit(ctx.arith_expr());
     // No 'let'. Updates the existing variable in the parent scope.
@@ -329,7 +430,10 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     const varName = this.visit(ctx.var_def().id());
     const startVal = this.visit(ctx.var_def().arith_expr());
     const endVal = this.visit(ctx.ternary_expr(0));
+    // The loop body may reassign accumulators with ':=' — allowed only here.
+    this.loopDepth++;
     const rawBody = this.visit(ctx.stmts_block());
+    this.loopDepth--;
 
     let stepVal = "1";
     if (ctx.FOR_STMT_BY()) {
@@ -426,6 +530,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   visitEq_expr(ctx: Eq_exprContext): string {
+    this.enforceNaComparison(ctx);
     const parts = ctx.cmp_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
     let out = parts[0];
@@ -525,9 +630,20 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
 
   // --- Function Calls with ID Tagging ---
   visitFun_call(ctx: Fun_callContext): string {
-    const originalName = ctx.id().getText(); 
+    const originalName = ctx.id().getText();
+
+    // study()/strategy() directives: record metadata instead of a normal call.
+    if (originalName === "study" || originalName === "strategy") {
+      return this.emitDirective(originalName, ctx);
+    }
+
+    // v2: strategy.* requires strategy() context (rejected under study()).
+    if (originalName.startsWith("strategy.")) {
+      this.enforceStrategyContext(originalName, ctx);
+    }
+
     const transpiledName = this.visit(ctx.id());
-    
+
     // 1. Just parse the arguments normally. NO manual 'ctx' injection!
     const args = ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
     
@@ -539,6 +655,18 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     const finalArgsPart = args ? `, ${args}` : "";
 
     return `ctx.call(${callId}, ${transpiledName}${finalArgsPart})`;
+  }
+
+  /** Emit a study()/strategy() directive as a metadata declaration. */
+  private emitDirective(kind: string, ctx: Fun_callContext): string {
+    const aa = ctx.fun_actual_args();
+    let posList = "";
+    let kwObj = "{}";
+    if (aa) {
+      if (aa.pos_args()) posList = this.visit(aa.pos_args()!);
+      if (aa.kw_args()) kwObj = this.visit(aa.kw_args()!); // "{ opsv2_key: value, ... }"
+    }
+    return `ctx.declareScript("${kind}", [${posList}], ${kwObj})`;
   }
 
   visitFun_actual_args(ctx: Fun_actual_argsContext): string {
@@ -587,7 +715,12 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
 
   visitId = (ctx: IdContext): string => {
     const text = ctx.getText();
-    
+
+    // v2: strategy.* namespace (getters/constants too) requires strategy() context.
+    if (text.startsWith("strategy.")) {
+      this.enforceStrategyContext(text, ctx);
+    }
+
     // 1. Handle Transpilation (Prefixing)
     let transpiledName = text;
     if (text.includes('.')) {

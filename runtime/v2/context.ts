@@ -69,6 +69,22 @@ export interface InputDef {
     type: string;    // 'integer', 'float', 'bool', 'string', 'source'
 }
 
+/**
+ * Script-level metadata declared by the `study()` / `strategy()` directive.
+ * `kind` drives mode-specific behavior (e.g. study mode disables the broker).
+ */
+export interface ScriptMeta {
+    kind: 'study' | 'strategy';
+    title: string;
+    shorttitle: string;
+    overlay: boolean;
+    precision?: number;          // study only
+    pyramiding?: number;         // strategy only
+    calc_on_every_tick?: boolean; // strategy only
+    calc_on_order_fills?: boolean; // strategy only
+    currency?: string;           // strategy only
+}
+
 export class Context {
     // 1. Internal Execution State (Private)
     protected callStack: string[] = [];
@@ -110,6 +126,9 @@ export class Context {
     
     // 6. Built-in Constants
     public opsv2_na: number = NaN;
+
+    // 7. Script Metadata (set by study()/strategy() directive)
+    public scriptMeta: ScriptMeta | null = null;
 
     constructor() {
         this.initBaseSeries();
@@ -157,6 +176,55 @@ export class Context {
         this.cash = 100000;
         this.trades = [];
         this.orders = [];
+
+        // 6. Reset Script Metadata (re-declared on the next pass)
+        this.scriptMeta = null;
+    }
+
+    /**
+     * Records the script's `study()` / `strategy()` directive metadata.
+     * Called from transpiled code; positional args are mapped to named params
+     * in directive-declaration order, with keyword args (prefix-stripped) taking
+     * precedence. Idempotent across bars.
+     */
+    public declareScript(kind: 'study' | 'strategy', positional: any[] = [], kwargs: Record<string, any> = {}): void {
+        const unwrap = (x: any): any =>
+            x !== null && x !== undefined && typeof x.valueOf === 'function' ? x.valueOf() : x;
+
+        // Strip the emitter prefix from keyword keys (e.g. "opsv2_overlay" -> "overlay").
+        const named: Record<string, any> = {};
+        for (const [k, v] of Object.entries(kwargs)) {
+            named[k.startsWith(PREFIX) ? k.slice(PREFIX.length) : k] = v;
+        }
+
+        const order = kind === 'strategy'
+            ? ['title', 'shorttitle', 'overlay', 'pyramiding', 'calc_on_every_tick', 'calc_on_order_fills', 'currency']
+            : ['title', 'shorttitle', 'overlay', 'precision'];
+
+        const arg = (name: string): any => {
+            if (named[name] !== undefined) return unwrap(named[name]);
+            const idx = order.indexOf(name);
+            return idx >= 0 && idx < positional.length ? unwrap(positional[idx]) : undefined;
+        };
+
+        const title = arg('title') !== undefined ? String(arg('title')) : '';
+        const shorttitle = arg('shorttitle') !== undefined ? String(arg('shorttitle')) : title;
+        const overlay = arg('overlay') !== undefined ? Boolean(arg('overlay')) : false;
+
+        if (kind === 'study') {
+            this.scriptMeta = {
+                kind, title, shorttitle, overlay,
+                precision: arg('precision') !== undefined ? Number(arg('precision')) : undefined,
+            };
+        } else {
+            this.scriptMeta = {
+                kind, title, shorttitle, overlay,
+                pyramiding: arg('pyramiding') !== undefined ? Number(arg('pyramiding')) : 0,
+                calc_on_every_tick: Boolean(arg('calc_on_every_tick')),
+                calc_on_order_fills: Boolean(arg('calc_on_order_fills')),
+                currency: arg('currency') !== undefined ? String(arg('currency')) : undefined,
+            };
+        }
     }
 
     // Helper to register an input during dry_run and retrieve value during real run
