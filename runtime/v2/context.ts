@@ -19,14 +19,41 @@ export interface Position {
     avgPrice: number;
 }
 
-export interface PlotData {
-    value: number;
+// --- Plot Data: Discriminated Union ---
+// Each plot type stores only the fields it needs.
+// Frontend can switch on `type` to map to KlineCharts structures.
+
+interface PlotBase {
     title: string;
     color?: string;
-    linewidth?: number;
-    style?: any;
-    type: 'line' | 'shape' | 'char' | 'bar';
 }
+
+export interface LinePlot extends PlotBase {
+    type: 'line';
+    value: number;
+    linewidth?: number;
+    style?: number;
+}
+
+export interface OHLCPlot extends PlotBase {
+    type: 'candle';
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+}
+
+export interface MarkerPlot extends PlotBase {
+    type: 'shape' | 'char' | 'arrow';
+    value: number;
+    style?: string;
+}
+
+export interface ColorDirective extends PlotBase {
+    type: 'bgcolor' | 'barcolor';
+}
+
+export type PlotData = LinePlot | OHLCPlot | MarkerPlot | ColorDirective;
 
 export interface FillData {
     plotId1: string; // The ID of the first line
@@ -317,44 +344,30 @@ export class Context {
 
     // --- Plotting ---
 
-    public registerPlot(
-        value: number, 
-        title: string = "Plot", 
-        options: { 
-            color?: string, 
-            linewidth?: number, 
-            style?: any,
-            type?: 'line' | 'shape' | 'char' | 'bar'
-        } = {}
-    ) {
+    /**
+     * Registers a pre-built PlotData object for the current bar.
+     * Each ui.ts function constructs the correctly-typed variant.
+     */
+    public registerPlot(data: PlotData) {
         // 1. Get the Unique Call ID (Storage Key)
-        // This ensures that "plot(close)" and "plot(open)" don't overwrite each other 
+        // This ensures that "plot(close)" and "plot(open)" don't overwrite each other
         // just because they both default to title="Plot".
-        const id = this.callStack.length > 0 
-            ? this.callStack[this.callStack.length - 1] 
-            : title;
+        const id = this.callStack.length > 0
+            ? this.callStack[this.callStack.length - 1]
+            : data.title;
 
         // 2. Use ID to retrieve the series
         let series = this.plots.get(id);
 
         if (!series) {
             series = [];
-            this.plots.set(id, series); // Store by ID
-            
+            this.plots.set(id, series);
+
             // Backfill history if this plot appears conditionally later in the script
             while (series.length < this.currentBarIndex) {
                 series.push(null);
             }
         }
-
-        const data: PlotData = {
-            value: Number(value), // 3. Ensure Primitive Number
-            title: title,         // 4. Store Display Title (can be duplicate)      
-            color: options.color,
-            linewidth: options.linewidth,
-            style: options.style,
-            type: options.type || 'line'
-        };
 
         if (series.length > this.currentBarIndex) {
             series[this.currentBarIndex] = data;

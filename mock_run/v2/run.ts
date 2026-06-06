@@ -218,7 +218,14 @@ function generateChartCsv(bars: Bar[], ctx: Context): string {
         const ohlcv = [ts, bar.open, bar.high, bar.low, bar.close, bar.volume];
         const plotValues = plotEntries.map(([, series]) => {
             const pt = series[i];
-            return pt !== null && pt !== undefined && !isNaN(pt.value) ? pt.value.toFixed(6) : "";
+            if (pt === null || pt === undefined) return "";
+            if ('value' in pt) {
+                return !isNaN(pt.value) ? pt.value.toFixed(6) : "";
+            }
+            if (pt.type === 'candle') {
+                return `${pt.open}/${pt.high}/${pt.low}/${pt.close}`;
+            }
+            return "";
         });
         return [...ohlcv, ...plotValues].join(",");
     });

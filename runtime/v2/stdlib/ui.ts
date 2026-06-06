@@ -19,114 +19,174 @@ export const color_purple = "#9C27B0";
 // --- Outputs ---
 
 export function plot(
-    ctx: Context, 
-    series: number, 
-    title: string = "Plot", 
-    color?: string, 
-    linewidth: number = 1, 
+    ctx: Context,
+    series: number,
+    title: string = "Plot",
+    color?: string,
+    linewidth: number = 1,
     style?: number
-): string { 
-    // Register the value to the Context's storage.
-    ctx.registerPlot(series, title, { 
-        color, 
-        linewidth, 
-        style, 
-        type: 'line' 
+): string {
+    ctx.registerPlot({
+        type: 'line',
+        value: Number(series),
+        title,
+        color,
+        linewidth,
+        style
     });
     // Return the ID (title) so it can be used by fill()
-    return title; 
+    return title;
 }
 
 export function plotshape(
-    ctx: Context, 
-    series: boolean | number, 
-    title: string = "Shape", 
-    style?: string, 
-    location?: string, 
+    ctx: Context,
+    series: boolean | number,
+    title: string = "Shape",
+    style?: string,
+    location?: string,
     color?: string
 ): void {
-    // 1. Convert to Number (Boolean true becomes 1, false becomes 0)
     let val = Number(series);
 
-    // 2. Pine Rule: 0 means "False" (Don't Plot). 
-    // We convert 0 to NaN so the chart ignores it.
+    // Pine Rule: 0 means "False" (Don't Plot).
     if (val === 0) {
         val = NaN;
     }
 
-    ctx.registerPlot(val, title, { 
-        color, 
-        style, 
-        type: 'shape' 
+    ctx.registerPlot({
+        type: 'shape',
+        value: val,
+        title,
+        color,
+        style
     });
 }
 
 export function plotchar(
-    ctx: Context, 
-    series: boolean | number, 
-    title: string = "Char", 
-    char: string = "★", 
-    location?: string, 
+    ctx: Context,
+    series: boolean | number,
+    title: string = "Char",
+    char: string = "★",
+    location?: string,
     color?: string
 ): void {
     let val = Number(series);
 
-    // Same rule: 0 means don't plot.
     if (val === 0) {
         val = NaN;
     }
 
-    ctx.registerPlot(val, title, { 
-        color, 
-        style: char, 
-        type: 'char' 
+    ctx.registerPlot({
+        type: 'char',
+        value: val,
+        title,
+        color,
+        style: char
     });
 }
 
 export function hline(
-    ctx: Context, 
-    price: number, 
-    title: string = "HLine", 
-    color?: string, 
-    linestyle?: number, 
+    ctx: Context,
+    price: number,
+    title: string = "HLine",
+    color?: string,
+    linestyle?: number,
     linewidth?: number
-): string { 
-    // Treat hline as a constant plot.
-    // Note: In a real chart, hlines are often horizontal rays, 
-    // but plotting them as a line series works for the Backtester.
-    ctx.registerPlot(price, title, { 
-        color, 
-        linewidth, 
-        style: linestyle, 
-        type: 'line' 
+): string {
+    ctx.registerPlot({
+        type: 'line',
+        value: Number(price),
+        title,
+        color,
+        linewidth,
+        style: linestyle
     });
-    return title; 
+    return title;
+}
+
+export function plotbar(
+    ctx: Context,
+    open: number,
+    high: number,
+    low: number,
+    close: number,
+    title: string = "Bar",
+    color?: string
+): void {
+    ctx.registerPlot({
+        type: 'candle',
+        open: Number(open),
+        high: Number(high),
+        low: Number(low),
+        close: Number(close),
+        title,
+        color
+    });
+}
+
+export function plotcandle(
+    ctx: Context,
+    open: number,
+    high: number,
+    low: number,
+    close: number,
+    title: string = "Candle",
+    color?: string
+): void {
+    ctx.registerPlot({
+        type: 'candle',
+        open: Number(open),
+        high: Number(high),
+        low: Number(low),
+        close: Number(close),
+        title,
+        color
+    });
+}
+
+export function plotarrow(
+    ctx: Context,
+    series: number,
+    title: string = "Arrow",
+    colorup?: string,
+    colordown?: string,
+    _minheight: number = 5,
+    _maxheight: number = 100
+): void {
+    ctx.registerPlot({
+        type: 'arrow',
+        value: Number(series),
+        title,
+        color: Number(series) >= 0 ? (colorup || "#4CAF50") : (colordown || "#FF5252")
+    });
 }
 
 // --- Visual Layers ---
 
 export function bgcolor(ctx: Context, color: string, transp?: number): void {
-    // We use a reserved prefix for background colors so they don't clash with user plots
-    // We plot '1' to indicate "Active" for this bar, with the specific color.
-    ctx.registerPlot(1, `_BGCOLOR_${color}`, { color, type: 'bar' }); 
+    ctx.registerPlot({
+        type: 'bgcolor',
+        title: `_BGCOLOR_${color}`,
+        color
+    });
 }
 
 export function barcolor(ctx: Context, color: string): void {
-    ctx.registerPlot(1, "_BARCOLOR_", { color, type: 'bar' });
+    ctx.registerPlot({
+        type: 'barcolor',
+        title: "_BARCOLOR_",
+        color
+    });
 }
 
 export function fill(
-    ctx: Context, 
-    plotId1: string, // Receives the ID string returned by plot()/hline()
-    plotId2: string, 
-    color?: string, 
-    title?: string, 
-    editable?: boolean, 
+    ctx: Context,
+    plotId1: string,
+    plotId2: string,
+    color?: string,
+    title?: string,
+    editable?: boolean,
     fillgaps?: boolean
 ): void {
-    // Register the visual instruction to the context
-    // This tells the frontend: "Draw color between Line A and Line B"
     ctx.registerFill(plotId1, plotId2, { color, title });
 }
-
-
