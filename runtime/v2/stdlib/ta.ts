@@ -189,8 +189,14 @@ export function wma(ctx: Context, sourceInput: any, lengthInput: any): number {
 export function vwma(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
+    // The two sma() accumulators must run under distinct frames; otherwise they
+    // share one SumState and corrupt each other's rolling buffer.
+    (ctx as any).callStack.push("vwma_num");
     const num = sma(ctx, source * ctx.volume, length);
+    (ctx as any).callStack.pop();
+    (ctx as any).callStack.push("vwma_denom");
     const denom = sma(ctx, ctx.volume, length);
+    (ctx as any).callStack.pop();
     return num / denom;
 }
 
@@ -214,9 +220,17 @@ export function swma(ctx: Context, sourceInput: any): number {
 export function trix(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
+    // Triple-smoothing: each ema() needs its own frame, otherwise all three
+    // share one EmaState (and also collide with trix's own state below).
+    (ctx as any).callStack.push("trix_e1");
     const e1 = ema(ctx, source, length);
+    (ctx as any).callStack.pop();
+    (ctx as any).callStack.push("trix_e2");
     const e2 = ema(ctx, e1, length);
+    (ctx as any).callStack.pop();
+    (ctx as any).callStack.push("trix_e3");
     const e3 = ema(ctx, e2, length);
+    (ctx as any).callStack.pop();
     const state = ctx.getPersistentState<{ prevE3: number | undefined }>(() => ({ prevE3: undefined }));
     if (state.prevE3 === undefined) { state.prevE3 = e3; return 0; }
     const result = 100 * (e3 - state.prevE3) / state.prevE3;
@@ -234,15 +248,23 @@ export function rsi(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
     const state = ctx.getPersistentState<{ prevSrc: number | undefined }>(() => ({ prevSrc: undefined }));
+    // avgGain and avgLoss are two independent RMAs — they need distinct frames,
+    // and both must stay clear of rsi's own state above (which sits on the base
+    // frame). Without isolation all three collide on one state object.
     if (state.prevSrc === undefined) {
         state.prevSrc = source;
-        rma(ctx, 0, length); rma(ctx, 0, length);
+        (ctx as any).callStack.push("rsi_gain"); rma(ctx, 0, length); (ctx as any).callStack.pop();
+        (ctx as any).callStack.push("rsi_loss"); rma(ctx, 0, length); (ctx as any).callStack.pop();
         return NaN;
     }
     const change = source - state.prevSrc;
     state.prevSrc = source;
+    (ctx as any).callStack.push("rsi_gain");
     const avgGain = rma(ctx, Math.max(change, 0), length);
+    (ctx as any).callStack.pop();
+    (ctx as any).callStack.push("rsi_loss");
     const avgLoss = rma(ctx, Math.max(-change, 0), length);
+    (ctx as any).callStack.pop();
     if (avgLoss === 0) return 100;
     return 100 - (100 / (1 + (avgGain / avgLoss)));
 }
@@ -253,10 +275,19 @@ export function rsi(ctx: Context, sourceInput: any, lengthInput: any): number {
  */
 export function macd(ctx: Context, sourceInput: any, fastLenInput: any, slowLenInput: any, sigLenInput: any): [number, number, number] {
     const source = val(sourceInput);
+    // Each ema() keeps its own state keyed by the call stack, so the three
+    // smoothers must run under distinct frames — otherwise they share one
+    // EmaState and overwrite each other every bar.
+    (ctx as any).callStack.push("macd_fast");
     const fast = ema(ctx, source, val(fastLenInput));
+    (ctx as any).callStack.pop();
+    (ctx as any).callStack.push("macd_slow");
     const slow = ema(ctx, source, val(slowLenInput));
+    (ctx as any).callStack.pop();
     const macdLine = fast - slow;
+    (ctx as any).callStack.push("macd_signal");
     const signalLine = ema(ctx, macdLine, val(sigLenInput));
+    (ctx as any).callStack.pop();
     return [macdLine, signalLine, macdLine - signalLine];
 }
 
@@ -342,7 +373,12 @@ export function bb(ctx: Context, sourceInput: any, lengthInput: any, multInput: 
 export function cci(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = Math.floor(val(lengthInput));
+    // Run sma() under its own frame: otherwise its SumState lands on the same
+    // key as cci's BufferState below, and source gets pushed into one shared
+    // buffer twice per bar.
+    (ctx as any).callStack.push("cci_sma");
     const ma = sma(ctx, source, length);
+    (ctx as any).callStack.pop();
     const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
     state.buffer.push(source);
     if (state.buffer.length > MAX_BUFFER_SIZE) {
@@ -485,9 +521,15 @@ export function lowestbars(ctx: Context, source: any, length: any): number {
  */
 export function stoch(ctx: Context, sourceInput: any, highInput: any, lowInput: any, lengthInput: any): number {
     const source = val(sourceInput);
+    // highest()/lowest() each keep their own rolling deque keyed by the call
+    // stack, so they must run under distinct frames to avoid sharing state.
+    (ctx as any).callStack.push("stoch_lowest");
     const l = lowest(ctx, lowInput, lengthInput);
+    (ctx as any).callStack.pop();
+    (ctx as any).callStack.push("stoch_highest");
     const h = highest(ctx, highInput, lengthInput);
-    if (h === l) return 0; 
+    (ctx as any).callStack.pop();
+    if (h === l) return 0;
     return 100 * (source - l) / (h - l);
 }
 
@@ -888,8 +930,15 @@ export function percentrank(ctx: Context, sourceInput: any, lengthInput: any): n
  */
 export function wpr(ctx: Context, lengthInput: any): number {
     const length = val(lengthInput);
+    // highest() and lowest() each keep their own rolling deque keyed by the
+    // call stack, so they must run under distinct frames — otherwise they share
+    // one state object and corrupt each other's buffers.
+    (ctx as any).callStack.push("wpr_highest");
     const h = highest(ctx, ctx.high, length);
+    (ctx as any).callStack.pop();
+    (ctx as any).callStack.push("wpr_lowest");
     const l = lowest(ctx, ctx.low, length);
+    (ctx as any).callStack.pop();
     if (h === l) return 0;
     return -100 * (h - ctx.close) / (h - l);
 }
@@ -987,7 +1036,9 @@ export function cog(ctx: Context, sourceInput: any, lengthInput: any): number {
     const start = state.buffer.length - length;
     for (let i = 0; i < length; i++) {
         const v = state.buffer[start + i];
-        num += v * (i + 1);
+        // Ehlers CoG: the most recent bar (i bars back, i=0) gets weight 1.
+        // buffer[start] is the oldest, buffer[start + length - 1] is the newest.
+        num += v * (length - i);
         den += v;
     }
     return den === 0 ? 0 : -num / den;
@@ -1003,28 +1054,32 @@ export function tsi(ctx: Context, sourceInput: any, longLenInput: any, shortLenI
     const shortLen = val(shortLenInput);
     const state = ctx.getPersistentState<{ prevSrc: number | undefined }>(() => ({ prevSrc: undefined }));
 
+    // Each ema() in the double-smoothing keeps its own state keyed by the call
+    // stack. The inner and outer EMAs must therefore run under *distinct* frames;
+    // nesting them in one frame makes inner/outer share a single EmaState.
+    const dblSmooth = (frameInner: string, frameOuter: string, x: number): number => {
+        (ctx as any).callStack.push(frameInner);
+        const inner = ema(ctx, x, longLen);
+        (ctx as any).callStack.pop();
+        (ctx as any).callStack.push(frameOuter);
+        const outer = ema(ctx, inner, shortLen);
+        (ctx as any).callStack.pop();
+        return outer;
+    };
+
     if (state.prevSrc === undefined) {
         state.prevSrc = source;
-        // Seed all 4 internal EMAs
-        (ctx as any).callStack.push("tsi_dbl_smooth_pc");
-        ema(ctx, 0, longLen); ema(ctx, 0, shortLen);
-        (ctx as any).callStack.pop();
-        (ctx as any).callStack.push("tsi_dbl_smooth_apc");
-        ema(ctx, 0, longLen); ema(ctx, 0, shortLen);
-        (ctx as any).callStack.pop();
+        // Seed all 4 internal EMAs (inner+outer for both pc and apc) with 0.
+        dblSmooth("tsi_pc_inner", "tsi_pc_outer", 0);
+        dblSmooth("tsi_apc_inner", "tsi_apc_outer", 0);
         return 0;
     }
 
     const pc = source - state.prevSrc;
     state.prevSrc = source;
 
-    (ctx as any).callStack.push("tsi_dbl_smooth_pc");
-    const pcSmooth = ema(ctx, ema(ctx, pc, longLen), shortLen);
-    (ctx as any).callStack.pop();
-
-    (ctx as any).callStack.push("tsi_dbl_smooth_apc");
-    const apcSmooth = ema(ctx, ema(ctx, Math.abs(pc), longLen), shortLen);
-    (ctx as any).callStack.pop();
+    const pcSmooth = dblSmooth("tsi_pc_inner", "tsi_pc_outer", pc);
+    const apcSmooth = dblSmooth("tsi_apc_inner", "tsi_apc_outer", Math.abs(pc));
 
     return apcSmooth === 0 ? 0 : 100 * pcSmooth / apcSmooth;
 }
