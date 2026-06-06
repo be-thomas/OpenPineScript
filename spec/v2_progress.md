@@ -152,19 +152,19 @@ Checklist mapped against [spec/v2.md](v2.md).
 | `sum` | ✅ |
 | `stdev` | ✅ |
 | `change` | ✅ |
-| `alma` | ❌ |
-| `cog` | ❌ |
-| `correlation` | ❌ |
-| `cum` | ❌ |
-| `dev` | ❌ |
-| `falling` | ❌ |
-| `mfi` | ❌ |
-| `percentrank` | ❌ |
-| `pivothigh`, `pivotlow` | ❌ |
-| `roc` | ❌ |
-| `tsi` | ❌ |
-| `variance` | ❌ |
-| `wpr` | ❌ |
+| `alma` | ✅ |
+| `cog` | ✅ |
+| `correlation` | ✅ |
+| `cum` | ✅ |
+| `dev` | ✅ |
+| `falling`, `rising` | ✅ |
+| `mfi` | ✅ |
+| `percentrank` | ✅ |
+| `pivothigh`, `pivotlow` | ✅ |
+| `roc` | ✅ |
+| `tsi` | ✅ |
+| `variance` | ✅ |
+| `wpr` | ✅ |
 
 ### 7.4 Time & Date Functions
 
@@ -183,7 +183,7 @@ Checklist mapped against [spec/v2.md](v2.md).
 | `na`, `nz` | ✅ | |
 | `iff` | ✅ | |
 | `tostring` | ✅ | |
-| `fixnan` | ❌ | |
+| `fixnan` | ✅ | Context-aware, per call site |
 | `offset` | ❌ | |
 | `security` | ❌ | Multi-timeframe — major feature |
 | `tickerid` | ❌ | |
@@ -201,9 +201,9 @@ Checklist mapped against [spec/v2.md](v2.md).
 | `bgcolor` | ✅ |
 | `barcolor` | ✅ |
 | `fill` | ✅ |
-| `plotbar` | ❌ |
-| `plotarrow` | ❌ |
-| `plotcandle` | ❌ |
+| `plotbar` | ✅ |
+| `plotarrow` | ✅ |
+| `plotcandle` | ✅ |
 
 ### 7.7 Color Constants
 
@@ -237,13 +237,13 @@ Checklist mapped against [spec/v2.md](v2.md).
 | Broker Emulator | 17 | 1 | 0 |
 | Type System | 11 | 1 | 1 |
 | Control Flow | 6 | 2 | 2 |
-| Standard Library | ~45 | ~2 | ~25 |
+| Standard Library | ~62 | ~2 | ~8 |
 | Metadata Annotations | 0 | 0 | 6 |
-| **Totals** | **~100** | **~7** | **~37** |
+| **Totals** | **~117** | **~7** | **~20** |
 
 ### Biggest Gaps
 
 1. **Metadata directive enforcement** — `study()` / `strategy()` not parsed or enforced
 2. **`security()`** — multi-timeframe data, major feature
-3. **TA indicators** — alma, cog, correlation, cum, dev, falling, mfi, percentrank, pivothigh/low, roc, tsi, variance, wpr
-4. **Chart type constructors** — heikinashi, kagi, linebreak, pointfigure, renko
+3. **Chart type constructors** — heikinashi, kagi, linebreak, pointfigure, renko
+4. **`offset`** — series offset utility
