@@ -4,16 +4,22 @@ The transpiler turns Pine Script source into JavaScript. Target: **Node.js** (e.
 
 ## API
 
-### `transpile(source: string): string`
+### `transpile(source: string, opts?): string`
 
-**Location:** `transpiler/v2/transpile.ts`
+The Pine version comes from the `//@version` annotation; a script without one is
+v1. Pass `{ version }` to force one. Use `compileScript(source, opts)` instead
+when you also need the resolved version — it returns `{ js, version, profile }`.
+A script declaring a version that is not implemented throws
+`UnimplementedVersionError`.
+
+**Location:** `transpiler/v2/index.ts`
 
 - **Input:** Pine Script source string.
 - **Output:** JavaScript source string (ES-like: `let`, `function`, etc.).
 - **Errors:** Throws `Error` with message `Parsing failed with N error(s)` if the source does not parse.
 
 ```ts
-import { transpile } from "./transpiler/v2/transpile";
+import { transpile } from "./transpiler/v2";
 
 const js = transpile("x = 1 + 2 * 3\n");
 // => "let opsv2_x = 1 + 2 * 3;\n"
@@ -36,7 +42,7 @@ Use a sandbox object as the global; top-level bindings will appear as properties
 
 ```ts
 import * as vm from "node:vm";
-import { transpile } from "./transpiler/v2/transpile";
+import { transpile } from "./transpiler/v2";
 
 const pine = "a = 1\nb = 2\nc = a + b\n";
 let js = transpile(pine);
@@ -72,7 +78,7 @@ For quick experiments you can `eval(transpile(pine))`. Prefixed names will be cr
 ## Example
 
 ```ts
-import { transpile } from "./transpiler/v2/transpile";
+import { transpile } from "./transpiler/v2";
 
 const pine = `
 double(x) => x * 2

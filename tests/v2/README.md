@@ -27,14 +27,18 @@ From repo root:
 npm test
 ```
 
-Runs all tests in `tests/v2/lexer/`, `tests/v2/parser/`, and `tests/v2/transpiler/`.
+Runs every `tests/**/*.test.ts` via vitest — discovery is a glob, so a new file
+or directory is picked up with no config change.
 
-Run a single suite:
+Run a single suite, or watch:
 
 ```bash
-node --import tsx --test tests/v2/lexer/lexer.test.ts
-node --import tsx --test tests/v2/parser/parser.test.ts
+npx vitest run tests/v2/lexer/lexer.test.ts
+npm run test:watch
 ```
+
+Cross-version suites live in `tests/conformance/`; shared helpers in
+`tests/helpers/`.
 
 ## Adding tests
 
