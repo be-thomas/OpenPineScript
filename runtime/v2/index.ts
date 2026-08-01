@@ -4,8 +4,7 @@
  * - Injects Standard Library (UI, TA, Math)
  * - Bridges Context Data to Sandbox
  */
-import * as vm from "node:vm";
-import { createStdlib } from "./stdlib"; 
+import { createStdlib } from "./stdlib";
 import { Context } from "./context";
 import { PREFIX } from "../../utils/v2/common";
 export { Context };
@@ -42,6 +41,8 @@ function isPlainObject(val: any) {
 function initializeSandbox(sandbox: any, ctx: Context) {
     if (!sandbox.__opsv2_initialized) {
         sandbox.ctx = ctx;
+        // Back-reference so security() can rebind global series during HTF eval (P1).
+        (ctx as any).__sandbox = sandbox;
 
         // Create & Inject Library
         const lib = createStdlib(ctx); 
@@ -59,51 +60,57 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         sandbox[`${PREFIX}n`] = ctx.vars.get(`${PREFIX}bar_index`);
         sandbox[`${PREFIX}na`] = ctx.opsv2_na;
 
+        // POISON PILL: reading bar_index throws (v2 mandates 'n'). As an own getter
+        // it resolves through `with(sandbox)` and is hit before the outer scope.
+        Object.defineProperty(sandbox, `${PREFIX}bar_index`, {
+            get() { throw new Error("bar_index is strictly prohibited in v2. Use 'n' instead."); },
+            configurable: true, enumerable: false,
+        });
+
         Object.defineProperty(sandbox, '__opsv2_initialized', {
             value: true, writable: true, enumerable: false
         });
     }
 }
 
+/**
+ * Browser-safe script host (replaces node:vm — enables the Web Worker runtime).
+ * Wraps the transpiled body in a function whose free variables (`ctx`,
+ * `opsv2_*`, …) resolve against `sandbox` via `with`. Names absent from the
+ * sandbox (Math, Number, NaN, …) fall through to the real globals. Closures
+ * created inside (e.g. security() thunks) keep dynamic `with`-scope lookup, so
+ * rebinding sandbox globals at call time is observed — the basis for HTF eval.
+ */
+function defineMain(jsCode: string, sandbox: any): () => any {
+    let factory: (sb: any) => () => any;
+    try {
+        // eslint-disable-next-line no-new-func
+        factory = new Function("sandbox", `with (sandbox) { return function() { ${jsCode} }; }`) as any;
+    } catch (e) {
+        throw new Error(`Script Compilation Failed: ${e instanceof Error ? e.message : "Unknown error"}`);
+    }
+    return factory(sandbox);
+}
+
 export function run(jsCode: string, ctx: Context, sandbox: any): any {
     initializeSandbox(sandbox, ctx);
-
     ctx.reset();
-
-    const vmContext = vm.isContext(sandbox) ? sandbox : vm.createContext(sandbox);
-    
-    // POISON PILL: Injected directly into the VM to bypass Contextification stripping 
-    const poisonJS = `Object.defineProperty(this, '${PREFIX}bar_index', { get: function() { throw new Error("bar_index is strictly prohibited in v2. Use 'n' instead."); }, configurable: true }); void 0;\n`;
-
-    return vm.runInContext(poisonJS + jsCode, vmContext);
+    return defineMain(jsCode, sandbox)();
 }
 
 export function compile(jsCode: string, ctx: Context, sandbox: any) {
     // 1. ONE-TIME INITIALIZATION
     initializeSandbox(sandbox, ctx);
 
-    // 2. WRAP SCRIPT IN A FUNCTION WITH POISON PILL INJECTED
-    const wrappedCode = `
-        Object.defineProperty(this, '${PREFIX}bar_index', { get: function() { throw new Error("bar_index is strictly prohibited in v2. Use 'n' instead."); }, configurable: true });
+    // 2. DEFINE THE EXECUTOR (browser-safe; no node:vm)
+    const main = defineMain(jsCode, sandbox);
 
-        ${PREFIX}main = function() {
-            ${jsCode}
-        };
-    `;
-
-    // 3. COMPILE & DEFINE
-    const vmContext = vm.isContext(sandbox) ? sandbox : vm.createContext(sandbox);
-    try {
-        vm.runInContext(wrappedCode, vmContext);
-    } catch (e) {
-        throw new Error(`Script Compilation Failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    }
-
-    // 4. RETURN THE EXECUTOR
-    return () => {
-        // Because sandbox.opsv2_close points to the Series object in memory,
-        // and ctx.setBar() updates that exact object, we no longer need to 
-        // manually sync primitives here!
-        return sandbox[`${PREFIX}main`]();
-    };
+    // 3. RETURN THE EXECUTOR
+    // sandbox.opsv2_close points at the Series object that ctx.setBar() mutates,
+    // so each call sees the current bar with no manual primitive syncing.
+    return () => main();
 }
+
+// Embeddable session/render-model API (see session.ts).
+export { Session, runScript, buildRenderModel, PROTOCOL_VERSION, ENGINE_VERSION } from "./session";
+export type { Compiled, SimResult, RenderSeries, RenderDelta, EngineError, InputView, Candle } from "./session";

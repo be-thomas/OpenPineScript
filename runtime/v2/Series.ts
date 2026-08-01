@@ -1,5 +1,14 @@
 import { Context } from "./context";
 
+/** Captured head state of a Series for live-tick rollback (P3). */
+export interface SeriesSnapshot<T = any> {
+    len: number;
+    val: T | null;
+    start: number;
+    fallback: any;
+    locked: boolean;
+}
+
 /**
  * Series<T> - Sparse Time-Series Storage
  * * STRATEGY: SPRASE ARRAY (Memory Optimization)
@@ -81,6 +90,30 @@ export class Series<T = any> {
         }
 
         return val;
+    }
+
+    /**
+     * Captures the mutable head state for live-tick rollback (P3).
+     * The buffer is referenced by length only — re-running the forming bar
+     * overwrites its single head index, so truncation restores prior content.
+     */
+    public snapshotMeta(): SeriesSnapshot<T> {
+        return {
+            len: this.buffer.length,
+            val: this._val,
+            start: this.startBarIndex,
+            fallback: this._fallback,
+            locked: this._typeLocked,
+        };
+    }
+
+    /** Restores head state captured by snapshotMeta() (live-tick rollback). */
+    public restoreTo(m: SeriesSnapshot<T>): void {
+        this.buffer.length = m.len;
+        this._val = m.val;
+        this.startBarIndex = m.start;
+        this._fallback = m.fallback;
+        this._typeLocked = m.locked;
     }
 
     /**

@@ -3,6 +3,7 @@ import * as barstate from "./barstate";
 import * as color from "./color";
 import * as core from "./core";
 import * as input from "./input";
+import * as mtf from "./mtf";
 import * as strategy from "./strategy";
 import * as ta from "./ta";
 import * as time from "./time";
@@ -1112,6 +1113,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: (time.default || time)["timestamp"]
+      },
+      "security": {
+          uses_context: true,
+          args: ["symbol","resolution","expression","gaps","lookahead"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: mtf.security
       },
       "plot": {
           uses_context: true,

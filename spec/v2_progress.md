@@ -26,7 +26,7 @@ Checklist mapped against [spec/v2.md](v2.md).
 |---------|--------|-------|
 | Statement hierarchy (`tvscript` → `stmt` → `fun_def_stmt` / `global_stmt`) | ✅ | |
 | Variable definitions (DEFINE `=`) | ✅ | |
-| `:=` rejection (v2 immutability) | ⚠️ | Parser accepts `:=` — not rejected at parse time |
+| `:=` rejection (v2 immutability) | ✅ | Rejected at global scope; allowed on for-loop accumulators. Overridable guard `enforceNoReassignment` |
 | Destructuring `[a, b] = func()` | ✅ | |
 | Logical operators (`or`, `and`, `not`) | ✅ | |
 | Comparison operators (`==`, `!=`, `>`, `>=`, `<`, `<=`) | ✅ | |
@@ -43,8 +43,8 @@ Checklist mapped against [spec/v2.md](v2.md).
 | Bar-by-bar execution loop | ✅ | `setBar()` → `exec()` → `finalizeBar()` |
 | Historical pass (full dataset) | ✅ | `is_history` flag |
 | Real-time evaluation | ✅ | `is_realtime` flag |
-| `calc_on_every_tick` (per-tick re-eval) | ❌ | Architecture supports it, not wired up |
-| Tick rollback (ephemeral state on real-time ticks) | ❌ | Not implemented |
+| `calc_on_every_tick` (per-tick re-eval) | ✅ | `applyTick`/`commitBar` + session honors `calc_on_every_tick` (`tests/v2/runtime/tick_model.test.ts`) |
+| Tick rollback (ephemeral state on real-time ticks) | ✅ | Snapshot/restore of states + broker + series on each re-tick (`tick_model.test.ts`) |
 | 500ms loop timeout per bar | ❌ | Intentionally omitted (README says "no loop timeouts") |
 | Global execution time cap | ❌ | Intentionally omitted |
 | Series data structure | ✅ | Sparse array, O(1) offset access, auto-truncation |
@@ -63,7 +63,7 @@ Checklist mapped against [spec/v2.md](v2.md).
 | `strategy.cancel()` | ✅ | |
 | `strategy.cancel_all()` | ✅ | |
 | Order matching between bars (fill on next bar H/L) | ✅ | `processPendingOrders()` |
-| Duplicate order ID → modify existing | ⚠️ | Not verified |
+| Duplicate order ID → modify existing | ✅ | Verified — id-keyed Map overwrites params (`transpiler_verification.test.ts`) |
 | OCA groups: `oca.cancel` | ✅ | Cancels sibling orders in same group on fill |
 | OCA groups: `oca.reduce` | ✅ | Reduces sibling order qty by filled amount |
 | OCA groups: `oca.none` | ✅ | Orders operate independently |
@@ -91,7 +91,7 @@ Checklist mapped against [spec/v2.md](v2.md).
 | Series wrapper | ✅ | Generic `Series<T>` |
 | `na` polymorphic null | ✅ | |
 | `na(x)` null-check function | ✅ | |
-| `x == na` rejection (must use `na(x)`) | ⚠️ | Not enforced — `x == na` silently misbehaves |
+| `x == na` rejection (must use `na(x)`) | ✅ | Rejected at transpile (`==`/`!=` vs `na`). Overridable guard `enforceNaComparison` |
 | `nz(x, replacement)` | ✅ | |
 | int → float implicit cast | ✅ | |
 | scalar → series promotion | ✅ | Via `new_var()` |
@@ -104,15 +104,15 @@ Checklist mapped against [spec/v2.md](v2.md).
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Custom functions with `=>` | ✅ | Single-line & multi-line |
-| No recursion enforcement | ❌ | Parser allows it, no guard |
+| No recursion enforcement | ✅ | Direct self-recursion rejected. Overridable guard `enforceNoRecursion` (mutual recursion still allowed — needs call-graph pass) |
 | No keyword args for user functions | ✅ | Positional only (kwargs only for built-ins) |
 | `if`/`else` as expression (returns value) | ✅ | |
-| `else if` rejection | ❌ | Parser accepts `else if` chains |
+| `else if` rejection | ✅ | Rejected at the parser/grammar layer |
 | `for` loop with `to` | ✅ | |
 | `for` loop `by` step keyword | ✅ | |
-| Auto-reverse step when `from > to` | ⚠️ | Not verified |
+| Auto-reverse step when `from > to` | ✅ | Verified (`transpiler_for.test.ts`) |
 | `break` / `continue` | ✅ | |
-| Loop returns value of final iteration | ⚠️ | Not verified |
+| Loop returns value of final iteration | ✅ | Verified for expression-bodied loops; body ending in a bare assignment yields `na` (`transpiler_verification.test.ts`) |
 
 ---
 
@@ -174,7 +174,7 @@ Checklist mapped against [spec/v2.md](v2.md).
 | `hour`, `minute`, `second` | ✅ |
 | `weekofyear` | ✅ |
 | `time` | ✅ |
-| `timestamp` | ⚠️ | Not verified |
+| `timestamp` | ✅ | `timestamp(y,m,d,h,min,s)` — UTC, 1-indexed month (`transpiler_verification.test.ts`) |
 
 ### 7.5 Utility Functions
 
@@ -185,7 +185,7 @@ Checklist mapped against [spec/v2.md](v2.md).
 | `tostring` | ✅ | |
 | `fixnan` | ✅ | Context-aware, per call site |
 | `offset` | ❌ | |
-| `security` | ❌ | Multi-timeframe — major feature |
+| `security` | ✅ | Deferred-thunk HTF sub-evaluation + no-lookahead alignment (`tests/v2/runtime/security.test.ts`) |
 | `tickerid` | ❌ | |
 | `alertcondition` | ❌ | |
 | `heikinashi`, `kagi`, `linebreak`, `pointfigure`, `renko` | ❌ | Chart type constructors |
@@ -218,12 +218,12 @@ Checklist mapped against [spec/v2.md](v2.md).
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| `study()` directive parsing | ❌ | Not enforced — doesn't block `strategy.*` calls |
-| `study()` params: `title`, `shorttitle`, `overlay`, `precision` | ❌ | |
-| `strategy()` directive parsing | ❌ | Not enforced |
-| `strategy()` params: `pyramiding`, `calc_on_every_tick`, `currency` | ❌ | |
-| `calc_on_order_fills` | ❌ | |
-| Reject `strategy.*` in `study()` context | ❌ | |
+| `study()` directive parsing | ✅ | Parsed → `ctx.scriptMeta`; directive optional (no directive = permissive default) |
+| `study()` params: `title`, `shorttitle`, `overlay`, `precision` | ✅ | Captured on `ctx.scriptMeta`; not yet wired to renderer |
+| `strategy()` directive parsing | ✅ | Parsed → `ctx.scriptMeta` |
+| `strategy()` params: `pyramiding`, `calc_on_every_tick`, `currency` | ✅ | Captured on `ctx.scriptMeta`; not yet wired to broker emulator |
+| `calc_on_order_fills` | ✅ | Captured on `ctx.scriptMeta`; not yet wired |
+| Reject `strategy.*` in `study()` context | ✅ | Calls + bare getters/constants rejected. Overridable guard `enforceStrategyContext` (`transpiler_metadata.test.ts`) |
 
 ---
 
@@ -232,18 +232,23 @@ Checklist mapped against [spec/v2.md](v2.md).
 | Category | ✅ Done | ⚠️ Partial | ❌ Missing |
 |----------|:-------:|:----------:|:---------:|
 | Lexer/Preprocessor | 9 | 0 | 0 |
-| Parser/AST | 8 | 1 | 0 |
+| Parser/AST | 9 | 0 | 0 |
 | Execution Model | 4 | 0 | 4 |
-| Broker Emulator | 17 | 1 | 0 |
-| Type System | 11 | 1 | 1 |
-| Control Flow | 6 | 2 | 2 |
-| Standard Library | ~62 | ~2 | ~8 |
-| Metadata Annotations | 0 | 0 | 6 |
-| **Totals** | **~117** | **~7** | **~20** |
+| Broker Emulator | 18 | 0 | 0 |
+| Type System | 13 | 0 | 0 |
+| Control Flow | 10 | 0 | 0 |
+| Standard Library | ~63 | 0 | ~8 |
+| Metadata Annotations | 6 | 0 | 0 |
+| **Totals** | **~132** | **0** | **~12** |
 
 ### Biggest Gaps
 
-1. **Metadata directive enforcement** — `study()` / `strategy()` not parsed or enforced
-2. **`security()`** — multi-timeframe data, major feature
+1. **`security()`** — multi-timeframe data, major feature
+2. **Real-time tick model** — `calc_on_every_tick` + tick rollback (needed for live/streaming re-evaluation)
 3. **Chart type constructors** — heikinashi, kagi, linebreak, pointfigure, renko
-4. **`offset`** — series offset utility
+4. **Remaining stdlib utilities** — `offset`, `tickerid`, `alertcondition`
+
+> **Note:** §8 metadata params and the `else if` rule are now enforced; the v2
+> language-restriction guards (`:=`, `==na`, recursion, strategy-in-study) are
+> overridable for a future v3 visitor. Charting-integration readiness (render-model
+> export, embeddable API, runtime host) is tracked separately in the private docs repo.

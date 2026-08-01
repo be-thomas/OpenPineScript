@@ -642,6 +642,12 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
       this.enforceStrategyContext(originalName, ctx);
     }
 
+    // security(): its 3rd arg is an expression evaluated in the HTF context, so it
+    // must be deferred as a thunk rather than evaluated eagerly in the chart context.
+    if (originalName === "security") {
+      return this.emitSecurity(ctx);
+    }
+
     const transpiledName = this.visit(ctx.id());
 
     // 1. Just parse the arguments normally. NO manual 'ctx' injection!
@@ -655,6 +661,24 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     const finalArgsPart = args ? `, ${args}` : "";
 
     return `ctx.call(${callId}, ${transpiledName}${finalArgsPart})`;
+  }
+
+  /**
+   * Emit a security() call with its 3rd argument (the expression) deferred as a
+   * thunk `() => (expr)`, so the runtime can evaluate it in the HTF sub-context.
+   * Other args (symbol, resolution, gaps, lookahead) are passed eagerly.
+   */
+  private emitSecurity(ctx: Fun_callContext): string {
+    const callId = `"security${this.getLocId(ctx)}"`;
+    const transpiledName = this.visit(ctx.id());
+    const pos = ctx.fun_actual_args()?.pos_args();
+    const exprs = pos ? pos.arith_expr() : [];
+    const parts = exprs.map((e, i) => {
+      const js = this.visit(e);
+      return i === 2 ? `() => (${js})` : js; // defer the expression argument
+    });
+    const argsPart = parts.length ? `, ${parts.join(", ")}` : "";
+    return `ctx.call(${callId}, ${transpiledName}${argsPart})`;
   }
 
   /** Emit a study()/strategy() directive as a metadata declaration. */

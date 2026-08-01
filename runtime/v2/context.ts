@@ -1,5 +1,5 @@
 import { PREFIX, removePrefix, extractFunctionName } from "../../utils/v2/common";
-import { Series } from "./Series";
+import { Series, SeriesSnapshot } from "./Series";
 import { REGISTRY } from "./stdlib";
 
 // Define Trade Types
@@ -85,10 +85,37 @@ export interface ScriptMeta {
     currency?: string;           // strategy only
 }
 
+/**
+ * A rollback point for live-tick re-evaluation (P3). Captures every piece of
+ * mutable runtime state that re-running the forming bar would otherwise
+ * accumulate incorrectly: indicator `states`, broker state, and series/plot
+ * lengths. Series buffers self-heal by truncation (head index is overwritten).
+ */
+interface RuntimeSnapshot {
+    states: Map<string, any>;
+    varMeta: Map<string, SeriesSnapshot>;
+    plotLens: Map<string, number>;
+    fillLens: Map<string, number>;
+    position: Position;
+    cash: number;
+    trades: Trade[];
+    orders: any[];
+    pendingEntries: Map<string, any>;
+    pendingExits: Map<string, any>;
+    riskState: any;
+}
+
+/** A higher-timeframe candle supplied for `security()` evaluation (P1). */
+export interface SecurityCandle {
+    time: number; open: number; high: number; low: number; close: number; volume: number;
+}
+
 export class Context {
     // 1. Internal Execution State (Private)
     protected callStack: string[] = [];
     private states: Map<string, any> = new Map();
+    // Committed baseline for the forming live bar (P3). Null outside live ticks.
+    private committedSnapshot: RuntimeSnapshot | null = null;
 
     // 2. Series Registry
     // Key = Variable Name (e.g. "opsv2_close", "opsv2_myVar")
@@ -129,6 +156,20 @@ export class Context {
 
     // 7. Script Metadata (set by study()/strategy() directive)
     public scriptMeta: ScriptMeta | null = null;
+
+    // 8. Multi-timeframe / security() (P1)
+    // Back-reference to the VM sandbox, so security() can rebind global series to
+    // a sub-context while evaluating its HTF expression (set by initializeSandbox).
+    public __sandbox: any = null;
+    // Provided higher-timeframe candle windows, keyed by `${symbol}@${resolution}`.
+    private securityData: Map<string, SecurityCandle[]> = new Map();
+    // Per-call-site HTF evaluation state (sub-context + cursor). Deliberately NOT
+    // part of `states`: it must survive live-tick rollback unchanged (HTF data
+    // doesn't roll back when the LTF forming bar re-ticks).
+    private htfStates: Map<string, any> = new Map();
+    // (symbol, resolution) pairs requested but not yet supplied — the session layer
+    // fulfils these via the data-request pull protocol.
+    public requestedSecurities: Set<string> = new Set();
 
     constructor() {
         this.initBaseSeries();
@@ -179,6 +220,13 @@ export class Context {
 
         // 6. Reset Script Metadata (re-declared on the next pass)
         this.scriptMeta = null;
+
+        // 7. Reset live-tick baseline
+        this.committedSnapshot = null;
+
+        // 8. Reset MTF eval state (keep provided securityData — it's supplied input)
+        this.htfStates.clear();
+        this.requestedSecurities.clear();
     }
 
     /**
@@ -482,5 +530,153 @@ export class Context {
             }
         });
         this.currentBarIndex++;
+    }
+
+    // --- Live-tick model (P3) ---
+
+    /**
+     * Applies a real-time tick to the forming (last) bar, per the control
+     * protocol §7. The candle is an ABSOLUTE snapshot of the forming bar, not an
+     * increment. On the first tick of a bar we capture the committed baseline; on
+     * every later tick we roll back to it first, so re-evaluation never
+     * double-counts accumulating state (e.g. `cum`, EMA `prev`, broker orders).
+     *
+     * The caller runs the compiled script after this, then reads provisional
+     * output. Finalize with `commitBar()` when the bar closes.
+     */
+    public applyTick(time: number, open: number, high: number, low: number, close: number, volume: number) {
+        if (this.committedSnapshot === null) {
+            this.committedSnapshot = this.captureSnapshot(); // baseline = state after last commit
+        } else {
+            this.restoreSnapshot(this.committedSnapshot);    // roll back the previous tick
+        }
+        this.is_history = false;
+        this.is_realtime = true;
+        this.is_last = true;
+        this.setBar(time, open, high, low, close, volume);
+    }
+
+    /**
+     * Commits the forming bar permanently and advances. After this the next
+     * `applyTick` re-captures a fresh baseline for the new forming bar.
+     */
+    public commitBar() {
+        this.finalizeBar();
+        this.committedSnapshot = null;
+    }
+
+    private captureSnapshot(): RuntimeSnapshot {
+        const varMeta = new Map<string, SeriesSnapshot>();
+        for (const [k, s] of this.vars) varMeta.set(k, s.snapshotMeta());
+        const plotLens = new Map<string, number>();
+        for (const [k, a] of this.plots) plotLens.set(k, a.length);
+        const fillLens = new Map<string, number>();
+        for (const [k, a] of this.fills) fillLens.set(k, a.length);
+
+        return {
+            states: structuredClone(this.states),
+            varMeta,
+            plotLens,
+            fillLens,
+            position: structuredClone(this.position),
+            cash: this.cash,
+            trades: structuredClone(this.trades),
+            orders: structuredClone(this.orders),
+            pendingEntries: structuredClone((this as any)._pendingEntries ?? new Map()),
+            pendingExits: structuredClone((this as any)._pendingExits ?? new Map()),
+            riskState: structuredClone((this as any)._riskState ?? null),
+        };
+    }
+
+    private restoreSnapshot(s: RuntimeSnapshot) {
+        // Re-clone so the baseline stays pristine across repeated ticks.
+        this.states = structuredClone(s.states);
+        for (const [k, meta] of s.varMeta) {
+            this.vars.get(k)?.restoreTo(meta);
+        }
+        // Series created *after* the baseline are simply truncated to empty; the
+        // upcoming re-run recreates and overwrites them.
+        for (const [k, s2] of this.vars) {
+            if (!s.varMeta.has(k)) s2.restoreTo({ len: 0, val: null, start: -1, fallback: null, locked: false });
+        }
+        for (const [k, len] of s.plotLens) {
+            const a = this.plots.get(k); if (a) a.length = len;
+        }
+        for (const [k, len] of s.fillLens) {
+            const a = this.fills.get(k); if (a) a.length = len;
+        }
+        this.position = structuredClone(s.position);
+        this.cash = s.cash;
+        this.trades = structuredClone(s.trades);
+        this.orders = structuredClone(s.orders);
+        (this as any)._pendingEntries = structuredClone(s.pendingEntries);
+        (this as any)._pendingExits = structuredClone(s.pendingExits);
+        (this as any)._riskState = structuredClone(s.riskState);
+    }
+
+    // --- Multi-timeframe / security() (P1) ---
+
+    private secKey(symbol: string, resolution: string): string {
+        return `${symbol}@${resolution}`;
+    }
+
+    /** Supplies HTF candles for a (symbol, resolution); called by the session layer. */
+    public provideSecurityData(symbol: string, resolution: string, candles: SecurityCandle[]): void {
+        this.securityData.set(this.secKey(symbol, resolution), candles);
+        this.requestedSecurities.delete(this.secKey(symbol, resolution));
+    }
+
+    public getSecurityData(symbol: string, resolution: string): SecurityCandle[] | undefined {
+        return this.securityData.get(this.secKey(symbol, resolution));
+    }
+
+    /** Records a (symbol, resolution) the script needs but hasn't been given. */
+    public requestSecurity(symbol: string, resolution: string): void {
+        this.requestedSecurities.add(this.secKey(symbol, resolution));
+    }
+
+    /** Stable key for the current call site (used for per-`security()` HTF state). */
+    public currentCallKey(): string {
+        return this.callStack.length > 0 ? this.callStack.join("/") : "global";
+    }
+
+    /** Per-call-site HTF state, exempt from live-tick snapshot/rollback. */
+    public getHtfState<T>(key: string, initFn: () => T): T {
+        if (!this.htfStates.has(key)) this.htfStates.set(key, initFn());
+        return this.htfStates.get(key);
+    }
+
+    /**
+     * Evaluates a deferred `security()` expression for one HTF bar inside a
+     * sub-context, by rebinding the VM's global series (open/high/.../close) and
+     * `ctx` to the sub-context for the duration of the thunk. Restores on exit.
+     */
+    public evalSecurityBar(sub: Context, bar: SecurityCandle, thunk: () => any): number {
+        const sb = this.__sandbox;
+        if (!sb) return NaN;
+        const P = "opsv2_";
+        const saved = {
+            ctx: sb.ctx,
+            open: sb[P + "open"], high: sb[P + "high"], low: sb[P + "low"],
+            close: sb[P + "close"], volume: sb[P + "volume"], time: sb[P + "time"],
+        };
+        sb.ctx = sub;
+        sb[P + "open"] = sub.vars.get(P + "open");
+        sb[P + "high"] = sub.vars.get(P + "high");
+        sb[P + "low"] = sub.vars.get(P + "low");
+        sb[P + "close"] = sub.vars.get(P + "close");
+        sb[P + "volume"] = sub.vars.get(P + "volume");
+        sb[P + "time"] = sub.vars.get(P + "time");
+        try {
+            sub.setBar(bar.time, bar.open, bar.high, bar.low, bar.close, bar.volume);
+            const r = thunk();
+            const num = (r !== null && r !== undefined && typeof (r as any).valueOf === "function") ? (r as any).valueOf() : r;
+            sub.finalizeBar();
+            return Number(num);
+        } finally {
+            sb.ctx = saved.ctx;
+            sb[P + "open"] = saved.open; sb[P + "high"] = saved.high; sb[P + "low"] = saved.low;
+            sb[P + "close"] = saved.close; sb[P + "volume"] = saved.volume; sb[P + "time"] = saved.time;
+        }
     }
 }
