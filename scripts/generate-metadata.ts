@@ -193,4 +193,4 @@ ${registryEntries.join("\n")}
     console.log(`✅ Registry generated with structured types at: ${outputFile}`);
 }
 
-generateConfig("./runtime/v2/stdlib");
+generateConfig("./runtime/v1/stdlib");
