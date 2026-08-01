@@ -40,12 +40,42 @@ export type Outcome =
   | { ok: true; js: string }
   | { ok: false; message: string };
 
-/** Runs the transpiler and captures success or failure without throwing. */
+/**
+ * Shapes the engine produces deliberately. Anything else — a TypeError, a
+ * ReferenceError, an internal invariant blowing up — is a crash, not a verdict
+ * on the script.
+ */
+const PINE_DIAGNOSTIC = [
+  /^Pine Script v\d Error at /,
+  /^Pine Script v\d: parsing failed with \d+ error\(s\)$/,
+  /^Pine Script v\d support is not yet implemented\b/,
+  /^Unknown Pine Script version \d+\b/,
+];
+
+export function isPineDiagnostic(message: string): boolean {
+  return PINE_DIAGNOSTIC.some(re => re.test(message));
+}
+
+/**
+ * Runs the transpiler and captures the verdict.
+ *
+ * Only recognised Pine diagnostics are captured. An engine crash is re-thrown,
+ * because callers compare two captured messages for equality — and two
+ * identical TypeErrors would compare equal and read as agreement. That is how
+ * `this.getChannel is not a function` sat green inside the v1≡v2 suite.
+ */
 export function attempt(version: PineVersion, src: string): Outcome {
   try {
     return { ok: true, js: transpileAs(version, src) };
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+    const message = e instanceof Error ? e.message : String(e);
+    if (!isPineDiagnostic(message)) {
+      throw new Error(
+        `Engine crash at v${version} (not a Pine diagnostic): ${message}`,
+        { cause: e },
+      );
+    }
+    return { ok: false, message };
   }
 }
 

@@ -1,11 +1,21 @@
 /**
- * Capability matrix: every language rule asserted at EVERY version.
+ * Capability matrix.
  *
  * The classic multi-version failure is not "v4 broke" — it is "adding v4
  * silently relaxed v2". A guard tested only on its own version cannot catch
- * that. Each rule below is therefore a table over all five versions, and the
- * rows for versions we have not built yet assert that the engine REFUSES the
- * script rather than guessing.
+ * that, so each rule is a table over versions.
+ *
+ * ── What this actually asserts today ────────────────────────────────────────
+ *
+ * Only v1 and v2 are implemented, so only their cells assert a real
+ * accept/reject verdict. The v3-v5 `expected` entries are RECORDED INTENT taken
+ * from the delta spec — they are not exercised yet, because those versions
+ * refuse to transpile at all. Do not read this file as "9 rules across 5
+ * versions"; it is 9 rules across 2 versions, plus a refusal tripwire for the
+ * other 3, plus the intent written down where IT-02 will pick it up.
+ *
+ * `records intent for unimplemented versions` below asserts the intent table is
+ * complete, so the rows cannot rot while they sit unused.
  *
  * Source for each rule: dev-docs/01-version-delta-spec.md §5.
  */
@@ -120,6 +130,35 @@ describe("language rules across versions", () => {
       }
     });
   }
+});
+
+describe("recorded intent for unimplemented versions", () => {
+  // These cells are not exercised (those versions refuse to transpile), so
+  // guard them structurally instead — otherwise they rot silently until IT-02
+  // tries to rely on them.
+  const UNIMPLEMENTED = ALL_VERSIONS.filter(v => !LANGUAGE_PROFILES[v].implemented);
+
+  it("v3 intent is recorded for every rule that changes at v3", () => {
+    // The four v2→v3 deltas plus the rules v3 lifts. If a rule has no v3 cell,
+    // IT-02 has nothing to flip.
+    const needsV3Intent = RULES.filter(r => r.expected[3] !== undefined);
+    expect(needsV3Intent.length).toBe(RULES.length);
+  });
+
+  it("every unimplemented version refuses regardless of the rule", () => {
+    for (const version of UNIMPLEMENTED) {
+      for (const rule of RULES) {
+        const result = attempt(version, rule.source);
+        expect(result.ok, `v${version} accepted "${rule.name}"`).toBe(false);
+      }
+    }
+  });
+
+  it("reports how much of the matrix is live", () => {
+    const live = ALL_VERSIONS.filter(v => LANGUAGE_PROFILES[v].implemented).length;
+    // Fails when a version is implemented without revisiting this file.
+    expect(live, "a version became implemented — turn its intent cells into real assertions").toBe(2);
+  });
 });
 
 describe("diagnostics name the version", () => {

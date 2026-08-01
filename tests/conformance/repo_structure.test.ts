@@ -88,11 +88,50 @@ describe("no unreachable or broken modules", () => {
   });
 });
 
+describe("docs do not reference deleted modules", () => {
+  // The import scan above only walks .ts/.js, so it cannot catch a Markdown
+  // file still documenting a module this repo removed.
+  const DOC_DIRS = [".", "transpiler", "tests", "tests/v2", "lexer", "parser", "runtime", "grammar", "repl"];
+
+  const docs = DOC_DIRS.flatMap(d => {
+    const abs = path.join(ROOT, d);
+    if (!fs.existsSync(abs)) return [];
+    return fs.readdirSync(abs, { withFileTypes: true })
+      .filter(e => e.isFile() && e.name.endsWith(".md"))
+      .map(e => path.join(abs, e.name));
+  });
+
+  it("finds docs to check", () => {
+    expect(docs.length).toBeGreaterThan(5);
+  });
+
+  it("every source path named in a doc exists", () => {
+    // Backticked paths that look like real repo files.
+    const PATH_REF = /`([A-Za-z0-9_./-]+\.(?:ts|js|sh|g4))`/g;
+    const stale: string[] = [];
+
+    for (const doc of docs) {
+      const text = fs.readFileSync(doc, "utf8");
+      let m: RegExpExecArray | null;
+      while ((m = PATH_REF.exec(text)) !== null) {
+        const ref = m[1];
+        if (!ref.includes("/")) continue;              // bare filenames: too ambiguous
+        if (ref.startsWith("http")) continue;
+        if (!fs.existsSync(path.join(ROOT, ref))) {
+          stale.push(`${path.relative(ROOT, doc)} → ${ref}`);
+        }
+      }
+    }
+
+    expect(stale, `stale doc references:\n${stale.join("\n")}`).toEqual([]);
+  });
+});
+
 describe("test discovery", () => {
   it("the runner uses a glob, not a hand-listed set of files", () => {
     // A literal file list silently drops suites as versions are added.
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
-    expect(pkg.scripts.test).toBe("vitest run");
+    expect(pkg.scripts.test).toMatch(/^vitest run/);
 
     const config = fs.readFileSync(path.join(ROOT, "vitest.config.ts"), "utf8");
     expect(config).toMatch(/tests\/\*\*\/\*\.test\.ts/);

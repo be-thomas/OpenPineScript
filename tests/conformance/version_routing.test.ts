@@ -66,15 +66,23 @@ describe("profile invariants", () => {
     expect([...v1.banned.keys()]).toEqual([...v2.banned.keys()]);
   });
 
-  it("v1 and v2 default security() to lookahead_on", () => {
-    // v3 flips this to 'off'; v1/v2 must keep the original behaviour.
-    expect(LANGUAGE_PROFILES[1].defaults.securityLookahead).toBe("on");
-    expect(LANGUAGE_PROFILES[2].defaults.securityLookahead).toBe("on");
-  });
-
   it("v1-v3 ban 'bar_index' (the v4 spelling)", () => {
     for (const v of [1, 2, 3] as const) {
       expect(LANGUAGE_PROFILES[v].banned.has("bar_index")).toBe(true);
     }
+  });
+
+  it("unimplemented versions carry no banned identifiers", () => {
+    // v4 renamed 'n' TO 'bar_index', so a v4/v5 profile inheriting the v1-v3
+    // ban would state the rename backwards.
+    for (const v of UNIMPLEMENTED_VERSIONS.filter(x => x >= 4)) {
+      expect([...LANGUAGE_PROFILES[v].banned.keys()]).toEqual([]);
+    }
+  });
+
+  it("every declared default has a consumer", () => {
+    // Guards against re-introducing config that nothing reads, where a test
+    // would only ever assert the constant against itself.
+    expect(Object.keys(LANGUAGE_PROFILES[1].defaults)).toEqual(["scriptDirective"]);
   });
 });

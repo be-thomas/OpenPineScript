@@ -6,7 +6,10 @@
  * what most of these cases pin down.
  */
 import { describe, it, expect } from "vitest";
-import { detectVersion, UnsupportedVersionError } from "../../transpiler/version";
+// Import through the public entry, as every real consumer does — that is what
+// loads profiles/ and registers which versions actually run.
+import { detectVersion } from "../../transpiler/v2";
+import { UnsupportedVersionError } from "../../transpiler/version";
 
 describe("detectVersion", () => {
   it("defaults to v1 when there is no annotation", () => {
@@ -64,10 +67,28 @@ describe("detectVersion", () => {
     expect(detectVersion("//@version=2\n//@version=4\nplot(close)")).toBe(2);
   });
 
-  it("rejects a version outside the supported range", () => {
+  it("rejects a version outside the known range", () => {
     expect(() => detectVersion("//@version=6\nplot(close)")).toThrow(UnsupportedVersionError);
-    expect(() => detectVersion("//@version=6\nplot(close)")).toThrow(/Unsupported Pine Script version 6/);
+    expect(() => detectVersion("//@version=6\nplot(close)")).toThrow(/Unknown Pine Script version 6/);
     expect(() => detectVersion("//@version=0\nplot(close)")).toThrow(UnsupportedVersionError);
+  });
+
+  it("reports which versions actually run, not merely which parse", () => {
+    // Saying "supports 1, 2, 3, 4, 5" would be misleading when three of those
+    // are refused a moment later.
+    let message = "";
+    try { detectVersion("//@version=6\nplot(close)"); } catch (e: any) { message = e.message; }
+    expect(message).toMatch(/currently runs 1, 2/);
+  });
+
+  it("ignores a trailing annotation after code on the same line", () => {
+    // The annotation must own its line; a trailing comment is not a directive.
+    expect(detectVersion("plot(close) //@version=2")).toBe(1);
+  });
+
+  it("is not fooled by a trailing backslash inside a string", () => {
+    // A naive escape-skip would consume the newline and hide the annotation.
+    expect(detectVersion('a = "x\\\n//@version=2\nplot(close)')).toBe(2);
   });
 
   it("treats a malformed annotation as absent rather than erroring", () => {
