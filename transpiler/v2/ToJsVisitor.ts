@@ -173,19 +173,21 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   protected enforceStrategyContext(name: string, ctx: SourceLocated): void {
     if (!this.restricts("strategy_context")) return;
     if (this.scriptKind === 'study') {
-      const directive = this.profile.defaults.scriptDirective;
+      // Name the directive the user actually wrote, not the profile default —
+      // otherwise the message points at the wrong keyword the moment the two
+      // differ (v5 renames study() to indicator()).
       throw this.err(
         ctx,
-        `'${name}' is unavailable in a ${directive}() script (indicator mode). ` +
+        `'${name}' is unavailable in a ${this.scriptKind}() script (indicator mode). ` +
         `Declare strategy(...) to use the broker emulator.`
       );
     }
   }
 
   /** All versions up to v3: user-defined functions cannot return tuples. */
-  protected enforceNoTupleReturn(ctx: SourceLocated): void {
+  protected enforceNoTupleReturn(ctx: SourceLocated, detail = ""): void {
     if (!this.restricts("no_tuple_return")) return;
-    throw this.err(ctx, `User-defined functions cannot return tuples.`);
+    throw this.err(ctx, `User-defined functions cannot return tuples.${detail}`);
   }
 
   /** Recursively scan a subtree for a call to the named function. */
@@ -412,9 +414,15 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
                 throw this.err(ctx, `'${funcName}' returns ${entry.returns.itemTypes.length} values, but you provided ${ids.length} variables.`);
             }
         } 
-        // If it's not in registry, it's a user-defined function (Forbidden in v2)
+        // Not in the registry, so it is user-defined. Route through the same
+        // gated guard the function-definition path uses — enforcing the rule
+        // unconditionally here would let a version that lifts it accept the
+        // definition and then reject the call site.
         else {
-            throw this.err(ctx, `User-defined functions cannot return tuples. Multi-variable assignment is only allowed for specific built-in functions.`);
+            this.enforceNoTupleReturn(
+                ctx,
+                ` Multi-variable assignment is only allowed for specific built-in functions.`,
+            );
         }
     } else {
         throw this.err(ctx, `Multi-variable assignment must originate directly from a supported built-in function call.`);
