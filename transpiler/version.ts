@@ -10,7 +10,11 @@
 
 export type PineVersion = 1 | 2 | 3 | 4 | 5;
 
-export const SUPPORTED_VERSIONS: readonly PineVersion[] = [1, 2, 3, 4, 5];
+/**
+ * Versions this engine can PARSE an annotation for. Not the same as the
+ * versions it can run — see LANGUAGE_PROFILES[v].implemented for that.
+ */
+export const KNOWN_VERSIONS: readonly PineVersion[] = [1, 2, 3, 4, 5];
 
 /** A script with no //@version annotation is Pine Script v1. */
 export const DEFAULT_VERSION: PineVersion = 1;
@@ -35,19 +39,28 @@ function lineComments(source: string): string[] {
       const quote = c;
       i++;
       while (i < n) {
-        if (source[i] === "\\") { i += 2; continue; }
-        if (source[i] === quote) { i++; break; }
         if (source[i] === "\n") break;
+        if (source[i] === "\\") {
+          // A trailing backslash must not swallow the newline — doing so would
+          // hide a real annotation sitting on the following line. Pine strings
+          // do not span lines, so an unterminated one just ends here.
+          if (source[i + 1] === "\n" || source[i + 1] === "\r") break;
+          i += 2;
+          continue;
+        }
+        if (source[i] === quote) { i++; break; }
         i++;
       }
       continue;
     }
 
-    // Line comment — capture to end of line.
+    // Line comment — capture to end of line, but only when the comment OWNS
+    // its line. A trailing comment after code (`plot(close) //@version=2`) is
+    // not a version annotation.
     if (c === "/" && source[i + 1] === "/") {
       let j = i + 2;
       while (j < n && source[j] !== "\n" && source[j] !== "\r") j++;
-      found.push(source.slice(i + 2, j));
+      if (ownsItsLine(source, i)) found.push(source.slice(i + 2, j));
       i = j;
       continue;
     }
@@ -73,11 +86,43 @@ function lineComments(source: string): string[] {
  */
 const ANNOTATION = /^\s*@version\s*=\s*(\d+)\s*$/;
 
+/** True when only whitespace precedes `start` on its line. */
+function ownsItsLine(source: string, start: number): boolean {
+  for (let k = start - 1; k >= 0; k--) {
+    const ch = source[k];
+    if (ch === "\n" || ch === "\r") return true;
+    if (ch !== " " && ch !== "\t") return false;
+  }
+  return true;
+}
+
+/**
+ * Versions that actually run, registered by profiles/ at module load.
+ *
+ * Registration rather than an import: profiles/ already imports this module, so
+ * importing it back would be a cycle. This keeps the dependency one-way and
+ * still lets the diagnostic name what really works.
+ */
+let IMPLEMENTED: readonly PineVersion[] = [];
+
+export function registerImplementedVersions(versions: readonly PineVersion[]): void {
+  IMPLEMENTED = versions;
+}
+
+function implementedVersions(): readonly PineVersion[] {
+  return IMPLEMENTED;
+}
+
 export class UnsupportedVersionError extends Error {
-  constructor(public readonly requested: number) {
+  constructor(public readonly requested: number, implemented: readonly PineVersion[] = []) {
+    // Report what actually runs, not what merely parses. Saying "supports
+    // 1, 2, 3, 4, 5" when three of those are refused a moment later is worse
+    // than saying nothing.
+    const runs = implemented.length ? implemented.join(", ") : "none";
     super(
-      `Unsupported Pine Script version ${requested}. ` +
-      `OpenPineScript supports versions ${SUPPORTED_VERSIONS.join(", ")}.`
+      `Unknown Pine Script version ${requested}. ` +
+      `OpenPineScript knows versions ${KNOWN_VERSIONS.join(", ")} ` +
+      `and currently runs ${runs}.`
     );
     this.name = "UnsupportedVersionError";
   }
@@ -94,8 +139,8 @@ export function detectVersion(source: string): PineVersion {
     if (!m) continue;
 
     const n = Number(m[1]);
-    if (!SUPPORTED_VERSIONS.includes(n as PineVersion)) {
-      throw new UnsupportedVersionError(n);
+    if (!KNOWN_VERSIONS.includes(n as PineVersion)) {
+      throw new UnsupportedVersionError(n, implementedVersions());
     }
     return n as PineVersion;
   }

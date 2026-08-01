@@ -10,7 +10,7 @@
  * TradingView's official migration guides.
  */
 
-import { PineVersion, DEFAULT_VERSION } from "../version";
+import { PineVersion, DEFAULT_VERSION, KNOWN_VERSIONS, registerImplementedVersions } from "../version";
 
 /**
  * A language rule that REJECTS something. Each maps to one `enforce*` method on
@@ -55,13 +55,13 @@ export interface LanguageProfile {
 
   readonly defaults: {
     /**
-     * security() `lookahead` default. v1/v2 default to lookahead_on; the v2→v3
-     * migration flipped it to lookahead_off.
+     * The indicator-declaration directive. v5 renames study() to indicator().
+     *
+     * Only fields with a real consumer live here. `securityLookahead` and
+     * `sessionDays` were removed: nothing read them, so the tests asserted the
+     * constants against themselves and drift would have been invisible. They
+     * come back with their consumers (mtf.ts and time.ts) in the v3/v5 work.
      */
-    readonly securityLookahead: "on" | "off";
-    /** Default session-day string for time()/time_close(). v5 widens to Sun–Sat. */
-    readonly sessionDays: string;
-    /** The indicator-declaration directive. v5 renames study() to indicator(). */
     readonly scriptDirective: "study" | "indicator";
   };
 
@@ -109,11 +109,7 @@ function profile(
     version,
     restrictions: new Set(restrictions),
     banned: bannedBarIndex(version),
-    defaults: {
-      securityLookahead: "on",
-      sessionDays: "23456",
-      scriptDirective: "study",
-    },
+    defaults: { scriptDirective: "study" },
     implemented: true,
     ...overrides,
   };
@@ -125,7 +121,11 @@ function profile(
  * produce wrong numbers rather than an error.
  */
 function unimplemented(version: PineVersion): LanguageProfile {
-  return profile(version, [], { implemented: false });
+  // No banned map: bannedBarIndex() would emit "'bar_index' is not available in
+  // Pine Script v5. Use 'n' instead", which is backwards — v4 renamed 'n' TO
+  // 'bar_index'. Unreachable while implemented is false, but it is the wrong
+  // data sitting exactly where the v4 work starts.
+  return { ...profile(version, [], { implemented: false }), banned: new Map() };
 }
 
 export const LANGUAGE_PROFILES: Readonly<Record<PineVersion, LanguageProfile>> = {
@@ -140,19 +140,15 @@ export const LANGUAGE_PROFILES: Readonly<Record<PineVersion, LanguageProfile>> =
   // It stays `implemented: false` until they are: routing a v3 script to a
   // profile whose tightenings are absent would silently produce wrong numbers,
   // which is worse than refusing to run it.
-  3: profile(3, V3_RESTRICTIONS, {
-    implemented: false,
-    defaults: {
-      // v2→v3 flipped the security() lookahead default.
-      securityLookahead: "off",
-      sessionDays: "23456",
-      scriptDirective: "study",
-    },
-  }),
+  3: profile(3, V3_RESTRICTIONS, { implemented: false }),
 
   4: unimplemented(4),
   5: unimplemented(5),
 };
+
+// Tell version.ts which versions actually run, so an unknown-version error can
+// name them. One-way dependency: version.ts never imports this module.
+registerImplementedVersions(KNOWN_VERSIONS.filter(v => LANGUAGE_PROFILES[v].implemented));
 
 export function profileFor(version: PineVersion): LanguageProfile {
   return LANGUAGE_PROFILES[version];
