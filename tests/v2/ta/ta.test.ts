@@ -1,130 +1,176 @@
 /**
- * test/verify_ta.ts
- * Stress test for the Optimized TA Engine.
+ * Differential stress test for the TA engine.
+ *
+ * Every indicator is run against `NaiveTA` — an independent from-scratch
+ * reimplementation — bar-for-bar over 5000 generated bars, under four
+ * length regimes (fixed, growing, shrinking, and randomly oscillating
+ * lookbacks). Varying the length is the point: it is where incremental
+ * ring-buffer implementations diverge from the naive definition.
+ *
+ * The data is generated from a SEEDED PRNG. A failure here reproduces
+ * exactly on the next run — with Math.random() it would not.
  */
+import { describe, it, expect } from "vitest";
 import { Context } from "../../../runtime/v2/context";
 import * as ta from "../../../runtime/v2/stdlib/ta";
 import { NaiveTA } from "./naive_ta";
 
-const C = {
-    Green: "\x1b[32m",
-    Red: "\x1b[31m",
-    Cyan: "\x1b[36m",
-    Reset: "\x1b[0m",
-};
-
-const EPSILON = 0.000001; 
+const EPSILON = 1e-6;
 const TOTAL_BARS = 5000;
+/** Indicators need history before they agree; skip the warm-up window. */
+const WARMUP = 100;
 
-function assertClose(name: string, actual: number, expected: number, barIdx: number, length: number) {
+type Mode = "STABLE" | "INCREASING" | "DECREASING" | "OSCILLATING";
+
+/** mulberry32 — small, fast, deterministic. Same seed ⇒ same bars. */
+function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function lengthFor(mode: Mode, i: number, rand: () => number): number {
+  switch (mode) {
+    case "STABLE":      return 14;
+    case "INCREASING":  return Math.min(100, 5 + Math.floor(i / 50));
+    case "DECREASING":  return Math.max(2, 100 - Math.floor(i / 50));
+    case "OSCILLATING": return Math.floor(rand() * 40) + 5;
+  }
+}
+
+interface Divergence {
+  indicator: string;
+  bar: number;
+  length: number;
+  actual: number;
+  expected: number;
+  delta: number;
+}
+
+/**
+ * Runs one regime and returns every divergence found. Collecting them all
+ * (rather than throwing on the first) makes a failure diagnosable: a bug in
+ * one indicator does not hide the others.
+ */
+function collectDivergences(mode: Mode, seed: number): Divergence[] {
+  const ctx = new Context();
+  const naive = new NaiveTA();
+  const rand = seededRandom(seed);
+  const found: Divergence[] = [];
+
+  const check = (
+    indicator: string, actual: number, expected: number, bar: number, length: number,
+  ) => {
     if (Number.isNaN(actual) && Number.isNaN(expected)) return;
-    
-    const diff = Math.abs(actual - expected);
-    if (diff > EPSILON) {
-        console.error(`${C.Red}[FAIL] ${name} Bar:${barIdx} Len:${length} | Actual: ${actual} vs Ref: ${expected}${C.Reset}`);
-        process.exit(1);
+    const delta = Math.abs(actual - expected);
+    if (delta > EPSILON || Number.isNaN(delta)) {
+      found.push({ indicator, bar, length, actual, expected, delta });
     }
-}
+  };
 
-function runStressTest(mode: "STABLE" | "INCREASING" | "DECREASING" | "OSCILLATING") {
-    console.log(`\n${C.Cyan}=== Running Test: ${mode} LENGTH ===${C.Reset}`);
+  let price = 100;
+  const conditionHistory: boolean[] = [];
+  const sourceHistory: number[] = [];
 
-    const ctx = new Context();
-    const naive = new NaiveTA();
-    
-    let price = 100;
-    // We'll track condition history for valuewhen/barssince
-    const conditionHistory: boolean[] = [];
-    const sourceHistory: number[] = [];
-    
-    for (let i = 0; i < TOTAL_BARS; i++) {
-        // 1. Generate Realistic OHLCV Data
-        const change = (Math.random() - 0.5) * 2;
-        const open = price;
-        const close = price + change;
-        const high = Math.max(open, close) + Math.random();
-        const low = Math.min(open, close) - Math.random();
-        const vol = Math.abs(Math.random() * 1000);
-        price = close;
+  for (let i = 0; i < TOTAL_BARS; i++) {
+    const open = price;
+    const close = price + (rand() - 0.5) * 2;
+    const high = Math.max(open, close) + rand();
+    const low = Math.min(open, close) - rand();
+    const volume = Math.abs(rand() * 1000);
+    price = close;
 
-        // Update Context (mimicking the real engine's setBar behavior)
-        (ctx as any).high = high;
-        (ctx as any).low = low;
-        ctx.close = close;
-        ctx.volume = vol;
-        
-        // Update Naive
-        naive.add(close, vol, high, low);
+    // Mirror what setBar() does, without the Series bookkeeping the naive
+    // reference has no equivalent for.
+    (ctx as any).high = high;
+    (ctx as any).low = low;
+    ctx.close = close;
+    ctx.volume = volume;
+    naive.add(close, volume, high, low);
 
-        // Track conditions for state lookups
-        const isBullish = close > open;
-        conditionHistory.push(isBullish);
-        sourceHistory.push(close);
+    const isBullish = close > open;
+    conditionHistory.push(isBullish);
+    sourceHistory.push(close);
 
-        // 2. Determine Length
-        let len = 14;
-        if (mode === "STABLE") len = 14;
-        if (mode === "INCREASING") len = Math.min(100, 5 + Math.floor(i / 50));
-        if (mode === "DECREASING") len = Math.max(2, 100 - Math.floor(i / 50));
-        if (mode === "OSCILLATING") len = Math.floor(Math.random() * 40) + 5;
+    const len = lengthFor(mode, i, rand);
 
-        // 3. EXECUTE OPTIMIZED
-        const resSMA = ctx.call("ta.sma@test", ta.sma, ctx, ctx.close, len);
-        const resWMA = ctx.call("ta.wma@test", ta.wma, ctx, ctx.close, len);
-        const resBB = ctx.call("ta.bb@test", ta.bb, ctx, ctx.close, len, 2.0);
-        const resHigh = ctx.call("ta.highest@test", ta.highest, ctx, ctx.close, len);
-        const resLow = ctx.call("ta.lowest@test", ta.lowest, ctx, ctx.close, len);
-        
-        // New Indicators
-        const resATR = ctx.call("ta.atr@test", ta.atr, ctx, len);
-        const resVWAP = ctx.call("ta.vwap@test", ta.vwap, ctx, ctx.close);
-        const resLinreg = ctx.call("ta.linreg@test", ta.linreg, ctx, ctx.close, len, 0);
-        const resSAR = ctx.call("ta.sar@test", ta.sar, ctx, 0.02, 0.02, 0.2);
-        
-        // State Lookups
-        const resVW = ctx.call("ta.valuewhen@test", ta.valuewhen, ctx, isBullish, ctx.close, 0);
-        const resBS = ctx.call("ta.barssince@test", ta.barssince, ctx, isBullish);
+    const actual = {
+      SMA:       ctx.call("ta.sma@test", ta.sma, ctx, ctx.close, len),
+      WMA:       ctx.call("ta.wma@test", ta.wma, ctx, ctx.close, len),
+      BBbasis:   ctx.call("ta.bb@test", ta.bb, ctx, ctx.close, len, 2.0)[0],
+      Highest:   ctx.call("ta.highest@test", ta.highest, ctx, ctx.close, len),
+      Lowest:    ctx.call("ta.lowest@test", ta.lowest, ctx, ctx.close, len),
+      ATR:       ctx.call("ta.atr@test", ta.atr, ctx, len),
+      VWAP:      ctx.call("ta.vwap@test", ta.vwap, ctx, ctx.close),
+      Linreg:    ctx.call("ta.linreg@test", ta.linreg, ctx, ctx.close, len, 0),
+      SAR:       ctx.call("ta.sar@test", ta.sar, ctx, 0.02, 0.02, 0.2),
+      ValueWhen: ctx.call("ta.valuewhen@test", ta.valuewhen, ctx, isBullish, ctx.close, 0),
+      BarsSince: ctx.call("ta.barssince@test", ta.barssince, ctx, isBullish),
+    };
 
-        // 4. EXECUTE NAIVE
-        const refSMA = naive.sma(len);
-        const refWMA = naive.wma(len);
-        const refBB = naive.bb(len, 2.0);
-        const refHigh = naive.highest(len);
-        const refLow = naive.lowest(len);
-        const refATR = naive.atr(len);
-        const refVWAP = naive.vwap();
-        const refLinreg = naive.linreg(len, 0);
-        const refSAR = naive.sar(0.02, 0.02, 0.2);
-        const refVW = naive.valuewhen(conditionHistory, sourceHistory, 0);
-        const refBS = naive.barssince(conditionHistory);
+    const expected = {
+      SMA:       naive.sma(len),
+      WMA:       naive.wma(len),
+      BBbasis:   naive.bb(len, 2.0)[0],
+      Highest:   naive.highest(len),
+      Lowest:    naive.lowest(len),
+      ATR:       naive.atr(len),
+      VWAP:      naive.vwap(),
+      Linreg:    naive.linreg(len, 0),
+      SAR:       naive.sar(0.02, 0.02, 0.2),
+      ValueWhen: naive.valuewhen(conditionHistory, sourceHistory, 0),
+      BarsSince: naive.barssince(conditionHistory),
+    };
 
-        // 5. COMPARE
-        if (i > 100) {
-            assertClose("SMA", resSMA, refSMA, i, len);
-            assertClose("WMA", resWMA, refWMA, i, len);
-            assertClose("BB.basis", resBB[0], refBB[0], i, len);
-            assertClose("Highest", resHigh, refHigh, i, len);
-            assertClose("Lowest", resLow, refLow, i, len);
-            
-            // New Comparisons
-            assertClose("ATR", resATR, refATR, i, len);
-            assertClose("VWAP", resVWAP, refVWAP, i, len);
-            assertClose("Linreg", resLinreg, refLinreg, i, len);
-            assertClose("SAR", resSAR, refSAR, i, len);
-            assertClose("ValueWhen", resVW, refVW, i, len);
-            assertClose("BarsSince", resBS, refBS, i, len);
-        }
+    if (i > WARMUP) {
+      for (const key of Object.keys(actual) as (keyof typeof actual)[]) {
+        check(key, actual[key], expected[key], i, len);
+      }
     }
-    console.log(`${C.Green}✔ Passed 5000 iterations.${C.Reset}`);
+  }
+
+  return found;
 }
 
-// Run All Modes
-try {
-    runStressTest("STABLE");
-    runStressTest("INCREASING");
-    runStressTest("DECREASING");
-    runStressTest("OSCILLATING");
-    console.log(`\n${C.Green}ALL SYSTEMS GREEN. ENGINE IS PRODUCTION READY.${C.Reset}`);
-} catch (e) {
-    console.error(e);
+function describeFailures(mode: Mode, seed: number, found: Divergence[]): string {
+  const byIndicator = new Map<string, number>();
+  for (const d of found) byIndicator.set(d.indicator, (byIndicator.get(d.indicator) ?? 0) + 1);
+  const summary = [...byIndicator].map(([k, n]) => `${k}×${n}`).join(", ");
+  const first = found
+    .slice(0, 5)
+    .map(d =>
+      `  ${d.indicator} bar=${d.bar} len=${d.length} ` +
+      `engine=${d.actual} naive=${d.expected} Δ=${d.delta.toExponential(3)}`)
+    .join("\n");
+  return (
+    `${found.length} divergence(s) in ${mode} regime (seed=${seed}): ${summary}\n` +
+    `first ${Math.min(5, found.length)}:\n${first}`
+  );
 }
+
+describe("TA engine matches the naive reference under varying lookback", () => {
+  // Distinct seeds so the four regimes exercise different price paths.
+  const REGIMES: [Mode, number][] = [
+    ["STABLE", 0x5eed_0001],
+    ["INCREASING", 0x5eed_0002],
+    ["DECREASING", 0x5eed_0003],
+    ["OSCILLATING", 0x5eed_0004],
+  ];
+
+  for (const [mode, seed] of REGIMES) {
+    it(`${mode} length: ${TOTAL_BARS} bars agree within ${EPSILON}`, () => {
+      const found = collectDivergences(mode, seed);
+      expect(found, found.length ? describeFailures(mode, seed, found) : "").toEqual([]);
+    });
+  }
+
+  it("is deterministic — the same seed produces the same result", () => {
+    expect(collectDivergences("OSCILLATING", 0xd1ce)).toEqual(
+      collectDivergences("OSCILLATING", 0xd1ce),
+    );
+  });
+});
