@@ -6,17 +6,17 @@
 
 import { CharStreams } from "antlr4ng";
 import { CommonTokenStream } from "antlr4ng";
-import { PineScriptLexer } from "./generated/PineScriptLexer.js";
-import { PineScriptParser } from "./generated/PineScriptParser.js";
+import { PineV2Lexer } from "./generated/PineV2Lexer.js";
+import { PineV2Parser } from "./generated/PineV2Parser.js";
 import * as fs from "fs";
 import * as path from "path";
 
 function parse(source: string) {
   const inputStream = CharStreams.fromString(source);
-  const lexer = new PineScriptLexer(inputStream);
+  const lexer = new PineV2Lexer(inputStream);
   const tokenStream = new CommonTokenStream(lexer);
-  const parser = new PineScriptParser(tokenStream);
-  return parser.opsv2_script();
+  const parser = new PineV2Parser(tokenStream);
+  return parser.pine_script();
 }
 
 function main() {
