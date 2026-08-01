@@ -47,7 +47,9 @@ export function security(
 
     const key = ctx.currentCallKey();
     const st = ctx.getHtfState<HtfState>(key, () => ({
-        sub: new (ctx.constructor as new () => Context)(),
+        // The sub-context must inherit the profile: the HTF expression is the
+        // same script and runs under the same language version.
+        sub: new (ctx.constructor as new (p: any) => Context)(ctx.profile),
         done: -1,
         last: NaN,
     }));

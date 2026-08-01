@@ -30,7 +30,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { Context } from "../../runtime/v2/context";
 import { compile } from "../../runtime/v2";
-import { transpile } from "../../transpiler/v2/";
+import { compileScript } from "../../transpiler/v2/";
+import type { PineVersion } from "../../transpiler/version";
+import { DEFAULT_PROFILE } from "../../transpiler/profiles";
 import { runComparison } from "../../utils/v2/comparison_engine";
 
 // --- Terminal Colors ---
@@ -415,8 +417,14 @@ async function main() {
     }
 
     let jsCode: string;
+    let pineVersion: PineVersion = 1;
+    let profile = DEFAULT_PROFILE;
     try {
-        jsCode = transpile(pineSource);
+        const compiled = compileScript(pineSource);
+        jsCode = compiled.js;
+        pineVersion = compiled.version;
+        profile = compiled.profile;
+        process.stderr.write(`${C.Cyan}Pine Script:${C.Reset} v${pineVersion}\n`);
     } catch (e: any) {
         console.error(`${C.Red}Transpilation failed:${C.Reset} ${e.message}`);
         if (Array.isArray(e.errors)) {
@@ -448,7 +456,7 @@ async function main() {
     }
 
     // 3. Setup Context — apply any input overrides before first bar
-    const ctx = new Context();
+    const ctx = new Context(profile);
 
     for (const [key, rawVal] of Object.entries(cli.inputs)) {
         const numVal = parseFloat(rawVal);

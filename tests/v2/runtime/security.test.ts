@@ -6,7 +6,7 @@
  * candles in a sub-context and aligns the result to the chart's bars using the
  * last CLOSED HTF bar (no lookahead / repaint).
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { transpile } from "../../../transpiler/v2";
 import { compile, Context } from "../../../runtime/v2";

@@ -10,7 +10,7 @@
  * - Color directives for bgcolor/barcolor
  * - Fill data references
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { transpile } from "../../../transpiler/v2";
 import { compile, Context } from "../../../runtime/v2";

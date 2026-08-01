@@ -10,7 +10,9 @@ import { CharStreams, CommonTokenStream, Lexer, Token } from "antlr4ng";
 import { PineScriptLexer } from "../../parser/v2/generated/PineScriptLexer";
 import { PineScriptTokenSource } from "../../lexer/v2/PineScriptTokenSource";
 import { parse } from "../../parser/v2";
-import { transpile } from "../../transpiler/v2";
+import { compileScript } from "../../transpiler/v2";
+import type { PineVersion } from "../../transpiler/version";
+import { DEFAULT_PROFILE } from "../../transpiler/profiles";
 import { Context, run } from "../../runtime/v2";   // Import the runtime runner
 
 // --- ANSI Colors ---
@@ -48,10 +50,15 @@ function looksIncomplete(code: string): boolean {
 function main(): void {
   const verbose = hasVerboseFlag();
   
-  // 1. Initialize the Long-lived Engine State
-  const ctx = new Context(); 
-  const sandbox = Object.create(null);
-  const sandboxContext = vm.createContext(sandbox);
+  // 1. Initialize the Long-lived Engine State.
+  // The session runs under one language version. A snippet carrying a
+  // //@version annotation for a different version resets the session, because
+  // the accumulated series state belongs to the old profile's rules.
+  let profile = DEFAULT_PROFILE;
+  let sessionVersion: PineVersion = profile.version;
+  let ctx = new Context(profile);
+  let sandbox = Object.create(null);
+  let sandboxContext = vm.createContext(sandbox);
 
   const defaultPrompt = C.Green + "> " + C.Reset;
 
@@ -81,8 +88,19 @@ function main(): void {
       }
 
       try {
-          // 2. Transpile using the V2 Transpiler
-          const js = transpile(source);
+          // 2. Transpile under the declared version (refuses unimplemented ones)
+          const compiled = compileScript(source);
+
+          if (compiled.version !== sessionVersion) {
+              sessionVersion = compiled.version;
+              profile = compiled.profile;
+              ctx = new Context(profile);
+              sandbox = Object.create(null);
+              sandboxContext = vm.createContext(sandbox);
+              console.log(`${C.Yellow}Switched to Pine Script v${sessionVersion}; session state reset.${C.Reset}`);
+          }
+
+          const js = compiled.js;
 
           // 3. EXECUTE via the Runtime Engine
           const resultValue = run(js, ctx, sandboxContext);

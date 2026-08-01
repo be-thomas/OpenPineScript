@@ -1,6 +1,7 @@
 import { PREFIX, removePrefix, extractFunctionName } from "../../utils/v2/common";
 import { Series, SeriesSnapshot } from "./Series";
 import { REGISTRY } from "./stdlib";
+import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/profiles";
 
 // Define Trade Types
 export interface Trade {
@@ -171,7 +172,18 @@ export class Context {
     // fulfils these via the data-request pull protocol.
     public requestedSecurities: Set<string> = new Set();
 
-    constructor() {
+    /**
+     * The language profile this script runs under. Drives version-dependent
+     * runtime behaviour: banned identifiers (`bar_index` vs `n`) and the
+     * security() lookahead default.
+     *
+     * profiles/ depends only on version.ts and nothing in runtime/, so this
+     * import direction introduces no cycle.
+     */
+    public readonly profile: LanguageProfile;
+
+    constructor(profile: LanguageProfile = DEFAULT_PROFILE) {
+        this.profile = profile;
         this.initBaseSeries();
     }
 

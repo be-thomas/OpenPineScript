@@ -4,7 +4,7 @@
  * Embeddable session API (B1 render-model + B3 runScript/Session + B4 errors +
  * B5 overlay/precision → pane) — ui-engine-control-protocol §3/§5.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { Session, runScript } from "../../../runtime/v2";
 
@@ -117,5 +117,26 @@ describe("live tick/commit via Session (P3)", () => {
         s.commit();
         d = s.tick({ time: 2, open: 3, high: 3, low: 3, close: 3, volume: 1 });
         assert.strictEqual(d.series[0].value, 33);             // committed 30 + 3
+    });
+});
+
+describe("Session version state", () => {
+    it("reports the compiled script's version", () => {
+        const s = new Session();
+        s.compile("//@version=2\nplot(close)\n");
+        assert.strictEqual(s.pineVersion, 2);
+    });
+
+    it("does not report a stale version after a failed compile", () => {
+        // Previously profile/pineVersion were written only on success, so a
+        // failed compile left the PREVIOUS script's version visible.
+        const s = new Session();
+        s.compile("//@version=2\nplot(close)\n");
+        assert.strictEqual(s.pineVersion, 2);
+
+        const result = s.compile("//@version=5\nplot(close)\n");
+        assert.ok(result.errors.length > 0);
+        assert.notStrictEqual(s.pineVersion, 2);
+        assert.strictEqual(s.pineVersion, 1);
     });
 });

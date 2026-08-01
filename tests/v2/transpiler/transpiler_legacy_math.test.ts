@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { transpile } from "../../../transpiler/v2";
 import { compile, Context } from "../../../runtime/v2";
@@ -51,10 +51,12 @@ describe("Pine Script v2 Legacy Math & Environment Variables", () => {
 
         it("should throw an error when attempting to access 'bar_index'", () => {
             const pine = `val = bar_index`;
-            
+
+            // 'bar_index' is the v4+ spelling; v1-v3 mandate 'n'. The message
+            // names the version and points at the right identifier.
             assert.throws(() => {
                 executePine(pine, 1);
-            }, /bar_index is strictly prohibited in v2/);
+            }, /'bar_index' is not available in Pine Script v\d\. Use 'n' instead/);
         });
     });
 

@@ -9,7 +9,7 @@
  *
  * Also verifies the guards are overridable so a future v3 visitor can lift them.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { transpile } from "../../../transpiler/v2";
 import { parse } from "../../../parser/v2";

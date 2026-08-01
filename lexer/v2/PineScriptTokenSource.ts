@@ -42,14 +42,15 @@ export class PineScriptTokenSource extends PineScriptLexer {
     // 3. Handle Explicit Indentation (LBEG)
     // LBEG matches: Newline(s) + Spaces/Tabs
     if (t.type === PineScriptLexer.LBEG) {
-      // If inside parentheses, treat as simple whitespace (ignore indent logic)
-      // But since LBEG contains a newline, we usually want to treat it as a hidden channel 
-      // or simple separator. For strict Pine, we just return it and let parser skip/handle if needed.
-      // However, usually we just skip emission if inside parens to allow multi-line function calls.
+      // Inside ( ) or [ ], a newline is just whitespace — that is what lets a
+      // function call span lines. Drop the token entirely and take the next one.
+      //
+      // This previously called this.getChannel(), which does not exist on the
+      // generated lexer, so any script with a multi-line call crashed with
+      // "this.getChannel is not a function". Emitting the LBEG instead is not an
+      // option either: no parser rule matches LBEG, so it would be a syntax error.
       if (this.parenLevel > 0) {
-          // Return as Hidden/Skipped or just a normal token depending on grammar needs.
-          // For now, we return it, but Parser rules usually don't match LBEG inside exprs.
-          return this.getChannel() === Token.HIDDEN_CHANNEL ? this.nextToken() : t;
+          return this.nextToken();
       }
 
       // Calculate Indent Length

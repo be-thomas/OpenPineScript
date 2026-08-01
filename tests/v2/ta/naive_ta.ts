@@ -68,11 +68,21 @@ export class NaiveTA {
         return this.rma('atr_exclusive_key', tr, length);
     }
 
-    wma(src: number[], len: number): number {
+    /**
+     * Weighted moving average over `this.history`, matching the signature
+     * convention of every other method on this class.
+     *
+     * Pine weights the MOST RECENT bar highest: weights run 1..length from
+     * oldest to newest, normalised by their sum (length*(length+1)/2).
+     * getSlice() returns oldest-first, so slice[i] takes weight i+1.
+     */
+    wma(length: number): number {
+        const slice = this.getSlice(length);
+        if (slice.length < length) return NaN;
         let sum = 0, weightSum = 0;
-        for (let i = 0; i < len; i++) {
-            const weight = len - i;
-            sum += src[src.length - 1 - i] * weight;
+        for (let i = 0; i < length; i++) {
+            const weight = i + 1;
+            sum += slice[i] * weight;
             weightSum += weight;
         }
         return sum / weightSum;

@@ -7,7 +7,7 @@
  *   - strategy() or no directive (permissive default) allows strategy.*
  *   - the enforcement guard is overridable for a future v3 visitor
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { transpile } from "../../../transpiler/v2";
 import { compile, Context } from "../../../runtime/v2";

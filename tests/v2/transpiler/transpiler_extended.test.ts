@@ -2,7 +2,7 @@
  * Transpiler v2 Extended Tests:
  * Focuses on v2-specific constraints: Ternary Associativity and Tuple Restrictions.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import * as vm from "node:vm";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";
@@ -54,13 +54,20 @@ describe("transpiler v2 extended (v2 constraints)", () => {
 
   describe("tuple destructuring restrictions", () => {
     it("throws error when user-defined function tries to return a tuple (Single-line)", () => {
-      const source = `myFunc(x) => [x, x + 1]\n[a, b] = myFunc(1)`;
-      assert.throws(() => transpile(source), /User-defined functions cannot return tuples in Pine Script v2/);
+      const source = `//@version=2\nmyFunc(x) => [x, x + 1]\n[a, b] = myFunc(1)`;
+      // The version is named in the message so the user knows which rule rejected it.
+      assert.throws(
+        () => transpile(source),
+        /Pine Script v2 Error .*User-defined functions cannot return tuples/,
+      );
     });
 
     it("throws error when user-defined function tries to return a tuple (Multi-line)", () => {
-      const source = `myFunc(x) =>\n    y = x + 1\n    [x, y]\n[a, b] = myFunc(1)`.trim();
-      assert.throws(() => transpile(source), /User-defined functions cannot return tuples in Pine Script v2/);
+      const source = `//@version=2\nmyFunc(x) =>\n    y = x + 1\n    [x, y]\n[a, b] = myFunc(1)`.trim();
+      assert.throws(
+        () => transpile(source),
+        /Pine Script v2 Error .*User-defined functions cannot return tuples/,
+      );
     });
 
     it("throws error when attempting to destructure a user-defined function call", () => {

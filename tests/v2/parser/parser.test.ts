@@ -1,7 +1,7 @@
 /**
  * Parser v2 tests (ANTLR lexer + parser). Run from repo root: npm test.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import * as path from "node:path";
 import * as fs from "node:fs";
