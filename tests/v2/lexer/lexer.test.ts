@@ -1,7 +1,7 @@
 /**
  * Lexer v2 tests using the PineScriptTokenSource (Smart Lexer).
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import * as path from "node:path";
 import * as fs from "node:fs";

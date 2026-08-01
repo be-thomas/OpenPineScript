@@ -6,7 +6,7 @@
  * previous tick's ephemeral state, so accumulating state (cum, EMA prev, broker
  * orders) never double-counts. commitBar() makes the bar permanent.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { transpile } from "../../../transpiler/v2";
 import { compile, Context } from "../../../runtime/v2";

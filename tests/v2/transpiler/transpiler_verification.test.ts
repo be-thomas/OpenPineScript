@@ -8,7 +8,7 @@
  *
  * (for-loop auto-reverse when from > to is already covered by transpiler_for.test.ts.)
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { transpile } from "../../../transpiler/v2";
 import { compile, Context } from "../../../runtime/v2";

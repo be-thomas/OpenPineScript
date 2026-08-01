@@ -1,7 +1,7 @@
 /**
  * Transpiler v2 tests: parse Pine Script, transpile to JavaScript, run and assert on results.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import * as path from "node:path";
 import * as fs from "node:fs";

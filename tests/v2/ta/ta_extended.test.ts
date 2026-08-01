@@ -13,7 +13,7 @@
  *      event/boolean indicators (falling/rising, pivots) and edge cases.
  *   3. Property tests — for tsi (EMA-recursive), assert bounds and sign.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { Context } from "../../../runtime/v2/context";
 import * as ta from "../../../runtime/v2/stdlib/ta";

@@ -4,7 +4,7 @@
  * Embeddable session API (B1 render-model + B3 runScript/Session + B4 errors +
  * B5 overlay/precision → pane) — ui-engine-control-protocol §3/§5.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert";
 import { Session, runScript } from "../../../runtime/v2";
 
