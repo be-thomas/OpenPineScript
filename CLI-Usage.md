@@ -118,7 +118,7 @@ npm run opsv2 -- strategy.pine --data data.csv --out-summary ./results/summary.j
 
 ## Comparison flags
 
-These validate `opsv2` output against reference data exported from TradingView, proving mathematical parity.
+These compare `opsv2` output against reference data exported from TradingView.
 
 ### `--compare-chart <file>`
 
@@ -296,7 +296,7 @@ npm run opsv2 -- strategy.pine --data data.csv \
 
 ## Input overrides
 
-Override `input.int()` / `input.float()` / `input.bool()` values without editing the `.pine` file.
+Override `input()` values without editing the `.pine` file. (Pine v2 has a single `input()` function; the typed `input.int()` / `input.float()` family arrives with v5 support.)
 
 ### `--input <key=value>`
 
@@ -335,6 +335,51 @@ String values are kept as strings; values that parse as numbers are coerced auto
 
 ---
 
+## Structured output
+
+### Default stdout behaviour
+
+With **no output or comparison flags**, a strict JSON document is written to
+stdout and the human-readable summary goes to stderr. Redirecting stderr gives
+you clean, pipeable JSON:
+
+```bash
+npm run opsv2 -- strategy.pine --data data.csv 2>/dev/null
+```
+
+```json
+{
+  "script": "strategy.pine",
+  "bars_processed": 506,
+  "inputs": [
+    { "id": "input_0", "title": "Fast Length", "type": "integer", "default": 9,  "current": 9,  "overridden": false },
+    { "id": "input_1", "title": "Slow Length", "type": "integer", "default": 21, "current": 21, "overridden": false }
+  ],
+  "performance": null
+}
+```
+
+Once any output or comparison flag is set, stdout carries file confirmations
+instead and this JSON is suppressed.
+
+### `--dry-run`
+
+Executes a **single bar** and emits the same JSON, then exits. Use it to
+discover a script's `input()` variables without paying for a full backtest.
+
+```bash
+npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null
+```
+
+```bash
+# Extract just the inputs for a UI to render
+npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null | jq '.inputs'
+```
+
+The `id` values are what `--input` expects.
+
+---
+
 ## Debug flags
 
 ### `--show-transpiled`
@@ -349,10 +394,10 @@ npm run opsv2 -- strategy.pine --data data.csv --show-transpiled
   Compiling: strategy.pine...
 
   --- Transpiled JavaScript ---
-  var opsv2_len = 14;
-  var opsv2_src = opsv2_close;
-  var opsv2_mySma = ctx.call("opsv2_sma@L4:C10", opsv2_sma, opsv2_src, opsv2_len);
-  ctx.call("opsv2_plot@L6:C0", opsv2_plot, opsv2_mySma, { opsv2_color: opsv2_color_red });
+  let opsv2_len = ctx.new_var("opsv2_len", 14);
+  let opsv2_src = ctx.new_var("opsv2_src", opsv2_close);
+  let opsv2_mySma = ctx.new_var("opsv2_mySma", ctx.call("sma@L4:C8", opsv2_sma, opsv2_src, opsv2_len));
+  ctx.call("plot@L6:C0", opsv2_plot, opsv2_mySma, { opsv2_color: opsv2_color.opsv2_red });
   -----------------------------
 
   Running backtest: 506 bars...

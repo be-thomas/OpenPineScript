@@ -1,147 +1,104 @@
+# OpenPineScript
 
----
+An open-source engine that runs Pine Script locally. It compiles `.pine` source to
+JavaScript and executes it against your own OHLCV data — no cloud account, no
+execution quotas, no 500 ms loop timeout.
 
-# OpenPineScript 🚀
+Requires Node.js 20+.
 
-**OpenPineScript** is a high-speed, local engine built to run your trading scripts anywhere. No cloud limits, no proprietary walls—just pure execution on your own hardware.
+## Status
 
----
+**Pine Script v2 is implemented and passing 228 tests.** That covers the full v2
+language, roughly 130 standard-library functions, the strategy broker emulator,
+multi-timeframe `security()`, and the real-time tick model.
 
-## 🌟 Why OpenPineScript?
+| Version | State |
+|---------|-------|
+| v1 | Planned — v1 is semantically identical to v2, so this is mostly version routing |
+| **v2** | **Implemented** |
+| v3 | Planned — a five-item delta from v2 |
+| v4 | Planned — `var`, `while`, `switch`, arrays, drawings, namespace migration |
+| v5 | Planned — `ta.*`/`math.*` namespaces, matrices, maps, user-defined types, libraries |
 
-* **⚡ Local-First Speed:** Built for **modern, high-performance CPUs**. Run backtests in seconds, not minutes.
-* **🔓 Total Freedom:** Execute your logic in an open environment. Your strategies stay on your machine.
-* **🛠 Rock Solid:** Over **5,000+ mathematical stress tests** passed, ensuring your calculations are 100% accurate.
-* **📦 Zero Bloat:** A modular, lightweight engine that runs wherever Node.js lives.
+The plan for v1–v5 lives in [dev-docs/](dev-docs/): an
+[architecture assessment](dev-docs/00-architecture-assessment.md), a
+[version delta spec](dev-docs/01-version-delta-spec.md) sourced from
+TradingView's migration guides, and a
+[16-iteration roadmap](dev-docs/02-roadmap.md).
 
----
-
-## 📍 Current Status: **v2 (Beta) is LIVE!**
-
-We have successfully built the core engine for **v2**. You can currently:
-
-* Convert scripts into lightning-fast JavaScript.
-* Run an interactive terminal (REPL) to test logic on the fly.
-* Execute complex Technical Analysis (TA) functions with mathematically perfect lookback logic.
-
-### ⏭ Next Milestones:
-
-1. **Full v2 Optimization:** Hardening the current beta for production use.
-2. **v3 Compatibility:** Expanding the engine to support the next generation of script logic.
-3. **UI Integration:** Bringing the engine to a visual charting interface.
-
----
-
-## 🚀 Getting Started
-
-### 1. Prerequisites
-
-Make sure you have [Node.js](https://nodejs.org/) 20+ installed.
-
-### 2. Setup
+## Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/be-thomas/OpenPineScript.git
 cd OpenPineScript
-
-# Install dependencies
 npm install
-
 ```
 
-### 3. Try the Interactive Terminal
+`npm install` runs `generate:parser`, which builds the ANTLR parser from
+`grammar/`.
 
-Test your logic instantly without writing a full file:
-
-```bash
-npm run replv2
-
-```
-
-Example session:
-
-![OpenPineScript REPL](/images/repl-1.png)
-
----
-
-## 💻 CLI Usage (`opsv2`)
-
-Run a Pine Script against a local CSV data file:
+## Run a script
 
 ```bash
 npm run opsv2 -- <script.pine> --data <data.csv> [flags]
 ```
 
----
+```bash
+npm run opsv2 -- sma_crossover.pine --data mock_data/AAPL_mock.csv
+```
 
-### 🔍 Discover script inputs (`--dry-run`)
+```
+Compiling: sma_crossover.pine...
+Running backtest: 506 bars...
+✔ Done.
 
-Use `--dry-run` to execute a single bar and discover all `input()` variables without running a full backtest. The output is a **strict JSON document on stdout**, ready to pipe into other tools.
+=== sma_crossover.pine — Summary ===
+Bars processed : 506
+Plots recorded : 1
+```
+
+### REPL
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null
+npm run replv2
 ```
 
-```json
-{
-  "script": "strategy.pine",
-  "bars_processed": 1,
-  "inputs": [
-    { "id": "input_0", "title": "Fast Length", "type": "integer", "default": 9,  "current": 9,  "overridden": false },
-    { "id": "input_1", "title": "Slow Length", "type": "integer", "default": 21, "current": 21, "overridden": false }
-  ],
-  "performance": null
-}
-```
+![OpenPineScript REPL](images/repl-1.png)
 
-This makes it trivial to pipe into other tools:
+### Inspect the generated JavaScript
 
 ```bash
-# Extract just the inputs for a UI to render
-npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null | jq '.inputs'
-
-# Feed straight into a Python optimizer
-npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null | python3 optimizer.py
+npm run opsv2 -- sma_crossover.pine --data mock_data/AAPL_mock.csv --show-transpiled
 ```
 
-Override inputs on the next run with `--input`:
-
-```bash
-npm run opsv2 -- strategy.pine --data data.csv \
-  --input input_0=20 --input input_1=50 \
-  --out-dir ./results
+```js
+let opsv2_len = ctx.new_var("opsv2_len", 14);
+let opsv2_src = ctx.new_var("opsv2_src", opsv2_close);
+let opsv2_mySma = ctx.new_var("opsv2_mySma", ctx.call("sma@L4:C8", opsv2_sma, opsv2_src, opsv2_len));
+ctx.call("plot@L6:C0", opsv2_plot, opsv2_mySma, { opsv2_color: opsv2_color.opsv2_red });
 ```
 
----
+Every identifier is prefixed to avoid collisions with the sandbox, and every
+stateful call carries its source location so per-call-site state (indicator
+lookback buffers, for example) stays independent.
 
-### 📁 Export results to a folder
+### Export results
 
 ```bash
 npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results
 ```
 
-```diff
-  Compiling: strategy.pine...
-  Running backtest: 506 bars...
-+ ✔ Done.
-+ ✔ Chart    → ./results/chart.csv
-+ ✔ Trades   → ./results/trades.csv  (38 trades)
-+ ✔ Summary  → ./results/summary.json
-```
-
 ```
 results/
-├── chart.csv       ← OHLCV + one column per plot()
-├── trades.csv      ← Entry & exit rows for every trade
-└── summary.json    ← Full performance metrics
+├── chart.csv       OHLCV plus one column per plot()
+├── trades.csv      entry and exit rows per trade
+└── summary.json    performance metrics
 ```
 
----
+### Compare against a TradingView export
 
-### 🔬 Validate against a TradingView export
-
-Point `--compare-dir` at a folder containing your TradingView CSV exports:
+Point `--compare-dir` at a folder holding `chart_data.csv`, `trades.csv`, and
+`summary.json` exported from TradingView:
 
 ```bash
 npm run opsv2 -- strategy.pine --data data.csv \
@@ -150,142 +107,73 @@ npm run opsv2 -- strategy.pine --data data.csv \
 ```
 
 ```
-tv_exports/          ← your TradingView exports go here
-├── chart_data.csv
-├── trades.csv
-└── summary.json
+=== Comparison Report ===
+Overall: PARTIAL    Tolerance: 0.0001
 
-results/             ← opsv2 writes its output + the report here
-├── chart.csv
-├── trades.csv
-├── summary.json
-└── comparison_report.json
+Chart Data: PASS  (506 rows compared, 0 mismatches)
+Trades:     FAIL  (38 tv / 37 opsv2 — 1 discrepancy)
+  Trade #42: exit_price_mismatch  tv=45000.5000  opsv2=45001.0000  Δ=0.5
+Summary:    PASS  (net profit Δ 0.05%)
+
+Report written: ./results/comparison_report.json
 ```
 
-When all outputs match TradingView:
+Every flag — `--out-chart`, `--out-trades`, `--compare-chart`, `--tolerance`,
+`--input`, `--dry-run` — is documented in the [CLI Usage Guide](CLI-Usage.md).
 
-```diff
-  === Comparison Report ===
-  Overall: PASS    Tolerance: 0.0001
-
-+ Chart Data: PASS  (506 rows compared, 0 mismatches, max Δ 2.9e-5)
-+ Trades:     PASS  (38 tv / 38 opsv2)
-+ Summary:    PASS  (net profit Δ 0.0000%)
-
-+ Report written: ./results/comparison_report.json
-```
-
-When there is a discrepancy:
-
-```diff
-  === Comparison Report ===
-  Overall: PARTIAL    Tolerance: 0.0001
-
-+ Chart Data: PASS  (506 rows compared, 0 mismatches)
-- Trades:     FAIL  (38 tv / 37 opsv2 — 1 discrepancy)
--   Trade #42: exit_price_mismatch  tv=45000.5000  opsv2=45001.0000  Δ=0.5
-+ Summary:    PASS  (net profit Δ 0.05%)
-
-  Report written: ./results/comparison_report.json
-```
-
-For granular flags (`--out-chart`, `--out-trades`, `--compare-chart`, `--tolerance`, etc.) see the full [CLI Usage Guide](CLI-Usage.md).
-
----
-
-## 🧪 Proven Accuracy
-
-We don't guess; we test. The engine has passed extensive stress tests, including:
-
-* **Variable Lookbacks:** Stable and oscillating lengths (5,000+ iterations).
-* **End-to-End Backtests:** Verified against real-world SMA crossover strategies.
-* **TA Engine Integrity:** Mathematically perfect reference implementation checks.
-
-To run the suite yourself:
+## Tests
 
 ```bash
 npm test
-
 ```
 
----
+228 tests across 77 suites. The suite covers lexer token streams, parser trees,
+transpiler output, and runtime behaviour. Technical-analysis functions are
+checked differentially: `tests/v2/ta/naive_ta.ts` is an independent naive
+reimplementation of the TA library, and the engine is asserted to match it
+bar-for-bar rather than against hand-picked expected values.
 
-## 🗺️ Project Roadmap
+## Repository layout
 
-### 📍 Current Phase: V2 Core Completion (95%)
+| Path | Contents |
+|------|----------|
+| `grammar/` | ANTLR lexer and parser grammars (`.g4`) |
+| `lexer/` | Token source that turns indentation into block tokens |
+| `parser/` | Generated ANTLR parser and the parse entry point |
+| `transpiler/` | Parse tree to JavaScript |
+| `runtime/` | Execution context, series storage, standard library, broker emulator |
+| `repl/` | Interactive REPL |
+| `mock_run/` | CLI runner |
+| `utils/` | Shared helpers and the TradingView comparison engine |
+| `tests/` | Test suites |
+| `validation/` | Real-world Pine scripts used for parity checking |
+| `spec/` | Language specification and per-version progress checklists |
+| `dev-docs/` | Development plan for v1–v5 |
+| `mock_data/` | Sample OHLCV data |
 
-We are in the "Last Mile" of the Pine Script v2 implementation. Our focus is on mathematical parity with TradingView.
+## Deliberate deviations from TradingView
 
-* [x] **Foundation:** Lexer/Parser for v2 grammar.
-* [x] **Core Math:** Implementation of `sma`, `ema`, `rsi`, and `macd`.
-* [ ] **Final 5%:** * [ ] Refined `security()` function logic for multi-timeframe data.
-* [ ] Implicit variable reassignment edge cases (The `:=` behavior in v2).
-* [ ] Support for `fill()` and basic `plotshape()` constants.
+TradingView enforces limits that protect a shared cloud tier. Running locally,
+those limits are not parity — they are rationing. The engine skips them:
 
-### 🔜 Next: Validation & Tooling (Q2 2026)
+- **No 500 ms loop timeout** and no cumulative execution cap. A genuine infinite
+  loop will hang the process.
+- **No plot limit.** TradingView allows 64.
+- **No `max_bars_back` window.** Lookback depth is bounded by available memory.
+- **No script size limits.**
 
-* [ ] **The Ground Truth Suite:** Automated comparison engine to test `OpenPineScript` outputs against TradingView CSV exports.
-* [ ] **CSV Exporting:** Native capability to dump indicator results to CSV for external analysis.
-* [ ] **CLI Backtester:** An interactive shell to test Pine v2 snippets instantly.
-* [ ] **UI based charting support** A UI for running pinescript code so we can compare it side-by-side with tradingview!
-* [ ] Support for running OpenPinescript in Python
-* [ ] **Version 3 Migration:** Adding support for the `//@version=3` syntax.
+Semantic rules — the ones that would silently change your numbers — are
+enforced, not skipped. Every skipped item is recorded with its blast radius in
+[dev-docs/04-skipped-restrictions.md](dev-docs/04-skipped-restrictions.md).
 
-### 🔭 Future Horizons (Late Q2 2026)
+## Contributing
 
-* [ ] **Version 4 Migration:** Adding support for the `//@version=4` syntax.
+The core is developed by a single author and pull requests are not being
+accepted, but bug reports and feature requests drive the roadmap. See
+[CONTRIBUTING.md](CONTRIBUTING.md), the
+[Code of Conduct](CODE_OF_CONDUCT.md), and the
+[Security Policy](SECURITY.md).
 
----
+## License
 
-### 📂 Repository Architecture
-
-* `grammar/` — The AST and Lexer (The DNA of the engine).
-* `transpiler/` — Logic that converts Pine into high-performance executable code.
-* `tests/` — Comprehensive test suites to ensure zero logic-drift.
-* `validation/` — *[NEW]* Real-world scripts and CSVs used for "Ground Truth" testing.
-
-
----
-
-## 🤝 Community & Support
-
-OpenPineScript is built by a solo developer with a passion for craftsmanship.
-
-* **Found a bug?** Open an Issue.
-* **Have an idea?** Start a Discussion.
-* **Want to help?** Check out [CONTRIBUTING.md](CONTRIBUTING.md).
-* [Code of Conduct](CODE_OF_CONDUCT.md)
-* [Security Policy](SECURITY.md)
-
----
-
-### ⚠️ Technical Limitations (By Design)
-
-Unlike the TradingView cloud environment, `OpenPineScript` is a local-first engine. We have intentionally deviated from standard Pine Script limits to allow for high-performance research:
-
-* **No Loop Timeouts:** We do not enforce the 500ms loop limit. Your local CPU can handle complex iterative logic that would normally crash a TradingView chart.
-* **Infinite Plotting:** The 64-plot limit is removed. You can generate hundreds of data streams for deep analysis.
-* **Deep Historical Buffer:** We bypass the 5,000-bar `max_bars_back` limit. Your lookback depth is limited only by your system's RAM.
-* **AST-Based Compilation:** We do not use "tokens." Even massive 10,000+ line scripts will compile as long as they follow the v2 grammar.
-
----
-
-### What's next?
-
-You are sitting on a very cool piece of tech—a local Pine v2 engine is rare. **Would you like me to help you draft the specific "Ground Truth" comparison script?** (Basically a small script that reads your engine's output and the TradingView CSV to tell you exactly where the numbers differ).
-
----
-
-## ⚖️ License
-
-GNU GPL-3.0. Built for the community, owned by the community.
-
----
-
-<!---
-Primary Keywords: Pine Script Open Source, Pine Script Runtime, Pine Script Parser, Local Backtesting Engine.
-Secondary Keywords: TradingView Alternative, Pine Script to JavaScript, Open Source Financial Charts, ANTLR Pine Script, Algorithmic Trading Tools, Quant Trading.
-Tags: #pinescript #tradingview #backtesting #fintech #technicalanalysis #compiler #opensource #quant #algotrading #javascript
-Description: OpenPineScript is the leading open-source alternative for executing script logic locally. Built for speed, privacy, and high-performance technical analysis.
---->
-
+GNU GPL-3.0. See [LICENSE](LICENSE).

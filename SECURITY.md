@@ -1,34 +1,54 @@
-
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-OpenPineScript is currently in active development. We prioritize fixes for the latest version of the `main` branch.
+OpenPineScript is pre-1.0 and under active development. Fixes land on `main`;
+there are no maintained release branches. Please reproduce against `main` before
+reporting.
 
-| Version | Supported |
-| --- | --- |
-| **v0.2.x** (Current) | :white_check_mark: |
-| < v0.2.x | :x: |
+## The transpiler is not a sandbox
 
-> **Note:** Once 100% parity with the v2 specification is reached, the stable release will transition to **v2.0.x**.
+This matters more than anything else on this page.
 
-## Transparency & Reporting
+Pine source is compiled to JavaScript and executed with `new Function` inside a
+`with (sandbox)` scope. Identifiers the sandbox does not define fall through to
+the real global scope by design — that is how `Math`, `Number`, and `NaN` work
+inside scripts. It also means **a crafted `.pine` file can reach host globals and
+run arbitrary JavaScript with the privileges of the process.**
 
-We believe in **100% Transparency**. To maintain community trust and ensure the integrity of the engine, **all issues must be reported publicly** via the [GitHub Issues](https://www.google.com/search?q=https://github.com/be-thomas/OpenPineScript/issues) tab.
+Only run Pine scripts you trust, exactly as you would only run shell scripts you
+trust. If you need to execute untrusted scripts, isolate the process yourself —
+a container, a locked-down worker, or a separate user account.
 
-### 🚩 What to Report
+Hardening this into a real sandbox is not currently on the roadmap. If you need
+it, open an issue describing the deployment so it can be scoped properly.
 
-Please open an issue immediately if you discover any of the following:
+## Reporting
 
-1. **Lookahead Leaks:** Any logic that allows the engine to "see" future bars during a backtest. This is a critical failure of algorithmic integrity.
-2. **Logic Drift:** Mathematical discrepancies between `OpenPineScript` and TradingView's official v2 output.
-3. **System Vulnerabilities:** Any bug that could lead to unauthorized local file access or unexpected code execution by the transpiler.
-4. **Memory Leaks:** Issues that cause excessive RAM usage during deep historical backtests (beyond the 5,000-bar limit).
+Report publicly through
+[GitHub Issues](https://github.com/be-thomas/OpenPineScript/issues). Given the
+above, there is no privately exploitable attack surface that a private channel
+would protect — the engine holds no credentials, opens no network connections,
+and runs entirely on data you supply.
 
-### 🛠️ How to Report
+If you find something you believe genuinely warrants private disclosure, open an
+issue asking for a contact address without including the details.
 
-When opening an issue, please use the appropriate **Issue Template** and include:
+## What to report
 
-* The Pine Script v2 code used.
-* The expected output (e.g., a TradingView CSV export).
-* The actual output from the OpenPineScript engine.
+Correctness failures in this engine are as serious as memory-safety bugs are
+elsewhere — a backtest that is quietly wrong is worse than one that crashes.
+
+1. **Lookahead leaks** — any path where the engine sees future bars during a
+   historical run. `security()` and the tick model are the likely places.
+2. **Numerical drift** — a discrepancy between OpenPineScript and TradingView on
+   the same script and data. Attach both exports.
+3. **Transpiler escapes** — a script that reaches host globals through something
+   other than the documented `with`-scope fallthrough above, particularly
+   anything that survives a future sandbox.
+4. **Unbounded memory growth** — deep historical runs are expected to be bounded
+   by the series truncation in `runtime/v2/Series.ts`. Growth beyond that is a
+   bug.
+
+Include the Pine source, the input data, the expected output (a TradingView
+export if you have one), and what the engine actually produced.
