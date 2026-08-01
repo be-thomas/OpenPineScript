@@ -54,18 +54,47 @@ import {
   IdContext,
 } from "../../parser/v2/generated/PineScriptParser";
 import { getGeneratedRegistry } from "../../runtime/v2/stdlib/metadata";
+import { LanguageProfile, RestrictionId, DEFAULT_PROFILE } from "../profiles";
 
 const REGISTRY = getGeneratedRegistry();
+
+/**
+ * Anything carrying a source position. Structural rather than
+ * `ParserRuleContext`, because the generated context classes are generic in
+ * their visit result and do not assign to the base type.
+ */
+interface SourceLocated {
+  start?: { line: number; column: number } | null;
+}
 
 export class ToJsVisitor extends ParseTreeVisitor<string> {
   // Prefix for all emitted identifiers to avoid sandbox name clashes
   private readonly PREFIX = common.PREFIX;
   private anonCounter = 0;
-  // Depth of for-loop bodies currently being visited. v2 keeps variables
-  // immutable globally but permits ':=' on loop accumulators (see enforceNoReassignment).
+  // Depth of for-loop bodies currently being visited. v1/v2 keep variables
+  // immutable globally but permit ':=' on loop accumulators (see enforceNoReassignment).
   protected loopDepth = 0;
   // Script kind from the study()/strategy() directive; drives strategy.* enforcement.
   protected scriptKind: 'study' | 'strategy' | undefined = undefined;
+  // The version's behaviour table. Every restriction is gated on it.
+  protected readonly profile: LanguageProfile;
+
+  constructor(profile: LanguageProfile = DEFAULT_PROFILE) {
+    super();
+    this.profile = profile;
+  }
+
+  /** Is this restriction live at the target version? */
+  protected restricts(id: RestrictionId): boolean {
+    return this.profile.restrictions.has(id);
+  }
+
+  /** Prefix every diagnostic with the version that rejected the code. */
+  protected err(ctx: SourceLocated, message: string): Error {
+    return new Error(
+      `Pine Script v${this.profile.version} Error at ${this.getLocId(ctx)}: ${message}`
+    );
+  }
 
   protected override defaultResult(): string {
     return "";
@@ -78,74 +107,85 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   /** * Helper: Generates a Deterministic ID based on Source Location.
-   * Example: "_L10_C5" (Line 10, Column 5)
+   * Example: "@L10:C5" (Line 10, Column 5)
    */
-  private getLocId(ctx: ParserRuleContext): string {
+  private getLocId(ctx: SourceLocated): string {
     const line = ctx.start?.line || 0;
     const col = ctx.start?.column || 0;
     return `@L${line}:C${col}`;
   }
 
   // ───────────────────────────────────────────────────────────────────────
-  // Pine Script v2 language restrictions
+  // Language restrictions
   //
-  // v2 is intentionally stricter than later versions. Every restriction lives
-  // in its own `protected enforce*` method and is invoked only from the
-  // relevant visit* method — the emit logic itself stays version-agnostic.
-  // A future v3 visitor can lift any restriction by overriding its guard to a
-  // no-op, without touching the transpilation code:
+  // Every restriction lives in its own `protected enforce*` method, is gated on
+  // `this.profile.restrictions`, and is invoked only from the relevant visit*
+  // method — the emit logic itself stays version-agnostic. Adding a version
+  // means adding a row to LANGUAGE_PROFILES, not editing the emitter.
   //
-  //   class V3ToJsVisitor extends ToJsVisitor {
-  //     protected enforceNoReassignment() {}  // v3 allows ':='
-  //     protected enforceNaComparison() {}    // v3 relaxes na comparisons
-  //     protected enforceNoRecursion() {}     // v3 allows recursion
-  //   }
+  // See dev-docs/01-version-delta-spec.md for the source of each rule.
   // ───────────────────────────────────────────────────────────────────────
 
   /**
-   * v2: variables are immutable within a bar — reject ':=' reassignment at the
-   * global/script scope. It remains valid for accumulators inside a for-loop
-   * body, which is the only place v2 mutation is supported.
+   * v1/v2: variables are immutable within a bar — reject ':=' reassignment at
+   * the global/script scope. It remains valid for accumulators inside a
+   * for-loop body, which is the only place v1/v2 mutation is supported.
+   * v3 introduced general mutability and lifts this.
    */
   protected enforceNoReassignment(ctx: Var_assignContext): void {
+    if (!this.restricts("no_reassignment")) return;
     if (this.loopDepth > 0) return; // loop accumulator — allowed
-    throw new Error(
-      `Pine Script v2 Error at ${this.getLocId(ctx)}: reassignment with ':=' is not allowed outside a for-loop (variables are immutable within a bar). Bind a new variable with '=' instead.`
+    throw this.err(
+      ctx,
+      `reassignment with ':=' is not allowed outside a for-loop (variables are ` +
+      `immutable within a bar). Bind a new variable with '=' instead.`
     );
   }
 
-  /** v2: '==' / '!=' against 'na' silently misbehaves — require the na(x) function. */
+  /** v1/v2: '==' / '!=' against 'na' silently misbehaves — require the na(x) function. */
   protected enforceNaComparison(ctx: Eq_exprContext): void {
+    if (!this.restricts("na_comparison")) return;
     if (ctx.cmp_expr().length < 2) return; // a single operand is not a comparison
     for (const operand of ctx.cmp_expr()) {
       if (operand.getText() === "na") {
-        throw new Error(
-          `Pine Script v2 Error at ${this.getLocId(ctx)}: cannot compare to 'na' with '==' or '!=' (it does not behave as expected). Use the na(x) function instead.`
+        throw this.err(
+          ctx,
+          `cannot compare to 'na' with '==' or '!=' (it does not behave as ` +
+          `expected). Use the na(x) function instead.`
         );
       }
     }
   }
 
-  /** v2: user-defined functions cannot recurse — reject direct self-reference. */
-  protected enforceNoRecursion(name: string, body: ParserRuleContext, ctx: ParserRuleContext): void {
+  /** All versions: user-defined functions cannot recurse — reject direct self-reference. */
+  protected enforceNoRecursion(name: string, body: ParseTree, ctx: SourceLocated): void {
+    if (!this.restricts("no_recursion")) return;
     if (this.callsFunction(body, name)) {
-      throw new Error(
-        `Pine Script v2 Error at ${this.getLocId(ctx)}: recursion is not allowed; function '${name}' refers to itself.`
-      );
+      throw this.err(ctx, `recursion is not allowed; function '${name}' refers to itself.`);
     }
   }
 
   /**
-   * v2: a study() script is in indicator mode — the broker emulator is disabled,
-   * so any strategy.* order/state call is a fatal error. Allowed under strategy()
+   * A study() script is in indicator mode — the broker emulator is disabled, so
+   * any strategy.* order/state call is a fatal error. Allowed under strategy()
    * or when no directive is declared (permissive default).
    */
-  protected enforceStrategyContext(name: string, ctx: ParserRuleContext): void {
+  protected enforceStrategyContext(name: string, ctx: SourceLocated): void {
+    if (!this.restricts("strategy_context")) return;
     if (this.scriptKind === 'study') {
-      throw new Error(
-        `Pine Script v2 Error at ${this.getLocId(ctx)}: '${name}' is unavailable in a study() script (indicator mode). Declare strategy(...) to use the broker emulator.`
+      const directive = this.profile.defaults.scriptDirective;
+      throw this.err(
+        ctx,
+        `'${name}' is unavailable in a ${directive}() script (indicator mode). ` +
+        `Declare strategy(...) to use the broker emulator.`
       );
     }
+  }
+
+  /** All versions up to v3: user-defined functions cannot return tuples. */
+  protected enforceNoTupleReturn(ctx: SourceLocated): void {
+    if (!this.restricts("no_tuple_return")) return;
+    throw this.err(ctx, `User-defined functions cannot return tuples.`);
   }
 
   /** Recursively scan a subtree for a call to the named function. */
@@ -235,7 +275,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     // V2 Constraint: Check if returning a tuple [x, y]
     const content = ctx.fun_body_singleline().local_stmt_singleline().local_stmt_content(0);
     if (content?.arith_exprs()) {
-        throw new Error(`Syntax Error at ${this.getLocId(ctx)}: User-defined functions cannot return tuples in Pine Script v2.`);
+        this.enforceNoTupleReturn(ctx);
     }
 
     const body = this.visit(ctx.fun_body_singleline());
@@ -251,7 +291,7 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
     const stmts = ctx.fun_body_multiline().local_stmts_multiline().local_stmts_list().local_stmt_multiline();
     const lastContent = stmts[stmts.length - 1]?.local_stmt_content(0);
     if (lastContent?.arith_exprs()) {
-        throw new Error(`Syntax Error at ${this.getLocId(ctx)}: User-defined functions cannot return tuples in Pine Script v2.`);
+        this.enforceNoTupleReturn(ctx);
     }
 
     const body = this.visit(ctx.fun_body_multiline());
@@ -366,18 +406,18 @@ export class ToJsVisitor extends ParseTreeVisitor<string> {
         // If it's a built-in, check the registry for tuple return
         if (entry) {
             if (entry.returns.kind !== "tuple") {
-                throw new Error(`Pine Script v2 Error at ${this.getLocId(ctx)}: '${funcName}' does not return a tuple. Multi-variable assignment is only allowed for specific built-in functions.`);
+                throw this.err(ctx, `'${funcName}' does not return a tuple. Multi-variable assignment is only allowed for specific built-in functions.`);
             }
             if (entry.returns.itemTypes && entry.returns.itemTypes.length !== ids.length) {
-                throw new Error(`Type Error at ${this.getLocId(ctx)}: '${funcName}' returns ${entry.returns.itemTypes.length} values, but you provided ${ids.length} variables.`);
+                throw this.err(ctx, `'${funcName}' returns ${entry.returns.itemTypes.length} values, but you provided ${ids.length} variables.`);
             }
         } 
         // If it's not in registry, it's a user-defined function (Forbidden in v2)
         else {
-            throw new Error(`Pine Script v2 Error at ${this.getLocId(ctx)}: User-defined functions cannot return tuples. Multi-variable assignment is only allowed for specific built-in functions.`);
+            throw this.err(ctx, `User-defined functions cannot return tuples. Multi-variable assignment is only allowed for specific built-in functions.`);
         }
     } else {
-        throw new Error(`Syntax Error at ${this.getLocId(ctx)}: Multi-variable assignment in v2 must originate directly from a supported built-in function call.`);
+        throw this.err(ctx, `Multi-variable assignment must originate directly from a supported built-in function call.`);
     }
 
     const idsArrayJs = `[${ids.join(", ")}]`; 

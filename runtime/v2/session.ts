@@ -13,7 +13,9 @@
  * The render model is derived from `ctx` (plots/fills/scriptMeta/trades), so the
  * typed PlotData union maps straight onto chart structures.
  */
-import { transpile } from "../../transpiler/v2";
+import { compileScript } from "../../transpiler/v2";
+import type { PineVersion } from "../../transpiler/version";
+import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/profiles";
 import { compile, Context } from "./index";
 import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle } from "./context";
 
@@ -167,18 +169,26 @@ export class Session {
     // Runtime context for the current run (created by runHistory, continued by tick/commit).
     private ctx: Ctx | null = null;
     private exec: (() => any) | null = null;
+    // Language profile of the compiled script; every Context created for this
+    // session must run under it. Reset on each compile().
+    private profile: LanguageProfile = DEFAULT_PROFILE;
+    /** Pine Script version detected in the last compile(). */
+    public pineVersion: PineVersion = 1;
 
     /** Transpile + validate; a 1-bar dry run on a throwaway context discovers inputs + metadata. */
     compile(source: string): Compiled {
         this.js = null; this.ctx = null; this.exec = null;
         let js: string;
         try {
-            js = transpile(source).replace(/\blet\b/g, "var ");
+            const compiled = compileScript(source);
+            js = compiled.js.replace(/\blet\b/g, "var ");
+            this.profile = compiled.profile;
+            this.pineVersion = compiled.version;
         } catch (e) {
             return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: null, inputs: [], errors: toEngineErrors(e) };
         }
 
-        const ctx = new Context();
+        const ctx = new Context(this.profile);
         try {
             const exec = compile(js, ctx, Object.create(null));
             ctx.setBar(0, 1, 1, 1, 1, 1); // dry bar: input()/study()/strategy() run here
@@ -217,7 +227,7 @@ export class Session {
      */
     runHistory(candles: Candle[]): SimResult {
         if (!this.js) throw new Error("compile() first");
-        const ctx = new Context();
+        const ctx = new Context(this.profile);
         const exec = compile(this.js, ctx, Object.create(null));
         Object.assign(ctx.userInputs, this.inputValues);
         for (const s of this.securities) ctx.provideSecurityData(s.symbol, s.resolution, s.candles);

@@ -60,12 +60,16 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         sandbox[`${PREFIX}n`] = ctx.vars.get(`${PREFIX}bar_index`);
         sandbox[`${PREFIX}na`] = ctx.opsv2_na;
 
-        // POISON PILL: reading bar_index throws (v2 mandates 'n'). As an own getter
-        // it resolves through `with(sandbox)` and is hit before the outer scope.
-        Object.defineProperty(sandbox, `${PREFIX}bar_index`, {
-            get() { throw new Error("bar_index is strictly prohibited in v2. Use 'n' instead."); },
-            configurable: true, enumerable: false,
-        });
+        // POISON PILLS: identifiers that exist in the engine but are not spellable
+        // at this language version — v1–v3 mandate 'n' and ban 'bar_index'; v4+
+        // invert that. As own getters they resolve through `with(sandbox)` and are
+        // hit before the outer scope, so the throw happens on read.
+        for (const [name, message] of ctx.profile.banned) {
+            Object.defineProperty(sandbox, `${PREFIX}${name}`, {
+                get() { throw new Error(message); },
+                configurable: true, enumerable: false,
+            });
+        }
 
         Object.defineProperty(sandbox, '__opsv2_initialized', {
             value: true, writable: true, enumerable: false
