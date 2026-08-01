@@ -1,0 +1,45 @@
+//@version=3
+study("[ProfitRobots] MTF Heatmap Template")
+
+tf1 = input('15', "Timeframe #1", resolution)
+tf2 = input('30', "Timeframe #2", resolution)
+tf3 = input('60', "Timeframe #3", resolution)
+tf4 = input('240', "Timeframe #4", resolution)
+tf5 = input('D', "Timeframe #5", resolution)
+transparency = input(50, "Transparency", minval=0, maxval=100)
+
+level_start = 5
+level_step = 1
+
+// User defined section
+ema_slow = input(50, "EMA Slow Period")
+ema_fast = input(20, "EMA Fast Period")
+
+getColor(val) => val == 1 ? green : red
+direction = ema(close, ema_slow) < ema(close, ema_fast) ? 1 : -1
+// End of user defined section
+
+h0 = plot(level_start - level_step * 5, title = "")
+indi_1 = security(tickerid, tf1, direction)
+h1 = plot(level_start - level_step * 4, color = getColor(indi_1), title = "TF #1")
+fill(h0, h1, color = getColor(indi_1), transp = transparency)
+
+indi_2 = security(tickerid, tf2, direction)
+h2 = plot(level_start - level_step * 3, color = getColor(indi_2), title = "TF #2")
+fill(h1, h2, color = getColor(indi_2), transp = transparency)
+
+indi_3 = security(tickerid, tf3, direction)
+h3 = plot(level_start - level_step * 2, color = getColor(indi_3), title = "TF #3")
+fill(h2, h3, color = getColor(indi_3), transp = transparency)
+
+indi_4 = security(tickerid, tf4, direction)
+h4 = plot(level_start - level_step * 1, color = getColor(indi_4), title = "TF #4")
+fill(h3, h4, color = getColor(indi_4), transp = transparency)
+
+indi_5 = security(tickerid, tf5, direction)
+h5 = plot(level_start - level_step * 0, color = getColor(indi_5), title = "TF #5")
+fill(h4, h5, color = getColor(indi_5), transp = transparency)
+
+summ = indi_1 + indi_2 + indi_3 + indi_4 + indi_5
+alertcondition(summ == 5,  "All timeframes are green")
+alertcondition(summ == -5, "All timeframes are red")

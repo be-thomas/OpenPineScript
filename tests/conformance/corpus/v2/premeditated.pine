@@ -1,0 +1,826 @@
+//@version=2
+//The moving averages are in days, and they are
+//converted into near-as-possible be scale independent.
+//
+//That is, if you view hourly candles it'll divide by
+//the number of hours in the day. Which varies from market
+//to market. So there's a setting for that.
+//
+//Different charts require different moving-averages
+//and other settings, to best match their highs and lows, 
+//and closing down for the night so we have some
+//defaults for the charts I've bothered to do that with.
+//Feel free to adjust below for your preference.
+
+strategy(
+  "Pre Meditated", 
+  initial_capital=1000, 
+  currency="USD", 
+  default_qty_type=strategy.percent_of_equity, 
+  default_qty_value=100, 
+  scale=scale.right, 
+  overlay=true )
+
+shortTermDays = input(20)
+med1TermDays = input(50)
+med2TermDays = input(128)
+longTermDays = input(200)
+vlongTermDays = input(365)
+vlong2TermDays = input(730)
+hoursPerDay = input(24)
+daysPerWeek = input(7)
+howSmoothIsChoppy = input(80)
+allowAdamOverride = input(true)
+useEma = input(true)
+background = input(true)
+
+
+//Sequential settings
+seq=input(true)
+seqLookback = input(4)
+transp=input(80) 
+transp9=input(10)
+
+
+//Strategy vars
+doStrategy = input(false)
+closeAtEnd = input(true)
+allowShorting = input(true)
+
+avgTrack = input(close)
+longTrack = input(close)
+shortTrack = input(close)
+bullishnessLine = input(-100)
+
+
+//Dates for the tests
+testStartYear = input(2010, "Backtest Start Year")
+testStartMonth = input(1, "Backtest Start Month")
+testStartDay = input(1, "Backtest Start Day")
+testPeriodStart = timestamp(testStartYear,testStartMonth,testStartDay,0,0)
+
+testStopYear = input(2050, "Backtest Stop Year")
+testStopMonth = input(1, "Backtest Stop Month")
+testStopDay = input(1, "Backtest Stop Day")
+testPeriodStop = timestamp(testStopYear,testStopMonth,testStopDay,0,0)
+
+//CONST for max candle-lookback allowed coz I bet they change it again.
+maxAvgLookback = 5000
+
+
+//
+// THE DATA
+//
+//Sometimes the easiest way to keep track of your prefered settings
+//for individual tickers is to just allow a script to override
+//them. Ideally it'd load from seomthing with a better format.
+//Maybe I should write a Pine-Compiled language or something.
+//But as I say. Sometimes the easiest way is just to hard-code
+//it in the script.
+//
+//Feel free to change these for your whim, I certainly will. So
+//you shouldn't assume they'll be the same next time you get an
+//update script.
+//
+//Backup your changes, backup any defaults you seriously
+//care about, defaults will change.
+
+shortTermDays_adj = 
+  not allowAdamOverride ? shortTermDays :
+  ticker == "BTCUSD" ? 16 : 
+  ticker == "BLX"    ? 16 : 
+  ticker == "BATETH" ? 19 : 
+  ticker == "ADABTC" ? 11 : 
+  ticker == "BNBBTC" ? 55 : 
+  ticker == "ETHBTC" ? 20 : 
+  ticker == "TRXBTC" ? 20 : 
+  ticker == "XMRBTC" ? 25 : 
+  ticker == "ABDP"   ? 15 : 
+  ticker == "ARWR"   ? 50 : 
+  ticker == "AAOI"   ? 17 : 
+  ticker == "AMD"    ? 20 : 
+  ticker == "ALFA"   ? 20 : 
+  ticker == "AMZN"   ? 25 : 
+  ticker == "BAND"   ? 50 : 
+  ticker == "BYND"   ? 15 : 
+  ticker == "BGNE"   ? 20 : 
+  ticker == "BLFS"   ? 25 : 
+  ticker == "BLDP"   ? 20 : 
+  ticker == "CRSP"   ? 19 : 
+  ticker == "GBSS"   ? 40 : 
+  ticker == "ES1!"   ? 29 : 
+  ticker == "FEVR"   ? 40 : 
+  ticker == "FFWD"   ? 10 : 
+  ticker == "JAY"    ? 40 : 
+  ticker == "JSG"    ? 40 : 
+  ticker == "LUCE"   ? 26 : 
+  ticker == "OIL_CRUDE" ?20 : 
+  ticker == "NDX"    ? 20 : 
+  ticker == "NICK"   ? 15 : 
+  ticker == "NFLX"   ? 40 : 
+  ticker == "SAFE"   ? 40 : 
+  ticker == "SPX"    ? 25 : 
+  ticker == "SSPG"   ? 50 : 
+  ticker == "TRX"    ? 45 : 
+  ticker == "TSLA"   ? 35 : 
+  ticker == "TERN"   ? 35 : 
+  ticker == "TUI"    ? 10 : 
+  ticker == "VRS"    ? 27 : 
+  ticker == "VTC"    ? 21 : 
+  ticker == "VLX"    ? 20 : 
+  ticker == "VCT"    ? 20 : 
+  ticker == "WEY"    ? 20 : 
+  ticker == "ZM"     ? 23 : 
+  ticker == "UKX"    ? 50 : 
+  ticker == "UK100GBP" ? 15   : 
+  ticker == "XAUUSD" ? 20 : 
+  ticker == "UKX*GBPUSD" ? 80 :
+  ticker == "GBPUSD" ? 140 : shortTermDays 
+
+med1TermDays_adj  = 
+  not allowAdamOverride ? med1TermDays :
+  ticker == "BTCUSD" ? 55 : 
+  ticker == "BLX"    ? 55 : 
+  ticker == "BATETH" ? 38 : 
+  ticker == "ADABTC" ? 28 : 
+  ticker == "BNBBTC" ? 114 : 
+  ticker == "ETHBTC" ? 40 : 
+  ticker == "TRXBTC" ? 60 : 
+  ticker == "XMRBTC" ? 55 : 
+  ticker == "ABDP"   ? 58 : 
+  ticker == "ARWR"   ? 80 : 
+  ticker == "AAOI"   ? 56  : 
+  ticker == "AMD"    ? 52 : 
+  ticker == "ALFA"   ? 60 : 
+  ticker == "AMZN"   ? 60 : 
+  ticker == "BAND"   ? 69 : 
+  ticker == "BYND"   ? 42 : 
+  ticker == "BGNE"   ? 42 : 
+  ticker == "BLFS"   ? 86 : 
+  ticker == "BLDP"   ? 60 : 
+  ticker == "CRSP"   ? 67 : 
+  ticker == "GBSS"   ? 120 :
+  ticker == "ES1!"   ? 68 :
+  ticker == "FEVR"   ? 86 :
+  ticker == "FFWD"   ? 40 :
+  ticker == "JAY"    ? 80 : 
+  ticker == "JSG"    ? 90 : 
+  ticker == "LUCE"   ? 56 : 
+  ticker == "OIL_CRUDE" ? 50: 
+  ticker == "NDX"    ? 53 : 
+  ticker == "NICK"   ? 50 : 
+  ticker == "NFLX"   ? 80 : 
+  ticker == "SAFE"   ? 120 : 
+  ticker == "SPX"    ? 67 : 
+  ticker == "SSPG"   ? 80 : 
+  ticker == "TRX"    ? 80 :
+  ticker == "TSLA"   ? 104 :
+  ticker == "TUI"    ? 40 :
+  ticker == "VRS"    ? 52 :
+  ticker == "VTC"    ? 81 :
+  ticker == "VLX"    ? 50 :
+  ticker == "VCT"    ? 55 :
+  ticker == "WEY"    ? 60 :
+  ticker == "ZM"     ? 60 : 
+  ticker == "UKX"    ? 130 : 
+  ticker == "UK100GBP" ? 50 : 
+  ticker == "XAUUSD" ? 51 : 
+  ticker == "UKX*GBPUSD" ? 130 :
+  ticker == "GBPUSD" ? 300 : med1TermDays 
+
+med2TermDays_adj  = 
+  not allowAdamOverride ? med2TermDays :
+  ticker == "BTCUSD" ? 80 : 
+  ticker == "BLX"    ? 80 : 
+  ticker == "BATETH" ? 39 : 
+  ticker == "ADABTC" ? 78 : 
+  ticker == "BNBBTC" ? 174 : 
+  ticker == "ETHBTC" ? 110 : 
+  ticker == "TRXBTC" ? 100 : 
+  ticker == "XMRBTC" ? 120 : 
+  ticker == "ABDP"   ? 125 : 
+  ticker == "ARWR"   ? 210 : 
+  ticker == "AAOI"   ? 117 : 
+  ticker == "AMD"    ? 87 : 
+  ticker == "ALFA"   ? 128 :
+  ticker == "AMZN"   ? 95 : 
+  ticker == "BAND"   ? 90 : 
+  ticker == "BYND"   ? 110 : 
+  ticker == "BGNE"   ? 110 : 
+  ticker == "BLFS"   ? 142 : 
+  ticker == "BLDP"   ? 110 : 
+  ticker == "CRSP"   ? 122 : 
+  ticker == "GBSS"   ? 210 :
+  ticker == "ES1!"   ? 145 :
+  ticker == "FEVR"   ? 130 :
+  ticker == "FFWD"   ? 65 :
+  ticker == "JAY"    ? 129 : 
+  ticker == "JSG"    ? 150 : 
+  ticker == "LUCE"   ? 80 : 
+  ticker == "OIL_CRUDE" ? 120 :
+  ticker == "NDX"    ? 86 : 
+  ticker == "NICK"   ? 120 : 
+  ticker == "NFLX"   ? 140 : 
+  ticker == "SAFE"   ? 230 : 
+  ticker == "SPX"    ? 110 : 
+  ticker == "SSPG"   ? 150 : 
+  ticker == "TRX"    ? 160 :
+  ticker == "TSLA"   ? 300 :
+  ticker == "TUI"    ? 75 :
+  ticker == "VRS"    ? 74 :
+  ticker == "VTC"    ? 130 :
+  ticker == "VLX"    ? 80  :
+  ticker == "VCT"    ? 120 :
+  ticker == "WEY"    ? 120 :
+  ticker == "ZM"     ? 128 : 
+  ticker == "UKX"    ? 240 : 
+  ticker == "UK100GBP" ? 128 : 
+  ticker == "XAUUSD" ? 93 : 
+  ticker == "UKX*GBPUSD" ? 240 :
+  ticker == "GBPUSD" ? 450 : med2TermDays 
+
+longTermDays_adj  = 
+  not allowAdamOverride ? longTermDays :
+  ticker == "BTCUSD" ? 160 : 
+  ticker == "BLX"    ? 160 : 
+  ticker == "BATETH" ? 128 : 
+  ticker == "ADABTC" ? 160 : 
+  ticker == "BNBBTC" ? 240 : 
+  ticker == "ETHBTC" ? 200: 
+  ticker == "TRXBTC" ? 140: 
+  ticker == "XMRBTC" ? 200: 
+  ticker == "ABDP"   ? 175 : 
+  ticker == "ARWR"   ? 360 : 
+  ticker == "AAOI"   ? 188  : 
+  ticker == "AMD"    ? 160 : 
+  ticker == "ALFA"   ? 190 : 
+  ticker == "AMZN"   ? 180 : 
+  ticker == "BAND"   ? 183 : 
+  ticker == "BYND"   ? 155 : 
+  ticker == "BGNE"   ? 155 : 
+  ticker == "BLFS"   ? 189 : 
+  ticker == "BLDP"   ? 200 : 
+  ticker == "CRSP"   ? 193 : 
+  ticker == "GBSS"   ? 250 :
+  ticker == "ES1!"   ? 250 :
+  ticker == "FEVR"   ? 206 :
+  ticker == "FFWD"   ? 130 :
+  ticker == "JAY"    ? 175 : 
+  ticker == "JSG"    ? 240 : 
+  ticker == "LUCE"   ? 105 : 
+  ticker == "OIL_CRUDE" ? 240 : 
+  ticker == "NDX"    ? 200 : 
+  ticker == "NICK"   ? 250 : 
+  ticker == "NFLX"   ? 270 : 
+  ticker == "SAFE"   ? 340 : 
+  ticker == "SPX"    ? 220 : 
+  ticker == "SSPG"   ? 200 : 
+  ticker == "TRX"    ? 220 :
+  ticker == "TSLA"   ? 500 :
+  ticker == "TUI"    ? 140 :
+  ticker == "VRS"    ? 105 :
+  ticker == "VTC"    ? 240 :
+  ticker == "VLX"    ? 245 :
+  ticker == "VCT"    ? 200 :
+  ticker == "WEY"    ? 180 :
+  ticker == "ZM"     ? 200 : 
+  ticker == "UKX"    ? 390 : 
+  ticker == "UK100GBP" ? 240 : 
+  ticker == "XAUUSD" ? 167 : 
+  ticker == "UKX*GBPUSD" ? 36 :
+  ticker == "GBPUSD" ? 1100 : longTermDays 
+
+vlongTermDays_adj = 
+  not allowAdamOverride ? vlongTermDays :
+  ticker == "BTCUSD" ? 365 : 
+  ticker == "BLX"    ? 365 : 
+  ticker == "BATETH" ? 330 : 
+  ticker == "ADABTC" ? 340 : 
+  ticker == "BNBBTC" ? 365 : 
+  ticker == "ETHBTC" ? 365 : 
+  ticker == "TRXBTC" ? 365 : 
+  ticker == "XMRBTC" ? 365 : 
+  ticker == "ABDP"   ? 365 : 
+  ticker == "ARWR"   ? 480 : 
+  ticker == "AAOI"   ? 300 : 
+  ticker == "AMD"    ? 365 : 
+  ticker == "ALFA"   ? 365 : 
+  ticker == "AMZN"   ? 350 : 
+  ticker == "BAND"   ? 365 : 
+  ticker == "BYND"   ? 250 : 
+  ticker == "BGNE"   ? 250 : 
+  ticker == "BLFS"   ? 369 : 
+  ticker == "BLDP"   ? 550 : 
+  ticker == "CRSP"   ? 340 : 
+  ticker == "GBSS"   ? 340 :
+  ticker == "ES1!"   ? 500 :
+  ticker == "FEVR"   ? 356 :
+  ticker == "FFWD"   ? 720 :
+  ticker == "JAY"    ? 800 : 
+  ticker == "JSG"    ? 750 : 
+  ticker == "LUCE"   ? 250 : 
+  ticker == "OIL_CRUDE" ? 340 :
+  ticker == "NDX"    ? 400 : 
+  ticker == "NICK"   ? 365 : 
+  ticker == "NFLX"   ? 365 : 
+  ticker == "SAFE"   ? 500 : 
+  ticker == "SPX"    ? 440 : 
+  ticker == "SSPG"   ? 344 : 
+  ticker == "TRX"    ? 365 :
+  ticker == "TSLA"   ? 700 :
+  ticker == "TUI"    ? 300 :
+  ticker == "VRS"    ? 250 :
+  ticker == "VTC"    ? 265 :
+  ticker == "VLX"    ? 365 :
+  ticker == "VCT"    ? 450 :
+  ticker == "WEY"    ? 270 :
+  ticker == "ZM"     ? 365 : 
+  ticker == "UKX"    ? 1000 : 
+  ticker == "UK100GBP" ? 500 : 
+  ticker == "XAUUSD" ? 365 : 
+  ticker == "UKX*GBPUSD" ? 800 :
+  ticker == "GBPUSD" ? 2000 : vlongTermDays 
+
+vlong2TermDays_adj= 
+  not allowAdamOverride ? vlong2TermDays :
+  ticker == "BTCUSD" ? 650 : 
+  ticker == "BLX"    ? 650 : 
+  ticker == "BATETH" ? 650 : 
+  ticker == "ADABTC" ? 650 : 
+  ticker == "BNBBTC" ? 650 : 
+  ticker == "ETHBTC" ? 730 : 
+  ticker == "TRXBTC" ? 650 : 
+  ticker == "XMRBTC" ? 730 : 
+  ticker == "ABDP"   ? 730 : 
+  ticker == "ARWR"   ? 730 : 
+  ticker == "AAOI"   ? 600 : 
+  ticker == "AMD"    ? 720 : 
+  ticker == "ALFA"   ? 730 : 
+  ticker == "AMZN"   ? 600 : 
+  ticker == "BAND"   ? 720 : 
+  ticker == "BYND"   ? 720 : 
+  ticker == "BGNE"   ? 720 : 
+  ticker == "BLFS"   ? 730 : 
+  ticker == "BLDP"   ? 1200: 
+  ticker == "CRSP"   ? 656 : 
+  ticker == "GBSS"   ? 650 :
+  ticker == "ES1!"   ? 700 :
+  ticker == "FEVR"   ? 670 :
+  ticker == "FFWD"   ? 730 :
+  ticker == "JAY"    ? 1000 : 
+  ticker == "JSG"    ? 1000 : 
+  ticker == "LUCE"   ? 500 : 
+  ticker == "OIL_CRUDE" ? 600 :
+  ticker == "NDX"    ? 800 : 
+  ticker == "NICK"   ? 730 : 
+  ticker == "NFLX"   ? 590 : 
+  ticker == "SAFE"   ? 730 : 
+  ticker == "SPX"    ? 900 : 
+  ticker == "SSPG"   ? 730 : 
+  ticker == "TRX"    ? 730 :
+  ticker == "TSLA"   ? 1000 :
+  ticker == "TUI"    ? 750 :
+  ticker == "VRS"    ? 500 :
+  ticker == "VTC"    ? 730 :
+  ticker == "VLX"    ? 500 :
+  ticker == "VCT"    ? 860 :
+  ticker == "WEY"    ? 730 :
+  ticker == "ZM"     ? 730 : 
+  ticker == "UKX"    ? 2200 : 
+  ticker == "UK100GBP" ? 1000 : 
+  ticker == "XAUUSD" ? 2350 : 
+  ticker == "UKX*GBPUSD" ? 2000 :
+  ticker == "GBPUSD" ? 800 :  vlong2TermDays
+
+hoursPerDay_adj = 
+  not allowAdamOverride ? hoursPerDay :
+  ticker == "BTCUSD" ? 24 : 
+  ticker == "BLX"    ? 24 : 
+  ticker == "BATETH" ? 24 : 
+  ticker == "ADABTC" ? 24 : 
+  ticker == "BNBBTC" ? 11 : 
+  ticker == "ETHBTC" ? 24 : 
+  ticker == "TRXBTC" ? 24 : 
+  ticker == "XMRBTC" ? 24 : 
+  ticker == "ABDP"   ? 7 : 
+  ticker == "ARWR"   ? 7:  
+  ticker == "AAOI"   ? 7 :  
+  ticker == "AMD"    ? 7 : 
+  ticker == "ALFA"   ? 7 : 
+  ticker == "AMZN"   ? 7 : 
+  ticker == "BAND"   ? 7 : 
+  ticker == "BYND"   ? 7 : 
+  ticker == "BGNE"   ? 7 : 
+  ticker == "BLFS"   ? 7 : 
+  ticker == "BLDP"   ? 9 : 
+  ticker == "CRSP"   ? 7 : 
+  ticker == "GBSS"   ? 9 : 
+  ticker == "ES1!"   ? 23 : 
+  ticker == "FEVR"   ? 9 : 
+  ticker == "FFWD"   ? 9 : 
+  ticker == "JAY"    ? 9 : 
+  ticker == "JSG"    ? 9 : 
+  ticker == "LUCE"   ? 9 : 
+  ticker == "OIL_CRUDE" ? 24 :
+  ticker == "NDX"    ? 7 : 
+  ticker == "NICK"   ? 7 : 
+  ticker == "NFLX"   ? 7 : 
+  ticker == "SAFE"   ? 7 : 
+  ticker == "SPX"    ? 7 : 
+  ticker == "SSPG"   ? 9 : 
+  ticker == "TRX"    ? 9 :
+  ticker == "TSLA"   ? 7 :
+  ticker == "TUI"    ? 9 :
+  ticker == "VRS"    ? 9 :
+  ticker == "VTC"    ? 7 :
+  ticker == "VLX"    ? 9 :
+  ticker == "VCT"    ? 9 :
+  ticker == "WEY"    ? 9 :
+  ticker == "ZM"     ? 7 : 
+  ticker == "UKX"    ? 9 : 
+  ticker == "UK100GBP" ? 24 : 
+  ticker == "XAUUSD" ? 24 : 
+  ticker == "UKX*GBPUSD" ? 8 :
+  ticker == "GBPUSD" ? 24 :  hoursPerDay
+
+daysPerWeek_adj = 
+  not allowAdamOverride ? daysPerWeek :
+  ticker == "BTCUSD" ? 7 : 
+  ticker == "BLX"    ? 7 : 
+  ticker == "BATETH" ? 7 : 
+  ticker == "ADABTC" ? 7 : 
+  ticker == "BNBBTC" ? 7 : 
+  ticker == "ETHBTC" ? 7 : 
+  ticker == "TRXBTC" ? 7 : 
+  ticker == "XMRBTC" ? 7 : 
+  ticker == "ABDP"   ? 5 : 
+  ticker == "ARWR"   ? 5: 
+  ticker == "AAOI"   ? 5: 
+  ticker == "AMD"    ? 5 : 
+  ticker == "ALFA"   ? 5 : 
+  ticker == "AMZN"   ? 5 : 
+  ticker == "BAND"   ? 5 : 
+  ticker == "BYND"   ? 5 : 
+  ticker == "BGNE"   ? 5 : 
+  ticker == "BLFS"   ? 5 : 
+  ticker == "BLDP"   ? 5 : 
+  ticker == "CRSP"   ? 5 : 
+  ticker == "GBSS"   ? 5 : 
+  ticker == "ES1!"   ? 5 : 
+  ticker == "FEVR"   ? 5 : 
+  ticker == "FFWD"   ? 5 : 
+  ticker == "JAY"    ? 5 : 
+  ticker == "JSG"    ? 5 : 
+  ticker == "LUCE"   ? 5 : 
+  ticker == "OIL_CRUDE" ? 5 : 
+  ticker == "NDX"    ? 5 : 
+  ticker == "NICK"   ? 5 : 
+  ticker == "NFLX"   ? 5 : 
+  ticker == "SAFE"   ? 5 : 
+  ticker == "SPX"    ? 5 : 
+  ticker == "SSPG"   ? 5 : 
+  ticker == "TRX"    ? 5 :
+  ticker == "TSLA"   ? 5 :
+  ticker == "TUI"    ? 5 :
+  ticker == "VRS"    ? 5 :
+  ticker == "VTC"    ? 5 :
+  ticker == "VLX"    ? 5 :
+  ticker == "VCT"    ? 5 :
+  ticker == "WEY"    ? 5 :
+  ticker == "ZM"     ? 5 : 
+  ticker == "UKX"    ? 5 : 
+  ticker == "UK100GBP" ? 5 : 
+  ticker == "XAUUSD" ? 5 : 
+  ticker == "UKX*GBPUSD" ? 5 :
+  ticker == "GBPUSD" ? 5 : daysPerWeek 
+
+howSmoothIsChoppy_adj = 
+  not allowAdamOverride ? howSmoothIsChoppy :
+  ticker == "BTCUSD" ? 80  : 
+  ticker == "BLX"    ? 80  : 
+  ticker == "BATETH" ? 0  : 
+  ticker == "ADABTC" ? 130 : 
+  ticker == "BNBBTC" ? 80  : 
+  ticker == "ETHBTC" ? 0  : 
+  ticker == "TRXBTC" ? 0  : 
+  ticker == "XMRBTC" ? 0  : 
+  ticker == "ABDP"   ? 100 : 
+  ticker == "ARWR"   ? 300 : 
+  ticker == "AAOI"   ? 0 : 
+  ticker == "AMD"    ? 100 : 
+  ticker == "ALFA"   ? 300 : 
+  ticker == "AMZN"   ? 60  : 
+  ticker == "BAND"   ? 100 : 
+  ticker == "BYND"   ? 0 : 
+  ticker == "BGNE"   ? 0 : 
+  ticker == "BLFS"   ? 200 : 
+  ticker == "BLDP"   ? 0 : 
+  ticker == "CRSP"   ? 120 : 
+  ticker == "GBSS"   ? 60  : 
+  ticker == "FEVR"   ? 100  : 
+  ticker == "FFWD"   ? 0  : 
+  ticker == "JAY"    ? 80  : 
+  ticker == "JSG"    ? 30  : 
+  ticker == "LUCE"   ? 0 : 
+  ticker == "OIL_CRUDE" ?  0 : 
+  ticker == "NDX"    ? 40  : 
+  ticker == "NICK"   ? 80  : 
+  ticker == "NFLX"   ? 60  : 
+  ticker == "SAFE"   ? 80  : 
+  ticker == "SPX"    ? 30  : 
+  ticker == "SSPG"   ? 40  : 
+  ticker == "TRX"    ? 0 :
+  ticker == "TSLA"   ? 150 :
+  ticker == "TUI"    ? 80 :
+  ticker == "VRS"    ? 0 :
+  ticker == "VTC"    ? 0 :
+  ticker == "VLX"    ? 0 :
+  ticker == "VCT"    ? 0 :
+  ticker == "WEY"    ? 0 :
+  ticker == "ZM"     ? 40  : 
+  ticker == "UKX"    ? 40  : 
+  ticker == "UK100GBP" ? 0  : 
+  ticker == "XAUUSD" ? 20  : 
+  ticker == "UKX*GBPUSD" ? 25 :
+  ticker == "GBPUSD" ? 50  :  howSmoothIsChoppy
+
+
+////////////
+//  END DATA
+/////////////
+
+
+
+//////////////
+//Function to determine if a time is 
+//within the actual trades-allowed person
+//
+testPeriod() =>
+    time >= testPeriodStart and time <= testPeriodStop ? true : false
+
+
+candlesShortTerm = 
+  period == "1"   ? shortTermDays_adj*hoursPerDay_adj*60/1   :
+  period == "3"   ? shortTermDays_adj*hoursPerDay_adj*60/3   :
+  period == "5"   ? shortTermDays_adj*hoursPerDay_adj*60/5   :
+  period == "15"  ? shortTermDays_adj*hoursPerDay_adj*60/15  :
+  period == "30"  ? shortTermDays_adj*hoursPerDay_adj*60/30  :
+  period == "45"  ? shortTermDays_adj*hoursPerDay_adj*60/45  :
+  period == "60"  ? shortTermDays_adj*hoursPerDay_adj*60/60  : 
+  period == "120" ? shortTermDays_adj*hoursPerDay_adj*60/120 :
+  period == "180" ? shortTermDays_adj*hoursPerDay_adj*60/180 :
+  period == "240" ? shortTermDays_adj*hoursPerDay_adj*60/240 :
+  period == "720" ? shortTermDays_adj*hoursPerDay_adj*60/720 :
+  period == "D"   ? shortTermDays_adj : 
+  period == "W"   ? shortTermDays_adj/daysPerWeek_adj : 
+  period == "M"   ? shortTermDays_adj/(daysPerWeek_adj*4) : 1
+  
+candlesMed1Term = 
+  period == "1"   ? med1TermDays_adj*hoursPerDay_adj*60/1   : 
+  period == "3"   ? med1TermDays_adj*hoursPerDay_adj*60/3   :
+  period == "5"   ? med1TermDays_adj*hoursPerDay_adj*60/5   :
+  period == "15"  ? med1TermDays_adj*hoursPerDay_adj*60/15  : 
+  period == "30"  ? med1TermDays_adj*hoursPerDay_adj*60/30  : 
+  period == "45"  ? med1TermDays_adj*hoursPerDay_adj*60/45  : 
+  period == "60"  ? med1TermDays_adj*hoursPerDay_adj*60/60  : 
+  period == "120" ? med1TermDays_adj*hoursPerDay_adj*60/120 : 
+  period == "180" ? med1TermDays_adj*hoursPerDay_adj*60/180 : 
+  period == "240" ? med1TermDays_adj*hoursPerDay_adj*60/240 : 
+  period == "720" ? med1TermDays_adj*hoursPerDay_adj*60/720 : 
+  period == "D"   ? med1TermDays_adj : 
+  period == "W"   ? med1TermDays_adj/daysPerWeek_adj : 
+  period == "M"   ? med1TermDays_adj/(daysPerWeek_adj*4) : 1
+  
+candlesMed2Term = 
+  period == "1"   ? med2TermDays_adj*hoursPerDay_adj*60/1   : 
+  period == "3"   ? med2TermDays_adj*hoursPerDay_adj*60/3   :
+  period == "5"   ? med2TermDays_adj*hoursPerDay_adj*60/5   :
+  period == "15"  ? med2TermDays_adj*hoursPerDay_adj*60/15  : 
+  period == "30"  ? med2TermDays_adj*hoursPerDay_adj*60/30  : 
+  period == "45"  ? med2TermDays_adj*hoursPerDay_adj*60/45  : 
+  period == "60"  ? med2TermDays_adj*hoursPerDay_adj*60/60  : 
+  period == "120" ? med2TermDays_adj*hoursPerDay_adj*60/120 : 
+  period == "180" ? med2TermDays_adj*hoursPerDay_adj*60/180 : 
+  period == "240" ? med2TermDays_adj*hoursPerDay_adj*60/240 : 
+  period == "720" ? med2TermDays_adj*hoursPerDay_adj*60/720 : 
+  period == "D"   ? med2TermDays_adj : 
+  period == "W"   ? med2TermDays_adj/daysPerWeek_adj : 
+  period == "M"   ? med2TermDays_adj/(daysPerWeek_adj*4) : 1
+
+candlesLongTerm = 
+  period == "1"   ? longTermDays_adj*hoursPerDay_adj*60/1   : 
+  period == "3"   ? longTermDays_adj*hoursPerDay_adj*60/3   :
+  period == "5"   ? longTermDays_adj*hoursPerDay_adj*60/5   :
+  period == "15"  ? longTermDays_adj*hoursPerDay_adj*60/15  : 
+  period == "30"  ? longTermDays_adj*hoursPerDay_adj*60/30  : 
+  period == "45"  ? longTermDays_adj*hoursPerDay_adj*60/45  : 
+  period == "60"  ? longTermDays_adj*hoursPerDay_adj*60/60  : 
+  period == "120" ? longTermDays_adj*hoursPerDay_adj*60/120 : 
+  period == "180" ? longTermDays_adj*hoursPerDay_adj*60/180 : 
+  period == "240" ? longTermDays_adj*hoursPerDay_adj*60/240 : 
+  period == "720" ? longTermDays_adj*hoursPerDay_adj*60/720 : 
+  period == "D"   ? longTermDays_adj : 
+  period == "W"   ? longTermDays_adj/daysPerWeek_adj : 
+  period == "M"   ? longTermDays_adj/(daysPerWeek_adj*4) : 1
+
+candlesvlongTerm = 
+  period == "1"   ? vlongTermDays_adj*hoursPerDay_adj*60/1   : 
+  period == "3"   ? vlongTermDays_adj*hoursPerDay_adj*60/3   :
+  period == "5"   ? vlongTermDays_adj*hoursPerDay_adj*60/5   :
+  period == "15"  ? vlongTermDays_adj*hoursPerDay_adj*60/15  : 
+  period == "30"  ? vlongTermDays_adj*hoursPerDay_adj*60/30  : 
+  period == "45"  ? vlongTermDays_adj*hoursPerDay_adj*60/45  : 
+  period == "60"  ? vlongTermDays_adj*hoursPerDay_adj*60/60  : 
+  period == "120" ? vlongTermDays_adj*hoursPerDay_adj*60/120 : 
+  period == "180" ? vlongTermDays_adj*hoursPerDay_adj*60/180 : 
+  period == "240" ? vlongTermDays_adj*hoursPerDay_adj*60/240 : 
+  period == "720" ? vlongTermDays_adj*hoursPerDay_adj*60/720 : 
+  period == "D"   ? vlongTermDays_adj : 
+  period == "W"   ? vlongTermDays_adj/daysPerWeek_adj : 
+  period == "M"   ? vlongTermDays_adj/(daysPerWeek_adj*4) : 1
+
+candlesvlong2Term = 
+  period == "1"   ? vlong2TermDays_adj*hoursPerDay_adj*60/1   : 
+  period == "3"   ? vlong2TermDays_adj*hoursPerDay_adj*60/3   :
+  period == "5"   ? vlong2TermDays_adj*hoursPerDay_adj*60/5   :
+  period == "15"  ? vlong2TermDays_adj*hoursPerDay_adj*60/15  : 
+  period == "30"  ? vlong2TermDays_adj*hoursPerDay_adj*60/30  : 
+  period == "45"  ? vlong2TermDays_adj*hoursPerDay_adj*60/45  : 
+  period == "60"  ? vlong2TermDays_adj*hoursPerDay_adj*60/60  : 
+  period == "120" ? vlong2TermDays_adj*hoursPerDay_adj*60/120 : 
+  period == "180" ? vlong2TermDays_adj*hoursPerDay_adj*60/180 : 
+  period == "240" ? vlong2TermDays_adj*hoursPerDay_adj*60/240 : 
+  period == "D"   ? vlong2TermDays_adj : 
+  period == "W"   ? vlong2TermDays_adj/daysPerWeek_adj : 
+  period == "M"   ? vlong2TermDays_adj/(daysPerWeek_adj*4) : 1
+
+
+
+//Darken the colours if we're resorting to candle-counts not scale-invariant
+colShortTerm  = (candlesShortTerm  > maxAvgLookback) ? #004400 : #00ff00
+colMed1Term   = (candlesMed1Term   > maxAvgLookback) ? #444400 : #ffff00
+colMed2Term   = (candlesMed2Term   > maxAvgLookback) ? #442200 : #ffaa00
+colLongTerm   = (candlesLongTerm   > maxAvgLookback) ? #440000 : #ff0000
+colVLongTerm  = (candlesvlongTerm  > maxAvgLookback) ? #220022 : #880088
+colVLong2Term = (candlesvlong2Term > maxAvgLookback) ? #002244 : #0088ff
+
+
+//Then actually resort to using a candle-count rather than scale-invarient if it won't fit.
+candlesShortTerm_ra  = (candlesShortTerm  > maxAvgLookback)?shortTermDays :candlesShortTerm 
+candlesMed1Term_ra   = (candlesMed1Term   > maxAvgLookback)?med1TermDays  :candlesMed1Term  
+candlesMed2Term_ra   = (candlesMed2Term   > maxAvgLookback)?med2TermDays  :candlesMed2Term  
+candlesLongTerm_ra   = (candlesLongTerm   > maxAvgLookback)?longTermDays  :candlesLongTerm  
+candlesvlongTerm_ra  = (candlesvlongTerm  > maxAvgLookback)?vlongTermDays :candlesvlongTerm 
+candlesvlong2Term_ra = (candlesvlong2Term > maxAvgLookback)?vlong2TermDays:candlesvlong2Term
+
+candlesShortTerm_rb  = (candlesShortTerm_ra  <=1)?shortTermDays :candlesShortTerm_ra 
+candlesMed1Term_rb   = (candlesMed1Term_ra   <=1)?med1TermDays  :candlesMed1Term_ra  
+candlesMed2Term_rb   = (candlesMed2Term_ra   <=1)?med2TermDays  :candlesMed2Term_ra  
+candlesLongTerm_rb   = (candlesLongTerm_ra   <=1)?longTermDays  :candlesLongTerm_ra  
+candlesvlongTerm_rb  = (candlesvlongTerm_ra  <=1)?vlongTermDays :candlesvlongTerm_ra 
+candlesvlong2Term_rb = (candlesvlong2Term_ra <=1)?vlong2TermDays:candlesvlong2Term_ra
+
+
+//Plot the averages.
+lineShortTerm  = useEma?ema(avgTrack,candlesShortTerm_rb) :sma(avgTrack,candlesShortTerm_rb)
+lineMed1Term   = useEma?ema(avgTrack,candlesMed1Term_rb)  :sma(avgTrack,candlesMed1Term_rb)
+lineMed2Term   = useEma?ema(avgTrack,candlesMed2Term_rb)  :sma(avgTrack,candlesMed2Term_rb)
+lineLongTerm   = useEma?ema(avgTrack,candlesLongTerm_rb)  :sma(avgTrack,candlesLongTerm_rb)
+linevlongTerm  = useEma?ema(avgTrack,candlesvlongTerm_rb) :sma(avgTrack,candlesvlongTerm_rb)
+linevlong2Term = useEma?ema(avgTrack,candlesvlong2Term_rb):sma(avgTrack,candlesvlong2Term_rb)
+
+plot(lineShortTerm, title="Short Term", color=colShortTerm)
+plot(lineMed1Term, title="Med1 Term", color=colMed1Term)
+plot(lineMed2Term, title="Med2 Term", color=colMed2Term)
+plot(lineLongTerm, title="Long Term", color=colLongTerm)
+plot(linevlongTerm, title="vLong Term", color=colVLongTerm)
+plot(linevlong2Term, title="vLong2 Term", color=colVLong2Term)
+
+
+////////////////////
+// The SEQUENTIAL count
+// Just a very simple one
+//
+seq_diff = close - close[seqLookback]
+Seq_Gn_t = (seq_diff> 0)?nz(Seq_Gn[1])+1:0
+Seq_Rd_t = (seq_diff<=0)?nz(Seq_Rd[1])+1:0
+Seq_Gn = Seq_Gn_t>9?1:Seq_Gn_t
+Seq_Rd = Seq_Rd_t>9?1:Seq_Rd_t
+
+
+//Then draw numbers...
+plotshape(seq?(Seq_Gn==1?true:na):na,style=shape.triangledown,text="1",color=green,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Gn==2?true:na):na,style=shape.triangledown,text="2",color=green,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Gn==3?true:na):na,style=shape.triangledown,text="3",color=green,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Gn==4?true:na):na,style=shape.triangledown,text="4",color=green,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Gn==5?true:na):na,style=shape.triangledown,text="5",color=green,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Gn==6?true:na):na,style=shape.triangledown,text="6",color=green,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Gn==7?true:na):na,style=shape.triangledown,text="7",color=green,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Gn==8?true:na):na,style=shape.triangledown,text="8",color=green,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Gn==9?true:na):na,style=shape.triangledown,text="9",color=green,location=location.abovebar,transp=transp9)
+
+plotshape(seq?(Seq_Rd==1?true:na):na,style=shape.triangleup,text="1",color=red,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Rd==2?true:na):na,style=shape.triangleup,text="2",color=red,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Rd==3?true:na):na,style=shape.triangleup,text="3",color=red,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Rd==4?true:na):na,style=shape.triangleup,text="4",color=red,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Rd==5?true:na):na,style=shape.triangleup,text="5",color=red,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Rd==6?true:na):na,style=shape.triangleup,text="6",color=red,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Rd==7?true:na):na,style=shape.triangleup,text="7",color=red,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Rd==8?true:na):na,style=shape.triangleup,text="8",color=red,location=location.abovebar,transp=transp)
+plotshape(seq?(Seq_Rd==9?true:na):na,style=shape.triangleup,text="9",color=red,location=location.abovebar,transp=transp9)
+
+
+
+
+//Strategy stuff
+flip = 
+  (lineShortTerm >= lineLongTerm)
+
+isFullBull = 
+  (avgTrack > lineShortTerm) and 
+  (lineShortTerm > lineMed1Term) and 
+  (lineMed1Term > lineMed2Term) and 
+  (lineMed2Term > lineLongTerm)
+
+isFullBear = 
+  (avgTrack < lineShortTerm) and 
+  (lineShortTerm < lineMed1Term) and 
+  (lineMed1Term < lineMed2Term) and 
+  (lineMed2Term < lineLongTerm)
+
+isAvgBull = 
+ (lineMed1Term  > lineMed1Term[1] ) and 
+ (lineMed2Term  > lineMed2Term[1] ) and 
+ (lineLongTerm  > lineLongTerm[1] ) and 
+ (lineShortTerm > lineMed1Term) and 
+ (lineMed1Term  > lineMed2Term) and
+ (lineMed2Term  > lineLongTerm)
+
+isAvgBear = 
+ (lineMed1Term  < lineMed1Term[1] ) and 
+ (lineMed2Term  < lineMed2Term[1] ) and 
+ (lineLongTerm  < lineLongTerm[1] ) and 
+ (lineShortTerm < lineMed1Term) and
+ (lineMed1Term  < lineMed2Term) and
+ (lineMed2Term  < lineLongTerm)
+
+//A sort of general bullishness scorde
+bullishness = 
+  isFullBull ? 100 : 
+  isFullBear ? -100:
+  ((longTrack<lineShortTerm)and(longTrack[1]>lineShortTerm[1])) ? bullishness[1]-25 :
+  ((longTrack<lineMed1Term) and(longTrack[1]>lineMed1Term[1]) ) ? bullishness[1]-25 :
+  ((longTrack<lineMed2Term) and(longTrack[1]>lineMed2Term[1]) ) ? bullishness[1]-25 :
+  ((longTrack<lineLongTerm) and(longTrack[1]>lineLongTerm[1]) ) ? bullishness[1]-25 :
+  ((shortTrack>lineShortTerm)and(shortTrack[1]<lineShortTerm[1])) ? bullishness[1]+25 :
+  ((shortTrack>lineMed1Term) and(shortTrack[1]<lineMed1Term[1]) ) ? bullishness[1]+25 :
+  ((shortTrack>lineMed2Term) and(shortTrack[1]<lineMed2Term[1]) ) ? bullishness[1]+25 :
+  ((shortTrack>lineLongTerm) and(shortTrack[1]<lineLongTerm[1]) ) ? bullishness[1]+25 :
+  ((lineShortTerm<lineMed1Term) and (lineShortTerm[1]>lineMed1Term[1]) ) ? bullishness[1]-25 :
+  ((lineMed1Term <lineMed2Term) and (lineMed1Term[1] >lineMed2Term[1]) ) ? bullishness[1]-25 :
+  ((lineMed2Term <lineLongTerm) and (lineMed2Term[1] >lineLongTerm[1]) ) ? bullishness[1]-25 :
+  ((lineShortTerm>lineMed1Term) and (lineShortTerm[1]<lineMed1Term[1]) ) ? bullishness[1]+25 :
+  ((lineMed1Term >lineMed2Term) and (lineMed1Term[1] <lineMed2Term[1]) ) ? bullishness[1]+25 :
+  ((lineMed2Term >lineLongTerm) and (lineMed2Term[1] <lineLongTerm[1]) ) ? bullishness[1]+25 :
+  bullishness[1]
+abullishness = abs(bullishness)
+
+//Trend vs choppyness
+smoothness = 1000 * ( abs(lineShortTerm - lineMed1Term) + abs(lineMed1Term  - lineMed2Term) + abs(lineMed2Term  - lineLongTerm) ) / ohlc4
+choppy = false and (smoothness < howSmoothIsChoppy_adj) 
+
+
+long  = 
+ choppy ? false :
+ isAvgBull ? true :
+ (longTrack < lineMed2Term) ? false :
+ long[1]
+
+short = 
+ choppy ? false :
+ isAvgBear ? true :
+ (shortTrack > lineMed2Term) ? false :
+ short[1]
+
+if(doStrategy and testPeriod() and not long and not short)
+    strategy.close("bull")
+    strategy.close("bear")
+if(doStrategy and testPeriod() and long and not long[1])
+    strategy.entry("bull", strategy.long)
+if(doStrategy and testPeriod() and short and not short[1])
+    strategy.entry("bear", strategy.short)
+
+//Close at end?
+if((closeAtEnd) and (time+3*1000*60*60*24 >= timenow))
+    strategy.close("bull")
+    strategy.close("bear")
+
+bgcol = not background ? color(black,100) :
+ choppy ? color(blue,95) :
+ short ? color(red,95) :
+ long  ? color(green,95) :
+ color(black,100)
+
+bgcolor(bgcol, 95, 0, false, "preBackground")
+
+plot((bullishnessLine==-100)?(na):(bullishnessLine+100),title="BullishnessPlotCenter",color=#ffffff)

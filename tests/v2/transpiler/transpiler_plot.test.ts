@@ -12,9 +12,9 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler/v2";
-import { compile, Context } from "../../../runtime/v2";
-import type { LinePlot, OHLCPlot, MarkerPlot, ColorDirective, PlotData, FillData } from "../../../runtime/v2/context";
+import { transpile } from "../../../transpiler";
+import { compile, Context } from "../../../runtime/v1";
+import type { LinePlot, OHLCPlot, MarkerPlot, ColorDirective, PlotData, FillData } from "../../../runtime/v1/context";
 
 interface Bar { o: number; h: number; l: number; c: number; }
 

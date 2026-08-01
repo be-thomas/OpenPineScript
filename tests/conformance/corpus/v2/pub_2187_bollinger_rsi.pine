@@ -1,0 +1,32 @@
+//@version=2
+strategy("Bollinger + RSI, Double Strategy (by ChartArt) v1.1", shorttitle="CA_-_RSI_Bol_Strat_1.1", overlay=true)
+
+// RSI
+RSIlength = input(6,title="RSI Period Length") 
+RSIoverSold = 50
+RSIoverBought = 50
+price = close
+vrsi = rsi(price, RSIlength)
+
+// Bollinger Bands
+BBlength = input(200, minval=1,title="Bollinger Period Length")
+BBmult = 2
+BBbasis = sma(price, BBlength)
+BBdev = BBmult * stdev(price, BBlength)
+BBupper = BBbasis + BBdev
+BBlower = BBbasis - BBdev
+source = close
+buyEntry = crossover(source, BBlower)
+sellEntry = crossunder(source, BBupper)
+
+// RSI + Bollinger Bands Strategy
+if (not na(vrsi))
+    if (crossover(vrsi, RSIoverSold) and crossover(source, BBlower))
+        strategy.entry("RSI_BB_L", strategy.long, stop=BBlower)
+    else
+        strategy.cancel(id="RSI_BB_L")
+        
+    if (crossunder(vrsi, RSIoverBought) and crossunder(source, BBupper))
+        strategy.entry("RSI_BB_S", strategy.short, stop=BBupper)
+    else
+        strategy.cancel(id="RSI_BB_S")

@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler/v2";
-import { compile, Context } from "../../../runtime/v2";
+import { transpile } from "../../../transpiler";
+import { compile, Context } from "../../../runtime/v1";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";
 
 describe("Two-Pass Input Architecture", () => {
@@ -15,7 +15,7 @@ describe("Two-Pass Input Architecture", () => {
         const js = transpile(pine).replace(/\blet\b/g, "var ");
 
         // DIAGNOSTIC 1: Did the transpiler actually output the input calls?
-        if (!js.includes('opsv2_input')) {
+        if (!js.includes('"input@')) {
             throw new Error(`[DIAGNOSTIC] Transpiler failed to generate input calls!\nJS Output:\n${js}`);
         }
 

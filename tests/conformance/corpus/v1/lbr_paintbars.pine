@@ -1,0 +1,14 @@
+/////////////////////////////////
+// LBR PAINTBARS
+///////////////////////////////////
+study("LBR PaintBars [LazyBear]", overlay=true, shorttitle="LBRBARS_LB") lbperiod = input (16, title="HL Length")
+atrperiod = input(9, title="ATR Length")
+mult = input (2.5, minval=0, title="ATR Multiplier") bcf = input(true, title="Color LBR Bars?") mnlb=input(false, title="Color non LBR Bars?" ) svb=input(false, title="Show Volatility Bands?") aatr = mult * sma(atr(atrperiod), atrperiod)
+b1 = lowest(low, lbperiod) + aatr
+b2 = highest(high, lbperiod) - aatr
+uvf = (close > b1 and close > b2)
+lvf = (close < b1 and close < b2 )
+uv = plot(svb?b2:na, style=line, linewidth=3, color=red, title="UpperBand")
+lv = plot(svb?b1:na, style=line, linewidth=3, color=green, title="LowBand")
+bc = (bcf ? uvf ? lime : lvf ? maroon : mnlb?blue:na : (not (uvf or lvf) and mnlb ? blue : na ) )
+barcolor(bc)

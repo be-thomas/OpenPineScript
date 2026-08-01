@@ -6,7 +6,7 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { Session, runScript } from "../../../runtime/v2";
+import { Session, runScript } from "../../../runtime/v1";
 
 const candles = (closes: number[]) =>
     closes.map((c, i) => ({ time: i, open: c, high: c + 1, low: c - 1, close: c, volume: 1 }));
@@ -24,11 +24,13 @@ describe("Session.compile — metadata, inputs, errors", () => {
     });
 
     it("normalizes a v2 restriction into a structured error with line/col", () => {
-        const c = new Session().compile("x = 1\nx := 2\n");
+        // The annotation matters: ':=' is a v2 token, so an unannotated script is
+        // v1 and fails in the PARSE phase instead of reaching the v2 guard.
+        const c = new Session().compile("//@version=2\ny = 1\nx := 2\n");
         assert.strictEqual(c.errors.length, 1);
         assert.strictEqual(c.errors[0].phase, "transpile");
-        assert.strictEqual(c.errors[0].line, 2);
-        assert.match(c.errors[0].message, /reassignment/);
+        assert.strictEqual(c.errors[0].line, 3);
+        assert.match(c.errors[0].message, /not declared/);
     });
 
     it("returns a structured error for malformed source instead of throwing", () => {
@@ -90,7 +92,8 @@ describe("runScript one-shot", () => {
     });
 
     it("resolves security() from supplied HTF data", () => {
-        const r = runScript('h = security("AAPL", "D", close)\nplot(h)\n', {
+        // v3 default is lookahead_off: only HTF bars that have already closed.
+        const r = runScript('//@version=3\nh = security("AAPL", "D", close)\nplot(h)\n', {
             candles: [{ time: 150, open: 5, high: 5, low: 5, close: 5, volume: 1 }],
             securities: [{ symbol: "AAPL", resolution: "D", candles: [
                 { time: 0, open: 100, high: 100, low: 100, close: 100, volume: 1 },

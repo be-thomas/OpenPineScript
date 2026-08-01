@@ -1,0 +1,44 @@
+// Black background highly recommended, lighten up to charcoal grey for the true monokai experience.
+
+// Complex Description:  THIS CODE IS FOR DISCUSSION PURPOSES ONLY.  THOSE IN POSSESSION ARE TO REFER BACK TO NEEDMONEY90 OR BEAUTYBUBBLE.  THE STACKING EMA SEQUENCE KNOWN AS RUBY HAS BEEN DOCUMENTED AND BACKTESTED ON MT GOX AND USED ON ALL EXCHANGES, INSTRUMENTS AND TRADING INSTRUCTIONALS FOR EMA SEQUENCE.  IT IS ENCOURAGED TO USE ALL INDICATORS WITH YOUR KNOWLEDGE, KNOW HOW AND WISDOM.  
+// ====================
+// Homepage: http://github.com/RubyCharts/rubypine
+
+study(title="RUBY Indicator", shorttitle="RUBY Indicator", overlay=true, scale = scale.right)
+
+// Function Definitions //
+ema_1h(length) => security(tickerid, "60", ema(close, length))
+
+// Color Definitions //
+ema8_color1  = #FD971F
+ema8_color2  = #FD971F
+ema12_color  = #FCE7BD
+ema32_color  = #FCE7BD
+ema41_color  = #FD971F
+ema51_color  = #F92672
+ema96_color  = #00FFCC
+ema243_color = #AE81FF
+
+// EMA Definitions //
+ema8   = ema_1h(8)
+ema12  = ema_1h(12)
+ema32  = ema_1h(32)
+ema41  = ema_1h(41)
+ema51  = ema_1h(51)
+ema96  = ema_1h(96)
+ema243 = ema_1h(243)
+ 
+// Plot Definitions //
+plot(ema8, style = circles, linewidth = 2, color = ema8_color1)
+ema8_plot = plot(ema8, style = line, linewidth = 1, color = ema8_color2)
+plot(ema12, style = line, linewidth = 2, color = ema12_color)
+plot(ema32, style = areabr, linewidth = 1, color = ema32_color, transp = 90)
+ema41_above_ema8_plot = plot(ema41 >= ema8 ? ema41 : na, style = cross, linewidth = 1, color = ema41_color)
+ema41_below_ema8_plot = plot(ema41 < ema8 ? ema41 : na, style = cross, linewidth = 1, color = ema41_color)
+plot(ema51, style = line, linewidth = 2, color = ema51_color)
+plot(ema96, style = line, linewidth = 3, color = ema96_color)
+plot(ema243, style = circles, linewidth = 2, color = ema243_color)
+
+// Color Fills //
+fill(ema8_plot, ema41_below_ema8_plot, #4ED037, transp = 70)
+fill(ema8_plot, ema41_above_ema8_plot, #AE81FF, transp = 70)

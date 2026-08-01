@@ -5,22 +5,30 @@
  * EVERY version, including the versions where it is illegal. See
  * dev-docs/03-tdd-workflow.md.
  */
-import { compileScript, transpile } from "../../transpiler/v2";
+import {
+  compileScript,
+  transpile,
+  IMPLEMENTED_VERSIONS as ROUTER_IMPLEMENTED,
+} from "../../transpiler";
 import type { PineVersion } from "../../transpiler/version";
-import { LANGUAGE_PROFILES } from "../../transpiler/profiles";
 
 export type { PineVersion };
 
 export const ALL_VERSIONS: PineVersion[] = [1, 2, 3, 4, 5];
 
-/** Versions the engine currently implements. */
-export const IMPLEMENTED_VERSIONS: PineVersion[] = ALL_VERSIONS.filter(
-  v => LANGUAGE_PROFILES[v].implemented,
-);
+/**
+ * Versions the engine currently implements.
+ *
+ * Sourced from the ROUTER, not from a data table. A version is implemented
+ * exactly when a parser and a visitor exist for it, which is a fact about the
+ * module graph — a `implemented: true` field could disagree with reality and
+ * nothing would notice.
+ */
+export const IMPLEMENTED_VERSIONS: PineVersion[] = [...ROUTER_IMPLEMENTED];
 
 /** Versions that exist in Pine but that this engine refuses to run. */
 export const UNIMPLEMENTED_VERSIONS: PineVersion[] = ALL_VERSIONS.filter(
-  v => !LANGUAGE_PROFILES[v].implemented,
+  v => !IMPLEMENTED_VERSIONS.includes(v),
 );
 
 /**

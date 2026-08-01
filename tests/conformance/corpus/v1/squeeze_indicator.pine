@@ -1,0 +1,26 @@
+///////////////////////////////////////////
+//          SQUEEZE INDICATOR
+///////////////////////////////////////////
+study(shorttitle = "UCS_SQUEEZE_Timing_V3", title="Squeeze Momentum Timing and Direction - Version 3", overlay=false)
+length = input(20, title="Squeeze Length")
+multBB = input(2,title="BB MultFactor")
+multKC = input(1.5, title="KC MultFactor")
+smooth = input(20, title = "Momentum Smoothing")
+usebbr = input(true, title = "Use Bollinger Band Ratio", type = bool) useHAC = input(true, title = "Use Heikin Ashi Candle", type=bool) useTrueRange = input(true, title="Use TrueRange (KC)", type=bool)
+// Calculate BB
+source = useHAC ? ohlc4 : close
+basis = sma(source, length)
+dev = multBB * stdev(source, length) upperBB = basis + dev
+lowerBB = basis - dev
+// Calculate KC
+ma = sma(source, length)
+range = useTrueRange ? tr : (high - low) rangema = sma(range, length)
+upperKC = ma + rangema * multKC lowerKC = ma - rangema * multKC
+sqzOn = (lowerBB > lowerKC) and (upperBB < upperKC) sqzOff = (lowerBB < lowerKC) and (upperBB > upperKC)
+noSqz = (sqzOn == false) and (sqzOff == false)
+momentum = usebbr ? (((source - lowerBB)/(upperBB - lowerBB))-0.5) : (((close - close[12])/close[12])*100)
+val = sma(momentum,smooth)
+bcolor = iff( val > 0,
+iff( val > nz(val[1]), green, blue), iff( val < nz(val[1]), red, orange))
+scolor = noSqz ? blue : sqzOn ? red : green
+plot(val, color=bcolor, style=histogram, linewidth=3) plot(0, color=scolor, style=circles, linewidth=3)

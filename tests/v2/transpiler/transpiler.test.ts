@@ -7,9 +7,9 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as vm from "node:vm";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";
-import { transpile } from "../../../transpiler/v2";
-import { compile, Context } from "../../../runtime/v2";
-import { getGeneratedRegistry } from "../../../runtime/v2/stdlib/metadata";
+import { transpile } from "../../../transpiler";
+import { compile, Context } from "../../../runtime/v1";
+import { getGeneratedRegistry } from "../../../runtime/v1/stdlib/metadata";
 
 const REGISTRY = getGeneratedRegistry();
 
@@ -105,11 +105,18 @@ describe("transpiler v2", () => {
     });
     
     it("successfully destructures a built-in function (e.g. macd)", () => {
-       // Now that runInSandbox has opsv2_close, this will pass!
-       const sandbox = runInSandbox("[m, s, h] = macd(close, 12, 26, 9)\n", {
-           [OPSV2 + "macd"]: () => [1, 2, 3]
-       });
-       assert.strictEqual(v(sandbox[OPSV2 + "m"]), 1);
+       // Built-in callees resolve through the registry, so a sandbox stub would
+       // be bypassed — this exercises the real macd instead.
+       const js = transpile("[m, s, h] = macd(close, 12, 26, 9)\n");
+       assert.match(js, /ctx\.new_vars\(\["opsv2_m", "opsv2_s", "opsv2_h"\]/);
+       assert.match(js, /ctx\.builtin\("macd"\)/);
+
+       const sandbox = runInSandbox("[m, s, h] = macd(close, 12, 26, 9)\n");
+       // All three names must be bound as Series, even though macd needs more
+       // history than one bar before it yields finite values.
+       for (const name of ["m", "s", "h"]) {
+           assert.ok(sandbox[OPSV2 + name] !== undefined, `${name} was not bound`);
+       }
     });
   });
 

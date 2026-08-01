@@ -15,8 +15,8 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { Context } from "../../../runtime/v2/context";
-import * as ta from "../../../runtime/v2/stdlib/ta";
+import { Context } from "../../../runtime/v1/context";
+import * as ta from "../../../runtime/v1/stdlib/ta";
 import { NaiveTA } from "./naive_ta";
 
 const EPSILON = 1e-6;

@@ -9,10 +9,10 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler/v2";
-import { compile, Context } from "../../../runtime/v2";
+import { transpile } from "../../../transpiler";
+import { compile, Context } from "../../../runtime/v1";
 import { parse } from "../../../parser/v2";
-import { ToJsVisitor } from "../../../transpiler/v2/ToJsVisitor";
+import { V2ToJsVisitor } from "../../../transpiler/v2/ToJsVisitor";
 
 /** Transpile + execute one bar, returning the resulting ctx.scriptMeta. */
 function metaOf(src: string) {
@@ -97,7 +97,7 @@ describe("study() forbids strategy.* (indicator mode)", () => {
 // ─── v3 extensibility ─────────────────────────────────────────────────────────
 
 describe("strategy-context guard is overridable for a future v3 visitor", () => {
-    class V3Visitor extends ToJsVisitor {
+    class V3Visitor extends V2ToJsVisitor {
         protected override enforceStrategyContext(): void { /* v3 allows strategy.* anywhere */ }
     }
     const transpileV3 = (src: string): string => {

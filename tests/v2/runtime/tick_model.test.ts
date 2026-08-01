@@ -8,8 +8,8 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler/v2";
-import { compile, Context } from "../../../runtime/v2";
+import { transpile } from "../../../transpiler";
+import { compile, Context } from "../../../runtime/v1";
 
 function build(pine: string) {
     const js = transpile(pine).replace(/\blet\b/g, "var ");
