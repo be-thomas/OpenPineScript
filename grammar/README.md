@@ -1,13 +1,33 @@
-# PineScript ANTLR 4 Grammar
+# Pine Script ANTLR 4 Grammars
 
-This directory contains the ANTLR 4 grammar for PineScript v2. The parser is generated from these sources and used by the runtime.
+One grammar pair per Pine Script version, arranged as an inheritance chain:
+**v1 is the base, and each later version imports the one before it and declares
+only its own delta.** See [dev-docs/00-architecture-assessment.md](../dev-docs/00-architecture-assessment.md) §5.
 
 ## Layout
 
-- **v2/PineScriptLexer.g4** – Lexer rules (keywords, operators, literals, `LBEG`/`LEND`, etc.).
-- **v2/PineScriptParser.g4** – Parser rules (statements, expressions, precedence). Uses `tokenVocab = PineScriptLexer`.
+| File | Role |
+|---|---|
+| `PineV1Lexer.g4` / `PineV1Parser.g4` | **The base.** Pine Script v1 and nothing else. |
+| `PineV2Lexer.g4` / `PineV2Parser.g4` | `import PineV1*`. Adds `ASSIGN : ':='` and the `var_assign` rule. |
+| `PineV3Lexer.g4` / `PineV3Parser.g4` | `import PineV2*`. No new syntax — v3's changes are semantic. |
 
-Grammars live under `grammar/v2/`.
+Two rules govern edits:
+
+1. **Only add to a version's file what that version introduced.** v1 has no
+   `':='` token, so `x := 1` is a *syntax error* at v1 — which is what
+   TradingView reports. Adding it to the base and rejecting it later would
+   misrepresent v1.
+2. **Rules declared in an importing grammar are matched BEFORE inherited ones.**
+   That is what lets `PineV2Lexer` declare `':='` and have it beat the inherited
+   `':'`, with no edit to v1.
+
+### Why one flat directory
+
+ANTLR resolves an `import` against `--lib` and the importing grammar's own
+directory only — never transitively. A `grammar/v3/` importing `PineV2Lexer`
+from `grammar/v2/` fails to resolve `PineV1Lexer` in turn. The layering is
+carried by the `import` statements, not by folders.
 
 ## Generate the parser
 
@@ -17,7 +37,8 @@ From the project root:
 npm run generate:parser
 ```
 
-Output is written to `parser/v2/generated/` (Lexer, Parser, Visitor). You need **Node.js 20+** and the `antlr-ng` CLI (installed via `npm install`).
+Output is written to `parser/v1/generated/`, `parser/v2/generated/` and
+`parser/v3/generated/` (Lexer, Parser, Visitor per version). You need **Node.js 20+** and the `antlr-ng` CLI (installed via `npm install`).
 
 ## Run a quick parse
 
