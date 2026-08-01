@@ -56,9 +56,19 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         sandbox[`${PREFIX}volume`] = ctx.vars.get(`${PREFIX}volume`);
         sandbox[`${PREFIX}time`] = ctx.vars.get(`${PREFIX}time`);
         
-        // LEGACY v2 MAPPING: 'n' replaces 'bar_index' as the chronological series
-        sandbox[`${PREFIX}n`] = ctx.vars.get(`${PREFIX}bar_index`);
         sandbox[`${PREFIX}na`] = ctx.opsv2_na;
+
+        // The bar counter is one series with two spellings. Bind BOTH names to
+        // it, then let the profile's poison pills below remove whichever one is
+        // not spellable at this version: v1-v3 mandate 'n', v4+ renamed it to
+        // 'bar_index'.
+        //
+        // Binding only 'n' (as this did) meant inverting profile.banned for v4
+        // would poison 'n' correctly but leave 'bar_index' unbound — a
+        // ReferenceError through `with(sandbox)` rather than the series.
+        const barCounter = ctx.vars.get(`${PREFIX}bar_index`);
+        sandbox[`${PREFIX}n`] = barCounter;
+        sandbox[`${PREFIX}bar_index`] = barCounter;
 
         // POISON PILLS: identifiers that exist in the engine but are not spellable
         // at this language version — v1–v3 mandate 'n' and ban 'bar_index'; v4+
