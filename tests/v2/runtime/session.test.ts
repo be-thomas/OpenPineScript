@@ -119,3 +119,24 @@ describe("live tick/commit via Session (P3)", () => {
         assert.strictEqual(d.series[0].value, 33);             // committed 30 + 3
     });
 });
+
+describe("Session version state", () => {
+    it("reports the compiled script's version", () => {
+        const s = new Session();
+        s.compile("//@version=2\nplot(close)\n");
+        assert.strictEqual(s.pineVersion, 2);
+    });
+
+    it("does not report a stale version after a failed compile", () => {
+        // Previously profile/pineVersion were written only on success, so a
+        // failed compile left the PREVIOUS script's version visible.
+        const s = new Session();
+        s.compile("//@version=2\nplot(close)\n");
+        assert.strictEqual(s.pineVersion, 2);
+
+        const result = s.compile("//@version=5\nplot(close)\n");
+        assert.ok(result.errors.length > 0);
+        assert.notStrictEqual(s.pineVersion, 2);
+        assert.strictEqual(s.pineVersion, 1);
+    });
+});

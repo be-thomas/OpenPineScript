@@ -177,7 +177,13 @@ export class Session {
 
     /** Transpile + validate; a 1-bar dry run on a throwaway context discovers inputs + metadata. */
     compile(source: string): Compiled {
+        // Reset ALL per-script state up front, version included. Writing
+        // profile/pineVersion only inside the try left a failed compile
+        // reporting the PREVIOUS script's version through the public field.
         this.js = null; this.ctx = null; this.exec = null;
+        this.profile = DEFAULT_PROFILE;
+        this.pineVersion = DEFAULT_PROFILE.version;
+
         let js: string;
         try {
             const compiled = compileScript(source);
