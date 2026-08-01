@@ -8,13 +8,17 @@ Requires Node.js 20+.
 
 ## Status
 
-**Pine Script v2 is implemented and passing 228 tests.** That covers the full v2
-language, roughly 130 standard-library functions, the strategy broker emulator,
-multi-timeframe `security()`, and the real-time tick model.
+**Pine Script v1 and v2 are implemented and passing 393 tests.** That covers the
+full v2 language, roughly 130 standard-library functions, the strategy broker
+emulator, multi-timeframe `security()`, and the real-time tick model.
+
+The `//@version` annotation selects the language version; a script without one
+is v1. A script declaring a version that is not implemented is refused rather
+than run under the wrong rules.
 
 | Version | State |
 |---------|-------|
-| v1 | Planned — v1 is semantically identical to v2, so this is mostly version routing |
+| **v1** | **Implemented** — TradingView states v1 and v2 are the same language, and the test suite asserts that over the whole corpus |
 | **v2** | **Implemented** |
 | v3 | Planned — a five-item delta from v2 |
 | v4 | Planned — `var`, `while`, `switch`, arrays, drawings, namespace migration |
@@ -44,11 +48,12 @@ npm run opsv2 -- <script.pine> --data <data.csv> [flags]
 ```
 
 ```bash
-npm run opsv2 -- sma_crossover.pine --data mock_data/AAPL_mock.csv
+npm run opsv2 -- tests/helpers/fixtures/sma_crossover.pine --data mock_data/AAPL_mock.csv
 ```
 
 ```
 Compiling: sma_crossover.pine...
+Pine Script: v1
 Running backtest: 506 bars...
 ✔ Done.
 
@@ -68,7 +73,7 @@ npm run replv2
 ### Inspect the generated JavaScript
 
 ```bash
-npm run opsv2 -- sma_crossover.pine --data mock_data/AAPL_mock.csv --show-transpiled
+npm run opsv2 -- tests/helpers/fixtures/sma_crossover.pine --data mock_data/AAPL_mock.csv --show-transpiled
 ```
 
 ```js
@@ -127,11 +132,18 @@ Every flag — `--out-chart`, `--out-trades`, `--compare-chart`, `--tolerance`,
 npm test
 ```
 
-228 tests across 77 suites. The suite covers lexer token streams, parser trees,
-transpiler output, and runtime behaviour. Technical-analysis functions are
-checked differentially: `tests/v2/ta/naive_ta.ts` is an independent naive
-reimplementation of the TA library, and the engine is asserted to match it
-bar-for-bar rather than against hand-picked expected values.
+393 tests across 23 files. The suite covers lexer token streams, parser trees,
+transpiler output, and runtime behaviour.
+
+Two patterns carry most of the weight:
+
+- **Differential testing.** `tests/v2/ta/naive_ta.ts` is an independent naive
+  reimplementation of the TA library. The engine is asserted to match it
+  bar-for-bar over 5000 seeded bars under four different lookback regimes,
+  rather than against hand-picked expected values.
+- **The version matrix.** `tests/conformance/` asserts every language rule at
+  every version, including the versions where it is illegal — so adding a
+  version cannot silently relax an older one.
 
 ## Repository layout
 
