@@ -2,7 +2,10 @@
   "name": "open-pinescript",
   "version": "0.0.1",
   "scripts": {
-    "generate:parser": "antlr-ng -Dlanguage=TypeScript -o parser/v2/generated -l false -v true grammar/v2/PineScriptLexer.g4 grammar/v2/PineScriptParser.g4 && node scripts/patch-visitor.js",
+    "generate:parser": "npm run generate:parser:v1 && npm run generate:parser:v2 && npm run generate:parser:v3 && node scripts/patch-visitor.js",
+    "generate:parser:v1": "antlr-ng -Dlanguage=TypeScript -o parser/v1/generated -l false -v true --lib grammar grammar/PineV1Lexer.g4 grammar/PineV1Parser.g4",
+    "generate:parser:v2": "antlr-ng -Dlanguage=TypeScript -o parser/v2/generated -l false -v true --lib grammar grammar/PineV2Lexer.g4 grammar/PineV2Parser.g4",
+    "generate:parser:v3": "antlr-ng -Dlanguage=TypeScript -o parser/v3/generated -l false -v true --lib grammar grammar/PineV3Lexer.g4 grammar/PineV3Parser.g4",
     "postinstall": "npm run generate:parser",
     "prebuild": "ts-node scripts/generate-metadata.ts",
     "build": "npm run generate:parser",

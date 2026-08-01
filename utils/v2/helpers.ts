@@ -5,7 +5,7 @@ import {
   LiteralContext,
   Num_literalContext,
   Other_literalContext
-} from "../../parser/v2/generated/PineScriptParser";
+} from "../../parser/v2/generated/PineV2Parser";
 
 // --- ID Generation ---
 

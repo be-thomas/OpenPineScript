@@ -7,13 +7,13 @@ import * as repl from "node:repl";
 import * as vm from "node:vm";
 import * as util from "node:util"; 
 import { CharStreams, CommonTokenStream, Lexer, Token } from "antlr4ng";
-import { PineScriptLexer } from "../../parser/v2/generated/PineScriptLexer";
-import { PineScriptTokenSource } from "../../lexer/v2/PineScriptTokenSource";
+import { PineV2Lexer } from "../../parser/v2/generated/PineV2Lexer";
+import { PineV2TokenSource } from "../../lexer/v2/PineV2TokenSource";
 import { parse } from "../../parser/v2";
-import { compileScript } from "../../transpiler/v2";
+import { compileScript } from "../../transpiler";
 import type { PineVersion } from "../../transpiler/version";
 import { DEFAULT_PROFILE } from "../../transpiler/profiles";
-import { Context, run } from "../../runtime/v2";   // Import the runtime runner
+import { Context, run } from "../../runtime/v1";   // Import the runtime runner
 
 // --- ANSI Colors ---
 const C = {
@@ -75,7 +75,7 @@ function main(): void {
 
       // --- Lexer/Parser Step ---
       const inputStream = CharStreams.fromString(source);
-      const lexer = new PineScriptTokenSource(inputStream);
+      const lexer = new PineV2TokenSource(inputStream);
       const tokenStream = new CommonTokenStream(lexer as unknown as Lexer);
       tokenStream.fill();
       const tokens = tokenStream.getTokens().filter((t) => t.type !== Token.EOF);
@@ -147,8 +147,8 @@ function main(): void {
                 }
   
                 // Check if it's a simple variable access (single ID token)
-                const meaningful = tokens.filter(t => ![PineScriptLexer.LEND, PineScriptLexer.BEGIN, PineScriptLexer.END, PineScriptLexer.WS].includes(t.type));
-                if (meaningful.length === 1 && meaningful[0].type === PineScriptLexer.ID) {
+                const meaningful = tokens.filter(t => ![PineV2Lexer.LEND, PineV2Lexer.BEGIN, PineV2Lexer.END, PineV2Lexer.WS].includes(t.type));
+                if (meaningful.length === 1 && meaningful[0].type === PineV2Lexer.ID) {
                     const name = meaningful[0].text;
                     // If resultValue is just the value, label it for clarity
                     outputResult = typeof resultValue === 'function' ? `${name}=[function]` : `${name}=${JSON.stringify(outputResult)}`;

@@ -47,7 +47,7 @@ elsewhere — a backtest that is quietly wrong is worse than one that crashes.
    other than the documented `with`-scope fallthrough above, particularly
    anything that survives a future sandbox.
 4. **Unbounded memory growth** — deep historical runs are expected to be bounded
-   by the series truncation in `runtime/v2/Series.ts`. Growth beyond that is a
+   by the series truncation in `runtime/v1/Series.ts`. Growth beyond that is a
    bug.
 
 Include the Pine source, the input data, the expected output (a TradingView
