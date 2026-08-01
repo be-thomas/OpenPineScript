@@ -1,815 +1,132 @@
 /**
- * ANTLR parse-tree visitor that emits JavaScript.
- * Target: OpenPineScript v2 Runtime (Series Object Architecture)
+ * Pine Script v2 → JavaScript emitter.
+ *
+ * v2 inherits every line of emit logic from v1 and adds exactly one thing:
+ * reassignment with ':='.
+ *
+ * The operator is a v2 GRAMMAR addition (PineV2Lexer.g4 declares the token,
+ * PineV2Parser.g4 the rule), so v1 rejects `x := 1` as a syntax error — its
+ * grammar has never heard of the token. There is no "reassignment is not
+ * allowed in v1" guard anywhere, because v1 cannot reach one.
+ *
+ * SCOPE is the part a grammar cannot express, and the documented rule is a
+ * DECLARATION rule, not a scope one:
+ *
+ *   "Pine now supports mutable variables! Use the ':=' operator to assign a new
+ *    value to a variable that has already been defined."
+ *      — TradingView release notes, Pine v2
+ *   "A variable must be declared before you can set a value for it."
+ *      — Expressions, declarations and statements (v3 manual, which documents
+ *        ':=' as requiring only //@version=2)
+ *
+ * Neither source restricts ':=' by scope, and the corpus agrees: two published
+ * //@version=2 scripts reassign at script scope —
+ *
+ *     longStopPrice = 0.0                          gap_down_reversal_strategy
+ *     longStopPrice := if (strategy.position_size > 0)
+ *
+ *     if crossunder(corVix, -.1) or ...            VIX_bonds_strategy
+ *         signal1 := -100
+ *
+ * An earlier version of this file restricted ':=' to for-loop accumulators and
+ * rejected both. That restriction was inferred, not sourced, and it was wrong:
+ * TradingView compiled and published these scripts. What is enforced now is the
+ * rule the documentation actually states — assign only to a name that was
+ * declared.
+ *
+ * v3 inherits this guard unchanged. ':=' scope was never a v1→v2→v3 delta.
+ *
+ * ⚠ See the sourcing note in grammar/PineV2Lexer.g4 on why ':=' is placed at v2
+ * rather than v1. If that turns out to be wrong, this class moves to v1 wholesale.
  */
-
-import { ParseTreeVisitor } from "antlr4ng";
-import type { TerminalNode, ParserRuleContext, ParseTree } from "antlr4ng";
-import * as common from "../../utils/v2/common";
+import type { PineVersion } from "../version";
+import { V1ToJsVisitor } from "../v1/ToJsVisitor";
+import { ScopeInfo, analyseScopes } from "../passes/ScopeAnalysis";
 import {
-  Opsv2_scriptContext,
-  StmtContext,
-  Global_stmtContext,
-  Global_stmt_contentContext,
-  Fun_def_stmtContext,
-  Fun_def_singlelineContext,
-  Fun_def_multilineContext,
-  Fun_headContext,
-  Fun_body_singlelineContext,
-  Local_stmt_singlelineContext,
-  Local_stmt_contentContext,
-  Loop_breakContext,
-  Loop_continueContext,
-  Fun_body_multilineContext,
-  Local_stmts_multilineContext,
-  Local_stmts_listContext,
-  Local_stmt_multilineContext,
-  Var_defContext,
-  Var_defsContext,
+  Pine_scriptContext,
   Var_assignContext,
-  Ids_arrayContext,
-  Arith_exprsContext,
-  Arith_exprContext,
-  If_exprContext,
-  For_exprContext,
-  Stmts_blockContext,
-  Ternary_exprContext,
-  Or_exprContext,
-  And_exprContext,
-  Eq_exprContext,
-  Cmp_exprContext,
-  Add_exprContext,
-  Mult_exprContext,
-  Unary_exprContext,
-  Sqbr_exprContext,
-  AtomContext,
-  Fun_callContext,
-  Fun_actual_argsContext,
-  Pos_argsContext,
-  Kw_argsContext,
-  Kw_argContext,
-  LiteralContext,
-  Num_literalContext,
-  Other_literalContext,
-  IdContext,
-} from "../../parser/v2/generated/PineScriptParser";
-import { getGeneratedRegistry } from "../../runtime/v2/stdlib/metadata";
-import { LanguageProfile, RestrictionId, DEFAULT_PROFILE } from "../profiles";
+  Global_stmt_contentContext,
+  Local_stmt_contentContext,
+} from "../../parser/v2/generated/PineV2Parser";
+export type { Local_stmt_contentContext };
 
-const REGISTRY = getGeneratedRegistry();
-
-/**
- * Anything carrying a source position. Structural rather than
- * `ParserRuleContext`, because the generated context classes are generic in
- * their visit result and do not assign to the base type.
- */
+/** Anything carrying a source position (see the v1 base for why it is structural). */
 interface SourceLocated {
   start?: { line: number; column: number } | null;
 }
 
-export class ToJsVisitor extends ParseTreeVisitor<string> {
-  // Prefix for all emitted identifiers to avoid sandbox name clashes
-  private readonly PREFIX = common.PREFIX;
-  private anonCounter = 0;
-  // Depth of for-loop bodies currently being visited. v1/v2 keep variables
-  // immutable globally but permit ':=' on loop accumulators (see enforceNoReassignment).
-  protected loopDepth = 0;
-  // Script kind from the study()/strategy() directive; drives strategy.* enforcement.
-  protected scriptKind: 'study' | 'strategy' | undefined = undefined;
-  // The version's behaviour table. Every restriction is gated on it.
-  protected readonly profile: LanguageProfile;
-
-  constructor(profile: LanguageProfile = DEFAULT_PROFILE) {
-    super();
-    this.profile = profile;
-  }
-
-  /** Is this restriction live at the target version? */
-  protected restricts(id: RestrictionId): boolean {
-    return this.profile.restrictions.has(id);
-  }
-
-  /** Prefix every diagnostic with the version that rejected the code. */
-  protected err(ctx: SourceLocated, message: string): Error {
-    return new Error(
-      `Pine Script v${this.profile.version} Error at ${this.getLocId(ctx)}: ${message}`
-    );
-  }
-
-  protected override defaultResult(): string {
-    return "";
-  }
-  protected override aggregateResult(aggregate: string, nextResult: string): string {
-    return aggregate + nextResult;
-  }
-  public override visitTerminal(node: TerminalNode): string {
-    return node.getText();
-  }
-
-  /** * Helper: Generates a Deterministic ID based on Source Location.
-   * Example: "@L10:C5" (Line 10, Column 5)
-   */
-  private getLocId(ctx: SourceLocated): string {
-    const line = ctx.start?.line || 0;
-    const col = ctx.start?.column || 0;
-    return `@L${line}:C${col}`;
-  }
-
-  // ───────────────────────────────────────────────────────────────────────
-  // Language restrictions
-  //
-  // Every restriction lives in its own `protected enforce*` method, is gated on
-  // `this.profile.restrictions`, and is invoked only from the relevant visit*
-  // method — the emit logic itself stays version-agnostic. Adding a version
-  // means adding a row to LANGUAGE_PROFILES, not editing the emitter.
-  //
-  // See dev-docs/01-version-delta-spec.md for the source of each rule.
-  // ───────────────────────────────────────────────────────────────────────
+export class V2ToJsVisitor extends V1ToJsVisitor {
+  protected override readonly version: PineVersion = 2;
 
   /**
-   * v1/v2: variables are immutable within a bar — reject ':=' reassignment at
-   * the global/script scope. It remains valid for accumulators inside a
-   * for-loop body, which is the only place v1/v2 mutation is supported.
-   * v3 introduced general mutability and lifts this.
+   * Whole-script facts the single-pass emitter cannot derive on its own.
+   *
+   * ':=' needs to know whether a name is bound ANYWHERE, including further down
+   * the file: v2 still permits forward references (v3 is the version that
+   * removes them), so a lexical "seen so far" set would reject valid v2 code.
+   *
+   * v1 never runs this pass — it has no ':=' to check.
    */
-  protected enforceNoReassignment(ctx: Var_assignContext): void {
-    if (!this.restricts("no_reassignment")) return;
-    if (this.loopDepth > 0) return; // loop accumulator — allowed
+  protected scopes: ScopeInfo = {
+    declared: new Map(), mutated: new Set(), booleans: new Set(),
+    functions: new Set(), bound: new Set(), functionScoped: new Set(),
+  };
+
+  override visitPine_script(ctx: Pine_scriptContext): string {
+    this.scopes = analyseScopes(ctx);
+    return super.visitPine_script(ctx as any);
+  }
+
+  /**
+   * ':=' assigns to a variable "that has already been defined". Assigning to a
+   * name that is never declared is the `Undeclared identifier` error, which is
+   * how `if x==1 / y := 2` fails on TradingView.
+   *
+   * Scope is deliberately NOT checked — see the sourcing note at the top of this
+   * file. POSITION is not checked here either: forward references are legal in
+   * v2, and v3 rejects them through `enforceNoForwardReference`, which already
+   * sees this id because `visitVar_assign` visits it.
+   */
+  protected enforceDeclaredBeforeReassignment(ctx: Var_assignContext): void {
+    const name = ctx.id().getText();
+    if (this.scopes.bound.has(name)) return;
     throw this.err(
       ctx,
-      `reassignment with ':=' is not allowed outside a for-loop (variables are ` +
-      `immutable within a bar). Bind a new variable with '=' instead.`
+      `'${name}' is not declared, so it cannot be assigned with ':='. ` +
+      `Declare it first (e.g. '${name} = 0.0').`
     );
   }
 
-  /** v1/v2: '==' / '!=' against 'na' silently misbehaves — require the na(x) function. */
-  protected enforceNaComparison(ctx: Eq_exprContext): void {
-    if (!this.restricts("na_comparison")) return;
-    if (ctx.cmp_expr().length < 2) return; // a single operand is not a comparison
-    for (const operand of ctx.cmp_expr()) {
-      if (operand.getText() === "na") {
-        throw this.err(
-          ctx,
-          `cannot compare to 'na' with '==' or '!=' (it does not behave as ` +
-          `expected). Use the na(x) function instead.`
-        );
-      }
-    }
-  }
-
-  /** All versions: user-defined functions cannot recurse — reject direct self-reference. */
-  protected enforceNoRecursion(name: string, body: ParseTree, ctx: SourceLocated): void {
-    if (!this.restricts("no_recursion")) return;
-    if (this.callsFunction(body, name)) {
-      throw this.err(ctx, `recursion is not allowed; function '${name}' refers to itself.`);
-    }
-  }
-
-  /**
-   * A study() script is in indicator mode — the broker emulator is disabled, so
-   * any strategy.* order/state call is a fatal error. Allowed under strategy()
-   * or when no directive is declared (permissive default).
-   */
-  protected enforceStrategyContext(name: string, ctx: SourceLocated): void {
-    if (!this.restricts("strategy_context")) return;
-    if (this.scriptKind === 'study') {
-      // Name the directive the user actually wrote, not the profile default —
-      // otherwise the message points at the wrong keyword the moment the two
-      // differ (v5 renames study() to indicator()).
-      throw this.err(
-        ctx,
-        `'${name}' is unavailable in a ${this.scriptKind}() script (indicator mode). ` +
-        `Declare strategy(...) to use the broker emulator.`
-      );
-    }
-  }
-
-  /** All versions up to v3: user-defined functions cannot return tuples. */
-  protected enforceNoTupleReturn(ctx: SourceLocated, detail = ""): void {
-    if (!this.restricts("no_tuple_return")) return;
-    throw this.err(ctx, `User-defined functions cannot return tuples.${detail}`);
-  }
-
-  /** Recursively scan a subtree for a call to the named function. */
-  private callsFunction(node: ParseTree, name: string): boolean {
-    if (node instanceof Fun_callContext && node.id().getText() === name) return true;
-    const count = node.getChildCount();
-    for (let i = 0; i < count; i++) {
-      const child = node.getChild(i);
-      if (child && this.callsFunction(child, name)) return true;
-    }
-    return false;
-  }
-
-  // --- Entry Point ---
-  visitOpsv2_script(ctx: Opsv2_scriptContext): string {
-    // Determine the script kind from its study()/strategy() directive up front,
-    // so strategy.* enforcement is independent of statement visit order.
-    this.scriptKind = this.detectDirective(ctx);
-    const stmts = ctx.stmt().map((s) => this.visit(s)).filter(Boolean);
-    return stmts.join("\n");
-  }
-
-  /** Find the first study()/strategy() directive call in the script, if any. */
-  private detectDirective(node: ParseTree): 'study' | 'strategy' | undefined {
-    if (node instanceof Fun_callContext) {
-      const name = node.id().getText();
-      if (name === "study" || name === "strategy") return name;
-    }
-    const count = node.getChildCount();
-    for (let i = 0; i < count; i++) {
-      const child = node.getChild(i);
-      if (child) {
-        const found = this.detectDirective(child);
-        if (found) return found;
-      }
-    }
-    return undefined;
-  }
-
-  visitStmt(ctx: StmtContext): string {
-    if (ctx.fun_def_stmt()) return this.visit(ctx.fun_def_stmt()!);
-    if (ctx.global_stmt()) return this.visit(ctx.global_stmt()!);
-    return "";
-  }
-
-  // --- Global Statements ---
-  visitGlobal_stmt(ctx: Global_stmtContext): string {
-    const parts = ctx.global_stmt_content().map((c) => this.visit(c));
-    return parts.filter(Boolean).join("\n");
-  }
-
-  visitGlobal_stmt_content(ctx: Global_stmt_contentContext): string {
-    const result = this.visitContent(ctx);
-    return result + ";"; 
-  }
-
-  private visitContent(ctx: Global_stmt_contentContext | Local_stmt_contentContext): string {
-    if (ctx.var_def()) return this.visit(ctx.var_def()!);
-    if (ctx.var_defs()) return this.visit(ctx.var_defs()!);
-    if (ctx.var_assign()) return this.visit(ctx.var_assign()!);
-    if (ctx.loop_break()) return this.visit(ctx.loop_break()!);
-    if (ctx.loop_continue()) return this.visit(ctx.loop_continue()!);
-    
-    // Check for expressions acting as statements
-    if ((ctx as any).fun_call && (ctx as any).fun_call()) return this.visit((ctx as any).fun_call()!);
-    if ((ctx as any).if_expr && (ctx as any).if_expr()) return this.visit((ctx as any).if_expr()!);
-    if ((ctx as any).for_expr && (ctx as any).for_expr()) return this.visit((ctx as any).for_expr()!);
-    if ((ctx as any).arith_expr && (ctx as any).arith_expr()) return this.visit((ctx as any).arith_expr()!);
-    // Added back as requested
-    if ((ctx as any).arith_exprs && (ctx as any).arith_exprs()) return this.visit((ctx as any).arith_exprs()!);
-    
-    return "";
-  }
-
-  // --- Functions ---
-  visitFun_def_stmt(ctx: Fun_def_stmtContext): string {
-    if (ctx.fun_def_singleline()) return this.visit(ctx.fun_def_singleline()!) + "\n";
-    if (ctx.fun_def_multiline()) return this.visit(ctx.fun_def_multiline()!) + "\n";
-    return "";
-  }
-
-  visitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
-    const name = this.visit(ctx.id());
-    const params = this.visit(ctx.fun_head());
-    this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_singleline(), ctx);
-
-    // V2 Constraint: Check if returning a tuple [x, y]
-    const content = ctx.fun_body_singleline().local_stmt_singleline().local_stmt_content(0);
-    if (content?.arith_exprs()) {
-        this.enforceNoTupleReturn(ctx);
-    }
-
-    const body = this.visit(ctx.fun_body_singleline());
-    return `function ${name}${params} {\n  return ${body};\n}`;
-  }
-
-  visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
-    const name = this.visit(ctx.id());
-    const params = this.visit(ctx.fun_head());
-    this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_multiline(), ctx);
-
-    // V2 Constraint: Check last statement of multiline block for tuple return
-    const stmts = ctx.fun_body_multiline().local_stmts_multiline().local_stmts_list().local_stmt_multiline();
-    const lastContent = stmts[stmts.length - 1]?.local_stmt_content(0);
-    if (lastContent?.arith_exprs()) {
-        this.enforceNoTupleReturn(ctx);
-    }
-
-    const body = this.visit(ctx.fun_body_multiline());
-    return `function ${name}${params} ${body}`;
-  }
-
-  visitFun_head(ctx: Fun_headContext): string {
-    if (!ctx.id()) return "()";
-    const ids = ctx.id();
-    const params = ids.map((id) => this.visit(id)).join(", ");
-    return `(${params})`;
-  }
-
-  visitFun_body_singleline(ctx: Fun_body_singlelineContext): string {
-    return this.visit(ctx.local_stmt_singleline());
-  }
-
-  visitLocal_stmt_singleline(ctx: Local_stmt_singlelineContext): string {
-    const contents = ctx.local_stmt_content().map((c) => this.visit(c));
-    return contents.join(", "); 
-  }
-
-  visitLocal_stmt_content(ctx: Local_stmt_contentContext): string {
-    return this.visitContent(ctx);
-  }
-
-  visitLoop_break(_ctx: Loop_breakContext): string {
-    return "break";
-  }
-
-  visitLoop_continue(_ctx: Loop_continueContext): string {
-    return "continue";
-  }
-
-  // --- Multiline Bodies ---
-  visitFun_body_multiline(ctx: Fun_body_multilineContext): string {
-    return this.visit(ctx.local_stmts_multiline());
-  }
-
-  visitLocal_stmts_multiline(ctx: Local_stmts_multilineContext): string {
-    return "{\n" + this.visit(ctx.local_stmts_list()) + "\n}";
-  }
-
-  visitLocal_stmts_list(ctx: Local_stmts_listContext): string {
-    const stmts = ctx.local_stmt_multiline();
-    
-    const lines = stmts.map((stmt, index) => {
-        let js = this.visit(stmt);
-        
-        // Return logic for last statement
-        if (index === stmts.length - 1) {
-             const content = stmt.local_stmt_content(0);
-             if (content) {
-                 const isExpression = 
-                    content.arith_expr() || 
-                    content.arith_exprs() || 
-                    (content as any).fun_call?.() || 
-                    (content as any).if_expr?.() ||
-                    (content as any).for_expr?.();
-
-                 if (isExpression) {
-                     return "return " + js;
-                 }
-             }
-        }
-        return js;
-    });
-    return lines.join(";\n") + ";";
-  }
-
-  visitLocal_stmt_multiline(ctx: Local_stmt_multilineContext): string {
-    const parts = ctx.local_stmt_content().map((c) => this.visit(c));
-    return parts.join(", ");
-  }
-
-  // --- Variables (Series Architecture) ---
-
-  // Handle: x = 1
-  visitVar_def(ctx: Var_defContext): string {
-    const name = this.visit(ctx.id());
-    const value = this.visit(ctx.arith_expr());
-    // Use 'let' to create a new variable in the current scope (Shadowing allowed)
-    return `let ${name} = ctx.new_var("${name}", ${value})`;
-  }
-
-  // Handle: [a, b] = myFunc()
-  visitVar_defs(ctx: Var_defsContext): string {
-    const ids = ctx.ids_array().id().map(i => this.visit(i)); 
-    
-    // V2 Constraint: Multi-variable assignment MUST originate from an authorized built-in tuple return
-    const arith = ctx.arith_expr();
-    
-    // Recursive helper to find the first fun_call in an expression tree
-    const findFunCall = (node: any): Fun_callContext | null => {
-        if (!node) return null;
-        if (node instanceof Fun_callContext) return node;
-        if (node.children) {
-            for (const child of node.children) {
-                const found = findFunCall(child);
-                if (found) return found;
-            }
-        }
-        return null;
-    };
-
-    const funCall = findFunCall(arith);
-    
-    if (funCall) {
-        const funcName = funCall.id().getText();
-        const entry = REGISTRY[funcName];
-
-        // If it's a built-in, check the registry for tuple return
-        if (entry) {
-            if (entry.returns.kind !== "tuple") {
-                throw this.err(ctx, `'${funcName}' does not return a tuple. Multi-variable assignment is only allowed for specific built-in functions.`);
-            }
-            if (entry.returns.itemTypes && entry.returns.itemTypes.length !== ids.length) {
-                throw this.err(ctx, `'${funcName}' returns ${entry.returns.itemTypes.length} values, but you provided ${ids.length} variables.`);
-            }
-        } 
-        // Not in the registry, so it is user-defined. Route through the same
-        // gated guard the function-definition path uses — enforcing the rule
-        // unconditionally here would let a version that lifts it accept the
-        // definition and then reject the call site.
-        else {
-            this.enforceNoTupleReturn(
-                ctx,
-                ` Multi-variable assignment is only allowed for specific built-in functions.`,
-            );
-        }
-    } else {
-        throw this.err(ctx, `Multi-variable assignment must originate directly from a supported built-in function call.`);
-    }
-
-    const idsArrayJs = `[${ids.join(", ")}]`; 
-    const idsStringsJs = `[${ids.map(id => `"${id}"`).join(", ")}]`;
-    const value = this.visit(ctx.arith_expr());
-
-    return `let ${idsArrayJs} = ctx.new_vars(${idsStringsJs}, ${value})`;
-  }
-
-  // Handle: x := 1
+  /** Handle: x := 1 */
   visitVar_assign(ctx: Var_assignContext): string {
-    this.enforceNoReassignment(ctx);
+    this.enforceDeclaredBeforeReassignment(ctx);
     const name = this.visit(ctx.id());
     const value = this.visit(ctx.arith_expr());
-    // No 'let'. Updates the existing variable in the parent scope.
-    // Note: ctx.new_var updates the internal Series and returns it.
+    // No 'let' — this updates the existing binding in the enclosing scope.
+    // ctx.new_var() overwrites the current bar's slot and returns the Series, so
+    // repeated assignment within one bar still yields exactly one history entry.
     return `${name} = ctx.new_var("${name}", ${value})`;
   }
 
-  visitIds_array(ctx: Ids_arrayContext): string {
-    const ids = ctx.id().map((i) => this.visit(i)).join(", ");
-    return `[${ids}]`;
-  }
-
-  visitArith_exprs(ctx: Arith_exprsContext): string {
-    const exprs = ctx.arith_expr().map((e) => this.visit(e)).join(", ");
-    return `[${exprs}]`;
-  }
-
-  // --- Expressions ---
-  visitArith_expr(ctx: Arith_exprContext): string {
-    if (ctx.ternary_expr()) return this.visit(ctx.ternary_expr()!);
-    if (ctx.if_expr()) return this.visit(ctx.if_expr()!);
-    if (ctx.for_expr()) return this.visit(ctx.for_expr()!);
-    return "";
-  }
-
-  visitIf_expr(ctx: If_exprContext): string {
-    const cond = this.visit(ctx.ternary_expr());
-    const thenBlock = this.visit(ctx.stmts_block(0));
-    let result = `if (${cond}) ${thenBlock}`;
-    if (ctx.IF_COND_ELSE()) {
-      const elseBlock = this.visit(ctx.stmts_block(1));
-      result += ` else ${elseBlock}`;
-    }
-    return `(() => { ${result} })()`;
-  }
-
-  visitFor_expr(ctx: For_exprContext): string {
-    const varName = this.visit(ctx.var_def().id());
-    const startVal = this.visit(ctx.var_def().arith_expr());
-    const endVal = this.visit(ctx.ternary_expr(0));
-    // The loop body may reassign accumulators with ':=' — allowed only here.
-    this.loopDepth++;
-    const rawBody = this.visit(ctx.stmts_block());
-    this.loopDepth--;
-
-    let stepVal = "1";
-    if (ctx.FOR_STMT_BY()) {
-      stepVal = this.visit(ctx.ternary_expr(1));
-    }
-
-    this.anonCounter = this.anonCounter || 0;
-    const id = this.anonCounter++;
-    const res = `_res${id}`;
-
-    // Forward lexical scanner to safely find the top-level 'return' statement
-    let nesting = 0;
-    let inString = false;
-    let stringChar = '';
-    const returns: { index: number, nesting: number }[] = [];
-
-    for (let i = 0; i < rawBody.length; i++) {
-        const char = rawBody[i];
-        
-        // Skip through strings safely
-        if (inString) {
-            if (char === stringChar && rawBody[i - 1] !== '\\') inString = false;
-            continue;
-        }
-        if (char === '"' || char === "'" || char === '`') {
-            inString = true;
-            stringChar = char;
-            continue;
-        }
-
-        // Track block nesting depths
-        if (char === '{' || char === '(' || char === '[') nesting++;
-        if (char === '}' || char === ')' || char === ']') nesting--;
-
-        // Check for 'return ' keyword
-        if (rawBody.substring(i, i + 7) === "return ") {
-            const prev = i === 0 ? ' ' : rawBody[i - 1];
-            // Must be preceded by space, newline, semicolon, or block boundary
-            if (/[ \n;{}]/.test(prev)) {
-                returns.push({ index: i, nesting: nesting });
-            }
-        }
-    }
-
-    let safeBody = rawBody;
-    if (returns.length > 0) {
-        // Find the absolute shallowest nesting level where a 'return' exists
-        const minNesting = Math.min(...returns.map(r => r.nesting));
-        const topLevelReturns = returns.filter(r => r.nesting === minNesting);
-        
-        // The last return at this shallowest level is the one injected by stmts_block
-        const target = topLevelReturns[topLevelReturns.length - 1];
-        safeBody = rawBody.substring(0, target.index) + `${res} = ` + rawBody.substring(target.index + 7);
-    }
-
-    const s = `_s${id}`, e = `_e${id}`, st = `_st${id}`, up = `_up${id}`;
-    
-    // Pure primitive loop execution
-    const loopDef = `for (let ${s} = ${startVal}, ${e} = ${endVal}, ${st} = Math.abs(${stepVal}), ${up} = ${s} <= ${e}, ${varName} = ${s}; ${up} ? ${varName} <= ${e} : ${varName} >= ${e}; ${varName} += (${up} ? ${st} : -${st}))`;
-
-    // Wrap it all together. Explicitly ensures `break` and `continue` work natively.
-    const loop = `let ${res};\n  ${loopDef} {\n    ${safeBody}\n  }\n  return ${res};`;
-
-    return `(() => {\n  ${loop}\n})()`;
-  }
-
-  visitStmts_block(ctx: Stmts_blockContext): string {
-    return this.visit(ctx.fun_body_multiline());
-  }
-
-  // --- Math ---
-// --- Math ---
-  visitTernary_expr(ctx: Ternary_exprContext): string {
-    const cond = this.visit(ctx.or_expr());
-    
-    // Check if the COND ('?') token exists
-    if (ctx.COND()) {
-      const trueBranch = this.visit(ctx.ternary_expr(0));
-      const falseBranch = this.visit(ctx.ternary_expr(1));
-      return `(${cond} ? ${trueBranch} : ${falseBranch})`;
-    }
-    
-    return cond;
-  }
-
-  visitOr_expr(ctx: Or_exprContext): string {
-    const parts = ctx.and_expr().map((e) => this.visit(e));
-    return parts.join(" || ");
-  }
-
-  visitAnd_expr(ctx: And_exprContext): string {
-    const parts = ctx.eq_expr().map((e) => this.visit(e));
-    return parts.join(" && ");
-  }
-
-  visitEq_expr(ctx: Eq_exprContext): string {
-    this.enforceNaComparison(ctx);
-    const parts = ctx.cmp_expr().map((e) => this.visit(e));
-    if (parts.length === 1) return parts[0];
-    let out = parts[0];
-    for (let i = 1; i < parts.length; i++) {
-      const op = ctx.EQ(i - 1) ? "==" : "!=";
-      out = `(${out} ${op} ${parts[i]})`;
-    }
-    return out;
-  }
-
-  visitCmp_expr(ctx: Cmp_exprContext): string {
-    const parts = ctx.add_expr().map((e) => this.visit(e));
-    if (parts.length === 1) return parts[0];
-    let out = parts[0];
-    for (let i = 1; i < parts.length; i++) {
-      const op = ctx.GT(i - 1) ? ">" : ctx.GE(i - 1) ? ">=" : ctx.LT(i - 1) ? "<" : "<=";
-      out = `(${out} ${op} ${parts[i]})`;
-    }
-    return out;
-  }
-
-  visitAdd_expr(ctx: Add_exprContext): string {
-    const parts = ctx.mult_expr().map((e) => this.visit(e));
-    if (parts.length === 1) return parts[0];
-    
-    let out = parts[0];
-    
-    // In ANTLR, children alternate: Expr(0), Op(1), Expr(2), Op(3), Expr(4)...
-    // This guarantees we process operators in exact visual left-to-right order.
-    for (let i = 1; i < parts.length; i++) {
-      const op = ctx.getChild(i * 2 - 1).getText();
-      
-      if (op === "+") {
-        out = `opsv2_safe_add(${out}, ${parts[i]})`;
-      } else {
-        out = `opsv2_safe_sub(${out}, ${parts[i]})`;
-      }
-    }
-    
-    return out;
-  }
-
-  visitMult_expr(ctx: Mult_exprContext): string {
-    const parts = ctx.unary_expr().map((e) => this.visit(e));
-    if (parts.length === 1) return parts[0];
-    let out = parts[0];
-    for (let i = 1; i < parts.length; i++) {
-      const op = ctx.MUL(i - 1) ? "*" : ctx.DIV(i - 1) ? "/" : "%";
-      out = `(${out} ${op} ${parts[i]})`;
-    }
-    return out;
-  }
-
-  visitUnary_expr(ctx: Unary_exprContext): string {
-    const inner = this.visit(ctx.sqbr_expr());
-    if (ctx.NOT()) return `!(${inner})`;
-    if (ctx.PLUS()) return `+${inner}`;
-    if (ctx.MINUS()) return `-${inner}`;
-    return inner;
-  }
-
-  // --- Series Access with ID Tagging ---
-  visitSqbr_expr(ctx: Sqbr_exprContext): string {
-    const base = this.visit(ctx.atom());
-    const idxExpr = ctx.arith_expr(0);
-
-    if (idxExpr) {
-      const index = this.visit(idxExpr);
-      
-      // 1. Check if the base is a simple identifier (e.g. 'close', 'myVar')
-      const isSimpleId = ctx.atom().id() != null;
-
-      if (isSimpleId) {
-        // Standard variable history lookup: close[1]
-        // We pass the base string as the exact key (e.g., "opsv2_close") 
-        // because Context.vars registers them under this exact name.
-        return `ctx.get(${base}, ${index}, "${base}")`;
-      } else {
-        // Complex expression history lookup: (close > open)[1] or sma(close, 14)[1]
-        // We use the Inline Hook strategy to evaluate, store, and fetch in one line!
-        const anonId = `"opsv2_anon_expr_${this.anonCounter++}"`;
-        return `ctx.get(ctx.new_var(${anonId}, ${base}), ${index}, ${anonId})`;
-      }
-    }
-    return base;
-  }
-
-  // --- Atoms ---
-  visitAtom(ctx: AtomContext): string {
-    if (ctx.fun_call()) return this.visit(ctx.fun_call()!);
-    if (ctx.id()) return this.visit(ctx.id()!);
-    if (ctx.literal()) return this.visit(ctx.literal()!);
-    if (ctx.LPAR()) return "(" + this.visit(ctx.arith_expr(0)!) + ")";
-    return "";
-  }
-
-
-  // --- Function Calls with ID Tagging ---
-  visitFun_call(ctx: Fun_callContext): string {
-    const originalName = ctx.id().getText();
-
-    // study()/strategy() directives: record metadata instead of a normal call.
-    if (originalName === "study" || originalName === "strategy") {
-      return this.emitDirective(originalName, ctx);
-    }
-
-    // v2: strategy.* requires strategy() context (rejected under study()).
-    if (originalName.startsWith("strategy.")) {
-      this.enforceStrategyContext(originalName, ctx);
-    }
-
-    // security(): its 3rd arg is an expression evaluated in the HTF context, so it
-    // must be deferred as a thunk rather than evaluated eagerly in the chart context.
-    if (originalName === "security") {
-      return this.emitSecurity(ctx);
-    }
-
-    const transpiledName = this.visit(ctx.id());
-
-    // 1. Just parse the arguments normally. NO manual 'ctx' injection!
-    const args = ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
-    
-    // 2. Generate Deterministic ID (e.g., "sma@L4:C8")
-    const callId = `"${originalName}${this.getLocId(ctx)}"`;
-
-    // 3. Construct the ctx.call wrapper
-    // We only add the comma after transpiledName if there are actually arguments to pass.
-    const finalArgsPart = args ? `, ${args}` : "";
-
-    return `ctx.call(${callId}, ${transpiledName}${finalArgsPart})`;
+  /**
+   * v2's global_stmt_content / local_stmt_content gained a `var_assign`
+   * alternative, so the statement dispatcher has to route it. Everything else
+   * falls through to the inherited implementation.
+   */
+  protected override visitContent(
+    ctx: Global_stmt_contentContext | Local_stmt_contentContext,
+  ): string {
+    if (ctx.var_assign()) return this.visit(ctx.var_assign()!);
+    return super.visitContent(ctx as any);
   }
 
   /**
-   * Emit a security() call with its 3rd argument (the expression) deferred as a
-   * thunk `() => (expr)`, so the runtime can evaluate it in the HTF sub-context.
-   * Other args (symbol, resolution, gaps, lookahead) are passed eagerly.
+   * ':=' is a binding form too, so a function body ending in one returns the
+   * reassigned variable. v1 only knows about '='.
    */
-  private emitSecurity(ctx: Fun_callContext): string {
-    const callId = `"security${this.getLocId(ctx)}"`;
-    const transpiledName = this.visit(ctx.id());
-    const pos = ctx.fun_actual_args()?.pos_args();
-    const exprs = pos ? pos.arith_expr() : [];
-    const parts = exprs.map((e, i) => {
-      const js = this.visit(e);
-      return i === 2 ? `() => (${js})` : js; // defer the expression argument
-    });
-    const argsPart = parts.length ? `, ${parts.join(", ")}` : "";
-    return `ctx.call(${callId}, ${transpiledName}${argsPart})`;
-  }
-
-  /** Emit a study()/strategy() directive as a metadata declaration. */
-  private emitDirective(kind: string, ctx: Fun_callContext): string {
-    const aa = ctx.fun_actual_args();
-    let posList = "";
-    let kwObj = "{}";
-    if (aa) {
-      if (aa.pos_args()) posList = this.visit(aa.pos_args()!);
-      if (aa.kw_args()) kwObj = this.visit(aa.kw_args()!); // "{ opsv2_key: value, ... }"
-    }
-    return `ctx.declareScript("${kind}", [${posList}], ${kwObj})`;
-  }
-
-  visitFun_actual_args(ctx: Fun_actual_argsContext): string {
-    const hasPos = ctx.pos_args() != null;
-    const hasKw = ctx.kw_args() != null;
-    if (hasPos && hasKw) {
-      return this.visit(ctx.pos_args()!) + ", " + this.visit(ctx.kw_args()!);
-    }
-    if (hasKw) return this.visit(ctx.kw_args()!);
-    if (hasPos) return this.visit(ctx.pos_args()!);
-    return "";
-  }
-
-  visitPos_args(ctx: Pos_argsContext): string {
-    return ctx.arith_expr().map((e) => this.visit(e)).join(", ");
-  }
-
-  visitKw_args(ctx: Kw_argsContext): string {
-    const args = ctx.kw_arg().map((a) => this.visit(a)).join(", ");
-    return `{ ${args} }`;
-  }
-
-  visitKw_arg(ctx: Kw_argContext): string {
-    const key = this.visit(ctx.id());
-    const value = this.visit(ctx.arith_expr());
-    return `${key}: ${value}`;
-  }
-
-  visitLiteral(ctx: LiteralContext): string {
-    if (ctx.num_literal()) return this.visit(ctx.num_literal()!);
-    return this.visit(ctx.other_literal()!);
-  }
-
-  visitNum_literal(ctx: Num_literalContext): string {
-    const t = ctx.INT_LITERAL() ?? ctx.FLOAT_LITERAL();
-    return t ? t.getText() : "";
-  }
-
-  visitOther_literal(ctx: Other_literalContext): string {
-    const t = ctx.STR_LITERAL() ?? ctx.BOOL_LITERAL() ?? ctx.COLOR_LITERAL();
-    if (!t) return "";
-    const text = t.getText();
-    if (ctx.COLOR_LITERAL()) return JSON.stringify(text);
-    return text;
-  }
-
-  visitId = (ctx: IdContext): string => {
-    const text = ctx.getText();
-
-    // v2: strategy.* namespace (getters/constants too) requires strategy() context.
-    if (text.startsWith("strategy.")) {
-      this.enforceStrategyContext(text, ctx);
-    }
-
-    // 1. Handle Transpilation (Prefixing)
-    let transpiledName = text;
-    if (text.includes('.')) {
-        transpiledName = text.split('.').map(p => `${this.PREFIX}${p}`).join('.');
-    } else {
-        transpiledName = `${this.PREFIX}${text}`;
-    }
-
-    // 2. THE GETTER CHECK
-    // If the standard library registry marks this identifier as a getter,
-    // we must transpile it into an execution call instead of a static reference!
-    const entry = REGISTRY[text];
-    if (entry && entry.is_getter) {
-        const callId = `"${text}${this.getLocId(ctx)}"`;
-        return `ctx.call(${callId}, ${transpiledName})`;
-    }
-
-    return transpiledName;
+  protected override trailingValueName(content: Local_stmt_contentContext): string | null {
+    const assign = content.var_assign();
+    if (assign) return this.visit(assign.id());
+    return super.trailingValueName(content as any);
   }
 }

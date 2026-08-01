@@ -12,7 +12,7 @@ when you also need the resolved version — it returns `{ js, version, profile }
 A script declaring a version that is not implemented throws
 `UnimplementedVersionError`.
 
-**Location:** `transpiler/v2/index.ts`
+**Location:** `transpiler/index.ts`
 
 - **Input:** Pine Script source string.
 - **Output:** JavaScript source string (ES-like: `let`, `function`, etc.).
