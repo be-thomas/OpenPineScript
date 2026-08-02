@@ -13,7 +13,7 @@
 // Because of (2), an override is the one place this hierarchy can silently
 // drift from its base: if PineV1Parser gains an alternative in
 // `global_stmt_content`, this copy will not pick it up. That is checked
-// executably by tests/conformance/grammar_layering.test.ts, which asserts each
+// executably by conformance/grammar_layering.test.ts, which asserts each
 // overridden rule still covers every alternative its base declares.
 //
 // WHAT A GRAMMAR CANNOT SEE. ':=' takes any scope in v2 — there is no scope

@@ -1,0 +1,92 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// GENERATED — do not edit. Source: conformance/golden/v3/harness_strategy.pine
+// Regenerate with: npx tsx scripts/make-log-harness.ts
+//
+// The Pine-Logs variant of that harness, for collecting golden data WITHOUT the
+// PRO+/Premium "Export chart data…" feature.
+//
+//   1. Paste into the Pine editor and add to the chart.
+//   2. Open  More (⋮) → Pine Logs.
+//   3. Select all the log lines and copy them.
+//   4. Save as conformance/golden/<version>/<harness>.<SYMBOL>.<TF>.log
+//
+// Pine Logs run on HISTORICAL bars — unlike alert(), which only ever fires on
+// realtime bars — and keep the last 10,000 historical messages.
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness — ORDER FLOW.
+//
+// Orders are the one control flow with no plot of its own, so the broker's own
+// state is the witness: `strategy.position_size`, `strategy.equity` and
+// `strategy.opentrades` are plottable, and each is a running consequence of
+// every entry and exit decision taken so far. One mis-fired order moves them
+// for the rest of the chart.
+//
+// ⚠ NEEDS FULL HISTORY, and it is a `strategy`, not a `study`. Export it the
+// same way — the plots appear in the CSV as usual.
+//
+// ⚠ Deliberately NOT passed: default_qty_type / default_qty_value / commission /
+// pyramiding. Those change fill sizing, and the point here is the CONTROL FLOW,
+// not the position sizing model. Leaving them at their defaults keeps a
+// disagreement attributable to a branch rather than to a rounding rule.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+strategy(title="OPS golden strategy", shorttitle="OPS strat", overlay=false)
+
+fast = ta.sma(close, 10)
+slow = ta.sma(close, 30)
+
+goLong  = ta.crossover(fast, slow)
+goFlat  = ta.crossunder(fast, slow)
+
+// The decisions, plotted before they are acted on — so a divergence can be
+// traced to either the SIGNAL or the ORDER, not left ambiguous between them.
+_v0 = goLong ? 1 : 0
+_v1 = goFlat ? 1 : 0
+
+if goLong
+    strategy.entry("L", strategy.long)
+
+if goFlat
+    strategy.close("L")
+
+// The consequences.
+_v2 = strategy.position_size
+_v3 = strategy.opentrades
+_v4 = strategy.equity
+
+// A second, independent decision path: hold state explicitly and compare it
+// against the broker's. These must move together; if they do not, the order
+// layer disagrees with the branch that placed the order.
+inPos = 0
+inPos := nz(inPos[1])
+if goLong
+    inPos := 1
+if goFlat
+    inPos := 0
+_v5 = inPos
+
+_v6 = ta.barssince(goLong)
+
+// ── Pine Logs emission ──────────────────────────────────────────────────
+// One row per bar. The OPS| marker lets the loader find the row inside
+// whatever prefix the Pine Logs pane adds when you copy it out.
+if barstate.isfirst
+    log.info("OPSHEAD|time,open,high,low,close,volume,signal_long,signal_flat,position_size,opentrades,equity,expected_in_position,bars_since_entry_signal")
+
+_row = str.tostring(time, "#")
+      + "," + str.tostring(open, "#.##########")
+      + "," + str.tostring(high, "#.##########")
+      + "," + str.tostring(low, "#.##########")
+      + "," + str.tostring(close, "#.##########")
+      + "," + str.tostring(volume, "#.##########")
+      + "," + str.tostring(_v0, "#.##########")
+      + "," + str.tostring(_v1, "#.##########")
+      + "," + str.tostring(_v2, "#.##########")
+      + "," + str.tostring(_v3, "#.##########")
+      + "," + str.tostring(_v4, "#.##########")
+      + "," + str.tostring(_v5, "#.##########")
+      + "," + str.tostring(_v6, "#.##########")
+
+log.info("OPS|" + _row)

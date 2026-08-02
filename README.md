@@ -48,7 +48,7 @@ npm run opsv2 -- <script.pine> --data <data.csv> [flags]
 ```
 
 ```bash
-npm run opsv2 -- tests/helpers/fixtures/sma_crossover.pine --data mock_data/AAPL_mock.csv
+npm run opsv2 -- examples/sma_crossover.pine --data mock_data/AAPL_mock.csv
 ```
 
 ```
@@ -73,7 +73,7 @@ npm run replv2
 ### Inspect the generated JavaScript
 
 ```bash
-npm run opsv2 -- tests/helpers/fixtures/sma_crossover.pine --data mock_data/AAPL_mock.csv --show-transpiled
+npm run opsv2 -- examples/sma_crossover.pine --data mock_data/AAPL_mock.csv --show-transpiled
 ```
 
 ```js
@@ -137,11 +137,11 @@ transpiler output, and runtime behaviour.
 
 Two patterns carry most of the weight:
 
-- **Differential testing.** `tests/v2/ta/naive_ta.ts` is an independent naive
+- **Differential testing.** `tests/v1/ta/naive_ta.ts` is an independent naive
   reimplementation of the TA library. The engine is asserted to match it
   bar-for-bar over 5000 seeded bars under four different lookback regimes,
   rather than against hand-picked expected values.
-- **The version matrix.** `tests/conformance/` asserts every language rule at
+- **The version matrix.** `conformance/` asserts every language rule at
   every version, including the versions where it is illegal — so adding a
   version cannot silently relax an older one.
 

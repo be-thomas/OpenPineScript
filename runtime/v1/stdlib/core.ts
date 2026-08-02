@@ -38,22 +38,29 @@ export function iff(cond: any, t: any, f: any): any {
     return val(cond) ? val(t) : val(f);
 }
 
-// --- Pine v2 Arithmetic Anomaly Wrappers ---
+// --- Arithmetic wrappers ---
+//
+// These exist for the BOOL coercion that v1-v3 perform (true -> 1, false -> 0),
+// which plain JS `+` does not do for a Series-wrapped boolean.
+//
+// They used to ALSO coerce `na` to 0, described as a "Pine v2 arithmetic
+// anomaly". It is not one. TradingView propagates `na` through arithmetic, and a
+// 5,998-bar export settles it directly: `sma(close, 20) + 2 * stdev(close, 20)`
+// is reported as `na` for the first 19 bars, where this engine reported a
+// number. `na + na` came out as 0 and `na + 5` as 5.
+//
+// The consequence was worse than a wrong value. Every indicator's warm-up
+// silently became a real number the moment it was combined with anything, so a
+// whole class of disagreement could never surface.
 
-// safe_add: Coerces NaN ('na') to 0 to prevent logical counting from poisoning the series.
-// Implicitly casts booleans (true=1, false=0).
+const asNumber = (x: any): number => Number(val(x));
+
 export function safe_add(a: any, b: any): number {
-    const nA = Number(val(a));
-    const nB = Number(val(b));
-    return (Number.isNaN(nA) ? 0 : nA) + (Number.isNaN(nB) ? 0 : nB);
+    return asNumber(a) + asNumber(b);
 }
 
-// safe_sub: Coerces NaN ('na') to 0 to prevent logical counting from poisoning the series.
-// Implicitly casts booleans (true=1, false=0).
 export function safe_sub(a: any, b: any): number {
-    const nA = Number(val(a));
-    const nB = Number(val(b));
-    return (Number.isNaN(nA) ? 0 : nA) - (Number.isNaN(nB) ? 0 : nB);
+    return asNumber(a) - asNumber(b);
 }
 
 // --- Type Conversion (v2 Only) ---

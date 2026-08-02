@@ -10,6 +10,7 @@
  *   v1        PineV1*.g4 (base)    parser/v1         V1ToJsVisitor (base)
  *   v2        import PineV1* + :=  parser/v2         extends V1
  *   v3        import PineV2*       parser/v3         extends V2
+ *   v4        import PineV3* + var parser/v4         extends V3
  *
  * This module is the ONLY place that maps a version number to a pipeline. It is
  * deliberately un-versioned: it belongs to no single version, and adding v4 must
@@ -18,9 +19,11 @@
 import { parse as parseV1 } from "../parser/v1";
 import { parse as parseV2 } from "../parser/v2";
 import { parse as parseV3 } from "../parser/v3";
+import { parse as parseV4 } from "../parser/v4";
 import { V1ToJsVisitor } from "./v1/ToJsVisitor";
 import { V2ToJsVisitor } from "./v2/ToJsVisitor";
 import { V3ToJsVisitor } from "./v3/ToJsVisitor";
+import { V4ToJsVisitor } from "./v4/ToJsVisitor";
 import {
   detectVersion,
   PineVersion,
@@ -45,7 +48,7 @@ const PIPELINES: Readonly<Record<PineVersion, Pipeline | null>> = {
   1: { parse: parseV1, createVisitor: () => new V1ToJsVisitor() },
   2: { parse: parseV2, createVisitor: () => new V2ToJsVisitor() },
   3: { parse: parseV3, createVisitor: () => new V3ToJsVisitor() },
-  4: null,
+  4: { parse: parseV4, createVisitor: () => new V4ToJsVisitor() },
   5: null,
 };
 

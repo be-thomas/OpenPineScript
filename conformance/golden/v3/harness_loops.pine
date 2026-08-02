@@ -1,0 +1,95 @@
+//@version=3
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness — LOOPS.
+//
+// Each plot is the RESULT of a loop, so the exported number witnesses how many
+// iterations ran and in what order. Where a loop reimplements a built-in, both
+// are plotted side by side: they must agree with each other AND with
+// TradingView, which catches a loop that is wrong in the same direction as our
+// built-in.
+//
+// Convergent — every loop reads a bounded window — so the standard warm-up
+// allowance applies and this can be exported from anywhere in the chart.
+//
+// Same rules as the other harnesses: bump line 1 to //@version=4 if v3 is
+// rejected, and delete any single plot TradingView will not compile.
+// ─────────────────────────────────────────────────────────────────────────────
+study(title="OPS golden loops", shorttitle="OPS loops", overlay=false)
+
+// 1. Plain accumulation over a fixed window, against the built-in mean.
+sum20 = 0.0
+for i = 0 to 19
+    sum20 := sum20 + close[i]
+plot(sum20 / 20,     title="loop_mean_20")
+plot(sma(close, 20), title="builtin_sma_20")
+
+// 2. break — the index of the first down bar in the last 50. -1 if none, which
+//    also tells us whether the loop ran to completion.
+firstDown = -1
+for i = 0 to 49
+    if close[i] < open[i]
+        firstDown := i
+        break
+plot(firstDown, title="loop_break_first_down")
+
+// 3. continue — count up bars by skipping the rest of the body.
+upCount = 0
+for i = 0 to 19
+    if close[i] <= open[i]
+        continue
+    upCount := upCount + 1
+plot(upCount, title="loop_continue_up_count")
+
+// 4. Running max, against the built-in.
+maxHigh = 0.0
+for i = 0 to 19
+    maxHigh := max(maxHigh, high[i])
+plot(maxHigh,           title="loop_max_high_20")
+plot(highest(high, 20), title="builtin_highest_20")
+
+// 5. A step other than 1 — five samples, not twenty-one.
+sumStep = 0.0
+for i = 0 to 20 by 5
+    sumStep := sumStep + close[i]
+plot(sumStep, title="loop_step_5")
+
+// 6. Nested loops: 25 comparisons per bar. Wrong nesting still produces a
+//    plausible-looking number, which is why it is worth exporting.
+nested = 0
+for i = 0 to 4
+    for j = 0 to 4
+        if close[i] > close[j]
+            nested := nested + 1
+plot(nested, title="nested_loops")
+
+// 7. A bound that changes per bar, so the iteration count is itself series data.
+len = 5 + (close > open ? 5 : 0)
+dyn = 0.0
+for i = 0 to len - 1
+    dyn := dyn + close[i]
+plot(dyn / len, title="loop_dynamic_bound")
+
+// 8. PROBE: a loop whose range is empty on some bars (`to` below `from`).
+//    Whether Pine runs zero iterations or one is what the export settles.
+empty = 0
+for i = 0 to (close > open ? 2 : -1)
+    empty := empty + 1
+plot(empty, title="probe_empty_range")
+
+// 9. PROBE: a stateful built-in called INSIDE a loop body. Its per-call state is
+//    keyed by call site, so a loop makes one site run many times per bar.
+loopEma = 0.0
+for i = 0 to 2
+    loopEma := loopEma + ema(close, 10)
+plot(loopEma / 3,    title="probe_ema_inside_loop")
+plot(ema(close, 10), title="builtin_ema_10")
+
+// 10. break out of the OUTER loop from inside the inner one.
+outerBreak = 0
+for i = 0 to 9
+    for j = 0 to 9
+        if close[i] < low[j]
+            outerBreak := outerBreak + 1
+    if outerBreak > 5
+        break
+plot(outerBreak, title="nested_break")

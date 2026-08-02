@@ -1,0 +1,45 @@
+//@version=4
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness — BUILT-INS THAT DO NOT EXIST BEFORE v4.
+//
+// TradingView added these in March 2020: bb, bbw, kc, kcw, dmi, wpr, hma,
+// supertrend, cmo, mfi, plus the variables iii, wvad, wad, obv, pvt, nvi, pvi.
+// A v3 script calling any of them fails to compile —
+//
+//     Could not find function or function reference 'bb'
+//
+// — which is why they live here and not in ../v3/. Only the three this engine
+// actually implements are plotted; adding a call to one it does not implement
+// would fail locally rather than tell us anything about TradingView.
+//
+// HOW THIS ONE IS COMPARED
+//
+// It is compiled AS v4, by the v4 pipeline, because the golden test now takes
+// each harness's version from its directory.
+//
+// That was not always so. While this engine implemented v1–v3 only, every
+// harness was forced through the v3 pipeline — which still tested the
+// arithmetic, since the runtime is shared across versions by design
+// (dev-docs/00-architecture-assessment.md §5.6), but said nothing about whether
+// v4 resolved these names at all. Now both are tested.
+//
+// Convergent, so the standard warm-up allowance applies.
+// ─────────────────────────────────────────────────────────────────────────────
+study(title="OPS golden v4 builtins", shorttitle="OPS v4", overlay=false)
+
+src = close
+
+[bbMid, bbUpper, bbLower] = bb(src, 20, 2)
+plot(bbMid,   title="bb_mid")
+plot(bbUpper, title="bb_upper")
+plot(bbLower, title="bb_lower")
+
+plot(wpr(14),      title="wpr_14")
+plot(mfi(src, 14), title="mfi_14")
+
+// Plotted alongside so a disagreement separates "our bb is wrong" from "our sma
+// or stdev is wrong" — the manual form in ../v3/harness_bands.pine must agree
+// with the built-in form here.
+plot(sma(src, 20),                    title="bb_mid_manual")
+plot(sma(src, 20) + 2 * stdev(src, 20), title="bb_upper_manual")
+plot(sma(src, 20) - 2 * stdev(src, 20), title="bb_lower_manual")
