@@ -3,11 +3,10 @@
 // ============================================================================
 // v3 adds no syntax over v2; every rule is inherited unchanged.
 //
-// v3's headline change — ':=' available at every scope rather than only on a
-// for-loop accumulator — is NOT a grammar change. The rule already parses from
-// v2; what changes is that V3ToJsVisitor overrides enforceNoReassignment to a
-// no-op. Scope is invisible to a grammar, so it could not have been expressed
-// here in the first place.
+// v3's changes are all SEMANTIC, and all tightenings: self- and forward-
+// reference become errors, bools stop coercing to numbers, and a ':='-mutated
+// variable may not be passed to security(). Each is a guard in
+// V3ToJsVisitor. ':=' itself, operator and rules alike, comes from v2 untouched.
 //
 // `options` are NOT inherited from an imported grammar — only the root grammar's
 // options apply — so tokenVocab must be restated here, pointing at v3's own

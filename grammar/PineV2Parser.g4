@@ -16,10 +16,12 @@
 // executably by tests/conformance/grammar_layering.test.ts, which asserts each
 // overridden rule still covers every alternative its base declares.
 //
-// SCOPE IS NOT A GRAMMAR CONCERN. v2 permits ':=' only on a for-loop
-// accumulator, but a grammar cannot see scope, so `x := 1` at the top level
-// PARSES here and is rejected by V2ToJsVisitor.enforceNoReassignment. v3 lifts
-// that restriction by overriding the guard, not by touching this file.
+// WHAT A GRAMMAR CANNOT SEE. ':=' takes any scope in v2 — there is no scope
+// restriction to express here or anywhere else. The one rule it does carry is
+// that the target must already be declared, which is a whole-script fact rather
+// than a syntactic one, so `x := 1` PARSES here and
+// V2ToJsVisitor.enforceDeclaredBeforeReassignment decides it. v3 inherits that
+// guard unchanged.
 //
 // `options` are NOT inherited from an imported grammar — only the root grammar's
 // options apply — so tokenVocab must be restated here, pointing at v2's own
