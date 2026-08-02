@@ -95,7 +95,19 @@ export function ema(ctx: Context, sourceInput: any, lengthInput: any): number {
     const state = ctx.getPersistentState<EmaState>(() => ({ prev: undefined }));
     const alpha = 2 / (length + 1);
 
-    if (state.prev === undefined) {
+    // A leading 'na' in the source DELAYS the average; it does not kill it.
+    //
+    // Without these two guards the seed became NaN, and since every later value
+    // is `source * alpha + prev * (1 - alpha)`, NaN propagated for the rest of
+    // the script. That made `ema(sma(close, 10), 10)` — an ema of anything with
+    // a warm-up — na on every bar, while `sma(ema(close, 10), 10)` worked. The
+    // idiom is everywhere in published code (trix is three nested emas), so
+    // this silently returned nothing for a whole class of real indicators.
+    //
+    // rma already did exactly this; ema did not. Matching it.
+    if (isNaN(source)) return NaN;
+
+    if (state.prev === undefined || isNaN(state.prev)) {
         state.prev = source;
         return source;
     }
@@ -232,7 +244,9 @@ export function trix(ctx: Context, sourceInput: any, lengthInput: any): number {
     const e3 = ema(ctx, e2, length);
     (ctx as any).callStack.pop();
     const state = ctx.getPersistentState<{ prevE3: number | undefined }>(() => ({ prevE3: undefined }));
-    if (state.prevE3 === undefined) { state.prevE3 = e3; return 0; }
+    // Same rule as ema — do not latch a NaN as the comparison point.
+    if (isNaN(e3)) return NaN;
+    if (state.prevE3 === undefined || isNaN(state.prevE3)) { state.prevE3 = e3; return 0; }
     const result = 100 * (e3 - state.prevE3) / state.prevE3;
     state.prevE3 = e3;
     return result;
@@ -251,7 +265,11 @@ export function rsi(ctx: Context, sourceInput: any, lengthInput: any): number {
     // avgGain and avgLoss are two independent RMAs — they need distinct frames,
     // and both must stay clear of rsi's own state above (which sits on the base
     // frame). Without isolation all three collide on one state object.
-    if (state.prevSrc === undefined) {
+    // Same rule as ema: never seed the comparison point from 'na', or `change`
+    // is NaN on every later bar. `rsi(sma(close, 10), 14)` hit this.
+    if (isNaN(source)) return NaN;
+
+    if (state.prevSrc === undefined || isNaN(state.prevSrc)) {
         state.prevSrc = source;
         (ctx as any).callStack.push("rsi_gain"); rma(ctx, 0, length); (ctx as any).callStack.pop();
         (ctx as any).callStack.push("rsi_loss"); rma(ctx, 0, length); (ctx as any).callStack.pop();
@@ -1083,7 +1101,10 @@ export function tsi(ctx: Context, sourceInput: any, longLenInput: any, shortLenI
         return outer;
     };
 
-    if (state.prevSrc === undefined) {
+    // Same rule as ema — do not latch a NaN as the comparison point.
+    if (isNaN(source)) return NaN;
+
+    if (state.prevSrc === undefined || isNaN(state.prevSrc)) {
         state.prevSrc = source;
         // Seed all 4 internal EMAs (inner+outer for both pc and apc) with 0.
         dblSmooth("tsi_pc_inner", "tsi_pc_outer", 0);
