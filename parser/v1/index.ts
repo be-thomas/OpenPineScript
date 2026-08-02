@@ -76,7 +76,14 @@ export function createParser<TParser extends Parser, TTree>(
 
     // Lexer and parser diagnostics are reported together — a bad token and the
     // syntax error it causes are one problem to the caller.
-    const allErrors = [...lexerListener.errors, ...parserListener.errors];
+    //
+    // `indentErrors` comes from IndentTokenSource, which cannot reach the error
+    // listeners: it rewrites the token stream rather than failing to read a
+    // character, so ANTLR never learns anything went wrong. A mismatched
+    // unindent used to be written to the console and ignored, letting the parser
+    // run over a stream the lexer knew was broken.
+    const indentErrors = (lexer as any).indentErrors ?? [];
+    const allErrors = [...lexerListener.errors, ...indentErrors, ...parserListener.errors];
 
     return { tree, errorCount: allErrors.length, errors: allErrors };
   };

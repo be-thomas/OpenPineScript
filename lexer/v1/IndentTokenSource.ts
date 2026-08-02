@@ -98,6 +98,15 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
     /** Type of the last real (non-virtual) token, for continuation detection. */
     private lastRealToken: number = -1;
 
+    /**
+     * Structural indentation errors, drained by createParser.
+     *
+     * Public because it crosses the lexer/parser boundary: the token source has
+     * no access to the parser's error listeners, and these must be reported
+     * alongside syntax errors rather than written to the console.
+     */
+    public indentErrors: { line: number; column: number; message: string }[] = [];
+
     public tokenFactory: TokenFactory<Token>;
 
     constructor(...args: any[]) {
@@ -254,14 +263,14 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
         // --- INDENT ---
         const delta = indentLength - currentIndent;
 
-        // Enforce Style Consistency
-        if (this.indentUnit === null) {
-          this.indentUnit = delta;
-        } else if (delta % this.indentUnit !== 0) {
-          console.warn(
-            `[Lexer Warning] Inconsistent indentation at line ${triggerToken.line}. Expected multiple of ${this.indentUnit}.`,
-          );
-        }
+        // The first indent establishes the unit. Deltas that are not a multiple
+        // of it are ACCEPTED, deliberately: `indentUnit` is this engine's
+        // heuristic, not TradingView's rule (which is a tab or four spaces per
+        // level, with its own allowances for continuation lines). Rejecting on a
+        // heuristic would reject valid scripts, so nothing is reported here.
+        // A genuinely broken structure is caught by the dedent branch below,
+        // where the token stream is provably wrong rather than merely unusual.
+        if (this.indentUnit === null) this.indentUnit = delta;
 
         this.indentStack.push(indentLength);
         return this.createVirtualToken(T.BEGIN, "<BEGIN>", triggerToken);
@@ -281,11 +290,28 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
           tokensToEmit.push(this.createVirtualToken(T.END, "<END>", triggerToken));
         }
 
-        // Check for alignment error
+        // An unindent that lands between two levels is a REJECTION, not a note.
+        //
+        // This used to `console.error` and carry on, so the parser then ran over
+        // a token stream the lexer already knew was wrong — either producing a
+        // confusing downstream syntax error or, worse, transpiling something the
+        // author did not write. TradingView rejects this outright, and rejecting
+        // rather than approximating is the rule everywhere else in this engine
+        // (v3's guards, UnimplementedVersionError, the null rows in PIPELINES).
+        //
+        // Recorded on the token source rather than thrown: createParser merges
+        // these with the parser's own diagnostics, so the caller gets one list
+        // and the usual "parsing failed with N error(s)" instead of an exception
+        // from inside the lexer.
         if (indentLength !== this.indentStack[this.indentStack.length - 1]) {
-          console.error(
-            `[Lexer Error] Indentation Error at line ${triggerToken.line}: Unindent does not match any outer indentation level.`,
-          );
+          this.indentErrors.push({
+            line: triggerToken.line,
+            column: indentLength,
+            message:
+              `unindent does not match any outer indentation level ` +
+              `(dedented to column ${indentLength}; open levels are ` +
+              `${this.indentStack.join(", ")})`,
+          });
         }
 
         // 3. If we landed on an existing level, this newline is also a separator for that level
