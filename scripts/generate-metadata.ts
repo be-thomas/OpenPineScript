@@ -24,6 +24,29 @@ function parseReturnType(raw: string): any {
     return { kind: "scalar", type: text || "any" };
 }
 
+/**
+ * The name a Pine author writes for a parameter, derived from the TypeScript one.
+ *
+ * `Context.call` matches keyword arguments by looking the written name up in
+ * `entry.args`, and an unmatched key is DROPPED — no error. So every place the
+ * TypeScript signature spells a parameter differently from Pine, the keyword
+ * form of that argument silently did nothing:
+ *
+ *     security(tickerid, "D", close, lookahead=barmerge.lookahead_off)
+ *         → `lookaheadInput` in the registry, `lookahead` written; dropped, and
+ *           the call fell back to the version default
+ *     sma(close, length=10)
+ *         → `lengthInput` in the registry; dropped, and length became undefined
+ *
+ * 44 registry entries carried an `Input`-suffixed parameter, so this was not a
+ * corner case. Two conventions are normalised: the `Input` suffix used to keep
+ * a parameter distinct from a local of the same name, and the leading
+ * underscore that marks a parameter as unused (`_gaps` → `gaps`).
+ */
+function pineParamName(tsName: string): string {
+    return tsName.replace(/^_+/, "").replace(/Input$/, "");
+}
+
 function generateConfig(stdlibPath: string) {
     const project = new Project({ compilerOptions: { allowJs: true } });
     const absolutePath = path.resolve(stdlibPath);
@@ -59,7 +82,7 @@ function generateConfig(stdlibPath: string) {
             const fullKey = `${prefix}${funcName}`;
 
             const isContextAware = params[0] === "ctx";
-            const args = isContextAware ? params.slice(1) : params;
+            const args = (isContextAware ? params.slice(1) : params).map(pineParamName);
             
             const jsDocs = fn.getJsDocs();
             const isGetter = jsDocs.some(doc => 
@@ -116,7 +139,7 @@ function generateConfig(stdlibPath: string) {
                             isValue = false; 
                             const params = initializer.getParameters().map(p => p.getName());
                             isContextAware = params[0] === "ctx";
-                            args = isContextAware ? params.slice(1) : params;
+                            args = (isContextAware ? params.slice(1) : params).map(pineParamName);
                         }
 
                         // Determine return type logic
@@ -193,4 +216,4 @@ ${registryEntries.join("\n")}
     console.log(`✅ Registry generated with structured types at: ${outputFile}`);
 }
 
-generateConfig("./runtime/v2/stdlib");
+generateConfig("./runtime/v1/stdlib");

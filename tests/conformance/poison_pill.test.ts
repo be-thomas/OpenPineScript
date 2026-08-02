@@ -7,8 +7,8 @@
  * surviving one resolves to data rather than a ReferenceError.
  */
 import { describe, it, expect } from "vitest";
-import { Context, compile } from "../../runtime/v2";
-import { transpile } from "../../transpiler/v2";
+import { Context, compile } from "../../runtime/v1";
+import { transpile } from "../../transpiler";
 import { LANGUAGE_PROFILES, LanguageProfile } from "../../transpiler/profiles";
 import { PREFIX } from "../../utils/v2/common";
 

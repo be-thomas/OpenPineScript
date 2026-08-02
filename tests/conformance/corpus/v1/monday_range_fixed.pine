@@ -1,0 +1,23 @@
+//author @TraderX0
+//script to plot Monday's range
+//version 1.1
+//last edited 16/12/2018
+
+//title
+study(title="Monday_Range_fixed", shorttitle="Monday_Range_fixed", overlay=true)
+
+// holds the daily price levels
+openPrice = security(tickerid, 'D', open)
+highPrice = security(tickerid, 'D', high)
+lowPrice  = security(tickerid, 'D', low)
+midPrice  = avg(highPrice, lowPrice)
+
+//function which is called by plot to establish day of the week is monday return true or false
+isMonday() => dayofweek(time('D')) == sunday ? 1 : 0
+
+
+//plot works by combining the isMonday function combined with the price to plot the line for that given condition
+plot(isMonday() and midPrice  ? midPrice :  na, title="Monday Eq",   style=circles, linewidth=1, color=black)
+plot(isMonday() and openPrice ? openPrice:  na, title="Monday Open",   style=circles, linewidth=1, color=purple)
+plot(isMonday() and highPrice ? highPrice:  na, title="Monday High", style=circles, linewidth=1, color=green)
+plot(isMonday() and lowPrice  ? lowPrice :  na, title="Monday Low",  style=circles, linewidth=1, color=green)

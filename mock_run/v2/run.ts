@@ -28,9 +28,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Context } from "../../runtime/v2/context";
-import { compile } from "../../runtime/v2";
-import { compileScript } from "../../transpiler/v2/";
+import { Context } from "../../runtime/v1/context";
+import { compile } from "../../runtime/v1";
+import { compileScript } from "../../transpiler";
 import type { PineVersion } from "../../transpiler/version";
 import { DEFAULT_PROFILE } from "../../transpiler/profiles";
 import { runComparison } from "../../utils/v2/comparison_engine";

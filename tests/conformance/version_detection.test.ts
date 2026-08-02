@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 // Import through the public entry, as every real consumer does — that is what
 // loads profiles/ and registers which versions actually run.
-import { detectVersion } from "../../transpiler/v2";
+import { detectVersion } from "../../transpiler";
 import { UnsupportedVersionError } from "../../transpiler/version";
 
 describe("detectVersion", () => {

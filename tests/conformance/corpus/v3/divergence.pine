@@ -1,0 +1,66 @@
+//@version=3
+study("[ProfitRobots] Divergence")
+
+// User defined section
+slow_length = input(34, "Slow Length")
+fast_length = input(5,  "Fast Length")
+fast = sma(hl2, fast_length)
+slow = sma(hl2, slow_length)
+ao   = fast - slow
+clr  = rising(ao, 1) ? green : red
+plot(ao, style = histogram, linewidth = 1, color = clr)
+indi  = ao
+// End of user defined section
+
+val_h = high
+val_l = low
+
+is_peak      = indi[2] >= indi[3] and indi[2] > indi[4] and indi[2] >= indi[1] and indi[2] > indi[0]
+peaks_prev   = valuewhen(is_peak, indi[2],  1)
+peaks        = valuewhen(is_peak, indi[2],  0)
+peaks_h      = valuewhen(is_peak, val_h[2], 0)
+peaks_h_prev = valuewhen(is_peak, val_h[2], 1)
+
+is_trough     = indi[2] <= indi[3] and indi[2] < indi[4] and indi[2] <= indi[1] and indi[2] < indi[0]
+trough_prev   = valuewhen(is_trough, indi[2],  1)
+trough        = valuewhen(is_trough, indi[2],  0)
+trough_l      = valuewhen(is_trough, val_l[2], 0)
+trough_l_prev = valuewhen(is_trough, val_l[2], 1)
+
+coeff = input(1.0, "Price rise/fall, %", float)
+
+div    = 0
+if change(peaks) != 0
+    if peaks < peaks_prev and peaks_h > peaks_h_prev
+        //Classic/regular bearish
+        div    := 1
+    if peaks > peaks_prev and peaks_h < peaks_h_prev
+        //Reversal/hidden bearish
+        div    := 2
+if change(trough) != 0
+    if trough > trough_prev and trough_l < trough_l_prev
+        //Classic/regular bullish
+        div    := -1
+    if trough < trough_prev and trough_l > trough_l_prev
+        //Reversal/hidden bullish
+        div    := -2
+
+regular_bearish = div == 1
+hidden_bearish  = div == 2
+regular_bullish = div == -1
+hidden_bullish  = div == -2
+
+plot(regular_bearish or hidden_bearish ? indi[2] : na, "Bearish Divergence", color = red,  trackprice = true, offset = -2)
+plot(regular_bullish or hidden_bullish ? indi[2] : na, "Bullish Divergence", color = lime, trackprice = true, offset = -2)
+
+plotshape(regular_bearish ? indi[2] : na, "Bearish",        shape.labeldown, location.absolute, color = red, text = "BR",  textcolor = black, size = size.tiny, offset = -2)
+plotshape(hidden_bearish  ? indi[2] : na, "Hidden Bearish", shape.labeldown, location.absolute, color = red, text = "HBR", textcolor = black, size = size.tiny, offset = -2)
+plotshape(regular_bearish or hidden_bearish ? indi[2] : na, "Bearish Point", shape.circle, location.absolute, color = red, offset = -2)
+alertcondition(regular_bearish, "Bearish Alert", "Bearish Alert")
+alertcondition(hidden_bearish, "Hidden Bearish Alert", "Hidden Bearish Alert")
+
+plotshape(regular_bullish ? indi[2] : na, "Bullish",        shape.labelup, location.absolute, color = lime, text = "BL",  textcolor = black, size = size.tiny, offset = -2)
+plotshape(hidden_bullish  ? indi[2] : na, "Hidden Bullish", shape.labelup, location.absolute, color = lime, text = "HBL", textcolor = black, size = size.tiny, offset = -2)
+plotshape(regular_bullish or hidden_bullish ? indi[2] : na, "Bullish Point", shape.circle, location.absolute, color = lime, offset = -2)
+alertcondition(regular_bullish, "Bullish Alert", "Bullish Alert")
+alertcondition(hidden_bullish, "Hidden Bullish Alert", "Hidden Bullish Alert")

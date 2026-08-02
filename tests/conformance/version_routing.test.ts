@@ -4,7 +4,7 @@
  * back to v2 rules and producing wrong numbers.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../transpiler/v2";
+import { compileScript } from "../../transpiler";
 import { UnimplementedVersionError, LANGUAGE_PROFILES } from "../../transpiler/profiles";
 import {
   ALL_VERSIONS,
@@ -56,12 +56,13 @@ describe("version routing", () => {
 });
 
 describe("profile invariants", () => {
-  it("v1 and v2 carry identical rules", () => {
-    // TradingView: v2 is "fully backwards compatible" with v1 — the annotation
-    // is the only difference. Any divergence here is a bug.
+  it("v1 and v2 carry identical runtime configuration", () => {
+    // A profile now holds only what the RUNTIME reads; language rules live in
+    // the grammars and visitor subclasses. v1 and v2 differ in exactly one
+    // language feature (':=' on loop accumulators) and in nothing the runtime
+    // sees, so their profiles must stay identical.
     const v1 = LANGUAGE_PROFILES[1];
     const v2 = LANGUAGE_PROFILES[2];
-    expect([...v1.restrictions].sort()).toEqual([...v2.restrictions].sort());
     expect(v1.defaults).toEqual(v2.defaults);
     expect([...v1.banned.keys()]).toEqual([...v2.banned.keys()]);
   });
@@ -83,6 +84,7 @@ describe("profile invariants", () => {
   it("every declared default has a consumer", () => {
     // Guards against re-introducing config that nothing reads, where a test
     // would only ever assert the constant against itself.
-    expect(Object.keys(LANGUAGE_PROFILES[1].defaults)).toEqual(["scriptDirective"]);
+    expect(Object.keys(LANGUAGE_PROFILES[1].defaults).sort())
+      .toEqual(["scriptDirective", "securityLookahead"]);
   });
 });

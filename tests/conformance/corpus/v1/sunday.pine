@@ -1,0 +1,6 @@
+//title
+study(title="Sunday Open", shorttitle="Sunday Open", overlay=true)
+
+openPrice = security(tickerid, 'D', open)
+isSunday() => dayofweek(time('D')) == sunday ? 1 : 0
+plot(isSunday() and openPrice ? openPrice:  na, title="Sunday Open",   style=linebr, linewidth=2, color=orange)

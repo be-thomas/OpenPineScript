@@ -1,0 +1,11 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © TPCharts
+//@version=2
+study("Chad's SFP Stop Suggestor (@tradeprophet)", "Chad's SFP Stop Suggestor (@tradeprophet)", true, 2)
+TF=input(defval="60",title="Timeframe",type=string)
+ATR = security(tickerid, TF, atr(input(defval=24,title="ATR",type=integer))[1])
+Multip = input(defval=1.5,title="Multiplier",type=integer)
+Longstop =low - ATR * Multip
+Shortstop =high + ATR * Multip
+plot(Longstop,"Long Stop Loss",color=#000000,linewidth=1, transp=80)
+plot(Shortstop,"Short Stop Loss",color=#000000,linewidth=1, transp=80)

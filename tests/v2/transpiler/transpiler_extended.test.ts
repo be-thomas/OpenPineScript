@@ -6,8 +6,8 @@ import { describe, it } from "vitest";
 import assert from "node:assert";
 import * as vm from "node:vm";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";
-import { transpile } from "../../../transpiler/v2";
-import { Context } from "../../../runtime/v2";
+import { transpile } from "../../../transpiler";
+import { Context } from "../../../runtime/v1";
 
 /**
  * Helper to unwrap Series values for assertion.

@@ -1,8 +1,8 @@
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler/v2";
-import { compile, Context } from "../../../runtime/v2";
-import { processPendingOrders, oca, direction } from "../../../runtime/v2/stdlib/strategy";
+import { transpile } from "../../../transpiler";
+import { compile, Context } from "../../../runtime/v1";
+import { processPendingOrders, oca, direction } from "../../../runtime/v1/stdlib/strategy";
 
 interface Bar { o: number; h: number; l: number; c: number; t?: number; }
 

@@ -1,0 +1,21 @@
+study(title="Data from another time frame", overlay=true,
+     shorttitle="Higher time frame")
+
+// Add the inputs
+timeFrame = input(title="Other time frame", type=resolution,
+     defval="180")
+
+emaLength = input(title="EMA length", type=integer,
+     defval=21, minval=5, maxval=100)
+
+// Retrieve the higher time frame's data
+symbolHigh = security(tickerid, timeFrame, high)
+symbolLow  = security(tickerid, timeFrame, low)
+
+emaClose = ema(security(tickerid, timeFrame, close),
+     emaLength)
+
+// Plot the other time frame's data
+plot(series=symbolHigh, color=green, linewidth=3, style=circles)
+plot(series=symbolLow, color=red, linewidth=3, style=cross)
+plot(series=emaClose, color=orange, linewidth=2)

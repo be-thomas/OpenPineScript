@@ -1,0 +1,35 @@
+//Pivot Points
+study(title="Pivots Points", shorttitle="Pivots", overlay=true) 
+sd = input(true, title="Show Daily Pivots?")
+sw = input(false, title="Show Weekly Pivots?")
+sm = input(false, title="Show Monthly Pivots?")
+sy = input(false, title="Show Yearly Pivots?")
+
+
+//Classic Pivot Calculations
+pivot = (high + low + close ) / 3.0 
+r1 = pivot + (pivot - low)
+s1 = pivot - (high - pivot) 
+r2 = pivot + (high - low) 
+s2 = pivot - (high - low) 
+
+//Daily Pivots 
+dtime_pivot = security(tickerid, 'D', pivot[1]) 
+
+offs_daily = 0 
+plot(sd and dtime_pivot ? dtime_pivot : na, title="Daily Pivot",style=circles, color=fuchsia,linewidth=2) 
+
+//Weekly Pivots 
+wtime_pivot = security(tickerid, 'W', pivot[1]) 
+
+plot(sw and wtime_pivot ? wtime_pivot : na, title="Weekly Pivot",style=circles, color=fuchsia,linewidth=3) 
+
+//Monthly Pivots 
+mtime_pivot = security(tickerid, 'M', pivot[1]) 
+
+plot(sm and mtime_pivot ? mtime_pivot : na, title="Monthly Pivot",style=cross, color=fuchsia,linewidth=4) 
+
+//Yearly Pivots
+ytime_pivot = security(tickerid, '12M', pivot[1]) 
+
+plot(sy and ytime_pivot ? ytime_pivot : na, title="Yearly Pivot",style=cross, color=fuchsia,linewidth=4)

@@ -1,0 +1,41 @@
+//@version=3
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness 3 of 3 — PATH-DEPENDENT values.
+//
+// ⚠ THIS ONE NEEDS THE INSTRUMENT'S FULL HISTORY IN THE EXPORT.
+//
+// Nothing here converges. `cum(volume)` is a running total from bar 0;
+// `barssince` and `valuewhen` reach arbitrarily far back; `sar` carries a
+// trend state that never forgets its start. If the exported window begins in
+// the middle of the chart, TradingView's values include history the engine
+// never saw, and every difference is an artefact of the export rather than a
+// bug.
+//
+// So export this one on a symbol whose ENTIRE history fits in a single export
+// (see README.md). If that is not possible, export the other two harnesses
+// only — the test skips whatever has no CSV.
+//
+// Same rules as harness_core: bump line 1 to //@version=4 if v3 is rejected,
+// and delete any single plot TradingView will not compile.
+// ─────────────────────────────────────────────────────────────────────────────
+study(title="OPS golden state", shorttitle="OPS state", overlay=false)
+
+src = close
+fast = sma(src, 10)
+slow = sma(src, 30)
+
+plot(cum(volume),                       title="cum_volume")
+plot(sum(src, 20),                      title="sum_20")
+plot(sar(0.02, 0.02, 0.2),              title="sar")
+plot(vwap(hlc3),                        title="vwap_hlc3")
+plot(barssince(close > open),           title="barssince_up")
+plot(valuewhen(close > open, close, 0), title="valuewhen_up_close_0")
+plot(valuewhen(close > open, close, 1), title="valuewhen_up_close_1")
+plot(rising(src, 5)  ? 1 : 0,           title="rising_5")
+plot(falling(src, 5) ? 1 : 0,           title="falling_5")
+plot(cross(fast, slow)      ? 1 : 0,    title="cross_10_30")
+plot(crossover(fast, slow)  ? 1 : 0,    title="crossover_10_30")
+plot(crossunder(fast, slow) ? 1 : 0,    title="crossunder_10_30")
+plot(nz(src[1], 0),                     title="nz_prev_close")
+plot(fixnan(close > open ? close : na), title="fixnan_up_close")
+plot(iff(close > open, 1, 0),           title="iff_up")

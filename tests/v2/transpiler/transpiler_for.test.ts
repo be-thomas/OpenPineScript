@@ -1,12 +1,15 @@
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler/v2";
-import { compile, Context } from "../../../runtime/v2";
+import { transpile } from "../../../transpiler";
+import { compile, Context } from "../../../runtime/v1";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";
 
 function executePine(pineCode: string): { ctx: Context, js: string } {
     // 1. Transpile to JS (var replacement ensures VM scoping safety)
-    const js = transpile(pineCode).replace(/\blet\b/g, "var ");
+    // These are v2 scripts: ':=' on a loop accumulator is a v2 feature, and v1
+    // has no such token at all. Without the explicit version the source would
+    // default to v1 and fail to parse.
+    const js = transpile(pineCode, { version: 2 }).replace(/\blet\b/g, "var ");
     
     // 2. Setup the Runtime Context & Sandbox
     const ctx = new Context();

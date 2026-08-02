@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler/v2";
-import { compile, Context } from "../../../runtime/v2";
+import { transpile } from "../../../transpiler";
+import { compile, Context } from "../../../runtime/v1";
 import { NaiveTA } from "../ta/naive_ta";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";
 

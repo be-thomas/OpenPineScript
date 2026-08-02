@@ -10,12 +10,14 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler/v2";
-import { compile, Context } from "../../../runtime/v2";
+import { transpile } from "../../../transpiler";
+import { compile, Context } from "../../../runtime/v1";
 
 /** Run a single bar and return the current value of a script variable. */
 function runVar(pine: string, name: string): any {
-    const js = transpile(pine).replace(/\blet\b/g, "var ");
+    // Pinned to v2: the loop cases below use ':=' on an accumulator, which is a
+    // v2 token. An unannotated script is v1, whose grammar has no ':=' at all.
+    const js = transpile(pine, { version: 2 }).replace(/\blet\b/g, "var ");
     const ctx = new Context();
     const exec = compile(js, ctx, Object.create(null));
     ctx.setBar(0, 10, 12, 9, 11, 100);
@@ -28,7 +30,9 @@ function runVar(pine: string, name: string): any {
  * pending-order queue can be inspected directly (no fills clearing it).
  */
 function placeOrders(pine: string): Context {
-    const js = transpile(pine).replace(/\blet\b/g, "var ");
+    // Pinned to v2: the loop cases below use ':=' on an accumulator, which is a
+    // v2 token. An unannotated script is v1, whose grammar has no ':=' at all.
+    const js = transpile(pine, { version: 2 }).replace(/\blet\b/g, "var ");
     const ctx = new Context();
     const exec = compile(js, ctx, Object.create(null));
     ctx.setBar(0, 50, 55, 45, 50, 1000);
@@ -58,11 +62,15 @@ describe("for-loop returns the value of its final iteration", () => {
         assert.strictEqual(runVar("r = for i = 0 to 10 by 2\n    i\n", "r"), 10);
     });
 
-    it("known limitation: a body ending in an assignment yields na (no trailing expression)", () => {
-        // The loop-value capture rewrites a trailing expression; a bare assignment
-        // leaves no value, so the loop yields undefined/na. Documented behavior.
+    it("a body ending in an assignment yields the assigned value", () => {
+        // Was a documented limitation: the loop-value capture only rewrote a
+        // trailing EXPRESSION, so a body ending in a binding left no value and
+        // the loop yielded undefined/na.
+        //
+        // Pine returns the value of the last statement whatever its form, so a
+        // trailing binding now returns the bound variable. 1+2+3+4 = 10.
         const r = runVar("acc = 0\nr = for i = 1 to 4\n    acc := acc + i\n", "r");
-        assert.strictEqual(r, undefined);
+        assert.strictEqual(Number(r), 10);
     });
 });
 

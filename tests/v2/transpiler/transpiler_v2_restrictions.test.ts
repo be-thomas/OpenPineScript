@@ -2,7 +2,7 @@
  * tests/v2/transpiler/transpiler_v2_restrictions.test.ts
  *
  * Pine Script v2 language restrictions enforced by ToJsVisitor:
- *   - ':=' reassignment rejected at global scope (allowed on loop accumulators)
+ *   - ':=' rejected on a name that was never declared
  *   - '==' / '!=' against 'na' rejected (must use na(x))
  *   - direct recursion in user functions rejected
  *   - 'else if' is rejected at the parser layer (verified here for completeness)
@@ -11,26 +11,58 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler/v2";
+import { transpile } from "../../../transpiler";
 import { parse } from "../../../parser/v2";
-import { ToJsVisitor } from "../../../transpiler/v2/ToJsVisitor";
+import { V2ToJsVisitor } from "../../../transpiler/v2/ToJsVisitor";
 
-const throws = (src: string, re: RegExp) => assert.throws(() => transpile(src), re);
-const ok = (src: string) => assert.doesNotThrow(() => transpile(src));
+// Every source here is v2, and must say so: an unannotated script is Pine
+// Script v1, whose grammar has no ':=' token at all, so these would fail as
+// syntax errors before reaching the v2 guards they are meant to exercise.
+const throws = (src: string, re: RegExp) =>
+    assert.throws(() => transpile(src, { version: 2 }), re);
+const ok = (src: string) => assert.doesNotThrow(() => transpile(src, { version: 2 }));
 
 // ─── ':=' reassignment ──────────────────────────────────────────────────────
 
-describe("v2 restriction: ':=' reassignment", () => {
-    it("rejects global reassignment", () => {
-        throws("x = 1\nx := 2\n", /reassignment with ':='/);
+// The rule is a DECLARATION rule, not a scope rule:
+//
+//   "Use the ':=' operator to assign a new value to a variable that has
+//    already been defined."   — TradingView release notes, Pine v2
+//
+// An earlier version of this suite asserted the opposite — that ':=' was legal
+// only on a for-loop accumulator. That was inferred rather than sourced, and it
+// rejected two real published //@version=2 scripts (gap_down_reversal_strategy,
+// VIX_bonds_strategy) that TradingView compiles. See transpiler/v2/ToJsVisitor.ts.
+describe("v2 restriction: ':=' assigns only to a declared variable", () => {
+    it("rejects assignment to a name that was never declared", () => {
+        throws("x := 2\n", /'x' is not declared/);
+    });
+
+    it("rejects it inside an if-block too — scope is not what matters", () => {
+        throws("a = 1\nif a == 1\n    y := 2\n", /'y' is not declared/);
+    });
+
+    it("allows reassignment at script scope", () => {
+        ok("x = 1\nx := 2\n");
+    });
+
+    it("allows reassignment inside an if-block", () => {
+        ok("a = 1\nif a == 1\n    a := 2\n");
     });
 
     it("allows ':=' on accumulators inside a for-loop", () => {
         ok("sum = 0\nfor i = 0 to 5\n    sum := sum + i\n");
     });
 
-    it("still rejects ':=' after a loop has closed", () => {
-        throws("y = 0\nfor i = 0 to 3\n    y := y + 1\ny := 9\n", /reassignment with ':='/);
+    it("allows ':=' after a loop has closed", () => {
+        ok("y = 0\nfor i = 0 to 3\n    y := y + 1\ny := 9\n");
+    });
+
+    it("checks that the name is declared, not WHERE — v2 still allows forward references", () => {
+        // Removing forward references is a v3 change (enforceNoForwardReference).
+        // A lexical "seen so far" check here would reject valid v2 code, so the
+        // guard asks whether the name is bound anywhere in the script.
+        ok("x := 2\nx = 1\n");
     });
 });
 
@@ -94,8 +126,8 @@ describe("v2 restriction: 'else if'", () => {
 
 describe("v2 guards are overridable for a future v3 visitor", () => {
     // A v3-style visitor that lifts the v2-only restrictions.
-    class V3Visitor extends ToJsVisitor {
-        protected override enforceNoReassignment(): void { /* v3 allows ':=' */ }
+    class V3Visitor extends V2ToJsVisitor {
+        protected override enforceDeclaredBeforeReassignment(): void { /* lifted */ }
         protected override enforceNaComparison(): void { /* v3 relaxes na compare */ }
         protected override enforceNoRecursion(): void { /* v3 allows recursion */ }
     }
@@ -106,8 +138,8 @@ describe("v2 guards are overridable for a future v3 visitor", () => {
         return new V3Visitor().visit(tree);
     };
 
-    it("overriding enforceNoReassignment lets ':=' through", () => {
-        const js = transpileV3("x = 1\nx := 2\n");
+    it("overriding enforceDeclaredBeforeReassignment lets an undeclared ':=' through", () => {
+        const js = transpileV3("x := 2\n");
         assert.match(js, /opsv2_x = ctx\.new_var/);
     });
 

@@ -1,0 +1,13 @@
+////////////////////////////////////////////////////////////
+// The Polarized Fractal Efficiency (PFE)
+////////////////////////////////////////////////////////////
+study(title="PFE (Polarized Fractal Efficiency)", shorttitle="PFE (Polarized Fractal Efficiency)")
+Length = input(9, minval=1)
+LengthEMA = input(5, minval=1)
+hline(50, color=green, linestyle=line, title = "TopBand")
+hline(-50, color=red, linestyle=line, title = "LowBand")
+PFE = sqrt(pow(close - close[Length], 2) + 100)
+C2C = sum(sqrt(pow((close - close[1]), 2) + 1), Length)
+xFracEff = iff(close - close[Length] > 0, round((PFE / C2C) * 100) , round(-(PFE / C2C) * 100))
+xEMA = ema(xFracEff, LengthEMA)
+plot(xEMA, color=blue, title="PFE")

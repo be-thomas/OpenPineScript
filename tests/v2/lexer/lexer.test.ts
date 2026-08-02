@@ -1,14 +1,14 @@
 /**
- * Lexer v2 tests using the PineScriptTokenSource (Smart Lexer).
+ * Lexer v2 tests using the PineV2TokenSource (Smart Lexer).
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { CharStreams, CommonTokenStream, Lexer } from "antlr4ng";
-import { PineScriptLexer } from "../../../parser/v2/generated/PineScriptLexer.js";
+import { PineV2Lexer } from "../../../parser/v2/generated/PineV2Lexer.js";
 // IMPORT YOUR SMART LEXER
-import { PineScriptTokenSource } from "../../../lexer/v2/PineScriptTokenSource.js"; 
+import { PineV2TokenSource } from "../../../lexer/v2/PineV2TokenSource.js"; 
 
 const FIXTURES_DIR = path.join(__dirname, "fixtures");
 
@@ -22,7 +22,7 @@ function tokenize(source: string): { types: string[]; tokens: import("antlr4ng")
   
   // USE THE SMART LEXER, NOT THE RAW ONE
   // This ensures LEND, BEGIN, and END are generated.
-  const lexer = new PineScriptTokenSource(input);
+  const lexer = new PineV2TokenSource(input);
   
   const stream = new CommonTokenStream(lexer as unknown as Lexer);
   stream.fill();
@@ -66,8 +66,8 @@ describe("lexer v2 (ANTLR)", () => {
       const source = loadFixture("directives_and_keywords.pine");
       const { types, tokens } = tokenize(source);
       assert.ok(hasTokenTypes(types, "BOOL_LITERAL"));
-      assert.ok(hasTokenWithText(tokens, PineScriptLexer.BOOL_LITERAL, "true"));
-      assert.ok(hasTokenWithText(tokens, PineScriptLexer.BOOL_LITERAL, "false"));
+      assert.ok(hasTokenWithText(tokens, PineV2Lexer.BOOL_LITERAL, "true"));
+      assert.ok(hasTokenWithText(tokens, PineV2Lexer.BOOL_LITERAL, "false"));
     });
 
     it("tokenizes var_assign_if.pine: IF_COND, EQ, ASSIGN", () => {

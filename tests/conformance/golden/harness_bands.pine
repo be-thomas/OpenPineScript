@@ -1,0 +1,33 @@
+//@version=3
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness 2 of 3 — TUPLE-RETURNING built-ins.
+//
+// Separate from harness_core because these destructure, which is a different
+// emit path. Also convergent, so the same warm-up allowance applies.
+//
+// Same rules as harness_core: bump line 1 to //@version=4 if v3 is rejected,
+// and delete any single plot TradingView will not compile.
+// ─────────────────────────────────────────────────────────────────────────────
+study(title="OPS golden bands", shorttitle="OPS bands", overlay=false)
+
+src = close
+
+[macdLine, macdSignal, macdHist] = macd(src, 12, 26, 9)
+plot(macdLine,   title="macd_line")
+plot(macdSignal, title="macd_signal")
+plot(macdHist,   title="macd_hist")
+
+[bbMid, bbUpper, bbLower] = bb(src, 20, 2)
+plot(bbMid,   title="bb_mid")
+plot(bbUpper, title="bb_upper")
+plot(bbLower, title="bb_lower")
+
+plot(tsi(src, 25, 13),  title="tsi_25_13")
+plot(ema(ema(ema(src, 9), 9), 9), title="triple_ema_9")
+
+// Deliberately nested and re-used: catches state-slot collisions between two
+// calls to the same function at different call sites, which is a bug class the
+// synthetic tests found once already.
+plot(sma(ema(src, 10), 10), title="sma_of_ema_10")
+plot(ema(sma(src, 10), 10), title="ema_of_sma_10")
+plot(rsi(ema(src, 10), 14), title="rsi_of_ema_10")
