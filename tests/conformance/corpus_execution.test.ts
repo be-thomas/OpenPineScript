@@ -11,6 +11,21 @@
  *   - it produces at least one plot
  *   - every plotted series contains at least one finite value, i.e. the script
  *     is not silently emitting NaN for its whole length
+ *
+ * ── WHAT THIS SUITE DOES NOT DO ─────────────────────────────────────────────
+ *
+ * It compares nothing against TradingView. A script that runs cleanly and
+ * produces confidently wrong numbers passes every assertion here.
+ *
+ * That is worth saying plainly, because the headline test count reads as
+ * stronger evidence than it is. This is a SMOKE suite: it catches crashes and
+ * all-NaN output — which were, in fairness, the two failure modes most of this
+ * branch fixed — and nothing finer. An `rma` seeded one bar early or a `linreg`
+ * off by a half-period is invisible to it.
+ *
+ * Numerical parity lives in tradingview_golden.test.ts, which compares plot
+ * values against exports from TradingView itself. That one cannot be
+ * automated — see tests/conformance/golden/README.md.
  */
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
