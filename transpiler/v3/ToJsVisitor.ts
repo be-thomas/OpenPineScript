@@ -25,9 +25,10 @@
  * NOTE ON `:=` — inherited from v2 wholesale, operator and guard alike. v1
  * rejects it as a syntax error because PineV1Lexer.g4 has no such token.
  */
-import type { ParseTree } from "antlr4ng";
+import type { ParseTree, ParserRuleContext } from "antlr4ng";
 import type { PineVersion } from "../version";
 import { V2ToJsVisitor } from "../v2/ToJsVisitor";
+import { isRule } from "../v1/ToJsVisitor";
 import { isStaticallyBool } from "../passes/ScopeAnalysis";
 import {
   Var_defContext,
@@ -40,6 +41,30 @@ import {
 /** Anything carrying a source position (see the v1 base for why it is structural). */
 interface SourceLocated {
   start?: { line: number; column: number } | null;
+}
+
+/**
+ * Is this id the KEY of a keyword argument rather than a reference to a variable?
+ *
+ * `kw_arg : id DEFINE ( arith_expr | arith_exprs )`, and the base
+ * `visitKw_arg` visits that id to emit the key — so a guard hooked on
+ * `visitId` sees it. It is not a variable read: the name belongs to the callee's
+ * parameter list, not to script scope.
+ *
+ *     plot(close, title="hi")
+ *     title = 5
+ *
+ * reported `'title' is used before it is declared`, rejecting valid v3. The same
+ * held for `color`, `style`, `length`, `transp` — any parameter name a script
+ * later happens to bind as a variable.
+ *
+ * Checked through the parent rather than a visitor flag so it stays correct when
+ * the VALUE side contains ids of its own (`title=prefix + name`).
+ */
+function isKeywordArgumentName(ctx: IdContext): boolean {
+  const parent = (ctx as any).parent;
+  // isRule, not instanceof — see the note in the v1 base.
+  return isRule(parent, "Kw_argContext") && parent.id?.() === ctx;
 }
 
 export class V3ToJsVisitor extends V2ToJsVisitor {
@@ -105,7 +130,7 @@ export class V3ToJsVisitor extends V2ToJsVisitor {
     const text = ctx.getText();
     // Dotted names are namespace members (strategy.long, shape.triangleup), not
     // script-scope bindings, so the declaration rule does not apply to them.
-    if (!text.includes(".")) {
+    if (!text.includes(".") && !isKeywordArgumentName(ctx)) {
       this.enforceNoForwardReference(text, ctx);
     }
     return super.visitId(ctx as any);
@@ -130,12 +155,27 @@ export class V3ToJsVisitor extends V2ToJsVisitor {
     );
   }
 
+  /**
+   * The operator ADJACENT to operand `i`, in a flat `a + b - c` chain.
+   *
+   * Children alternate operand, operator, operand, …, so operand `i` is
+   * preceded by the operator at `i * 2 - 1`. Reading `getChild(1)`
+   * unconditionally named the FIRST operator every time, so `z = 1 + 2 - b`
+   * with a bool `b` reported "cannot use a bool as an operand of '+'" when the
+   * offending operator is '-'. Cosmetic, but a diagnostic that points at the
+   * wrong token sends the reader to the wrong place.
+   */
+  private operatorFor(ctx: ParserRuleContext, index: number, fallback: string): string {
+    if (index === 0) return (ctx.getChild(1) as any)?.getText() ?? fallback;
+    return (ctx.getChild(index * 2 - 1) as any)?.getText() ?? fallback;
+  }
+
   override visitAdd_expr(ctx: Add_exprContext): string {
     const operands = ctx.mult_expr();
     if (operands.length > 1) {
-      for (const operand of operands) {
-        this.enforceNoBoolArithmetic(operand, ctx, (ctx.getChild(1) as any)?.getText() ?? "+");
-      }
+      operands.forEach((operand, i) => {
+        this.enforceNoBoolArithmetic(operand, ctx, this.operatorFor(ctx as any, i, "+"));
+      });
     }
     return super.visitAdd_expr(ctx as any);
   }
@@ -143,9 +183,9 @@ export class V3ToJsVisitor extends V2ToJsVisitor {
   override visitMult_expr(ctx: Mult_exprContext): string {
     const operands = ctx.unary_expr();
     if (operands.length > 1) {
-      for (const operand of operands) {
-        this.enforceNoBoolArithmetic(operand, ctx, (ctx.getChild(1) as any)?.getText() ?? "*");
-      }
+      operands.forEach((operand, i) => {
+        this.enforceNoBoolArithmetic(operand, ctx, this.operatorFor(ctx as any, i, "*"));
+      });
     }
     return super.visitMult_expr(ctx as any);
   }

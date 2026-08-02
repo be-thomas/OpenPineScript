@@ -23,9 +23,32 @@ export interface Declaration {
 export interface ScopeInfo {
   /** name → position of its first '=' binding, script scope only. */
   declared: ReadonlyMap<string, Declaration>;
-  /** names ever assigned with ':='. */
+  /**
+   * Names assigned with ':=' AT SCRIPT SCOPE.
+   *
+   * Scope-aware for the same reason `declared` is. These were collected
+   * script-wide, so a function local shadowing a global made the global look
+   * mutable, and v3's security() guard rejected valid code:
+   *
+   *     f(z) =>
+   *         src = z
+   *         src := src * 2      // function-local
+   *         src
+   *     src = close             // never mutated
+   *     a = security(tickerid, "D", src)   → "cannot use mutable variable 'src'"
+   */
   mutated: ReadonlySet<string>;
-  /** names whose declared value is statically a boolean. */
+  /**
+   * Names whose declared value is statically a boolean, AT SCRIPT SCOPE.
+   *
+   * Same fix, same reason — a function-local `up = close > open` made a global
+   * numeric `up` look boolean and v3's arithmetic guard rejected `up + 1`.
+   *
+   * The trade-off is a false NEGATIVE inside function bodies: bool arithmetic on
+   * a function-local is no longer caught statically. That is the safe direction —
+   * the runtime backstop in the arithmetic helpers still sees it, whereas a false
+   * positive rejects a script outright.
+   */
   booleans: ReadonlySet<string>;
   /** user-defined function names. */
   functions: ReadonlySet<string>;
@@ -153,7 +176,10 @@ class Collector {
             this.declared.set(name, positionOf(node));
           }
           if (this.fnDepth > 0) this.functionScoped.add(name);
-          if (isStaticallyBool(node.arith_expr?.(), this.booleans)) this.booleans.add(name);
+          // Script scope only — see the note on `booleans` above.
+          if (this.fnDepth === 0 && isStaticallyBool(node.arith_expr?.(), this.booleans)) {
+            this.booleans.add(name);
+          }
         }
         break;
       }
@@ -174,6 +200,13 @@ class Collector {
       case "Var_assignContext": {
         const name = textOf(node.id?.());
         if (name) {
+          this.bound.add(name);
+          if (this.fnDepth > 0) {
+            // A function-local ':=' says nothing about a same-named global —
+            // see the note on `mutated` above.
+            this.functionScoped.add(name);
+            break;
+          }
           this.mutated.add(name);
           // A variable assigned a boolean is a boolean from then on.
           if (isStaticallyBool(node.arith_expr?.(), this.booleans)) this.booleans.add(name);

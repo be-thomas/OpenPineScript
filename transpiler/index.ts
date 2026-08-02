@@ -8,8 +8,8 @@
  *   version   grammar              parser            visitor
  *   ────────────────────────────────────────────────────────────────────
  *   v1        PineV1*.g4 (base)    parser/v1         V1ToJsVisitor (base)
- *   v2        import PineV1*       parser/v2         extends V1
- *   v3        import PineV2* + :=  parser/v3         extends V2
+ *   v2        import PineV1* + :=  parser/v2         extends V1
+ *   v3        import PineV2*       parser/v3         extends V2
  *
  * This module is the ONLY place that maps a version number to a pipeline. It is
  * deliberately un-versioned: it belongs to no single version, and adding v4 must

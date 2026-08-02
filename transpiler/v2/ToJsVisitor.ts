@@ -89,7 +89,24 @@ export class V2ToJsVisitor extends V1ToJsVisitor {
    */
   protected enforceDeclaredBeforeReassignment(ctx: Var_assignContext): void {
     const name = ctx.id().getText();
-    if (this.scopes.bound.has(name)) return;
+
+    // Inside a function body, the target may be a parameter or a local, neither
+    // of which is a script-scope declaration. `bound` is the right question there.
+    //
+    // At script scope it is the WRONG question: `bound` also contains every
+    // function parameter and local in the file, so
+    //
+    //     f(x) => x + 1
+    //     x := 2            // no script-scope 'x' exists
+    //
+    // passed because some function happened to bind `x`. TradingView reports
+    // `Undeclared identifier`. Script scope asks `declared`, which the analysis
+    // pass already restricts to fnDepth 0.
+    const known = this.fnDepth > 0
+      ? this.scopes.bound.has(name)
+      : this.scopes.declared.has(name);
+    if (known) return;
+
     throw this.err(
       ctx,
       `'${name}' is not declared, so it cannot be assigned with ':='. ` +

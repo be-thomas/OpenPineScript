@@ -102,11 +102,21 @@ interface SourceLocated {
  * overridden rules first, so the same rule has a different index per version.
  * The class NAME is the one identifier ANTLR keeps stable across the hierarchy.
  */
-function isRule(node: unknown, ruleContextName: string): boolean {
+export function isRule(node: unknown, ruleContextName: string): boolean {
   return (node as any)?.constructor?.name === ruleContextName;
 }
 
 export class V1ToJsVisitor extends ParseTreeVisitor<string> {
+  /**
+   * Depth of user-function bodies currently being emitted.
+   *
+   * Pine scopes a function body separately from script scope, and several
+   * guards need to know which they are in — a name bound only inside some
+   * function says nothing about script scope. Tracked here rather than in a
+   * subclass so every version shares one counter.
+   */
+  protected fnDepth = 0;
+
   /**
    * The version this emitter implements. Subclasses override it, and every
    * diagnostic is stamped with it, so an inherited guard reports the version
@@ -435,7 +445,10 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
         this.enforceNoTupleReturn(ctx);
     }
 
-    const body = this.visit(ctx.fun_body_singleline());
+    this.fnDepth++;
+    let body: string;
+    try { body = this.visit(ctx.fun_body_singleline()); }
+    finally { this.fnDepth--; }   // a guard deeper in the body throws
     return `function ${name}${params} {\n  return ${body};\n}`;
   }
 
@@ -451,7 +464,10 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
         this.enforceNoTupleReturn(ctx);
     }
 
-    const body = this.visit(ctx.fun_body_multiline());
+    this.fnDepth++;
+    let body: string;
+    try { body = this.visit(ctx.fun_body_multiline()); }
+    finally { this.fnDepth--; }   // a guard deeper in the body throws
     return `function ${name}${params} ${body}`;
   }
 
@@ -940,19 +956,49 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   /**
-   * Emit a security() call with its 3rd argument (the expression) deferred as a
-   * thunk `() => (expr)`, so the runtime can evaluate it in the HTF sub-context.
-   * Other args (symbol, resolution, gaps, lookahead) are passed eagerly.
+   * Emit a security() call with the `expression` argument deferred as a thunk
+   * `() => (expr)`, so the runtime can evaluate it in the HTF sub-context.
+   * Every other argument (symbol, resolution, gaps, lookahead) is eager.
+   *
+   * KEYWORD ARGUMENTS ARE INCLUDED. This method used to read `pos_args()` only,
+   * which silently discarded them:
+   *
+   *     security(tickerid, "D", close, lookahead=barmerge.lookahead_off)
+   *
+   * emitted no `lookahead` at all, so `resolveLookahead` in
+   * runtime/v1/stdlib/mtf.ts never saw an explicit value and always applied the
+   * version default. That made the documented per-call escape hatch unreachable,
+   * and a v2 script asking for `lookahead_off` silently got `on` — the exact
+   * behaviour the v2→v3 default flip exists to distinguish.
+   *
+   * `ctx.call` maps the keyword object onto positional slots by name, so the
+   * object is appended unchanged and `expression=` is deferred wherever it lands.
    */
   protected emitSecurity(ctx: Fun_callContext): string {
     const callId = `"security${this.getLocId(ctx)}"`;
     const transpiledName = this.visit(ctx.id());
-    const pos = ctx.fun_actual_args()?.pos_args();
+    const aa = ctx.fun_actual_args();
+
+    const pos = aa?.pos_args();
     const exprs = pos ? pos.arith_expr() : [];
     const parts = exprs.map((e, i) => {
       const js = this.visit(e);
-      return i === 2 ? `() => (${js})` : js; // defer the expression argument
+      return i === 2 ? `() => (${js})` : js; // positional `expression`
     });
+
+    const kwArgs = aa?.kw_args();
+    if (kwArgs) {
+      const entries = kwArgs.kw_arg().map(a => {
+        const key = this.visit(a.id());
+        const valueCtx = a.arith_expr() ?? a.arith_exprs()!;
+        const js = this.visit(valueCtx);
+        // The same deferral rule, applied to the keyword spelling.
+        const deferred = a.id().getText() === "expression" ? `() => (${js})` : js;
+        return `${key}: ${deferred}`;
+      });
+      parts.push(`{ ${entries.join(", ")} }`);
+    }
+
     const argsPart = parts.length ? `, ${parts.join(", ")}` : "";
     return `ctx.call(${callId}, ${transpiledName}${argsPart})`;
   }
