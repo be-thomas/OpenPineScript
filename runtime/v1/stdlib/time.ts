@@ -93,18 +93,20 @@ const parts = {
      */
     "second": (t: number): number => new Date(t).getUTCSeconds(),
 
-    /**
-     * Built-in 'time' variable getter.
-     * In v2, 'time' returns the UNIX timestamp of the current bar.
-     * The transpiler maps the 'time' keyword directly to this Context call.
-     * * @param {Context} ctx - The current execution context.
-     * @returns {number} The current bar's UNIX timestamp in milliseconds.
-     */
-    "time": (ctx: Context): number => ctx.time,
-
 };
 
-export default time;
+// No `export default`. This file used to end `export default time;` back when
+// `time` named the accessor map above. Renaming that map to `parts` — needed to
+// free the bare "time" registry key for the `time(resolution, session)` function
+// declared below — silently repointed the default export at that function
+// instead. Nothing imported it (the generator reads NAMED exports), so it was
+// dead rather than broken, but it read as if it exported the accessors.
+//
+// The map's own "time" entry went with it. Pine's bare `time` variable never
+// reached it either: initializeSandbox binds `opsv2_time` straight to the
+// Context series, so a bare `time` resolves there and only `time(...)` calls go
+// through the registry.
+
 /**
  * Constructs a UNIX timestamp (ms) from calendar components (UTC).
  * Pine months are 1-indexed (January = 1); JS Date.UTC expects 0-indexed.

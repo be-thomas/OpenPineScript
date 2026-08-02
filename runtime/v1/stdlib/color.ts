@@ -102,6 +102,16 @@ const color = {
     }
 };
 
-export const __IS_NAMESPACE__ = true;
-
+// NO `__IS_NAMESPACE__` here, deliberately.
+//
+// That flag makes the registry generator prefix every key with the MODULE name.
+// This module is color.ts and the object it exports is also called `color`, so
+// the flag produced `color.color.new` — a key no Pine source can ever write.
+// `visitFun_call` found no registry entry for `color.new`, fell through to a
+// plain identifier, and emitted `opsv2_color.opsv2_new`, which is undefined at
+// runtime. Same for .rgb / .r / .g / .b / .t.
+//
+// Without the flag the object's own name supplies the namespace and the keys
+// come out as `color.new`, which is what Pine spells. registry_keys.test.ts
+// asserts that.
 export default color;

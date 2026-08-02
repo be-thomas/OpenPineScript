@@ -230,7 +230,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: chart.HEIKINASHI_PREFIX
       },
-      "color.color.new": {
+      "color.new": {
           uses_context: false,
           args: ["colorStr","transp"],
           is_getter: false,
@@ -238,7 +238,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["new"]
       },
-      "color.color.rgb": {
+      "color.rgb": {
           uses_context: false,
           args: ["r","g","b","transp"],
           is_getter: false,
@@ -246,7 +246,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["rgb"]
       },
-      "color.color.r": {
+      "color.r": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
@@ -254,7 +254,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["r"]
       },
-      "color.color.g": {
+      "color.g": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
@@ -262,7 +262,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["g"]
       },
-      "color.color.b": {
+      "color.b": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
@@ -270,7 +270,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: (color.default || color)["b"]
       },
-      "color.color.t": {
+      "color.t": {
           uses_context: false,
           args: ["c"],
           is_getter: false,
@@ -688,7 +688,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "security": {
           uses_context: true,
-          args: ["symbolInput","resolutionInput","expression","_gaps","lookaheadInput"],
+          args: ["symbol","resolution","expression","gaps","lookahead"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -960,7 +960,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "sma": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -968,7 +968,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "ema": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -976,7 +976,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "rma": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -984,7 +984,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "wma": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -992,7 +992,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "vwma": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1000,7 +1000,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "swma": {
           uses_context: true,
-          args: ["sourceInput"],
+          args: ["source"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1008,7 +1008,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "trix": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1016,7 +1016,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "rsi": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1024,7 +1024,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "macd": {
           uses_context: true,
-          args: ["sourceInput","fastLenInput","slowLenInput","sigLenInput"],
+          args: ["source","fastLen","slowLen","sigLen"],
           is_getter: false,
           returns: {"kind":"tuple","itemTypes":[{"kind":"series","type":"series float"},{"kind":"series","type":"series float"},{"kind":"series","type":"series float"}]},
           is_value: false,
@@ -1032,7 +1032,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "mom": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1040,7 +1040,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "bb": {
           uses_context: true,
-          args: ["sourceInput","lengthInput","multInput"],
+          args: ["source","length","mult"],
           is_getter: false,
           returns: {"kind":"tuple","itemTypes":[{"kind":"series","type":"series float"},{"kind":"series","type":"series float"},{"kind":"series","type":"series float"}]},
           is_value: false,
@@ -1048,7 +1048,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "cci": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1056,7 +1056,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "cross": {
           uses_context: true,
-          args: ["xInput","yInput"],
+          args: ["x","y"],
           is_getter: false,
           returns: {"kind":"scalar","type":"bool"},
           is_value: false,
@@ -1064,7 +1064,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "crossover": {
           uses_context: true,
-          args: ["xInput","yInput"],
+          args: ["x","y"],
           is_getter: false,
           returns: {"kind":"scalar","type":"bool"},
           is_value: false,
@@ -1072,7 +1072,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "crossunder": {
           uses_context: true,
-          args: ["xInput","yInput"],
+          args: ["x","y"],
           is_getter: false,
           returns: {"kind":"scalar","type":"bool"},
           is_value: false,
@@ -1112,7 +1112,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "stoch": {
           uses_context: true,
-          args: ["sourceInput","highInput","lowInput","lengthInput"],
+          args: ["source","high","low","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1120,7 +1120,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "valuewhen": {
           uses_context: true,
-          args: ["conditionInput","sourceInput","occurrenceInput"],
+          args: ["condition","source","occurrence"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1128,7 +1128,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "barssince": {
           uses_context: true,
-          args: ["conditionInput"],
+          args: ["condition"],
           is_getter: false,
           returns: {"kind":"series","type":"int"},
           is_value: false,
@@ -1136,7 +1136,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "atr": {
           uses_context: true,
-          args: ["lengthInput"],
+          args: ["length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1144,7 +1144,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "vwap": {
           uses_context: true,
-          args: ["sourceInput"],
+          args: ["source"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1152,7 +1152,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "linreg": {
           uses_context: true,
-          args: ["sourceInput","lengthInput","offsetInput"],
+          args: ["source","length","offset"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1160,7 +1160,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "sar": {
           uses_context: true,
-          args: ["startInput","incInput","maxInput"],
+          args: ["start","inc","max"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1168,7 +1168,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "cum": {
           uses_context: true,
-          args: ["sourceInput"],
+          args: ["source"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1176,7 +1176,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "roc": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1184,7 +1184,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "change": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1192,7 +1192,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "falling": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"bool"},
           is_value: false,
@@ -1200,7 +1200,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "rising": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"bool"},
           is_value: false,
@@ -1208,7 +1208,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "dev": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1216,7 +1216,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "variance": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1224,7 +1224,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "stdev": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1232,7 +1232,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "correlation": {
           uses_context: true,
-          args: ["source1Input","source2Input","lengthInput"],
+          args: ["source1","source2","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1240,7 +1240,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "percentrank": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1248,7 +1248,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "wpr": {
           uses_context: true,
-          args: ["lengthInput"],
+          args: ["length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1256,7 +1256,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "mfi": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1264,7 +1264,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "alma": {
           uses_context: true,
-          args: ["sourceInput","lengthInput","offsetInput","sigmaInput"],
+          args: ["source","length","offset","sigma"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1272,7 +1272,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "cog": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1280,7 +1280,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "tsi": {
           uses_context: true,
-          args: ["sourceInput","longLenInput","shortLenInput"],
+          args: ["source","longLen","shortLen"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1288,7 +1288,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "pivothigh": {
           uses_context: true,
-          args: ["sourceInput","leftbarsInput","rightbarsInput"],
+          args: ["source","leftbars","rightbars"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1296,7 +1296,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "pivotlow": {
           uses_context: true,
-          args: ["sourceInput","leftbarsInput","rightbarsInput"],
+          args: ["source","leftbars","rightbars"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1312,7 +1312,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "sum": {
           uses_context: true,
-          args: ["sourceInput","lengthInput"],
+          args: ["source","length"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1320,7 +1320,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "fixnan": {
           uses_context: true,
-          args: ["xInput"],
+          args: ["x"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1328,7 +1328,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "percentile_nearest_rank": {
           uses_context: true,
-          args: ["sourceInput","lengthInput","percentageInput"],
+          args: ["source","length","percentage"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1336,7 +1336,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "percentile_linear_interpolation": {
           uses_context: true,
-          args: ["sourceInput","lengthInput","percentageInput"],
+          args: ["source","length","percentage"],
           is_getter: false,
           returns: {"kind":"series","type":"float"},
           is_value: false,
@@ -1416,7 +1416,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "time": {
           uses_context: true,
-          args: ["_resolution","session"],
+          args: ["resolution","session"],
           is_getter: false,
           returns: {"kind":"scalar","type":"float} The bar's UNIX time in ms, or na."},
           is_value: false,
@@ -1472,7 +1472,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plotarrow": {
           uses_context: true,
-          args: ["series","title","colorup","colordown","_minheight","_maxheight"],
+          args: ["series","title","colorup","colordown","minheight","maxheight"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
