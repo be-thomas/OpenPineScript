@@ -106,6 +106,21 @@ interface RuntimeSnapshot {
     riskState: any;
 }
 
+/**
+ * A v4 drawing object (line, label, box, table).
+ *
+ * `props` is deliberately untyped: the four kinds share no fields, every one of
+ * them has ~10 optional style properties, and nothing in this engine reads them
+ * — they exist so a host can render, and so a script that draws does not crash.
+ */
+export interface Drawing {
+    id: string;
+    kind: 'line' | 'label' | 'box' | 'table';
+    /** The bar the drawing was created on. */
+    bar: number;
+    props: Record<string, any>;
+}
+
 /** A higher-timeframe candle supplied for `security()` evaluation (P1). */
 export interface SecurityCandle {
     time: number; open: number; high: number; low: number; close: number; volume: number;
@@ -191,8 +206,37 @@ export class Context {
      */
     public now: number = Date.now();
 
-    public plots: Map<string, (PlotData | null)[]> = new Map(); 
+    public plots: Map<string, (PlotData | null)[]> = new Map();
     public fills: Map<string, (FillData | null)[]> = new Map();
+
+    /**
+     * v4 drawing objects — line, label, box, table — keyed by their generated id.
+     *
+     * A Map rather than an array so `line.delete(id)` is O(1) and ids stay
+     * stable, which is what a host needs to diff one bar's drawings against the
+     * next instead of re-rendering everything.
+     *
+     * These do NOT feed `plots`: a drawing is not a per-bar value, it is an
+     * object with a lifetime. Nothing in the golden-parity suite reads them —
+     * TradingView's exported chart data does not include drawings either.
+     */
+    public drawings: Map<string, Drawing> = new Map();
+    private drawingCounter: number = 0;
+
+    /** Registers a drawing and returns its id. */
+    public newDrawing(kind: Drawing["kind"], props: Record<string, any>): string {
+        const id = `${kind}_${this.drawingCounter++}`;
+        this.drawings.set(id, { id, kind, bar: this.currentBarIndex, props });
+        return id;
+    }
+
+    /** Looks a drawing up, or throws — a stale id is a bug, not a no-op. */
+    public getDrawing(id: any, fn: string): Drawing {
+        const key = String(id instanceof Series ? id.valueOf() : id);
+        const drawing = this.drawings.get(key);
+        if (!drawing) throw new Error(`${fn}: no such drawing '${key}' (it may have been deleted)`);
+        return drawing;
+    }
 
     // NEW: Barstate Flags (Required for barstate.ts getters)
     public is_history: boolean = true;
@@ -265,6 +309,10 @@ export class Context {
         this.callStack = [];
         this.states.clear();
         this.inputCounter = 0;
+        // A `var` initialiser must run again on a fresh pass, or a re-run would
+        // carry the previous pass's value in and never re-evaluate it.
+        this.varInitialised.clear();
+        this.varipSeries.clear();
 
         // 2. Reset Registry & Re-initialize built-ins
         this.vars.clear();
@@ -464,7 +512,88 @@ export class Context {
         return this.states.get(key);
     }
 
+    // --- v4 `var` / `varip` declarations ---------------------------------
+    //
+    // Lives on the shared base rather than in runtime/v4/ because the runtime is
+    // one implementation across versions by design
+    // (dev-docs/00-architecture-assessment.md §5.6). Only V4ToJsVisitor can emit
+    // a call to it: v1–v3 have no `var` token, so their scripts cannot reach it.
+
+    /** Declaration sites whose initialiser has already run, keyed by @L:C. */
+    private varInitialised: Set<string> = new Set();
+
+    /** Series declared `varip`, exempt from intra-bar rollback. */
+    private varipSeries: Set<string> = new Set();
+
+    /**
+     * `var x = expr` — initialise ONCE, then persist across bars.
+     *
+     * The initialiser is passed as a thunk, not a value: `var x = expr` must not
+     * evaluate `expr` after the first bar. Passing the value would evaluate it
+     * every bar and throw the result away, which is invisible for `0.0` and
+     * quite visible for `var count = count + 1` or anything with a side effect.
+     *
+     * Persistence re-stamps the LAST value onto the current bar, read from
+     * `valueOf()` rather than `get(1)`. The two differ exactly when the variable
+     * was last written on an earlier bar than the previous one — a `var` inside
+     * a conditional block — where `get(1)` finds a hole and returns NaN while
+     * `valueOf()` returns the value that is actually still held. Pine persists
+     * the value, so `valueOf()` is the right question.
+     *
+     * Re-stamping every bar is also what makes `:=` work unchanged: it writes
+     * the current bar's slot through `new_var`, and the next bar carries that
+     * forward. No write-back path and no coupling to the assignment emitter.
+     *
+     * @param key  the declaration's @L<line>:C<col> site, so two `var`s in one
+     *             script — or the same one in two function instantiations — do
+     *             not share an initialised flag.
+     */
+    public var_def(name: string, key: string, initFn: () => any, ip: boolean = false): Series {
+        if (ip) this.varipSeries.add(name);
+
+        if (this.varInitialised.has(key)) {
+            const held = this.vars.get(name);
+            return this.new_var(name, held ? held.valueOf() : NaN);
+        }
+
+        this.varInitialised.add(key);
+        return this.new_var(name, initFn());
+    }
+
     // --- Series Management ---
+
+    /**
+     * Pine truthiness, for anything used as a CONDITION.
+     *
+     * ── Why this exists ─────────────────────────────────────────────────────
+     *
+     * `new_var` returns a Series, and in JavaScript EVERY object is truthy. So
+     * a condition stored in a variable was permanently true:
+     *
+     *     up = close > open        // a Series wrapping true/false
+     *     plot(up ? 1 : 0)         // 1 on every bar, forever
+     *
+     * Relational operators hid it — `close > open` coerces through valueOf() and
+     * works — but `?:`, `if`, `and`, `or` and `not` use ToBoolean, which does not
+     * consult valueOf(). Naming a condition and reusing it is how nearly every
+     * published script is written, so every branch in them was taken.
+     *
+     * The corpus suite could not see this: a script whose conditions are all
+     * true still runs and still plots finite numbers.
+     *
+     * ── The rule ────────────────────────────────────────────────────────────
+     *
+     * Unwrap first, then apply Pine's own conversion: `na` is false, 0 is false,
+     * any other number is true. v1–v3 coerce numbers to bool freely (`isSunday()
+     * and openPrice ? ...` is published v1), so this must accept numbers rather
+     * than demand a bool.
+     */
+    public truthy(v: any): boolean {
+        const x = v instanceof Series ? v.valueOf() : v;
+        if (x === null || x === undefined) return false;
+        if (typeof x === "number") return !Number.isNaN(x) && x !== 0;
+        return Boolean(x);
+    }
 
     /**
      * FACTORY: Creates or Updates a Series Object.
@@ -675,12 +804,19 @@ export class Context {
     private restoreSnapshot(s: RuntimeSnapshot) {
         // Re-clone so the baseline stays pristine across repeated ticks.
         this.states = structuredClone(s.states);
+
+        // `varip` is the whole point of this exemption: it is defined as "like
+        // var, but retains its value between the updates of a real-time bar".
+        // Rolling one back would make it identical to `var`, and the difference
+        // between them is only ever observable here.
         for (const [k, meta] of s.varMeta) {
+            if (this.varipSeries.has(k)) continue;
             this.vars.get(k)?.restoreTo(meta);
         }
         // Series created *after* the baseline are simply truncated to empty; the
         // upcoming re-run recreates and overwrites them.
         for (const [k, s2] of this.vars) {
+            if (this.varipSeries.has(k)) continue;
             if (!s.varMeta.has(k)) s2.restoreTo({ len: 0, val: null, start: -1, fallback: null, locked: false });
         }
         for (const [k, len] of s.plotLens) {

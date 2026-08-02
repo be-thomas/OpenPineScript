@@ -75,9 +75,8 @@ import {
   Other_literalContext,
   IdContext,
 } from "../../parser/v1/generated/PineV1Parser";
-import { getGeneratedRegistry } from "../../runtime/v1/stdlib/metadata";
-
-const REGISTRY = getGeneratedRegistry();
+import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
+import { BASE_REGISTRY, REGISTRY } from "../../runtime/v1/stdlib";
 
 /**
  * Anything carrying a source position. Structural rather than
@@ -117,12 +116,39 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    */
   protected fnDepth = 0;
 
+  /** Depth of for-loop bodies currently being emitted. */
+  protected loopDepth = 0;
+
+  /**
+   * While positive, a block does NOT turn its last statement into a `return`.
+   * Set only for a statement-position `if` inside a loop — see visitIf_expr.
+   */
+  protected suppressBlockReturn = 0;
+
   /**
    * The version this emitter implements. Subclasses override it, and every
    * diagnostic is stamped with it, so an inherited guard reports the version
    * that actually rejected the code rather than the one that wrote the check.
    */
   protected readonly version: PineVersion = 1;
+
+  /**
+   * The names this VERSION may spell, and what each one means.
+   *
+   * An extension point, not a constant, because the stdlib is not the same set
+   * at every version: v4 renamed a pile of globals into namespaces, so `red`
+   * and `color.red` are each valid at exactly one version and invalid at the
+   * other. A single shared table cannot say that — it would accept both
+   * dialects everywhere and quietly compile scripts TradingView rejects.
+   *
+   * v1–v3 get the generated registry unchanged. v4 overrides this with its own
+   * view. Nothing about v4 appears in this file, which is the point: adding a
+   * version must never mean editing an earlier one
+   * (dev-docs/00-architecture-assessment.md §5).
+   */
+  protected get registry(): Record<string, StdlibEntry> {
+    return BASE_REGISTRY;
+  }
 
   // Prefix for all emitted identifiers to avoid sandbox name clashes
   protected readonly PREFIX = common.PREFIX;
@@ -531,8 +557,15 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
         let js = this.visit(stmt);
 
         // Return logic for last statement
-        if (index === stmts.length - 1) {
+        if (index === stmts.length - 1 && this.suppressBlockReturn === 0) {
              const content = stmt.local_stmt_content(0);
+
+             // A statement-position `if` inside a loop is emitted as a plain
+             // `if` block, not an IIFE, so that break/continue are legal. It is
+             // a STATEMENT — `return <that>` (or the `_res = <that>` that
+             // visitFor_expr rewrites it into) is a syntax error.
+             if (content && this.loopDepth > 0 && this.statementIf(content)) return js;
+
              if (content) {
                  const isExpression =
                     content.arith_expr() ||
@@ -641,7 +674,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     
     if (funCall) {
         const funcName = funCall.id().getText();
-        const entry = REGISTRY[funcName];
+        const entry = this.registry[funcName];
 
         // If it's a built-in, check the registry for tuple return
         if (entry) {
@@ -652,7 +685,22 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
                 throw this.err(ctx, `'${funcName}' returns ${entry.returns.itemTypes.length} values, but you provided ${ids.length} variables.`);
             }
         } 
-        // Not in the registry, so it is user-defined. Route through the same
+        // Absent from THIS version's registry but present in a later one —
+        // report the version, not a generic tuple complaint.
+        //
+        // `[a, b, c] = bb(close, 5, 2)` at v3 said "User-defined functions
+        // cannot return tuples", which sends the reader looking for a function
+        // they never wrote. TradingView says "Could not find function or
+        // function reference 'bb'", and the real answer is that `bb` arrived in
+        // v4.
+        else if (!this.userFunctions.has(funcName) && funcName in REGISTRY) {
+            throw this.err(
+                ctx,
+                `'${funcName}' is not available in Pine Script v${this.version}. ` +
+                `It was added in a later version.`,
+            );
+        }
+        // Not in any registry, so it is user-defined. Route through the same
         // gated guard the function-definition path uses — enforcing the rule
         // unconditionally here would let a version that lifts it accept the
         // definition and then reject the call site.
@@ -691,22 +739,75 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return "";
   }
 
+  /**
+   * Is this `if` a STATEMENT, whose value is discarded, rather than an
+   * expression being bound to something?
+   *
+   * The grammar admits `if_expr` in exactly two places — `*_stmt_content` and
+   * `arith_expr` — so the parent rule answers it.
+   */
+  /**
+   * The `if` this statement IS, or null if the statement is something else.
+   *
+   * `global_stmt_content` names if_expr directly; `local_stmt_content` reaches
+   * it through the transparent `arith_expr` wrapper.
+   */
+  protected statementIf(content: any): any | null {
+    return content?.if_expr?.() ?? content?.arith_expr?.()?.if_expr?.() ?? null;
+  }
+
+  private isStatementPosition(ctx: If_exprContext): boolean {
+    // `arith_expr : ternary_expr | if_expr | for_expr` is a transparent wrapper,
+    // and `local_stmt_content` reaches if_expr THROUGH it, so the immediate
+    // parent is Arith_exprContext in both statement and expression position.
+    // Walk past those wrappers; what is underneath tells the two apart —
+    // Local_stmt_contentContext is a statement, Var_defContext is a binding.
+    let node = (ctx as any).parent;
+    while (isRule(node, "Arith_exprContext")) node = node.parent;
+    return isRule(node, "Global_stmt_contentContext")
+        || isRule(node, "Local_stmt_contentContext");
+  }
+
   visitIf_expr(ctx: If_exprContext): string {
     const cond = this.visit(ctx.ternary_expr());
-    const thenBlock = this.visit(ctx.stmts_block(0));
-    let result = `if (${cond}) ${thenBlock}`;
-    if (ctx.IF_COND_ELSE()) {
-      const elseBlock = this.visit(ctx.stmts_block(1));
-      result += ` else ${elseBlock}`;
+
+    // An `if` normally becomes an IIFE, because a block's last statement is
+    // emitted as `return <value>` — Pine blocks evaluate to something, and the
+    // function boundary is what contains that return.
+    //
+    // Inside a LOOP that boundary is fatal: `break` and `continue` cannot cross
+    // a function, so
+    //
+    //     for i = 0 to 49
+    //         if close[i] < open[i]
+    //             firstDown := i
+    //             break
+    //
+    // failed to compile with "Illegal break statement". In statement position
+    // the block's value is discarded anyway, so the IIFE buys nothing there —
+    // emit a plain `if` and suppress the trailing return that made it necessary.
+    const plain = this.loopDepth > 0 && this.isStatementPosition(ctx);
+    if (plain) this.suppressBlockReturn++;
+    try {
+      const thenBlock = this.visit(ctx.stmts_block(0));
+      let result = `if (ctx.truthy(${cond})) ${thenBlock}`;
+      if (ctx.IF_COND_ELSE()) {
+        result += ` else ${this.visit(ctx.stmts_block(1))}`;
+      }
+      return plain ? result : `(() => { ${result} })()`;
+    } finally {
+      if (plain) this.suppressBlockReturn--;
     }
-    return `(() => { ${result} })()`;
   }
 
   visitFor_expr(ctx: For_exprContext): string {
     const varName = this.visit(ctx.var_def().id());
     const startVal = this.visit(ctx.var_def().arith_expr());
     const endVal = this.visit(ctx.ternary_expr(0));
-    const rawBody = this.visit(ctx.stmts_block());
+    this.loopDepth++;
+    let rawBody: string;
+    try { rawBody = this.visit(ctx.stmts_block()); }
+    finally { this.loopDepth--; }
 
     let stepVal = "1";
     if (ctx.FOR_STMT_BY()) {
@@ -781,25 +882,32 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
 // --- Math ---
   visitTernary_expr(ctx: Ternary_exprContext): string {
     const cond = this.visit(ctx.or_expr());
-    
+
     // Check if the COND ('?') token exists
     if (ctx.COND()) {
       const trueBranch = this.visit(ctx.ternary_expr(0));
       const falseBranch = this.visit(ctx.ternary_expr(1));
-      return `(${cond} ? ${trueBranch} : ${falseBranch})`;
+      // ctx.truthy, not the raw value: a condition held in a variable is a
+      // Series object, and every object is truthy in JS. See Context.truthy.
+      return `(ctx.truthy(${cond}) ? ${trueBranch} : ${falseBranch})`;
     }
     
     return cond;
   }
 
+  // `and` / `or` take BOOLEANS, so each operand goes through ctx.truthy for the
+  // same reason the ternary condition does. A single operand is passed straight
+  // through: it may be a number being used as a value, not a condition.
   visitOr_expr(ctx: Or_exprContext): string {
     const parts = ctx.and_expr().map((e) => this.visit(e));
-    return parts.join(" || ");
+    if (parts.length === 1) return parts[0];
+    return parts.map(p => `ctx.truthy(${p})`).join(" || ");
   }
 
   visitAnd_expr(ctx: And_exprContext): string {
     const parts = ctx.eq_expr().map((e) => this.visit(e));
-    return parts.join(" && ");
+    if (parts.length === 1) return parts[0];
+    return parts.map(p => `ctx.truthy(${p})`).join(" && ");
   }
 
   visitEq_expr(ctx: Eq_exprContext): string {
@@ -859,7 +967,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
 
   visitUnary_expr(ctx: Unary_exprContext): string {
     const inner = this.visit(ctx.sqbr_expr());
-    if (ctx.NOT()) return `!(${inner})`;
+    if (ctx.NOT()) return `!ctx.truthy(${inner})`;   // see Context.truthy
     if (ctx.PLUS()) return `+${inner}`;
     if (ctx.MINUS()) return `-${inner}`;
     return inner;
@@ -936,7 +1044,22 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // JavaScript does not. A name that is neither a built-in nor a declared
     // function keeps the plain identifier — that is a call through a parameter
     // or an outright typo, and either way the runtime should say so.
-    const transpiledName = REGISTRY[originalName]
+    // A built-in this version does not have, but a later one does, is reported
+    // as a VERSION problem. Otherwise it falls through to the plain-identifier
+    // branch and fails at run time as "opsv2_bb is not a function", which reads
+    // like an engine bug rather than the migration error it is. TradingView
+    // says "Could not find function or function reference 'bb'".
+    if (!this.registry[originalName]
+        && !this.userFunctions.has(originalName)
+        && originalName in REGISTRY) {
+      throw this.err(
+        ctx,
+        `'${originalName}' is not available in Pine Script v${this.version}. ` +
+        `It was added in a later version.`,
+      );
+    }
+
+    const transpiledName = this.registry[originalName]
       ? `ctx.builtin(${JSON.stringify(originalName)})`
       : this.userFunctions.has(originalName)
         ? this.funcName(originalName)
@@ -1067,8 +1190,52 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   // A real method, NOT an arrow-function property: a property is installed on
   // the instance and cannot be reached by `super.visitId(...)`, which would make
   // it the one visit* method a subclass could not extend.
+  /**
+   * The namespace roots this version knows — `strategy`, `barstate`, `color`, …
+   * Derived from the version's own registry, so v4's extra roots appear only
+   * there. Cached: it is a scan of ~250 keys and `visitId` runs constantly.
+   */
+  private namespaceRootCache: ReadonlySet<string> | null = null;
+  protected get namespaceRoots(): ReadonlySet<string> {
+    if (!this.namespaceRootCache) {
+      this.namespaceRootCache = new Set(
+        Object.keys(this.registry).filter(k => k.includes(".")).map(k => k.split(".")[0]),
+      );
+    }
+    return this.namespaceRootCache;
+  }
+
   visitId(ctx: IdContext): string {
     const text = ctx.getText();
+
+    // An UNKNOWN NAMESPACE is an error, not an undefined read.
+    //
+    // Pine has no user-defined dotted names before v5, so every dotted
+    // identifier names a built-in namespace. If the root is not one this
+    // version has, the script is written against a different version.
+    //
+    // Only the ROOT is checked, not the full key. A missing member of a real
+    // namespace (`strategy.wintrades`, `barstate.isconfirmed`) is this engine's
+    // gap rather than the script's mistake, and failing those here would report
+    // an incomplete stdlib as a user error.
+    //
+    // This exists because the failure was previously an ACCIDENT: `syminfo` had
+    // no entry at all, so `opsv2_syminfo.opsv2_timezone` threw a TypeError on a
+    // missing object. The moment v4 added `syminfo.ticker` — which builds an
+    // `opsv2_syminfo` object for every version, the runtime registry being
+    // deliberately a union — the same v2 script started reading `undefined` and
+    // running to completion with a silently wrong timezone.
+    const dot = text.indexOf(".");
+    if (dot > 0) {
+      const root = text.slice(0, dot);
+      if (!this.namespaceRoots.has(root)) {
+        throw this.err(
+          ctx,
+          `'${root}' is not a namespace in Pine Script v${this.version}, so ` +
+          `'${text}' cannot be resolved.`,
+        );
+      }
+    }
 
     // strategy.* namespace (getters/constants too) requires strategy() context.
     if (text.startsWith("strategy.")) {
@@ -1086,7 +1253,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // 2. THE GETTER CHECK
     // If the standard library registry marks this identifier as a getter,
     // we must transpile it into an execution call instead of a static reference!
-    const entry = REGISTRY[text];
+    const entry = this.registry[text];
     if (entry && entry.is_getter) {
         const callId = `"${text}${this.getLocId(ctx)}"`;
         return `ctx.call(${callId}, ${transpiledName})`;
