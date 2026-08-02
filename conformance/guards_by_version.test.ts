@@ -36,7 +36,7 @@ import {
   IMPLEMENTED_VERSIONS,
   UNIMPLEMENTED_VERSIONS,
   PineVersion,
-} from "../helpers/transpileAs";
+} from "../test-utils/transpileAs";
 
 type Verdict = "accept" | "guard" | "syntax";
 
@@ -191,7 +191,7 @@ describe("recorded intent for unimplemented versions", () => {
     expect(
       IMPLEMENTED_VERSIONS.length,
       "a version became implemented — turn its intent cells into real assertions",
-    ).toBe(3);
+    ).toBe(4);
   });
 });
 

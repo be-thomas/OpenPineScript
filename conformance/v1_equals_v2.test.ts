@@ -44,7 +44,7 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { attempt, stripVersionAnnotation } from "../helpers/transpileAs";
+import { attempt, stripVersionAnnotation } from "../test-utils/transpileAs";
 
 /**
  * Why a corpus file does not transpile.
@@ -99,7 +99,7 @@ const EXPECTED_FAILURES: Record<string, FailureKind> = {
   "tests/v2/parser/fixtures/destructuring.pine": "restriction",    // user fn tuple return
 };
 
-const ROOT = path.resolve(__dirname, "../..");
+const ROOT = path.resolve(__dirname, "..");
 const CORPUS_DIRS = ["validation", "tests/v2/parser/fixtures", "tests/v2/lexer/fixtures"];
 
 const FILES: string[] = CORPUS_DIRS.flatMap(dir => {

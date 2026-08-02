@@ -4,13 +4,13 @@
  * back to v2 rules and producing wrong numbers.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../transpiler";
-import { UnimplementedVersionError, LANGUAGE_PROFILES } from "../../transpiler/profiles";
+import { compileScript } from "../transpiler";
+import { UnimplementedVersionError, LANGUAGE_PROFILES } from "../transpiler/profiles";
 import {
   ALL_VERSIONS,
   IMPLEMENTED_VERSIONS,
   UNIMPLEMENTED_VERSIONS,
-} from "../helpers/transpileAs";
+} from "../test-utils/transpileAs";
 
 const SIMPLE = "plot(close)\n";
 
@@ -73,11 +73,31 @@ describe("profile invariants", () => {
     }
   });
 
-  it("unimplemented versions carry no banned identifiers", () => {
-    // v4 renamed 'n' TO 'bar_index', so a v4/v5 profile inheriting the v1-v3
-    // ban would state the rename backwards.
-    for (const v of UNIMPLEMENTED_VERSIONS.filter(x => x >= 4)) {
-      expect([...LANGUAGE_PROFILES[v].banned.keys()]).toEqual([]);
+  it("v4+ ban 'n' (the v1-v3 spelling) — the rename inverts", () => {
+    // The bar counter is spelled 'n' up to v3 and 'bar_index' from v4, and each
+    // version must ban exactly the OTHER one. Getting the direction wrong is
+    // silent: the script still runs, the counter just reads as 'na' forever.
+    //
+    // This test used to assert that v4 and v5 banned NOTHING, on the grounds
+    // that they were unimplemented and the inherited v1-v3 map would state the
+    // rename backwards. The second half was right and the first was a
+    // placeholder — a profile is data about the LANGUAGE, and v5 bans 'n'
+    // whether or not a v5 pipeline exists.
+    for (const v of [4, 5] as const) {
+      expect([...LANGUAGE_PROFILES[v].banned.keys()]).toEqual(["n"]);
+      expect(LANGUAGE_PROFILES[v].banned.has("bar_index")).toBe(false);
+    }
+  });
+
+  it("no version bans both spellings, or neither", () => {
+    // The two maps are built by different functions; nothing but this stops one
+    // version from ending up with an empty map and no bar counter rule at all.
+    for (const v of ALL_VERSIONS) {
+      const banned = LANGUAGE_PROFILES[v].banned;
+      expect(
+        banned.has("n") !== banned.has("bar_index"),
+        `v${v} must ban exactly one bar-counter spelling`,
+      ).toBe(true);
     }
   });
 

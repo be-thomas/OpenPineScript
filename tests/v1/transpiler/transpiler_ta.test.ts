@@ -142,24 +142,7 @@ describe("transpiler ta differential testing", () => {
         });
     });
 
-    it("matches Naive BB (Tuple) destructuring (Post-Warmup)", () => {
-        const len = 5;
-        const ctx = new Context();
-        const exec = setupEngine(`[basis, upper, lower] = bb(close, ${len}, 2)`.trim(), ctx);
-        const naive = new NaiveTA();
-
-        data.forEach((d, i) => {
-            ctx.setBar(i, d.o, d.h, d.l, d.c, d.v);
-            exec();
-            naive.add(d.c, d.v, d.h, d.l);
-
-            if (i >= len - 1) {
-                const [nBasis, nUpper, nLower] = naive.bb(len, 2);
-                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}basis`, 0)), fix(nBasis), `Basis mismatch at bar ${i}`);
-                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}upper`, 0)), fix(nUpper), `Upper mismatch at bar ${i}`);
-                assert.strictEqual(fix(ctx.getSeries(`${OPSV2}lower`, 0)), fix(nLower), `Lower mismatch at bar ${i}`);
-            }
-            ctx.finalizeBar();
-        });
-    });
+    // The bb() differential moved to tests/v4/transpiler/bb_differential.test.ts.
+    // `bb` is a v4 built-in (TradingView added it in March 2020) and is no longer
+    // resolvable at v1, so the test had to move with it rather than be deleted.
 });

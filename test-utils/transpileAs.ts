@@ -9,8 +9,8 @@ import {
   compileScript,
   transpile,
   IMPLEMENTED_VERSIONS as ROUTER_IMPLEMENTED,
-} from "../../transpiler";
-import type { PineVersion } from "../../transpiler/version";
+} from "../transpiler";
+import type { PineVersion } from "../transpiler/version";
 
 export type { PineVersion };
 

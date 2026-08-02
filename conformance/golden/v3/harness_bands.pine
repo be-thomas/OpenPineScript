@@ -17,10 +17,20 @@ plot(macdLine,   title="macd_line")
 plot(macdSignal, title="macd_signal")
 plot(macdHist,   title="macd_hist")
 
-[bbMid, bbUpper, bbLower] = bb(src, 20, 2)
-plot(bbMid,   title="bb_mid")
-plot(bbUpper, title="bb_upper")
-plot(bbLower, title="bb_lower")
+// Bollinger bands, written out. `bb()` is NOT a v3 function — it arrived with
+// the March 2020 batch (bb, bbw, kc, kcw, dmi, wpr, hma, supertrend, cmo, mfi),
+// which is v4 and later only. TradingView rejects it here with
+// "Could not find function or function reference 'bb'".
+//
+// Computing it by hand loses nothing that mattered: the point was to compare
+// sma and stdev against TradingView, and this compares them more directly.
+bbLength = 20
+bbMult   = 2
+bbBasis  = sma(src, bbLength)
+bbDev    = bbMult * stdev(src, bbLength)
+plot(bbBasis,          title="bb_mid")
+plot(bbBasis + bbDev,  title="bb_upper")
+plot(bbBasis - bbDev,  title="bb_lower")
 
 plot(tsi(src, 25, 13),  title="tsi_25_13")
 plot(ema(ema(ema(src, 9), 9), 9), title="triple_ema_9")

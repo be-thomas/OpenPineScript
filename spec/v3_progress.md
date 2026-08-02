@@ -53,7 +53,7 @@ when the v4 delta is researched.
   all-constant trace cannot pass
 - `tests/v2/runtime/security.test.ts` — both lookahead modes across v1/v2/v3,
   including an assertion that the two modes actually differ
-- `tests/conformance/guards_by_version.test.ts` — the capability matrix, now
+- `conformance/guards_by_version.test.ts` — the capability matrix, now
   live for v1, v2 and v3
 
 ### Blast radius on the real corpus

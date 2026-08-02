@@ -20,7 +20,7 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const ROOT = path.resolve(__dirname, "../..");
+const ROOT = path.resolve(__dirname, "..");
 const GRAMMAR = path.join(ROOT, "grammar");
 
 /** The hierarchy, as declared by the architecture doc. */
@@ -28,6 +28,7 @@ const CHAIN: Array<{ version: number; importsFrom: number | null }> = [
   { version: 1, importsFrom: null },
   { version: 2, importsFrom: 1 },
   { version: 3, importsFrom: 2 },
+  { version: 4, importsFrom: 3 },
 ];
 
 type Kind = "Lexer" | "Parser";
@@ -149,4 +150,51 @@ describe("the v1 base does not know later versions' syntax", () => {
   it("PineV2Lexer is where ':=' is introduced", () => {
     expect(stripComments(read(2, "Lexer"))).toMatch(/ASSIGN\s*:\s*':='/);
   });
+});
+
+describe("v4's keyword tokens do not break dotted names", () => {
+  /**
+   * The hazard v4 introduces, and the reason `id` is overridden at all.
+   *
+   * The v1 base declares `id : ID ( DOT ID )*`. v4 turns `color`, `label`,
+   * `line`, `int`, `float`, … into their own tokens, so each one STOPS being an
+   * ID — and `color.new(...)`, `label.new(...)` and the `color=` keyword
+   * argument on nearly every plot all cease to parse. PineV4Parser repairs this
+   * by admitting the tokens as `id_part`s.
+   *
+   * Nothing else can catch a miss. Adding a token to PineV4Lexer.g4 and
+   * forgetting `id_part` produces a grammar that still builds and a parser that
+   * still runs; only scripts using that word after a dot break, and only at
+   * runtime.
+   */
+  const lexer = stripComments(read(4, "Lexer"));
+  const parser = stripComments(read(4, "Parser"));
+
+  /** Token names declared by v4 itself, e.g. `COLOR_TYPE : 'color' ;`. */
+  const declared = [...lexer.matchAll(/^\s*([A-Z][A-Z0-9_]*)\s*:/gm)].map(m => m[1]);
+
+  const idPart = /id_part\s*:([^;]*);/.exec(parser)?.[1] ?? "";
+
+  it("v4 declares tokens at all (guards the regex above)", () => {
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared).toContain("VAR");
+  });
+
+  // VAR and VARIP are reserved words in v4 and may not name anything, so they
+  // are the two that must NOT be admitted.
+  for (const token of ["VAR", "VARIP"]) {
+    it(`${token} is reserved — not admitted as a name part`, () => {
+      expect(idPart).not.toMatch(new RegExp(`\\b${token}\\b`));
+    });
+  }
+
+  for (const token of declared.filter(t => t !== "VAR" && t !== "VARIP")) {
+    it(`${token} is admitted as a name part`, () => {
+      expect(
+        idPart,
+        `PineV4Lexer declares ${token}, so it is no longer an ID. Add it to ` +
+        `id_part in PineV4Parser.g4 or every dotted name ending in that word breaks.`,
+      ).toMatch(new RegExp(`\\b${token}\\b`));
+    });
+  }
 });

@@ -14,11 +14,11 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const ROOT = path.resolve(__dirname, "../..");
+const ROOT = path.resolve(__dirname, "..");
 
 const SOURCE_DIRS = [
   "lexer", "parser", "transpiler", "runtime", "repl",
-  "mock_run", "utils", "scripts", "tests",
+  "mock_run", "utils", "scripts", "tests", "conformance", "test-utils",
 ];
 
 const SKIP_DIRS = new Set(["node_modules", "generated", ".git"]);
@@ -135,11 +135,23 @@ describe("test discovery", () => {
 
     const config = fs.readFileSync(path.join(ROOT, "vitest.config.ts"), "utf8");
     expect(config).toMatch(/tests\/\*\*\/\*\.test\.ts/);
+    expect(config).toMatch(/conformance\/\*\*\/\*\.test\.ts/);
   });
 
-  it("discovers suites outside tests/v2", () => {
-    // This file lives in tests/conformance/ — if it ran, discovery is not
-    // pinned to the original v2-only directory.
-    expect(__filename).toContain(path.join("tests", "conformance"));
+  it("discovers both test roots", () => {
+    // This file lives in conformance/, which is a SECOND root outside tests/.
+    // If it ran at all, discovery is not pinned to tests/.
+    expect(__filename).toContain(`${path.sep}conformance${path.sep}`);
+  });
+
+  it("every version directory under tests/ is discovered", () => {
+    // tests/ is organised by language version — see
+    // dev-docs/00-architecture-assessment.md §6. A version directory that
+    // exists but contains no suite is a silent hole.
+    for (const v of ["v1", "v2", "v3"]) {
+      const dir = path.join(ROOT, "tests", v);
+      expect(fs.existsSync(dir), `tests/${v} is missing`).toBe(true);
+      expect(walk(dir).some(f => f.endsWith(".test.ts")), `tests/${v} has no suite`).toBe(true);
+    }
   });
 });

@@ -8,8 +8,8 @@
 import { describe, it, expect } from "vitest";
 // Import through the public entry, as every real consumer does — that is what
 // loads profiles/ and registers which versions actually run.
-import { detectVersion } from "../../transpiler";
-import { UnsupportedVersionError } from "../../transpiler/version";
+import { detectVersion } from "../transpiler";
+import { UnsupportedVersionError } from "../transpiler/version";
 
 describe("detectVersion", () => {
   it("defaults to v1 when there is no annotation", () => {

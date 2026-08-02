@@ -25,16 +25,16 @@
  *
  * Numerical parity lives in tradingview_golden.test.ts, which compares plot
  * values against exports from TradingView itself. That one cannot be
- * automated — see tests/conformance/golden/README.md.
+ * automated — see conformance/golden/README.md.
  */
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { compileScript } from "../../transpiler";
-import { compile, Context } from "../../runtime/v1";
-import type { PineVersion } from "../../transpiler/version";
+import { compileScript } from "../transpiler";
+import { compile, Context } from "../runtime/v1";
+import type { PineVersion } from "../transpiler/version";
 
-const ROOT = path.resolve(__dirname, "../..");
+const ROOT = path.resolve(__dirname, "..");
 
 interface Bar { time: number; open: number; high: number; low: number; close: number; volume: number; }
 
@@ -136,9 +136,9 @@ const SEVEN_DAY_BARS: Bar[] = BARS.map((b, i) => ({
  * the gap inventories.
  */
 const SEVEN_DAY_INSTRUMENT: Record<string, string> = {
-  "tests/conformance/corpus/v1/sunday.pine":
+  "conformance/corpus/v1/sunday.pine":
     "plots only when dayofweek(time('D')) == sunday",
-  "tests/conformance/corpus/v1/monday_range_fixed.pine":
+  "conformance/corpus/v1/monday_range_fixed.pine":
     "plots only when dayofweek(time('D')) == sunday (the published script's own bug: " +
     "the function is named isMonday but compares against `sunday`)",
 };
@@ -203,6 +203,32 @@ function runScript(source: string, bars: Bar[] = BARS): RunResult {
  */
 const KNOWN_RUNTIME_GAPS: Record<string, string> = {};
 
+/**
+ * Scripts whose CORRECT output on this dataset is no numeric plot at all.
+ *
+ * Not an exemption — the assertion is inverted, not dropped: each of these must
+ * still run, must still register its plot directives, and every numeric series
+ * must be entirely `na`. If one starts producing values, that is a change
+ * someone has to justify.
+ *
+ * All three arrived together when `Context.truthy` landed. Before it, a
+ * condition held in a variable was a Series object, and every object is truthy
+ * in JavaScript — so `svb ? b2 : na` took the `b2` arm on every bar even though
+ * `svb` is `input(false)`. They looked like they were working, and the only
+ * assertion that could have noticed was this one, pointing the wrong way.
+ */
+const PLOTS_NOTHING_BY_DESIGN: Record<string, string> = {
+  "conformance/corpus/v1/lbr_paintbars.pine":
+    "both plots are `svb ? band : na`, and svb is input(false) — the volatility " +
+    "bands are off unless the user turns them on. Its real output is barcolor().",
+  "conformance/corpus/v3/breakout.pine":
+    "every plot is `not isinsession ? na : x`, and isinsession is " +
+    "`not na(time('1', '0400-0700,...'))` — the sample bars are daily stamps at " +
+    "00:00 UTC, which fall in no intraday session.",
+  "conformance/corpus/v3/strategy_template.pine":
+    "every plot is gated on isTS/isTP/isSL, which are inputs defaulting to off.",
+};
+
 
 /**
  * Scripts that do not PARSE. Separated from the runtime gaps because they fail a
@@ -213,11 +239,11 @@ const KNOWN_PARSE_GAPS: Record<string, string> = {};
 
 /** Corpus files for one version, repo-relative. */
 function corpusFiles(version: PineVersion): string[] {
-  const dir = path.join(ROOT, `tests/conformance/corpus/v${version}`);
+  const dir = path.join(ROOT, `conformance/corpus/v${version}`);
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir)
     .filter(f => f.endsWith(".pine")).sort()
-    .map(f => `tests/conformance/corpus/v${version}/${f}`);
+    .map(f => `conformance/corpus/v${version}/${f}`);
 }
 
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -244,6 +270,12 @@ describe("gap inventories", () => {
 
   it("every 24/7 instrument entry still exists", () => {
     const missing = Object.keys(SEVEN_DAY_INSTRUMENT)
+      .filter(f => !fs.existsSync(path.join(ROOT, f)));
+    expect(missing, `listed but not on disk:\n${missing.join("\n")}`).toEqual([]);
+  });
+
+  it("every plots-nothing-by-design entry still exists", () => {
+    const missing = Object.keys(PLOTS_NOTHING_BY_DESIGN)
       .filter(f => !fs.existsSync(path.join(ROOT, f)));
     expect(missing, `listed but not on disk:\n${missing.join("\n")}`).toEqual([]);
   });
@@ -319,6 +351,21 @@ function describeCorpus(version: PineVersion, minFiles: number) {
       // the SYMBOL, not an exemption: it still has to plot real values.
       const needs247 = SEVEN_DAY_INSTRUMENT[rel];
       const bars = needs247 ? SEVEN_DAY_BARS : BARS;
+      const silentBy = PLOTS_NOTHING_BY_DESIGN[rel];
+
+      if (silentBy) {
+        it(`${name} correctly plots nothing — ${silentBy}`, () => {
+          const result = runScript(read(rel), bars);
+          expect(result.bars).toBe(bars.length);
+          // It must still RUN and still declare its plots...
+          expect(result.plots, "registered no numeric plot at all").toBeGreaterThan(0);
+          // ...and every one of them must be na.
+          expect(result.finitePlots,
+            `${name} now produces values — the reason it did not is no longer true`)
+            .toBe(0);
+        });
+        continue;
+      }
 
       it(`${name} ${gap ? `is a known gap: ${gap}` : `runs over ${bars.length} bars and plots real values`}`, () => {
         const source = read(rel);

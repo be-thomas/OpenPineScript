@@ -44,8 +44,20 @@ plot(lowestbars(low, 20),           title="lowestbars_20")
 plot(linreg(src, 20, 0),            title="linreg_20_0")
 plot(correlation(src, volume, 20),  title="correlation_20")
 plot(stoch(close, high, low, 14),   title="stoch_14")
-plot(wpr(14),                       title="wpr_14")
-plot(mfi(src, 14),                  title="mfi_14")
 plot(cog(src, 20),                  title="cog_20")
+
+// Williams %R and Money Flow Index, written out. `wpr()` and `mfi()` are NOT v3
+// functions — both arrived in the March 2020 batch, which is v4 and later only.
+// Spelled out here they still exercise highest/lowest and sum/change/hlc3, and
+// they compile at v3.
+wprHigh = highest(high, 14)
+wprLow  = lowest(low, 14)
+plot(100 * (close - wprHigh) / (wprHigh - wprLow), title="wpr_14_manual")
+
+mfiTp   = hlc3
+mfiFlow = mfiTp * volume
+mfiPos  = sum(change(mfiTp) > 0 ? mfiFlow : 0, 14)
+mfiNeg  = sum(change(mfiTp) < 0 ? mfiFlow : 0, 14)
+plot(100 - 100 / (1 + mfiPos / mfiNeg), title="mfi_14_manual")
 plot(alma(src, 20, 0.85, 6),        title="alma_20")
 plot(percentrank(src, 20),          title="percentrank_20")

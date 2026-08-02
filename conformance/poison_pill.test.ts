@@ -7,10 +7,10 @@
  * surviving one resolves to data rather than a ReferenceError.
  */
 import { describe, it, expect } from "vitest";
-import { Context, compile } from "../../runtime/v1";
-import { transpile } from "../../transpiler";
-import { LANGUAGE_PROFILES, LanguageProfile } from "../../transpiler/profiles";
-import { PREFIX } from "../../utils/v2/common";
+import { Context, compile } from "../runtime/v1";
+import { transpile } from "../transpiler";
+import { LANGUAGE_PROFILES, LanguageProfile } from "../transpiler/profiles";
+import { PREFIX } from "../utils/v2/common";
 
 /** Runs `src` for `bars` bars under `profile` and returns the value of `val`. */
 function runWith(profile: LanguageProfile, src: string, bars = 3): number {

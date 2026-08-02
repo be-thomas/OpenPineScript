@@ -15,7 +15,7 @@ const REGISTRY = getGeneratedRegistry();
 
 /** Must match prefix in ToJsVisitor (opsv2_ = openpinescript v2). */
 
-const PARSER_FIXTURES = path.join(__dirname, "../parser/fixtures");
+const PARSER_FIXTURES = path.join(__dirname, "../../v2/parser/fixtures");
 
 function loadFixture(name: string): string {
   const p = path.join(PARSER_FIXTURES, name.endsWith(".pine") ? name : `${name}.pine`);

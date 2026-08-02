@@ -19,7 +19,7 @@ import * as path from "node:path";
 import { transpile } from "../../transpiler";
 import { compile, Context } from "../../runtime/v1";
 import { profileFor } from "../../transpiler/profiles";
-import { attempt, PineVersion } from "../helpers/transpileAs";
+import { attempt, PineVersion } from "../../test-utils/transpileAs";
 import { PREFIX } from "../../utils/v2/common";
 
 const ROOT = path.resolve(__dirname, "../..");

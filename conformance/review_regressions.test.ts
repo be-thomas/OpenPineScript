@@ -9,14 +9,14 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { compileScript } from "../../transpiler";
-import { attempt } from "../helpers/transpileAs";
-import { Context } from "../../runtime/v1/context";
-import { compile } from "../../runtime/v1/index";
-import { getGeneratedRegistry } from "../../runtime/v1/stdlib/metadata";
-import type { PineVersion } from "../../transpiler/version";
+import { compileScript } from "../transpiler";
+import { attempt } from "../test-utils/transpileAs";
+import { Context } from "../runtime/v1/context";
+import { compile } from "../runtime/v1/index";
+import { getGeneratedRegistry } from "../runtime/v1/stdlib/metadata";
+import type { PineVersion } from "../transpiler/version";
 
-const ROOT = path.resolve(__dirname, "../..");
+const ROOT = path.resolve(__dirname, "..");
 const REGISTRY = getGeneratedRegistry();
 
 interface Bar { time: number; open: number; high: number; low: number; close: number; volume: number; }

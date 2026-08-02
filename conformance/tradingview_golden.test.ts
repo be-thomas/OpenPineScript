@@ -11,8 +11,8 @@
  *
  * TradingView has no public API for indicator values, so this cannot be
  * automated. A human runs one of the harness scripts in
- * tests/conformance/golden/ on a real chart and uses "Export chart data…".
- * The recipe is in tests/conformance/golden/README.md.
+ * conformance/golden/ on a real chart and uses "Export chart data…".
+ * The recipe is in conformance/golden/README.md.
  *
  * ── How the comparison works ────────────────────────────────────────────────
  *
@@ -41,11 +41,12 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { compileScript } from "../../transpiler";
-import { Context } from "../../runtime/v1/context";
-import { compile } from "../../runtime/v1/index";
+import { compileScript, IMPLEMENTED_VERSIONS } from "../transpiler";
+import type { PineVersion } from "../transpiler/version";
+import { Context } from "../runtime/v1/context";
+import { compile } from "../runtime/v1/index";
 
-const ROOT = path.resolve(__dirname, "../..");
+const ROOT = path.resolve(__dirname, "..");
 const GOLDEN_DIR = path.join(__dirname, "golden");
 
 /** Bars to ignore at the start of a file, so seeded state can converge. */
@@ -127,9 +128,66 @@ function parseCell(raw: string): number {
   return Number.isFinite(n) ? n : NaN;
 }
 
-function loadGolden(file: string): Golden {
+/**
+ * Reads an export, from either route.
+ *
+ * `.csv` — "Export chart data…", PRO+/Premium only. Header row, then one row
+ *          per bar.
+ * `.log` — text copied out of the Pine Logs pane, which is free and works on
+ *          historical bars. Each row is wrapped in whatever prefix the pane
+ *          renders (a timestamp, a source link), so the generated harnesses tag
+ *          the payload and this strips everything before the tag:
+ *
+ *              [2015-01-02T00:00 UTC]: OPSHEAD|time,open,high,…
+ *              [2015-01-02T00:00 UTC]: OPS|1420156800000,111.39,…
+ *
+ * Both end up as the same list of CSV lines, so everything downstream is shared.
+ */
+function readExportLines(file: string): string[] {
   const text = fs.readFileSync(path.join(GOLDEN_DIR, file), "utf8").trim();
-  const lines = text.split(/\r?\n/);
+  const raw = text.split(/\r?\n/);
+
+  // Detected by CONTENT, not by extension. The Pine Logs pane has its own CSV
+  // download — `Date,Message` with our payload quoted inside the message — so a
+  // log export legitimately arrives named .csv. Sniffing for the marker means
+  // either name works and neither has to be explained.
+  const isLog = raw.some(l => l.includes("OPSHEAD|") || l.includes("OPS|"));
+  if (!isLog) return raw;
+
+  const head: string[] = [];
+  const rows: string[] = [];
+  for (const line of raw) {
+    const h = line.indexOf("OPSHEAD|");
+    if (h >= 0) { head.push(line.slice(h + "OPSHEAD|".length).trim()); continue; }
+    const r = line.indexOf("OPS|");
+    if (r >= 0) rows.push(line.slice(r + "OPS|".length).trim());
+  }
+  if (head.length === 0) {
+    throw new Error(
+      `${file}: no OPSHEAD| line found. Copy the WHOLE Pine Logs pane — the ` +
+      `header is logged once, on the first bar, and without it there are no ` +
+      `column names.`,
+    );
+  }
+  // Sort by bar time: the pane renders newest-first, and a downloaded CSV is
+  // ordered by LOG time, which for historical bars is all the same instant.
+  rows.sort((a, b) => Number(a.split(",")[0]) - Number(b.split(",")[0]));
+
+  // Collapse repeated rows for the same bar, keeping the LAST.
+  //
+  // A script logs once per historical bar but once per TICK on the realtime
+  // bar, so the bar that was still forming when the log was taken appears many
+  // times with a growing volume. Keeping the last is the settled value; keeping
+  // them all would feed the engine the same bar repeatedly and desynchronise
+  // every series after it.
+  const byTime = new Map<string, string>();
+  for (const r of rows) byTime.set(r.split(",")[0], r);
+
+  return [head[0], ...byTime.values()];
+}
+
+function loadGolden(file: string): Golden {
+  const lines = readExportLines(file);
   const header = splitCsvLine(lines[0]);
 
   const indexOf = (name: string) =>
@@ -178,18 +236,51 @@ function loadGolden(file: string): Golden {
     }
   }
 
-  // The harness is named by everything before the first dot, so
-  // "harness_core.BTCUSD.1D.csv" runs harness_core.pine.
-  const harness = file.split(".")[0];
+  // The harness is the sibling .pine named by everything before the first dot,
+  // so "v3/harness_core.BTCUSD.1D.csv" runs "v3/harness_core.pine".
+  const dir = path.dirname(file);
+  let harness = path.join(dir, path.basename(file).split(".")[0]);
+
+  // A v5 harness is GENERATED for log collection and cannot be run here — it is
+  // v5, and this engine implements v1-v3. Its banner records the v3 (or v4)
+  // file it was derived from, so an export dropped next to the harness that
+  // produced it still resolves to something runnable.
+  const generated = path.join(GOLDEN_DIR, `${harness}.pine`);
+  if (fs.existsSync(generated)) {
+    const banner = fs.readFileSync(generated, "utf8").slice(0, 2000);
+    const src = /Source:\s*conformance\/golden\/(\S+)\.pine/.exec(banner);
+    if (src) harness = src[1];
+  }
+
   return { file, harness, bars, columns };
 }
 
+/**
+ * The version a harness must be COMPILED as, taken from its directory.
+ *
+ * `golden/v4/harness_builtins.pine` is v4 by necessity — `bb()` does not exist
+ * earlier — and is now compiled AS v4, which this engine implements.
+ *
+ * This used to force 3 for everything, with a note that running a v4 export
+ * through the v3 pipeline still tested the arithmetic because the runtime is
+ * shared. That was true, and it was a workaround: it tested `ta.bb`'s numbers
+ * while saying nothing about whether v4 resolves `bb` at all. Now that v4 has a
+ * pipeline, the harness runs at its own version and the gate is tested too.
+ *
+ * Anything outside a recognised version directory still falls back to 3 — the
+ * generated v5 harnesses resolve back to their v3/v4 source before this is
+ * asked, so nothing reaches here needing a version this engine cannot run.
+ */
+function versionOf(harness: string): PineVersion {
+  const dir = harness.split(path.sep)[0];
+  const m = /^v([1-9])$/.exec(dir);
+  const v = m ? Number(m[1]) : 3;
+  return (IMPLEMENTED_VERSIONS.includes(v as PineVersion) ? v : 3) as PineVersion;
+}
+
 /** Runs a harness over the exported bars and returns its plots by title. */
-function runHarness(harnessSource: string, bars: Bar[]): Map<string, number[]> {
-  // Version is FORCED to 3 rather than read from the annotation: the user may
-  // have had to bump the harness to //@version=4 for TradingView to accept it,
-  // and v4 is not implemented here. The built-ins used are spelled identically.
-  const compiled = compileScript(harnessSource, { version: 3 });
+function runHarness(harnessSource: string, bars: Bar[], version: PineVersion): Map<string, number[]> {
+  const compiled = compileScript(harnessSource, { version });
   const ctx = new Context(compiled.profile);
   const exec = compile(compiled.js, ctx, { ctx } as any);
 
@@ -222,15 +313,35 @@ function close(a: number, b: number): boolean {
   return diff <= ABS_TOL || diff <= REL_TOL * Math.max(Math.abs(a), Math.abs(b));
 }
 
-const CSVS = fs.existsSync(GOLDEN_DIR)
-  ? fs.readdirSync(GOLDEN_DIR).filter(f => f.toLowerCase().endsWith(".csv")).sort()
-  : [];
+/**
+ * Every export, as a path relative to the golden directory.
+ *
+ * `golden/` is split by the Pine version a harness must be COMPILED AS on
+ * TradingView — `golden/v4/harness_builtins.pine` calls `bb()`, which does not
+ * exist before v4 — so an export lives beside the harness that produced it:
+ *
+ *     golden/v3/harness_core.pine
+ *     golden/v3/harness_core.BTCUSDT.1D.csv
+ */
+function findCsvs(): string[] {
+  if (!fs.existsSync(GOLDEN_DIR)) return [];
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(GOLDEN_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    for (const f of fs.readdirSync(path.join(GOLDEN_DIR, entry.name))) {
+      if (/\.(csv|log)$/i.test(f)) out.push(path.join(entry.name, f));
+    }
+  }
+  return out.sort();
+}
+
+const CSVS = findCsvs();
 
 const HOW_TO =
-  "No TradingView exports found in tests/conformance/golden/.\n" +
+  "No TradingView exports found in conformance/golden/.\n" +
   "This is the only suite that can catch a numerically-wrong indicator, and it " +
   "cannot be automated — TradingView has no public API for plot values.\n" +
-  "See tests/conformance/golden/README.md for the ~10-minute recipe.";
+  "See conformance/golden/README.md for the ~10-minute recipe.";
 
 describe("TradingView golden data", () => {
   it("is present", () => {
@@ -241,13 +352,14 @@ describe("TradingView golden data", () => {
   });
 
   it("every export names a harness that exists", () => {
-    const orphans = CSVS.filter(
-      f => !fs.existsSync(path.join(GOLDEN_DIR, `${f.split(".")[0]}.pine`)),
-    );
+    const orphans = CSVS.filter(f => {
+      const sibling = path.join(path.dirname(f), `${path.basename(f).split(".")[0]}.pine`);
+      return !fs.existsSync(path.join(GOLDEN_DIR, sibling));
+    });
     expect(
       orphans,
-      `these CSVs do not match a harness .pine — rename them to ` +
-      `<harness>.<symbol>.<timeframe>.csv:\n${orphans.join("\n")}`,
+      `these CSVs have no sibling harness .pine — put each export next to the ` +
+      `harness that produced it, named <harness>.<symbol>.<timeframe>.csv:\n${orphans.join("\n")}`,
     ).toEqual([]);
   });
 });
@@ -256,9 +368,13 @@ for (const file of CSVS) {
   describe(`${file} matches TradingView`, () => {
     const golden = loadGolden(file);
     const harnessPath = path.join(GOLDEN_DIR, `${golden.harness}.pine`);
-    const warmup = WARMUP[golden.harness] ?? DEFAULT_WARMUP;
+    const warmup = WARMUP[path.basename(golden.harness)] ?? DEFAULT_WARMUP;
 
-    const ours = runHarness(fs.readFileSync(harnessPath, "utf8"), golden.bars);
+    const ours = runHarness(
+      fs.readFileSync(harnessPath, "utf8"),
+      golden.bars,
+      versionOf(golden.harness),
+    );
     const shared = [...golden.columns.keys()].filter(t => ours.has(t));
 
     it("the export is long enough to be worth comparing", () => {
