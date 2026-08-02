@@ -26,6 +26,26 @@ function injectStdlib(target: any, lib: any, prefix: string) {
         } else {
             // 4. It's a function or primitive, just assign it
             target[prefixedKey] = val;
+
+            // 5. A namespace can hang off a CALLABLE.
+            //
+            // `plot` is a function AND `plot.style_line` is a constant; the same
+            // holds for `color`, `input`, `hline` and `dayofweek`. createStdlib
+            // attaches those members to the function object, where the recursion
+            // in (3) never reaches them — so the sandbox got `opsv2_plot` with a
+            // plain `style_line` on it, while the emitter looks for
+            // `opsv2_plot.opsv2_style_line`, and every one of those constants
+            // read as `undefined`.
+            //
+            // Calls hid this completely: `color.new(...)` is emitted as
+            // `ctx.builtin("color.new")` and never touches the sandbox tree, so
+            // only namespaced CONSTANTS were affected.
+            if (typeof val === "function") {
+                for (const [member, memberVal] of Object.entries(val)) {
+                    if (member.startsWith(prefix)) continue;
+                    (val as any)[prefix + member] = memberVal;
+                }
+            }
         }
     }
 }
