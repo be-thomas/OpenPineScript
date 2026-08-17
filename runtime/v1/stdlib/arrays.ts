@@ -118,8 +118,10 @@ export const array = {
     },
 
     // --- Whole-array operations -------------------------------------------
-    // `copy`, `slice` and `concat` return NEW arrays; the rest mutate in place.
-    // Pine draws the same line, so the distinction is not ours to invent.
+    // `copy` and `slice` return NEW arrays. `concat` does NOT: it appends id2
+    // onto id1 and returns id1, which is what Pine does — so a caller holding
+    // id1 sees it grow. The rest mutate in place. Pine draws these lines, not
+    // us; the shapes are copied, not chosen.
     copy: (id: any) => arr(id, "copy").slice(),
     slice: (id: any, index_from: any, index_to: any) =>
         arr(id, "slice").slice(Number(val(index_from)), Number(val(index_to))),

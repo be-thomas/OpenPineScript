@@ -113,7 +113,7 @@ export const line = {
     },
 
     delete: (ctx: Context, id: any) => {
-        ctx.drawings.delete(String(v(id)));
+        ctx.deleteDrawing(v(id));
     },
     copy: (ctx: Context, id: any) =>
         ctx.newDrawing("line", { ...ctx.getDrawing(id, "line.copy").props }),
@@ -165,7 +165,7 @@ export const label = {
     },
 
     delete: (ctx: Context, id: any) => {
-        ctx.drawings.delete(String(v(id)));
+        ctx.deleteDrawing(v(id));
     },
     copy: (ctx: Context, id: any) =>
         ctx.newDrawing("label", { ...ctx.getDrawing(id, "label.copy").props }),
@@ -230,7 +230,7 @@ export const box = {
     },
 
     delete: (ctx: Context, id: any) => {
-        ctx.drawings.delete(String(v(id)));
+        ctx.deleteDrawing(v(id));
     },
     copy: (ctx: Context, id: any) =>
         ctx.newDrawing("box", { ...ctx.getDrawing(id, "box.copy").props }),
@@ -289,7 +289,7 @@ export const table = {
         ctx.getDrawing(id, "table.clear").props.cells.clear();
     },
     delete: (ctx: Context, id: any) => {
-        ctx.drawings.delete(String(v(id)));
+        ctx.deleteDrawing(v(id));
     },
 };
 

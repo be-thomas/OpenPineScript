@@ -223,11 +223,65 @@ export class Context {
     public drawings: Map<string, Drawing> = new Map();
     private drawingCounter: number = 0;
 
-    /** Registers a drawing and returns its id. */
+    /** Live ids per kind, oldest first, so the cap below can evict in O(1). */
+    private drawingOrder: Map<Drawing["kind"], string[]> = new Map();
+
+    /**
+     * How many drawings of each kind survive.
+     *
+     * Pine caps these — `max_lines_count`, `max_labels_count` and
+     * `max_boxes_count` all default to 50 — and DELETES THE OLDEST past the
+     * cap. Without that, `label.new` on every bar of a 6,000-bar chart retains
+     * 6,000 records here while TradingView is showing 50, so a script that
+     * reads its own drawings back diverges, and memory grows without bound on
+     * exactly the scripts most likely to be long-running.
+     *
+     * Tables are absent deliberately: Pine limits them by POSITION (one per
+     * slot), not by count, so an eviction rule would be the wrong shape.
+     */
+    private static readonly DRAWING_LIMITS: Partial<Record<Drawing["kind"], number>> = {
+        line: 50,
+        label: 50,
+        box: 50,
+    };
+
+    /** Registers a drawing and returns its id, evicting the oldest past the cap. */
     public newDrawing(kind: Drawing["kind"], props: Record<string, any>): string {
         const id = `${kind}_${this.drawingCounter++}`;
         this.drawings.set(id, { id, kind, bar: this.currentBarIndex, props });
+
+        const order = this.drawingOrder.get(kind) ?? [];
+        order.push(id);
+
+        const limit = Context.DRAWING_LIMITS[kind];
+        if (limit !== undefined) {
+            while (order.length > limit) {
+                this.drawings.delete(order.shift()!);
+            }
+        }
+        this.drawingOrder.set(kind, order);
+
         return id;
+    }
+
+    /**
+     * Removes a drawing, keeping the eviction queue in step.
+     *
+     * Deleting straight out of `drawings` would leave the id in `drawingOrder`,
+     * so the next eviction would shift off a dead id, delete nothing, and let
+     * the live count sit above the cap indefinitely.
+     */
+    public deleteDrawing(id: any): void {
+        const key = String(id instanceof Series ? id.valueOf() : id);
+        const drawing = this.drawings.get(key);
+        if (!drawing) return;
+
+        this.drawings.delete(key);
+        const order = this.drawingOrder.get(drawing.kind);
+        if (order) {
+            const at = order.indexOf(key);
+            if (at >= 0) order.splice(at, 1);
+        }
     }
 
     /** Looks a drawing up, or throws — a stale id is a bug, not a no-op. */
@@ -330,6 +384,11 @@ export class Context {
         this.currentBarIndex = 0;
         this.plots.clear();
         this.fills.clear();
+        // Drawings are output too. Leaving them behind made `run()` accumulate
+        // every drawing from every pass, with ids climbing across re-runs.
+        this.drawings.clear();
+        this.drawingOrder.clear();
+        this.drawingCounter = 0;
 
         // 5. Reset Strategy State
         this.position = { size: 0, avgPrice: 0 };
@@ -544,9 +603,39 @@ export class Context {
      * the current bar's slot through `new_var`, and the next bar carries that
      * forward. No write-back path and no coupling to the assignment emitter.
      *
-     * @param key  the declaration's @L<line>:C<col> site, so two `var`s in one
-     *             script — or the same one in two function instantiations — do
-     *             not share an initialised flag.
+     * @param key  the declaration's @L<line>:C<col> site, so two DIFFERENT
+     *             `var` declarations do not share an initialised flag.
+     *
+     * ── KNOWN LIMIT: `var` inside a user function ───────────────────────────
+     *
+     * Every call site of a function shares one `var`. Given
+     *
+     *     f() =>
+     *         var c = 0
+     *         c := c + 1
+     *         c
+     *     a = f()
+     *     b = f()
+     *
+     * this yields a = 1,3,5 and b = 2,4,6. TradingView gives 1,2,3 for both:
+     * there, each call site gets its own instance of the function's locals.
+     *
+     * Keying on `callStack.join("/")` instead — the obvious fix — does not fix
+     * it. The SERIES NAME is shared too: the body emits `new_var("opsv2_c", …)`
+     * for every call site, so per-site initialisation flags just redistribute
+     * the error (a = 1,2 / b = 1,3) rather than removing it.
+     *
+     * The real cause is older and wider than `var`: NO function local is
+     * per-call-site in this engine — `t = close * 2` inside a function is one
+     * `opsv2_t` series shared by every caller. Fixing it means making emitted
+     * local names call-site-scoped at both the declaration and the `:=` site,
+     * across v1–v4. That is a real change, not a tweak here, so this is
+     * recorded rather than papered over.
+     *
+     * `varipSeries` has the same root cause and is therefore keyed by NAME,
+     * not by site: rollback operates on series names, and a `varip x` in one
+     * scope and a `var x` in another are one series here, so both end up
+     * exempt. Keying it by site would not separate them either.
      */
     public var_def(name: string, key: string, initFn: () => any, ip: boolean = false): Series {
         if (ip) this.varipSeries.add(name);
