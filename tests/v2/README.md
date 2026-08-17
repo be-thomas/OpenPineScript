@@ -37,7 +37,7 @@ npx vitest run tests/v2/lexer/lexer.test.ts
 npm run test:watch
 ```
 
-Cross-version suites live in `tests/conformance/`; shared helpers in
+Cross-version suites live in `conformance/`; shared helpers in
 `tests/helpers/`.
 
 ## Adding tests

@@ -22,7 +22,7 @@ Identical to v2 in every respect — see [v2_progress.md](v2_progress.md).
 
 ## How the equivalence is verified
 
-[tests/conformance/v1_equals_v2.test.ts](../tests/conformance/v1_equals_v2.test.ts)
+[conformance/v1_equals_v2.test.ts](../conformance/v1_equals_v2.test.ts)
 is the executable form of TradingView's claim:
 
 1. Every script in `validation/` plus the lexer and parser fixtures is
@@ -32,7 +32,7 @@ is the executable form of TradingView's claim:
    reason, modulo the version named in the message.
 3. Removing the `//@version=2` annotation from a v2 script must change **only**
    the line numbers embedded in call-site IDs (`sma@L4:C8`) — nothing else.
-4. `tests/conformance/version_routing.test.ts` additionally asserts the two
+4. `conformance/version_routing.test.ts` additionally asserts the two
    profiles carry identical restriction sets, defaults, and banned identifiers.
 
 If a future change makes v1 and v2 diverge, these tests fail. v1 stays free only

@@ -20,10 +20,16 @@ function val(v: any): number {
 
 // --- Helper Types ---
 interface BufferState { buffer: number[]; }
-interface SumState { buffer: number[]; sum: number; prevLength: number; counter: number; }
+interface SumState { buffer: number[]; sum: number; prevLength: number; counter: number; nanCount: number; }
 interface StdDevState { buffer: number[]; sum: number; sumSq: number; prevLength: number; counter: number; }
 interface WmaState { buffer: number[]; sum: number; numerator: number; counter: number; prevLength: number; }
 interface DequeState { buffer: number[]; dequeVals: number[]; dequeIdxs: number[]; globalIdx: number; prevLength: number; }
+/** ema/rma warm-up: the samples collected before the SMA seed is available. */
+interface EmaSeedState {
+    prev: number | undefined;
+    seed: number[];
+}
+
 interface EmaState { prev: number | undefined; }
 interface CrossState { prevX: number; prevY: number; }
 interface BarsSinceState { counter: number; }
@@ -43,37 +49,52 @@ export function sma(ctx: Context, sourceInput: any, lengthInput: any): number {
     const length = Math.floor(val(lengthInput));
 
     const state = ctx.getPersistentState<SumState>(() => ({ 
-        buffer: [], sum: 0, prevLength: 0, counter: 0 
+        buffer: [], sum: 0, prevLength: 0, counter: 0, nanCount: 0
     }));
 
     state.buffer.push(source);
 
-    if (length !== state.prevLength) {
+    // NaN is COUNTED, never summed.
+    //
+    // The running sum is incremental, so one `na` in the source poisoned it
+    // permanently — `sum` became NaN and stayed NaN until the periodic heal
+    // recomputed the window, HEAL_SMA_INTERVAL (200) bars later. That is exactly
+    // what `sma(ema(close, 10), 10)` did once ema gained its warm-up: it
+    // returned na for 200 bars instead of 18.
+    //
+    // Counting instead means the window knows whether it currently holds an
+    // `na`, which is also the rule TradingView applies — ta.sma is na if any
+    // value in its window is.
+    const recompute = () => {
         state.sum = 0;
+        state.nanCount = 0;
         const start = Math.max(0, state.buffer.length - length);
         for (let i = start; i < state.buffer.length; i++) {
-            state.sum += state.buffer[i];
+            const v = state.buffer[i];
+            if (Number.isNaN(v)) state.nanCount++;
+            else state.sum += v;
         }
-       state.prevLength = length;
-        state.counter = 0; // Reset healing
+        state.counter = 0;
+    };
+
+    if (length !== state.prevLength) {
+        recompute();
+        state.prevLength = length;
     } else {
         // O(1) UPDATE
-        state.sum += source;
-        
-        // If we have more data than the window needs, subtract the trailing item.
+        if (Number.isNaN(source)) state.nanCount++;
+        else state.sum += source;
+
+        // If we have more data than the window needs, drop the trailing item.
         // The item leaving the window is at index: (Total - 1) - Length
         if (state.buffer.length > length) {
-            const exitIdx = state.buffer.length - 1 - length;
-            state.sum -= state.buffer[exitIdx];
+            const exiting = state.buffer[state.buffer.length - 1 - length];
+            if (Number.isNaN(exiting)) state.nanCount--;
+            else state.sum -= exiting;
         }
 
-        // HEALING
-        if (++state.counter >= HEAL_SMA_INTERVAL) {
-            state.sum = 0;
-            const start = Math.max(0, state.buffer.length - length);
-            for (let i = start; i < state.buffer.length; i++) state.sum += state.buffer[i];
-            state.counter = 0;
-        }
+        // HEALING — bounds floating-point drift in the incremental sum.
+        if (++state.counter >= HEAL_SMA_INTERVAL) recompute();
     }
 
     if (state.buffer.length > MAX_BUFFER_SIZE) {
@@ -82,6 +103,7 @@ export function sma(ctx: Context, sourceInput: any, lengthInput: any): number {
     }
 
     if (state.buffer.length < length) return NaN;
+    if (state.nanCount > 0) return NaN;   // any 'na' in the window makes the mean na
     return state.sum / length;
 }
 
@@ -92,7 +114,7 @@ export function sma(ctx: Context, sourceInput: any, lengthInput: any): number {
 export function ema(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
-    const state = ctx.getPersistentState<EmaState>(() => ({ prev: undefined }));
+    const state = ctx.getPersistentState<EmaSeedState>(() => ({ prev: undefined, seed: [] }));
     const alpha = 2 / (length + 1);
 
     // A leading 'na' in the source DELAYS the average; it does not kill it.
@@ -107,9 +129,29 @@ export function ema(ctx: Context, sourceInput: any, lengthInput: any): number {
     // rma already did exactly this; ema did not. Matching it.
     if (isNaN(source)) return NaN;
 
-    if (state.prev === undefined || isNaN(state.prev)) {
-        state.prev = source;
-        return source;
+    // ── WARM-UP: na until `length` samples, then seeded with their SMA ───────
+    //
+    // This is TradingView's rule, and it is not a detail. Seeding from the
+    // FIRST value and returning it immediately — what this did — was 28% out at
+    // the bar where TradingView's ema begins, and started the series `length-1`
+    // bars too early. Both were caught by a 5,998-bar export:
+    //
+    //     seeding          relative error vs TradingView, bars 25-60
+    //     first value      2.8e-01
+    //     SMA of first N   2.9e-13     <- i.e. double-precision noise
+    //
+    // The error decays, so far enough along the chart the two agree and no
+    // synthetic test would ever have noticed. Everything built on ema inherited
+    // it: macd, tsi, trix, and any script smoothing a smoothed series.
+    //
+    // Samples are counted, not bars: `ema(sma(close, 10), 10)` sees na for its
+    // first 9 inputs, and its own warm-up starts only once real values arrive.
+    if (state.prev === undefined) {
+        state.seed.push(source);
+        if (state.seed.length < length) return NaN;
+        state.prev = state.seed.reduce((a, b) => a + b, 0) / length;
+        state.seed = [];
+        return state.prev;
     }
 
     const currentEma = (source * alpha) + (state.prev * (1 - alpha));
@@ -126,13 +168,18 @@ export function rma(ctx: Context, sourceInput: any, lengthInput: any): number {
     const length = val(lengthInput);
     
     // Uses whatever is on the stack (e.g., ".../ta.atr/internal_rma")
-    const state = ctx.getPersistentState<EmaState>(() => ({ prev: undefined }));
-    
+    const state = ctx.getPersistentState<EmaSeedState>(() => ({ prev: undefined, seed: [] }));
+
     if (isNaN(source)) return NaN;
 
-    if (state.prev === undefined || isNaN(state.prev)) { 
-        state.prev = source; 
-        return source; 
+    // Same warm-up rule as ema — see the note there. rma is what rsi and atr are
+    // built from, so their start bars were wrong for the same reason.
+    if (state.prev === undefined) {
+        state.seed.push(source);
+        if (state.seed.length < length) return NaN;
+        state.prev = state.seed.reduce((a, b) => a + b, 0) / length;
+        state.seed = [];
+        return state.prev;
     }
     
     const alpha = 1 / length;
@@ -270,9 +317,13 @@ export function rsi(ctx: Context, sourceInput: any, lengthInput: any): number {
     if (isNaN(source)) return NaN;
 
     if (state.prevSrc === undefined || isNaN(state.prevSrc)) {
+        // The first sample establishes the comparison point and nothing else.
+        //
+        // This used to feed a synthetic 0 into both internal rmas "to keep them
+        // aligned". Now that rma has a real warm-up, that extra sample makes it
+        // reach its seed one bar early, and rsi started at bar 22 where
+        // TradingView starts at 23.
         state.prevSrc = source;
-        (ctx as any).callStack.push("rsi_gain"); rma(ctx, 0, length); (ctx as any).callStack.pop();
-        (ctx as any).callStack.push("rsi_loss"); rma(ctx, 0, length); (ctx as any).callStack.pop();
         return NaN;
     }
     const change = source - state.prevSrc;
@@ -1105,11 +1156,14 @@ export function tsi(ctx: Context, sourceInput: any, longLenInput: any, shortLenI
     if (isNaN(source)) return NaN;
 
     if (state.prevSrc === undefined || isNaN(state.prevSrc)) {
+        // Returns na, and primes nothing.
+        //
+        // This returned a literal 0 and fed a synthetic 0 into all four internal
+        // emas. The 0 made tsi finite from bar 0 where TradingView reports na
+        // until bar 37, and the priming shifted every internal ema one sample
+        // early — the same mistake rsi made.
         state.prevSrc = source;
-        // Seed all 4 internal EMAs (inner+outer for both pc and apc) with 0.
-        dblSmooth("tsi_pc_inner", "tsi_pc_outer", 0);
-        dblSmooth("tsi_apc_inner", "tsi_apc_outer", 0);
-        return 0;
+        return NaN;
     }
 
     const pc = source - state.prevSrc;
@@ -1118,7 +1172,10 @@ export function tsi(ctx: Context, sourceInput: any, longLenInput: any, shortLenI
     const pcSmooth = dblSmooth("tsi_pc_inner", "tsi_pc_outer", pc);
     const apcSmooth = dblSmooth("tsi_apc_inner", "tsi_apc_outer", Math.abs(pc));
 
-    return apcSmooth === 0 ? 0 : 100 * pcSmooth / apcSmooth;
+    // NO 100x. TradingView's `ta.tsi` returns a RATIO in [-1, 1], not a
+    // percentage — verified against a 5,998-bar export, where our value was
+    // out by exactly 100 on every bar (relative error 9.90e-1).
+    return apcSmooth === 0 ? 0 : pcSmooth / apcSmooth;
 }
 
 /**

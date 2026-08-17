@@ -8,7 +8,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const VERSIONS = [1, 2, 3];
+const VERSIONS = [1, 2, 3, 4];
 let patched = 0;
 
 for (const v of VERSIONS) {

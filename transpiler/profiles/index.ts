@@ -47,11 +47,31 @@ export interface LanguageProfile {
   };
 }
 
+/**
+ * The bar counter is spelled `n` up to v3 and `bar_index` from v4. Whichever
+ * name does not belong to this version must THROW rather than silently read as
+ * `na` — a bar counter that is quietly absent produces plausible wrong numbers
+ * for the whole script.
+ *
+ * The runtime binds both names and consults this map to poison one, so the v4
+ * inversion is a data change here and nothing else.
+ */
 function bannedBarIndex(version: PineVersion): ReadonlyMap<string, string> {
   return new Map([
     [
       "bar_index",
       `'bar_index' is not available in Pine Script v${version}. Use 'n' instead ` +
+      `('n' was renamed to 'bar_index' in v4).`,
+    ],
+  ]);
+}
+
+/** The v4+ direction: `bar_index` is canonical and `n` no longer exists. */
+function bannedBarCounter(version: PineVersion): ReadonlyMap<string, string> {
+  return new Map([
+    [
+      "n",
+      `'n' is not available in Pine Script v${version}. Use 'bar_index' instead ` +
       `('n' was renamed to 'bar_index' in v4).`,
     ],
   ]);
@@ -75,15 +95,30 @@ export const LANGUAGE_PROFILES: Readonly<Record<PineVersion, LanguageProfile>> =
   // The one v2→v3 behaviour change that is neither syntax nor a rejection rule.
   3: profile(3, { defaults: { scriptDirective: "study", securityLookahead: "off" } }),
 
+  // v4 INVERTS the bar-counter ban. `n` was renamed to `bar_index`, and the old
+  // spelling is gone — a v4 script using `n` gets "Undeclared identifier 'n'"
+  // from TradingView, so leaving it bound would accept code TradingView rejects.
+  //
+  // The runtime binds BOTH names and lets this map remove one, so the inversion
+  // is exactly this entry and no code change.
+  //
+  // securityLookahead stays "off": v3 flipped it and v4 does not flip it back.
+  4: {
+    ...profile(4),
+    banned: bannedBarCounter(4),
+    defaults: { scriptDirective: "study", securityLookahead: "off" },
+  },
+
   // Declared so profileFor() is TOTAL. Whether a version actually RUNS is decided
   // by transpiler/index.ts (PIPELINES), not here — a profile is data, and data
   // cannot tell you whether a parser exists.
   //
-  // No banned map: bannedBarIndex() would emit "'bar_index' is not available in
-  // Pine Script v5. Use 'n' instead", which is backwards — v4 renamed 'n' TO
-  // 'bar_index'.
-  4: { ...profile(4), banned: new Map() },
-  5: { ...profile(5), banned: new Map() },
+  // v5 keeps v4's rename but renames the DIRECTIVE: study() becomes indicator().
+  5: {
+    ...profile(5),
+    banned: bannedBarCounter(5),
+    defaults: { scriptDirective: "indicator", securityLookahead: "off" },
+  },
 };
 
 export function profileFor(version: PineVersion): LanguageProfile {
@@ -96,7 +131,7 @@ export class UnimplementedVersionError extends Error {
   constructor(public readonly version: PineVersion) {
     super(
       `Pine Script v${version} support is not yet implemented. ` +
-      `OpenPineScript currently implements v1, v2, and v3.`
+      `OpenPineScript currently implements v1, v2, v3, and v4.`
     );
     this.name = "UnimplementedVersionError";
   }

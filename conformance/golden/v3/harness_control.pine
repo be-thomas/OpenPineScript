@@ -1,0 +1,106 @@
+//@version=3
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness — CONDITIONAL FLOW.
+//
+// Control flow is not directly exportable: "Export chart data" gives plot
+// values. So every branch here is WITNESSED by a number — the plotted value
+// encodes which path the script took, so a disagreement in the CSV localises to
+// a construct rather than to arithmetic.
+//
+// ⚠ NEEDS FULL HISTORY. The counters and the state machine carry state from bar
+// 0 and never converge. Export this on a symbol whose whole history fits, as
+// with harness_state.pine. Warm-up allowance is 0.
+//
+// Same rules as the other harnesses: bump line 1 to //@version=4 if v3 is
+// rejected, and delete any single plot TradingView will not compile.
+//
+// NOTE: `else if` is deliberately absent — it is not Pine v3. Nested `if` is
+// used instead.
+// ─────────────────────────────────────────────────────────────────────────────
+study(title="OPS golden control", shorttitle="OPS control", overlay=false)
+
+src  = close
+fast = sma(src, 10)
+slow = sma(src, 30)
+
+// 1. if/else as a STATEMENT, with ':=' in both branches.
+trend = 0
+if fast > slow
+    trend := 1
+else
+    trend := -1
+plot(trend, title="if_else_stmt")
+
+// 2. if with NO else. What the variable holds on the untaken bar is the whole
+//    question — Pine leaves the previous assignment's value, it does not reset.
+flag = 0
+if close > open
+    flag := 1
+plot(flag, title="if_no_else")
+
+// 3. if as an EXPRESSION, which is a different grammar path from (1).
+grade = if fast > slow
+    2
+else
+    -2
+plot(grade, title="if_expr")
+
+// 4. Nested if/else, four reachable leaves.
+zone = 0
+if fast > slow
+    if close > fast
+        zone := 2
+    else
+        zone := 1
+else
+    if close < fast
+        zone := -2
+    else
+        zone := -1
+plot(zone, title="nested_if")
+
+// 5. Ternary chain — same four leaves, expressed as expressions. Should agree
+//    with (4) in shape; if it does not, one of the two paths is wrong.
+band = close > fast ? (close > slow ? 3 : 2) : (close < slow ? -3 : -2)
+plot(band, title="ternary_chain")
+
+// 6. PROBE, not an assertion: does a ternary evaluate BOTH branches?
+//    Pine's series functions need to be called on every bar to keep their
+//    history continuous, so a stateful call inside one arm of a ternary is the
+//    classic trap. Whether TradingView hoists these or lets the untaken arm go
+//    stale is what the export answers.
+plot(close > open ? sma(close, 5) : sma(close, 50), title="probe_ternary_both_arms")
+
+// 7. PROBE: the same question for a call reached only inside an if-block.
+condSma = 0.0
+if close > open
+    condSma := sma(close, 5)
+plot(condSma, title="probe_call_inside_if")
+
+// 8. Boolean operators, each isolated.
+plot((close > open and fast > slow) ? 1 : 0, title="and_gate")
+plot((close > open or  fast > slow) ? 1 : 0, title="or_gate")
+plot(not (close > open)             ? 1 : 0, title="not_gate")
+
+// 9. PROBE: does `and` short-circuit? If it does, the right-hand `sma` is not
+//    called on bars where the left side is false, and its history diverges.
+plot((close > open and sma(close, 7) > sma(close, 21)) ? 1 : 0, title="probe_and_shortcircuit")
+
+// 10. A counter that only advances inside a branch — pure path dependence.
+streak = 0
+streak := close > close[1] ? nz(streak[1]) + 1 : 0
+plot(streak, title="up_streak")
+
+// 11. A two-state machine. Holds its state across bars and flips only on a
+//     cross, so any single mis-taken branch changes every later bar.
+state = 0
+state := nz(state[1])
+if fast > slow and nz(state[1]) <= 0
+    state := 1
+if fast < slow and nz(state[1]) >= 0
+    state := -1
+plot(state, title="state_machine")
+
+// 12. Branch witnesses for the history-reading built-ins.
+plot(barssince(fast > slow),            title="barssince_cross_up")
+plot(valuewhen(fast > slow, close, 0),  title="valuewhen_cross_up")

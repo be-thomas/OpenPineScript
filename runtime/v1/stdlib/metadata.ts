@@ -1,11 +1,14 @@
 // This file is AUTO-GENERATED. Do not edit manually.
+import * as arrays from "./arrays";
 import * as barmerge from "./barmerge";
 import * as barstate from "./barstate";
 import * as chart from "./chart";
 import * as color from "./color";
 import * as core from "./core";
+import * as drawings from "./drawings";
 import * as input from "./input";
 import * as mtf from "./mtf";
+import * as renames from "./renames";
 import * as scale from "./scale";
 import * as sources from "./sources";
 import * as strategy from "./strategy";
@@ -30,6 +33,342 @@ export interface StdlibEntry {
 
 export function getGeneratedRegistry(): Record<string, StdlibEntry> {
     return {
+      "array.new_float": {
+          uses_context: false,
+          args: ["size","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["new_float"]
+      },
+      "array.new_int": {
+          uses_context: false,
+          args: ["size","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["new_int"]
+      },
+      "array.new_bool": {
+          uses_context: false,
+          args: ["size","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["new_bool"]
+      },
+      "array.new_string": {
+          uses_context: false,
+          args: ["size","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["new_string"]
+      },
+      "array.new_color": {
+          uses_context: false,
+          args: ["size","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["new_color"]
+      },
+      "array.new_line": {
+          uses_context: false,
+          args: ["size","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["new_line"]
+      },
+      "array.new_label": {
+          uses_context: false,
+          args: ["size","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["new_label"]
+      },
+      "array.new_box": {
+          uses_context: false,
+          args: ["size","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["new_box"]
+      },
+      "array.new_table": {
+          uses_context: false,
+          args: ["size","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["new_table"]
+      },
+      "array.from": {
+          uses_context: false,
+          args: ["items"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["from"]
+      },
+      "array.get": {
+          uses_context: false,
+          args: ["id","index"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["get"]
+      },
+      "array.set": {
+          uses_context: false,
+          args: ["id","index","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["set"]
+      },
+      "array.size": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["size"]
+      },
+      "array.push": {
+          uses_context: false,
+          args: ["id","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["push"]
+      },
+      "array.pop": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["pop"]
+      },
+      "array.shift": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["shift"]
+      },
+      "array.unshift": {
+          uses_context: false,
+          args: ["id","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["unshift"]
+      },
+      "array.insert": {
+          uses_context: false,
+          args: ["id","index","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["insert"]
+      },
+      "array.remove": {
+          uses_context: false,
+          args: ["id","index"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["remove"]
+      },
+      "array.clear": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["clear"]
+      },
+      "array.fill": {
+          uses_context: false,
+          args: ["id","value","index_from","index_to"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["fill"]
+      },
+      "array.copy": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["copy"]
+      },
+      "array.slice": {
+          uses_context: false,
+          args: ["id","index_from","index_to"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["slice"]
+      },
+      "array.concat": {
+          uses_context: false,
+          args: ["id1","id2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["concat"]
+      },
+      "array.reverse": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["reverse"]
+      },
+      "array.sort": {
+          uses_context: false,
+          args: ["id","order"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["sort"]
+      },
+      "array.includes": {
+          uses_context: false,
+          args: ["id","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["includes"]
+      },
+      "array.indexof": {
+          uses_context: false,
+          args: ["id","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["indexof"]
+      },
+      "array.lastindexof": {
+          uses_context: false,
+          args: ["id","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["lastindexof"]
+      },
+      "array.sum": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["sum"]
+      },
+      "array.avg": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["avg"]
+      },
+      "array.min": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["min"]
+      },
+      "array.max": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["max"]
+      },
+      "array.range": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["range"]
+      },
+      "array.median": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["median"]
+      },
+      "array.mode": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["mode"]
+      },
+      "array.variance": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["variance"]
+      },
+      "array.stdev": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["stdev"]
+      },
+      "array.covariance": {
+          uses_context: false,
+          args: ["id1","id2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["covariance"]
+      },
+      "array.join": {
+          uses_context: false,
+          args: ["id","separator"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["join"]
+      },
+      "order.ascending": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: arrays.order["ascending"]
+      },
+      "order.descending": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: arrays.order["descending"]
+      },
       "barmerge.lookahead_on": {
           uses_context: false,
           args: [],
@@ -614,6 +953,918 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: core.silver
       },
+      "line.new": {
+          uses_context: true,
+          args: ["x1","y1","x2","y2","xloc","extend","color","style","width"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["new"]
+      },
+      "line.set_x1": {
+          uses_context: true,
+          args: ["id","x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_x1"]
+      },
+      "line.set_y1": {
+          uses_context: true,
+          args: ["id","y"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_y1"]
+      },
+      "line.set_x2": {
+          uses_context: true,
+          args: ["id","x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_x2"]
+      },
+      "line.set_y2": {
+          uses_context: true,
+          args: ["id","y"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_y2"]
+      },
+      "line.set_width": {
+          uses_context: true,
+          args: ["id","width"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_width"]
+      },
+      "line.set_xloc": {
+          uses_context: true,
+          args: ["id","xloc"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_xloc"]
+      },
+      "line.set_extend": {
+          uses_context: true,
+          args: ["id","extend"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_extend"]
+      },
+      "line.set_color": {
+          uses_context: true,
+          args: ["id","color"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_color"]
+      },
+      "line.set_style": {
+          uses_context: true,
+          args: ["id","style"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_style"]
+      },
+      "line.get_x1": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["get_x1"]
+      },
+      "line.get_y1": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["get_y1"]
+      },
+      "line.get_x2": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["get_x2"]
+      },
+      "line.get_y2": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["get_y2"]
+      },
+      "line.set_xy1": {
+          uses_context: true,
+          args: ["id","x","y"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_xy1"]
+      },
+      "line.set_xy2": {
+          uses_context: true,
+          args: ["id","x","y"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_xy2"]
+      },
+      "line.get_price": {
+          uses_context: true,
+          args: ["id","x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["get_price"]
+      },
+      "line.delete": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["delete"]
+      },
+      "line.copy": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["copy"]
+      },
+      "line.style_solid": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.line["style_solid"]
+      },
+      "line.style_dotted": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.line["style_dotted"]
+      },
+      "line.style_dashed": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.line["style_dashed"]
+      },
+      "line.style_arrow_left": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.line["style_arrow_left"]
+      },
+      "line.style_arrow_right": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.line["style_arrow_right"]
+      },
+      "line.style_arrow_both": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.line["style_arrow_both"]
+      },
+      "label.new": {
+          uses_context: true,
+          args: ["x","y","text","xloc","yloc","color","style","textcolor","size","textalign","tooltip"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["new"]
+      },
+      "label.set_x": {
+          uses_context: true,
+          args: ["id","x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_x"]
+      },
+      "label.set_y": {
+          uses_context: true,
+          args: ["id","y"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_y"]
+      },
+      "label.set_text": {
+          uses_context: true,
+          args: ["id","text"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_text"]
+      },
+      "label.set_xloc": {
+          uses_context: true,
+          args: ["id","xloc"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_xloc"]
+      },
+      "label.set_yloc": {
+          uses_context: true,
+          args: ["id","yloc"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_yloc"]
+      },
+      "label.set_color": {
+          uses_context: true,
+          args: ["id","color"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_color"]
+      },
+      "label.set_style": {
+          uses_context: true,
+          args: ["id","style"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_style"]
+      },
+      "label.set_textcolor": {
+          uses_context: true,
+          args: ["id","textcolor"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_textcolor"]
+      },
+      "label.set_size": {
+          uses_context: true,
+          args: ["id","size"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_size"]
+      },
+      "label.set_textalign": {
+          uses_context: true,
+          args: ["id","textalign"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_textalign"]
+      },
+      "label.set_tooltip": {
+          uses_context: true,
+          args: ["id","tooltip"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_tooltip"]
+      },
+      "label.get_x": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["get_x"]
+      },
+      "label.get_y": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["get_y"]
+      },
+      "label.get_text": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["get_text"]
+      },
+      "label.set_xy": {
+          uses_context: true,
+          args: ["id","x","y"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_xy"]
+      },
+      "label.delete": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["delete"]
+      },
+      "label.copy": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["copy"]
+      },
+      "label.style_none": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_none"]
+      },
+      "label.style_xcross": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_xcross"]
+      },
+      "label.style_cross": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_cross"]
+      },
+      "label.style_triangleup": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_triangleup"]
+      },
+      "label.style_triangledown": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_triangledown"]
+      },
+      "label.style_flag": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_flag"]
+      },
+      "label.style_circle": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_circle"]
+      },
+      "label.style_arrowup": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_arrowup"]
+      },
+      "label.style_arrowdown": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_arrowdown"]
+      },
+      "label.style_label_up": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_label_up"]
+      },
+      "label.style_label_down": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_label_down"]
+      },
+      "label.style_label_left": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_label_left"]
+      },
+      "label.style_label_right": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_label_right"]
+      },
+      "label.style_label_lower_left": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_label_lower_left"]
+      },
+      "label.style_label_lower_right": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_label_lower_right"]
+      },
+      "label.style_label_upper_left": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_label_upper_left"]
+      },
+      "label.style_label_upper_right": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_label_upper_right"]
+      },
+      "label.style_label_center": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_label_center"]
+      },
+      "label.style_square": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_square"]
+      },
+      "label.style_diamond": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.label["style_diamond"]
+      },
+      "box.new": {
+          uses_context: true,
+          args: ["left","top","right","bottom","border_color","border_width","border_style","extend","bgcolor"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["new"]
+      },
+      "box.set_left": {
+          uses_context: true,
+          args: ["id","left"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_left"]
+      },
+      "box.set_top": {
+          uses_context: true,
+          args: ["id","top"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_top"]
+      },
+      "box.set_right": {
+          uses_context: true,
+          args: ["id","right"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_right"]
+      },
+      "box.set_bottom": {
+          uses_context: true,
+          args: ["id","bottom"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_bottom"]
+      },
+      "box.set_border_width": {
+          uses_context: true,
+          args: ["id","width"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_border_width"]
+      },
+      "box.set_border_color": {
+          uses_context: true,
+          args: ["id","color"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_border_color"]
+      },
+      "box.set_border_style": {
+          uses_context: true,
+          args: ["id","style"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_border_style"]
+      },
+      "box.set_extend": {
+          uses_context: true,
+          args: ["id","extend"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_extend"]
+      },
+      "box.set_bgcolor": {
+          uses_context: true,
+          args: ["id","bgcolor"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_bgcolor"]
+      },
+      "box.get_left": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["get_left"]
+      },
+      "box.get_top": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["get_top"]
+      },
+      "box.get_right": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["get_right"]
+      },
+      "box.get_bottom": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["get_bottom"]
+      },
+      "box.set_lefttop": {
+          uses_context: true,
+          args: ["id","left","top"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_lefttop"]
+      },
+      "box.set_rightbottom": {
+          uses_context: true,
+          args: ["id","right","bottom"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_rightbottom"]
+      },
+      "box.delete": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["delete"]
+      },
+      "box.copy": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["copy"]
+      },
+      "box.style_solid": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.box["style_solid"]
+      },
+      "box.style_dotted": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.box["style_dotted"]
+      },
+      "box.style_dashed": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.box["style_dashed"]
+      },
+      "table.new": {
+          uses_context: true,
+          args: ["position","columns","rows","bgcolor","frame_color","frame_width","border_color","border_width"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["new"]
+      },
+      "table.cell": {
+          uses_context: true,
+          args: ["table_id","column","row","text","width","height","text_color","text_halign","text_valign","text_size","bgcolor"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell"]
+      },
+      "table.set_cell_text": {
+          uses_context: true,
+          args: ["table_id","column","row","text"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["set_cell_text"]
+      },
+      "table.set_position": {
+          uses_context: true,
+          args: ["id","position"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["set_position"]
+      },
+      "table.set_bgcolor": {
+          uses_context: true,
+          args: ["id","bgcolor"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["set_bgcolor"]
+      },
+      "table.clear": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["clear"]
+      },
+      "table.delete": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["delete"]
+      },
+      "xloc.bar_index": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.xloc["bar_index"]
+      },
+      "xloc.bar_time": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.xloc["bar_time"]
+      },
+      "yloc.price": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.yloc["price"]
+      },
+      "yloc.abovebar": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.yloc["abovebar"]
+      },
+      "yloc.belowbar": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.yloc["belowbar"]
+      },
+      "extend.none": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.extend["none"]
+      },
+      "extend.right": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.extend["right"]
+      },
+      "extend.left": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.extend["left"]
+      },
+      "extend.both": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.extend["both"]
+      },
+      "position.top_left": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.position["top_left"]
+      },
+      "position.top_center": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.position["top_center"]
+      },
+      "position.top_right": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.position["top_right"]
+      },
+      "position.middle_left": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.position["middle_left"]
+      },
+      "position.middle_center": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.position["middle_center"]
+      },
+      "position.middle_right": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.position["middle_right"]
+      },
+      "position.bottom_left": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.position["bottom_left"]
+      },
+      "position.bottom_center": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.position["bottom_center"]
+      },
+      "position.bottom_right": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.position["bottom_right"]
+      },
+      "text.align_left": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.text["align_left"]
+      },
+      "text.align_center": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.text["align_center"]
+      },
+      "text.align_right": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.text["align_right"]
+      },
+      "text.align_top": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.text["align_top"]
+      },
+      "text.align_bottom": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.text["align_bottom"]
+      },
       "input": {
           uses_context: true,
           args: ["defval","title","type"],
@@ -693,6 +1944,30 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: mtf.security
+      },
+      "V4_ONLY_NAMESPACES": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: renames.V4_ONLY_NAMESPACES
+      },
+      "V4_RENAMES": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: renames.V4_RENAMES
+      },
+      "V4_REMOVED": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: renames.V4_REMOVED
       },
       "scale.right": {
           uses_context: false,

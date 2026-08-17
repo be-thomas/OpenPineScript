@@ -1,0 +1,82 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// GENERATED — do not edit. Source: conformance/golden/v3/harness_bands.pine
+// Regenerate with: npx tsx scripts/make-log-harness.ts
+//
+// The Pine-Logs variant of that harness, for collecting golden data WITHOUT the
+// PRO+/Premium "Export chart data…" feature.
+//
+//   1. Paste into the Pine editor and add to the chart.
+//   2. Open  More (⋮) → Pine Logs.
+//   3. Select all the log lines and copy them.
+//   4. Save as conformance/golden/<version>/<harness>.<SYMBOL>.<TF>.log
+//
+// Pine Logs run on HISTORICAL bars — unlike alert(), which only ever fires on
+// realtime bars — and keep the last 10,000 historical messages.
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness 2 of 3 — TUPLE-RETURNING built-ins.
+//
+// Separate from harness_core because these destructure, which is a different
+// emit path. Also convergent, so the same warm-up allowance applies.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+indicator(title="OPS golden bands", shorttitle="OPS bands", overlay=false)
+
+src = close
+
+[macdLine, macdSignal, macdHist] = ta.macd(src, 12, 26, 9)
+_v0 = macdLine
+_v1 = macdSignal
+_v2 = macdHist
+
+// Bollinger bands, written out. `bb()` is NOT a v3 function — it arrived with
+// the March 2020 batch (bb, bbw, kc, kcw, dmi, wpr, hma, supertrend, cmo, mfi),
+// which is v4 and later only. TradingView rejects it here with
+// "Could not find function or function reference 'bb'".
+//
+// Computing it by hand loses nothing that mattered: the point was to compare
+// sma and stdev against TradingView, and this compares them more directly.
+bbLength = 20
+bbMult   = 2
+bbBasis  = ta.sma(src, bbLength)
+bbDev    = bbMult * ta.stdev(src, bbLength)
+_v3 = bbBasis
+_v4 = bbBasis + bbDev
+_v5 = bbBasis - bbDev
+
+_v6 = ta.tsi(src, 25, 13)
+_v7 = ta.ema(ta.ema(ta.ema(src, 9), 9), 9)
+
+// Deliberately nested and re-used: catches state-slot collisions between two
+// calls to the same function at different call sites, which is a bug class the
+// synthetic tests found once already.
+_v8 = ta.sma(ta.ema(src, 10), 10)
+_v9 = ta.ema(ta.sma(src, 10), 10)
+_v10 = ta.rsi(ta.ema(src, 10), 14)
+
+// ── Pine Logs emission ──────────────────────────────────────────────────
+// One row per bar. The OPS| marker lets the loader find the row inside
+// whatever prefix the Pine Logs pane adds when you copy it out.
+if barstate.isfirst
+    log.info("OPSHEAD|time,open,high,low,close,volume,macd_line,macd_signal,macd_hist,bb_mid,bb_upper,bb_lower,tsi_25_13,triple_ema_9,sma_of_ema_10,ema_of_sma_10,rsi_of_ema_10")
+
+_row = str.tostring(time, "#")
+      + "," + str.tostring(open, "#.##########")
+      + "," + str.tostring(high, "#.##########")
+      + "," + str.tostring(low, "#.##########")
+      + "," + str.tostring(close, "#.##########")
+      + "," + str.tostring(volume, "#.##########")
+      + "," + str.tostring(_v0, "#.##########")
+      + "," + str.tostring(_v1, "#.##########")
+      + "," + str.tostring(_v2, "#.##########")
+      + "," + str.tostring(_v3, "#.##########")
+      + "," + str.tostring(_v4, "#.##########")
+      + "," + str.tostring(_v5, "#.##########")
+      + "," + str.tostring(_v6, "#.##########")
+      + "," + str.tostring(_v7, "#.##########")
+      + "," + str.tostring(_v8, "#.##########")
+      + "," + str.tostring(_v9, "#.##########")
+      + "," + str.tostring(_v10, "#.##########")
+
+log.info("OPS|" + _row)

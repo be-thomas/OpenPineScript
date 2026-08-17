@@ -1,0 +1,121 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// GENERATED — do not edit. Source: conformance/golden/v3/harness_core.pine
+// Regenerate with: npx tsx scripts/make-log-harness.ts
+//
+// The Pine-Logs variant of that harness, for collecting golden data WITHOUT the
+// PRO+/Premium "Export chart data…" feature.
+//
+//   1. Paste into the Pine editor and add to the chart.
+//   2. Open  More (⋮) → Pine Logs.
+//   3. Select all the log lines and copy them.
+//   4. Save as conformance/golden/<version>/<harness>.<SYMBOL>.<TF>.log
+//
+// Pine Logs run on HISTORICAL bars — unlike alert(), which only ever fires on
+// realtime bars — and keep the last 10,000 historical messages.
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness 1 of 3 — CONVERGENT indicators.
+//
+// Paste into the TradingView Pine editor, add to the chart, then use
+// "Export chart data…". See README.md in this directory for the full recipe.
+//
+// Everything here is CONVERGENT: its value depends on a bounded window, or
+// converges exponentially, so it is safe to export a window that does not start
+// at the instrument's first bar. The comparison skips a warm-up allowance.
+//
+// If TradingView rejects //@version=3, change ONLY line 1 to //@version=4 — the
+// built-ins below are spelled identically in v4, and the test forces our engine
+// to read the file as v3 regardless of the annotation.
+//
+// If TradingView rejects one specific plot, DELETE THAT LINE. The test compares
+// the intersection of the CSV's columns and our engine's plots, so a missing
+// column costs only that one assertion.
+// ─────────────────────────────────────────────────────────────────────────────
+indicator(title="OPS golden core", shorttitle="OPS core", overlay=false)
+
+src = close
+
+_v0 = ta.sma(src, 20)
+_v1 = ta.ema(src, 20)
+_v2 = ta.rma(src, 20)
+_v3 = ta.wma(src, 20)
+_v4 = ta.vwma(src, 20)
+_v5 = ta.swma(src)
+_v6 = ta.rsi(src, 14)
+_v7 = ta.atr(14)
+_v8 = ta.tr(true)
+_v9 = ta.stdev(src, 20)
+_v10 = ta.variance(src, 20)
+_v11 = ta.dev(src, 20)
+_v12 = ta.cci(src, 20)
+_v13 = ta.mom(src, 10)
+_v14 = ta.roc(src, 10)
+_v15 = ta.change(src)
+_v16 = ta.highest(high, 20)
+_v17 = ta.lowest(low, 20)
+_v18 = ta.highestbars(high, 20)
+_v19 = ta.lowestbars(low, 20)
+_v20 = ta.linreg(src, 20, 0)
+_v21 = ta.correlation(src, volume, 20)
+_v22 = ta.stoch(close, high, low, 14)
+_v23 = ta.cog(src, 20)
+
+// Williams %R and Money Flow Index, written out. `wpr()` and `mfi()` are NOT v3
+// functions — both arrived in the March 2020 batch, which is v4 and later only.
+// Spelled out here they still exercise highest/lowest and sum/change/hlc3, and
+// they compile at v3.
+wprHigh = ta.highest(high, 14)
+wprLow  = ta.lowest(low, 14)
+_v24 = 100 * (close - wprHigh) / (wprHigh - wprLow)
+
+mfiTp   = hlc3
+mfiFlow = mfiTp * volume
+mfiPos  = math.sum(ta.change(mfiTp) > 0 ? mfiFlow : 0, 14)
+mfiNeg  = math.sum(ta.change(mfiTp) < 0 ? mfiFlow : 0, 14)
+_v25 = 100 - 100 / (1 + mfiPos / mfiNeg)
+_v26 = ta.alma(src, 20, 0.85, 6)
+_v27 = ta.percentrank(src, 20)
+
+// ── Pine Logs emission ──────────────────────────────────────────────────
+// One row per bar. The OPS| marker lets the loader find the row inside
+// whatever prefix the Pine Logs pane adds when you copy it out.
+if barstate.isfirst
+    log.info("OPSHEAD|time,open,high,low,close,volume,sma_20,ema_20,rma_20,wma_20,vwma_20,swma,rsi_14,atr_14,tr_true,stdev_20,variance_20,dev_20,cci_20,mom_10,roc_10,change_1,highest_20,lowest_20,highestbars_20,lowestbars_20,linreg_20_0,correlation_20,stoch_14,cog_20,wpr_14_manual,mfi_14_manual,alma_20,percentrank_20")
+
+_row = str.tostring(time, "#")
+      + "," + str.tostring(open, "#.##########")
+      + "," + str.tostring(high, "#.##########")
+      + "," + str.tostring(low, "#.##########")
+      + "," + str.tostring(close, "#.##########")
+      + "," + str.tostring(volume, "#.##########")
+      + "," + str.tostring(_v0, "#.##########")
+      + "," + str.tostring(_v1, "#.##########")
+      + "," + str.tostring(_v2, "#.##########")
+      + "," + str.tostring(_v3, "#.##########")
+      + "," + str.tostring(_v4, "#.##########")
+      + "," + str.tostring(_v5, "#.##########")
+      + "," + str.tostring(_v6, "#.##########")
+      + "," + str.tostring(_v7, "#.##########")
+      + "," + str.tostring(_v8, "#.##########")
+      + "," + str.tostring(_v9, "#.##########")
+      + "," + str.tostring(_v10, "#.##########")
+      + "," + str.tostring(_v11, "#.##########")
+      + "," + str.tostring(_v12, "#.##########")
+      + "," + str.tostring(_v13, "#.##########")
+      + "," + str.tostring(_v14, "#.##########")
+      + "," + str.tostring(_v15, "#.##########")
+      + "," + str.tostring(_v16, "#.##########")
+      + "," + str.tostring(_v17, "#.##########")
+      + "," + str.tostring(_v18, "#.##########")
+      + "," + str.tostring(_v19, "#.##########")
+      + "," + str.tostring(_v20, "#.##########")
+      + "," + str.tostring(_v21, "#.##########")
+      + "," + str.tostring(_v22, "#.##########")
+      + "," + str.tostring(_v23, "#.##########")
+      + "," + str.tostring(_v24, "#.##########")
+      + "," + str.tostring(_v25, "#.##########")
+      + "," + str.tostring(_v26, "#.##########")
+      + "," + str.tostring(_v27, "#.##########")
+
+log.info("OPS|" + _row)

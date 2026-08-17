@@ -1,0 +1,136 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// GENERATED — do not edit. Source: conformance/golden/v3/harness_loops.pine
+// Regenerate with: npx tsx scripts/make-log-harness.ts
+//
+// The Pine-Logs variant of that harness, for collecting golden data WITHOUT the
+// PRO+/Premium "Export chart data…" feature.
+//
+//   1. Paste into the Pine editor and add to the chart.
+//   2. Open  More (⋮) → Pine Logs.
+//   3. Select all the log lines and copy them.
+//   4. Save as conformance/golden/<version>/<harness>.<SYMBOL>.<TF>.log
+//
+// Pine Logs run on HISTORICAL bars — unlike alert(), which only ever fires on
+// realtime bars — and keep the last 10,000 historical messages.
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness — LOOPS.
+//
+// Each plot is the RESULT of a loop, so the exported number witnesses how many
+// iterations ran and in what order. Where a loop reimplements a built-in, both
+// are plotted side by side: they must agree with each other AND with
+// TradingView, which catches a loop that is wrong in the same direction as our
+// built-in.
+//
+// Convergent — every loop reads a bounded window — so the standard warm-up
+// allowance applies and this can be exported from anywhere in the chart.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+indicator(title="OPS golden loops", shorttitle="OPS loops", overlay=false)
+
+// 1. Plain accumulation over a fixed window, against the built-in mean.
+sum20 = 0.0
+for i = 0 to 19
+    sum20 := sum20 + close[i]
+_v0 = sum20 / 20
+_v1 = ta.sma(close, 20)
+
+// 2. break — the index of the first down bar in the last 50. -1 if none, which
+//    also tells us whether the loop ran to completion.
+firstDown = -1
+for i = 0 to 49
+    if close[i] < open[i]
+        firstDown := i
+        break
+_v2 = firstDown
+
+// 3. continue — count up bars by skipping the rest of the body.
+upCount = 0
+for i = 0 to 19
+    if close[i] <= open[i]
+        continue
+    upCount := upCount + 1
+_v3 = upCount
+
+// 4. Running max, against the built-in.
+maxHigh = 0.0
+for i = 0 to 19
+    maxHigh := math.max(maxHigh, high[i])
+_v4 = maxHigh
+_v5 = ta.highest(high, 20)
+
+// 5. A step other than 1 — five samples, not twenty-one.
+sumStep = 0.0
+for i = 0 to 20 by 5
+    sumStep := sumStep + close[i]
+_v6 = sumStep
+
+// 6. Nested loops: 25 comparisons per bar. Wrong nesting still produces a
+//    plausible-looking number, which is why it is worth exporting.
+nested = 0
+for i = 0 to 4
+    for j = 0 to 4
+        if close[i] > close[j]
+            nested := nested + 1
+_v7 = nested
+
+// 7. A bound that changes per bar, so the iteration count is itself series data.
+len = 5 + (close > open ? 5 : 0)
+dyn = 0.0
+for i = 0 to len - 1
+    dyn := dyn + close[i]
+_v8 = dyn / len
+
+// 8. PROBE: a loop whose range is empty on some bars (`to` below `from`).
+//    Whether Pine runs zero iterations or one is what the export settles.
+empty = 0
+for i = 0 to (close > open ? 2 : -1)
+    empty := empty + 1
+_v9 = empty
+
+// 9. PROBE: a stateful built-in called INSIDE a loop body. Its per-call state is
+//    keyed by call site, so a loop makes one site run many times per bar.
+loopEma = 0.0
+for i = 0 to 2
+    loopEma := loopEma + ta.ema(close, 10)
+_v10 = loopEma / 3
+_v11 = ta.ema(close, 10)
+
+// 10. break out of the OUTER loop from inside the inner one.
+outerBreak = 0
+for i = 0 to 9
+    for j = 0 to 9
+        if close[i] < low[j]
+            outerBreak := outerBreak + 1
+    if outerBreak > 5
+        break
+_v12 = outerBreak
+
+// ── Pine Logs emission ──────────────────────────────────────────────────
+// One row per bar. The OPS| marker lets the loader find the row inside
+// whatever prefix the Pine Logs pane adds when you copy it out.
+if barstate.isfirst
+    log.info("OPSHEAD|time,open,high,low,close,volume,loop_mean_20,builtin_sma_20,loop_break_first_down,loop_continue_up_count,loop_max_high_20,builtin_highest_20,loop_step_5,nested_loops,loop_dynamic_bound,probe_empty_range,probe_ema_inside_loop,builtin_ema_10,nested_break")
+
+_row = str.tostring(time, "#")
+      + "," + str.tostring(open, "#.##########")
+      + "," + str.tostring(high, "#.##########")
+      + "," + str.tostring(low, "#.##########")
+      + "," + str.tostring(close, "#.##########")
+      + "," + str.tostring(volume, "#.##########")
+      + "," + str.tostring(_v0, "#.##########")
+      + "," + str.tostring(_v1, "#.##########")
+      + "," + str.tostring(_v2, "#.##########")
+      + "," + str.tostring(_v3, "#.##########")
+      + "," + str.tostring(_v4, "#.##########")
+      + "," + str.tostring(_v5, "#.##########")
+      + "," + str.tostring(_v6, "#.##########")
+      + "," + str.tostring(_v7, "#.##########")
+      + "," + str.tostring(_v8, "#.##########")
+      + "," + str.tostring(_v9, "#.##########")
+      + "," + str.tostring(_v10, "#.##########")
+      + "," + str.tostring(_v11, "#.##########")
+      + "," + str.tostring(_v12, "#.##########")
+
+log.info("OPS|" + _row)

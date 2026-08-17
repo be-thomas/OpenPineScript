@@ -1,0 +1,84 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// GENERATED — do not edit. Source: conformance/golden/v3/harness_state.pine
+// Regenerate with: npx tsx scripts/make-log-harness.ts
+//
+// The Pine-Logs variant of that harness, for collecting golden data WITHOUT the
+// PRO+/Premium "Export chart data…" feature.
+//
+//   1. Paste into the Pine editor and add to the chart.
+//   2. Open  More (⋮) → Pine Logs.
+//   3. Select all the log lines and copy them.
+//   4. Save as conformance/golden/<version>/<harness>.<SYMBOL>.<TF>.log
+//
+// Pine Logs run on HISTORICAL bars — unlike alert(), which only ever fires on
+// realtime bars — and keep the last 10,000 historical messages.
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness 3 of 3 — PATH-DEPENDENT values.
+//
+// ⚠ THIS ONE NEEDS THE INSTRUMENT'S FULL HISTORY IN THE EXPORT.
+//
+// Nothing here converges. `cum(volume)` is a running total from bar 0;
+// `barssince` and `valuewhen` reach arbitrarily far back; `sar` carries a
+// trend state that never forgets its start. If the exported window begins in
+// the middle of the chart, TradingView's values include history the engine
+// never saw, and every difference is an artefact of the export rather than a
+// bug.
+//
+// So export this one on a symbol whose ENTIRE history fits in a single export
+// (see README.md). If that is not possible, export the other two harnesses
+// only — the test skips whatever has no CSV.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+indicator(title="OPS golden state", shorttitle="OPS state", overlay=false)
+
+src = close
+fast = ta.sma(src, 10)
+slow = ta.sma(src, 30)
+
+_v0 = ta.cum(volume)
+_v1 = math.sum(src, 20)
+_v2 = ta.sar(0.02, 0.02, 0.2)
+_v3 = ta.vwap(hlc3)
+_v4 = ta.barssince(close > open)
+_v5 = ta.valuewhen(close > open, close, 0)
+_v6 = ta.valuewhen(close > open, close, 1)
+_v7 = ta.rising(src, 5)  ? 1 : 0
+_v8 = ta.falling(src, 5) ? 1 : 0
+_v9 = ta.cross(fast, slow)      ? 1 : 0
+_v10 = ta.crossover(fast, slow)  ? 1 : 0
+_v11 = ta.crossunder(fast, slow) ? 1 : 0
+_v12 = nz(src[1], 0)
+_v13 = ta.fixnan(close > open ? close : na)
+_v14 = iff(close > open, 1, 0)
+
+// ── Pine Logs emission ──────────────────────────────────────────────────
+// One row per bar. The OPS| marker lets the loader find the row inside
+// whatever prefix the Pine Logs pane adds when you copy it out.
+if barstate.isfirst
+    log.info("OPSHEAD|time,open,high,low,close,volume,cum_volume,sum_20,sar,vwap_hlc3,barssince_up,valuewhen_up_close_0,valuewhen_up_close_1,rising_5,falling_5,cross_10_30,crossover_10_30,crossunder_10_30,nz_prev_close,fixnan_up_close,iff_up")
+
+_row = str.tostring(time, "#")
+      + "," + str.tostring(open, "#.##########")
+      + "," + str.tostring(high, "#.##########")
+      + "," + str.tostring(low, "#.##########")
+      + "," + str.tostring(close, "#.##########")
+      + "," + str.tostring(volume, "#.##########")
+      + "," + str.tostring(_v0, "#.##########")
+      + "," + str.tostring(_v1, "#.##########")
+      + "," + str.tostring(_v2, "#.##########")
+      + "," + str.tostring(_v3, "#.##########")
+      + "," + str.tostring(_v4, "#.##########")
+      + "," + str.tostring(_v5, "#.##########")
+      + "," + str.tostring(_v6, "#.##########")
+      + "," + str.tostring(_v7, "#.##########")
+      + "," + str.tostring(_v8, "#.##########")
+      + "," + str.tostring(_v9, "#.##########")
+      + "," + str.tostring(_v10, "#.##########")
+      + "," + str.tostring(_v11, "#.##########")
+      + "," + str.tostring(_v12, "#.##########")
+      + "," + str.tostring(_v13, "#.##########")
+      + "," + str.tostring(_v14, "#.##########")
+
+log.info("OPS|" + _row)

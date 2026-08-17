@@ -1,0 +1,88 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// GENERATED — do not edit. Source: conformance/golden/v4/harness_builtins.pine
+// Regenerate with: npx tsx scripts/make-log-harness.ts
+//
+// The Pine-Logs variant of that harness, for collecting golden data WITHOUT the
+// PRO+/Premium "Export chart data…" feature.
+//
+//   1. Paste into the Pine editor and add to the chart.
+//   2. Open  More (⋮) → Pine Logs.
+//   3. Select all the log lines and copy them.
+//   4. Save as conformance/golden/<version>/<harness>.<SYMBOL>.<TF>.log
+//
+// Pine Logs run on HISTORICAL bars — unlike alert(), which only ever fires on
+// realtime bars — and keep the last 10,000 historical messages.
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness — BUILT-INS THAT DO NOT EXIST BEFORE v4.
+//
+// TradingView added these in March 2020: bb, bbw, kc, kcw, dmi, wpr, hma,
+// supertrend, cmo, mfi, plus the variables iii, wvad, wad, obv, pvt, nvi, pvi.
+// A v3 script calling any of them fails to compile —
+//
+//     Could not find function or function reference 'bb'
+//
+// — which is why they live here and not in ../v3/. Only the three this engine
+// actually implements are plotted; adding a call to one it does not implement
+// would fail locally rather than tell us anything about TradingView.
+//
+// ⚠ HOW THIS ONE IS COMPARED, AND THE CAVEAT
+//
+// This engine implements v1–v3 only, so it cannot run a v4 script as v4. The
+// golden test runs every harness through the v3 pipeline, including this one.
+//
+// That is meaningful because the RUNTIME is shared across versions by design
+// (dev-docs/00-architecture-assessment.md §5.6) — `ta.bb` is one implementation,
+// not one per version — so exporting at v4 and comparing against the shared
+// runtime tests exactly the arithmetic we want tested.
+//
+// What it does NOT test is the version GATE. This engine currently resolves
+// `bb`, `wpr` and `mfi` at v3, where TradingView rejects them. That is a real
+// parity gap in the opposite direction from the rest of this suite, and it is
+// recorded in ../README.md rather than fixed here — fixing it would make this
+// harness unrunnable until v4 is implemented.
+//
+// Convergent, so the standard warm-up allowance applies.
+// ─────────────────────────────────────────────────────────────────────────────
+indicator(title="OPS golden v4 builtins", shorttitle="OPS v4", overlay=false)
+
+src = close
+
+[bbMid, bbUpper, bbLower] = ta.bb(src, 20, 2)
+_v0 = bbMid
+_v1 = bbUpper
+_v2 = bbLower
+
+_v3 = ta.wpr(14)
+_v4 = ta.mfi(src, 14)
+
+// Plotted alongside so a disagreement separates "our bb is wrong" from "our sma
+// or stdev is wrong" — the manual form in ../v3/harness_bands.pine must agree
+// with the built-in form here.
+_v5 = ta.sma(src, 20)
+_v6 = ta.sma(src, 20) + 2 * ta.stdev(src, 20)
+_v7 = ta.sma(src, 20) - 2 * ta.stdev(src, 20)
+
+// ── Pine Logs emission ──────────────────────────────────────────────────
+// One row per bar. The OPS| marker lets the loader find the row inside
+// whatever prefix the Pine Logs pane adds when you copy it out.
+if barstate.isfirst
+    log.info("OPSHEAD|time,open,high,low,close,volume,bb_mid,bb_upper,bb_lower,wpr_14,mfi_14,bb_mid_manual,bb_upper_manual,bb_lower_manual")
+
+_row = str.tostring(time, "#")
+      + "," + str.tostring(open, "#.##########")
+      + "," + str.tostring(high, "#.##########")
+      + "," + str.tostring(low, "#.##########")
+      + "," + str.tostring(close, "#.##########")
+      + "," + str.tostring(volume, "#.##########")
+      + "," + str.tostring(_v0, "#.##########")
+      + "," + str.tostring(_v1, "#.##########")
+      + "," + str.tostring(_v2, "#.##########")
+      + "," + str.tostring(_v3, "#.##########")
+      + "," + str.tostring(_v4, "#.##########")
+      + "," + str.tostring(_v5, "#.##########")
+      + "," + str.tostring(_v6, "#.##########")
+      + "," + str.tostring(_v7, "#.##########")
+
+log.info("OPS|" + _row)

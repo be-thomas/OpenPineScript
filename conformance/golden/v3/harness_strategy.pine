@@ -1,0 +1,57 @@
+//@version=3
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness — ORDER FLOW.
+//
+// Orders are the one control flow with no plot of its own, so the broker's own
+// state is the witness: `strategy.position_size`, `strategy.equity` and
+// `strategy.opentrades` are plottable, and each is a running consequence of
+// every entry and exit decision taken so far. One mis-fired order moves them
+// for the rest of the chart.
+//
+// ⚠ NEEDS FULL HISTORY, and it is a `strategy`, not a `study`. Export it the
+// same way — the plots appear in the CSV as usual.
+//
+// ⚠ Deliberately NOT passed: default_qty_type / default_qty_value / commission /
+// pyramiding. Those change fill sizing, and the point here is the CONTROL FLOW,
+// not the position sizing model. Leaving them at their defaults keeps a
+// disagreement attributable to a branch rather than to a rounding rule.
+//
+// Same rules as the other harnesses: bump line 1 to //@version=4 if v3 is
+// rejected, and delete any single plot TradingView will not compile.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy(title="OPS golden strategy", shorttitle="OPS strat", overlay=false)
+
+fast = sma(close, 10)
+slow = sma(close, 30)
+
+goLong  = crossover(fast, slow)
+goFlat  = crossunder(fast, slow)
+
+// The decisions, plotted before they are acted on — so a divergence can be
+// traced to either the SIGNAL or the ORDER, not left ambiguous between them.
+plot(goLong ? 1 : 0, title="signal_long")
+plot(goFlat ? 1 : 0, title="signal_flat")
+
+if goLong
+    strategy.entry("L", strategy.long)
+
+if goFlat
+    strategy.close("L")
+
+// The consequences.
+plot(strategy.position_size, title="position_size")
+plot(strategy.opentrades,    title="opentrades")
+plot(strategy.equity,        title="equity")
+
+// A second, independent decision path: hold state explicitly and compare it
+// against the broker's. These must move together; if they do not, the order
+// layer disagrees with the branch that placed the order.
+inPos = 0
+inPos := nz(inPos[1])
+if goLong
+    inPos := 1
+if goFlat
+    inPos := 0
+plot(inPos, title="expected_in_position")
+
+plot(barssince(goLong), title="bars_since_entry_signal")
