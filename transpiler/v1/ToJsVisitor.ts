@@ -787,7 +787,27 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // the block's value is discarded anyway, so the IIFE buys nothing there —
     // emit a plain `if` and suppress the trailing return that made it necessary.
     const plain = this.loopDepth > 0 && this.isStatementPosition(ctx);
-    if (plain) this.suppressBlockReturn++;
+
+    // Suppression stops at the IIFE boundary — it is SET, not incremented.
+    //
+    // A plain `if` suppresses the trailing return in its own blocks. An IIFE
+    // `if` is an EXPRESSION whose blocks must return, so any suppression from
+    // an enclosing plain `if` must not reach inside it.
+    //
+    // Incrementing unconditionally leaked it down the whole subtree, and an
+    // if-EXPRESSION nested in a statement-`if` inside a loop lost its value:
+    //
+    //     for i = 0 to 2
+    //         if close > open
+    //             v = if high > low
+    //                 1
+    //             else
+    //                 2
+    //
+    // emitted `(() => { if (...) { 1; } else { 2; } })()`, so `v` was
+    // `undefined` on every bar — no error, just a silently empty variable.
+    const saved = this.suppressBlockReturn;
+    this.suppressBlockReturn = plain ? saved + 1 : 0;
     try {
       const thenBlock = this.visit(ctx.stmts_block(0));
       let result = `if (ctx.truthy(${cond})) ${thenBlock}`;
@@ -796,7 +816,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
       }
       return plain ? result : `(() => { ${result} })()`;
     } finally {
-      if (plain) this.suppressBlockReturn--;
+      this.suppressBlockReturn = saved;
     }
   }
 
@@ -818,15 +838,39 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     const id = this.anonCounter++;
     const res = `_res${id}`;
 
-    // Forward lexical scanner to safely find the top-level 'return' statement
-    let nesting = 0;
+    // Forward lexical scanner to find the loop's OWN trailing 'return'.
+    //
+    // ── Why nesting alone is not enough ─────────────────────────────────────
+    //
+    // The body can contain whole FUNCTIONS — an if-expression emits
+    // `(() => { … })()`, and its returns belong to that function, not to the
+    // loop. Ranking by brace depth and taking the shallowest picked one of them
+    // whenever the loop had no trailing return of its own, which is exactly the
+    // case for a statement-`if` body:
+    //
+    //     v = if high > low
+    //             1
+    //         else
+    //             2
+    //
+    // came out as `if (…) { return 1; } else { _res0 = 2; }`, so the else
+    // branch assigned the LOOP's result variable and the expression evaluated
+    // to undefined. Silent: no error, just an `na` on every bar that took the
+    // else.
+    //
+    // So function bodies are tracked separately from plain blocks, and only a
+    // return at function depth 0 can be the loop's.
     let inString = false;
     let stringChar = '';
-    const returns: { index: number, nesting: number }[] = [];
+    /** One entry per open '{'; true when it opens a FUNCTION body. */
+    const braces: boolean[] = [];
+    let funcDepth = 0;
+    let depth = 0;
+    const returns: { index: number, depth: number }[] = [];
 
     for (let i = 0; i < rawBody.length; i++) {
         const char = rawBody[i];
-        
+
         // Skip through strings safely
         if (inString) {
             if (char === stringChar && rawBody[i - 1] !== '\\') inString = false;
@@ -838,26 +882,39 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
             continue;
         }
 
-        // Track block nesting depths
-        if (char === '{' || char === '(' || char === '[') nesting++;
-        if (char === '}' || char === ')' || char === ']') nesting--;
+        if (char === '{') {
+            // A '{' preceded by '=>' opens a function body. The emitter only
+            // ever produces arrow functions, so this is the whole rule.
+            const isFunctionBody = /=>\s*$/.test(rawBody.substring(0, i));
+            braces.push(isFunctionBody);
+            if (isFunctionBody) funcDepth++;
+            depth++;
+            continue;
+        }
+        if (char === '}') {
+            if (braces.pop()) funcDepth--;
+            depth--;
+            continue;
+        }
+        if (char === '(' || char === '[') depth++;
+        if (char === ')' || char === ']') depth--;
 
         // Check for 'return ' keyword
         if (rawBody.substring(i, i + 7) === "return ") {
             const prev = i === 0 ? ' ' : rawBody[i - 1];
             // Must be preceded by space, newline, semicolon, or block boundary
-            if (/[ \n;{}]/.test(prev)) {
-                returns.push({ index: i, nesting: nesting });
+            if (/[ \n;{}]/.test(prev) && funcDepth === 0) {
+                returns.push({ index: i, depth });
             }
         }
     }
 
     let safeBody = rawBody;
     if (returns.length > 0) {
-        // Find the absolute shallowest nesting level where a 'return' exists
-        const minNesting = Math.min(...returns.map(r => r.nesting));
-        const topLevelReturns = returns.filter(r => r.nesting === minNesting);
-        
+        // Find the absolute shallowest depth where one of OUR returns exists
+        const minDepth = Math.min(...returns.map(r => r.depth));
+        const topLevelReturns = returns.filter(r => r.depth === minDepth);
+
         // The last return at this shallowest level is the one injected by stmts_block
         const target = topLevelReturns[topLevelReturns.length - 1];
         safeBody = rawBody.substring(0, target.index) + `${res} = ` + rawBody.substring(target.index + 7);
