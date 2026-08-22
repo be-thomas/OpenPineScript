@@ -153,8 +153,11 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   // Prefix for all emitted identifiers to avoid sandbox name clashes
   protected readonly PREFIX = common.PREFIX;
   protected anonCounter = 0;
-  // Script kind from the study()/strategy() directive; drives strategy.* enforcement.
-  protected scriptKind: 'study' | 'strategy' | undefined = undefined;
+  // Script kind from the study()/strategy() directive; drives strategy.*
+  // enforcement. 'indicator' and 'library' are v5 directives, admitted here
+  // only so the TYPE is total — v1 has neither, and detectDirective below never
+  // returns either. See transpiler/v5/ToJsVisitor.ts.
+  protected scriptKind: 'study' | 'indicator' | 'strategy' | 'library' | undefined = undefined;
   /** Names of user-defined functions; populated at the entry point. */
   protected userFunctions: ReadonlySet<string> = new Set();
   /**
@@ -402,8 +405,15 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return `${this.PREFIX}$fn_${pineName}`;
   }
 
-  /** Find the first study()/strategy() directive call in the script, if any. */
-  protected detectDirective(node: ParseTree): 'study' | 'strategy' | undefined {
+  /**
+   * Find the first study()/strategy() directive call in the script, if any.
+   *
+   * The return type admits 'indicator' so a later version can override this
+   * without widening it; v1 knows only the two spellings it tests for.
+   */
+  protected detectDirective(
+    node: ParseTree,
+  ): 'study' | 'indicator' | 'strategy' | 'library' | undefined {
     if (isRule(node, "Fun_callContext")) {
       const name = node.id().getText();
       if (name === "study" || name === "strategy") return name;
@@ -967,14 +977,36 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return parts.map(p => `ctx.truthy(${p})`).join(" && ");
   }
 
+  /**
+   * The operator BETWEEN operand `i - 1` and operand `i`, in a flat chain.
+   *
+   * ── Why not ctx.MUL(i - 1) ────────────────────────────────────────────────
+   *
+   * Because that indexes the list of MUL tokens, not the position in the
+   * expression. In `a * b / c` there is one DIV and it is `DIV(0)`, so asking
+   * `MUL(1) ? "*" : DIV(1) ? "/" : "%"` for the second operator finds neither
+   * and falls through to MODULO:
+   *
+   *     a * b / c    →    (a * b) % c
+   *
+   * Silent, and wrong for every mixed `*`/`/` chain — which is most of them.
+   * `a > b < c` and `a != b == c` had the same defect for the same reason.
+   *
+   * ANTLR alternates children operand, operator, operand, so operand `i` is
+   * preceded by the operator at `i * 2 - 1`. `visitAdd_expr` below already read
+   * it that way; these did not.
+   */
+  protected operatorBefore(ctx: ParserRuleContext, index: number): string {
+    return (ctx.getChild(index * 2 - 1) as any)?.getText() ?? "";
+  }
+
   visitEq_expr(ctx: Eq_exprContext): string {
     this.enforceNaComparison(ctx);
     const parts = ctx.cmp_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      const op = ctx.EQ(i - 1) ? "==" : "!=";
-      out = `(${out} ${op} ${parts[i]})`;
+      out = `(${out} ${this.operatorBefore(ctx as any, i)} ${parts[i]})`;
     }
     return out;
   }
@@ -984,8 +1016,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      const op = ctx.GT(i - 1) ? ">" : ctx.GE(i - 1) ? ">=" : ctx.LT(i - 1) ? "<" : "<=";
-      out = `(${out} ${op} ${parts[i]})`;
+      out = `(${out} ${this.operatorBefore(ctx as any, i)} ${parts[i]})`;
     }
     return out;
   }
@@ -1016,8 +1047,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      const op = ctx.MUL(i - 1) ? "*" : ctx.DIV(i - 1) ? "/" : "%";
-      out = `(${out} ${op} ${parts[i]})`;
+      out = `(${out} ${this.operatorBefore(ctx as any, i)} ${parts[i]})`;
     }
     return out;
   }
@@ -1116,17 +1146,38 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
       );
     }
 
-    const transpiledName = this.registry[originalName]
-      ? `ctx.builtin(${JSON.stringify(originalName)})`
-      : this.userFunctions.has(originalName)
-        ? this.funcName(originalName)
+    // A SCRIPT-DEFINED function wins over a registry entry of the same name.
+    //
+    // Pine keeps functions and variables in separate namespaces, so a script
+    // may define `area(x) =>` even though `area` is a built-in plot-style
+    // CONSTANT. Checking the registry first resolved that call to
+    // `ctx.builtin("area")` — the string "area" — and the runtime reported
+    // "The provided reference is not a function", which reads as an engine bug
+    // rather than as the name collision it is.
+    //
+    // Where the registry entry is a FUNCTION rather than a value, TradingView
+    // rejects the definition outright ("cannot use a built-in name"), so no
+    // valid script can reach this ordering and disagree with it.
+    const isUserDefined = this.userFunctions.has(originalName);
+
+    const transpiledName = isUserDefined
+      ? this.funcName(originalName)
+      : this.registry[originalName]
+        ? `ctx.builtin(${JSON.stringify(originalName)})`
         : this.visit(ctx.id());
 
     // 1. Just parse the arguments normally. NO manual 'ctx' injection!
     const args = ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
-    
-    // 2. Generate Deterministic ID (e.g., "sma@L4:C8")
-    const callId = `"${originalName}${this.getLocId(ctx)}"`;
+
+    // 2. Generate Deterministic ID (e.g., "sma@L4:C8").
+    //
+    // A user function's id carries the `$fn_` marker, because `Context.call`
+    // reads the leading name out of this id to find the call's registry
+    // metadata — and a user function called `area` would otherwise be handed
+    // the built-in constant's entry and rejected as "a value, not a function".
+    // `$` cannot occur in a Pine name, so the marked form matches nothing.
+    const idName = isUserDefined ? this.funcName(originalName) : originalName;
+    const callId = `"${idName}${this.getLocId(ctx)}"`;
 
     // 3. Construct the ctx.call wrapper
     // We only add the comma after transpiledName if there are actually arguments to pass.
