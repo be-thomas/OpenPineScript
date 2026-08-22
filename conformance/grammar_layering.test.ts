@@ -29,6 +29,7 @@ const CHAIN: Array<{ version: number; importsFrom: number | null }> = [
   { version: 2, importsFrom: 1 },
   { version: 3, importsFrom: 2 },
   { version: 4, importsFrom: 3 },
+  { version: 5, importsFrom: 4 },
 ];
 
 type Kind = "Lexer" | "Parser";

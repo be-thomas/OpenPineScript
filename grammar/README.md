@@ -11,6 +11,8 @@ only its own delta.** See [dev-docs/00-architecture-assessment.md](../dev-docs/0
 | `PineV1Lexer.g4` / `PineV1Parser.g4` | **The base.** Pine Script v1 and nothing else. |
 | `PineV2Lexer.g4` / `PineV2Parser.g4` | `import PineV1*`. Adds `ASSIGN : ':='` and the `var_assign` rule. |
 | `PineV3Lexer.g4` / `PineV3Parser.g4` | `import PineV2*`. No new syntax — v3's changes are semantic. |
+| `PineV4Lexer.g4` / `PineV4Parser.g4` | `import PineV3*`. Adds `var` / `varip`, the type prefix on a declaration, and an `id` override so the new keyword tokens do not break dotted names. |
+| `PineV5Lexer.g4` / `PineV5Parser.g4` | `import PineV4*`. Adds `while`, `switch`, `type`, `method`, `import`/`export`, typed parameters with defaults, and `type_args` (`matrix.new<float>(…)`). |
 
 Two rules govern edits:
 
@@ -37,8 +39,15 @@ From the project root:
 npm run generate:parser
 ```
 
-Output is written to `parser/v1/generated/`, `parser/v2/generated/` and
-`parser/v3/generated/` (Lexer, Parser, Visitor per version). You need **Node.js 20+** and the `antlr-ng` CLI (installed via `npm install`).
+Output is written to `parser/v<N>/generated/` (Lexer, Parser, Visitor per
+version), for every version in the chain. You need **Node.js 20+** and the
+`antlr-ng` CLI (installed via `npm install`).
+
+Adding a version means three edits, and the layering test in
+[conformance/grammar_layering.test.ts](../conformance/grammar_layering.test.ts)
+checks the result: a `generate:parser:vN` script in `package.json`, an entry in
+`VERSIONS` in [scripts/patch-visitor.js](../scripts/patch-visitor.js), and a row
+in that test's `CHAIN`.
 
 ## Run a quick parse
 
