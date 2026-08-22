@@ -84,6 +84,7 @@ function splitComment(line: string): [string, string] {
 
 /** Apply the v3 → v5 call renames to one line of code. */
 function rename(code: string): string {
+  code = rewriteIff(code);
   // Lookbehind, NOT a consumed leading character: consuming it meant a nested
   // call could not match, because its delimiter had already been eaten by the
   // enclosing match. `ema(ema(ema(x, 9), 9), 9)` came out renamed at the outer
@@ -95,13 +96,8 @@ function rename(code: string): string {
     });
 }
 
-/** `plot(EXPR, title="NAME")` → the expression and the column name. */
-function parsePlot(code: string): { expr: string; title: string } | null {
-  const trimmed = code.trim();
-  if (!/^plot\s*\(/.test(trimmed)) return null;
-  const inner = trimmed.slice(trimmed.indexOf("(") + 1, trimmed.lastIndexOf(")"));
-
-  // Split on top-level commas only — the expression itself contains commas.
+/** Splits an argument list on TOP-LEVEL commas — the arguments contain their own. */
+function splitTopLevel(inner: string): string[] {
   const parts: string[] = [];
   let depth = 0, cur = "", inStr = false, quote = "";
   for (const c of inner) {
@@ -113,6 +109,45 @@ function parsePlot(code: string): { expr: string; title: string } | null {
     cur += c;
   }
   parts.push(cur);
+  return parts;
+}
+
+/**
+ * `iff(cond, t, f)` → `(cond ? t : f)`.
+ *
+ * v5 REMOVED `iff` (dev-docs/01-version-delta-spec.md §4c), so it cannot be
+ * renamed like the rest — the replacement is a different construct. Rewriting
+ * it here rather than marking the source line `@nov5` keeps the column: the v3
+ * harness tests `iff` and the v5 one tests the ternary it became, and the two
+ * must produce the same numbers.
+ *
+ * Innermost-first, so a nested `iff` inside another one is rewritten too.
+ */
+function rewriteIff(code: string): string {
+  for (;;) {
+    const at = code.search(/(?<![A-Za-z0-9_.])iff\s*\(/);
+    if (at === -1) return code;
+
+    const open = code.indexOf("(", at);
+    let depth = 0, close = -1;
+    for (let i = open; i < code.length; i++) {
+      if (code[i] === "(") depth++;
+      else if (code[i] === ")" && --depth === 0) { close = i; break; }
+    }
+    if (close === -1) return code; // unbalanced — leave it for the reader to see
+
+    const args = splitTopLevel(code.slice(open + 1, close)).map(a => a.trim());
+    if (args.length !== 3) return code;
+    code = `${code.slice(0, at)}(${args[0]} ? ${args[1]} : ${args[2]})${code.slice(close + 1)}`;
+  }
+}
+
+/** `plot(EXPR, title="NAME")` → the expression and the column name. */
+function parsePlot(code: string): { expr: string; title: string } | null {
+  const trimmed = code.trim();
+  if (!/^plot\s*\(/.test(trimmed)) return null;
+  const inner = trimmed.slice(trimmed.indexOf("(") + 1, trimmed.lastIndexOf(")"));
+  const parts = splitTopLevel(inner);
 
   const titlePart = parts.find(p => /^\s*title\s*=/.test(p));
   if (!titlePart) return null;
@@ -172,7 +207,17 @@ function convert(file: string): { out: string; titles: string[] } {
     "if barstate.isfirst",
     `    log.info("OPSHEAD|${header}")`,
     "",
-    "_row = " + cells.join('\n      + "," + '),
+    // The '+' goes at the END of each line, not the start of the next.
+    //
+    // Pine allows both and this engine now reads both — a leading operator on
+    // an indented line is recognised as a continuation (see
+    // `nextLineStartsWithArithmetic` in lexer/v1/IndentTokenSource.ts), which
+    // was added because every generated harness used to fail to parse.
+    //
+    // Trailing is still what is emitted, because it needs no such rule: the
+    // previous line's last token settles it, which is the older and simpler of
+    // the two paths through the token source.
+    "_row = " + cells.join(' + "," +\n      '),
     '',
     'log.info("OPS|" + _row)',
   ].join("\n");

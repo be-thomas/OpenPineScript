@@ -50,6 +50,22 @@ The v3 harness stays the source of truth and
 [`scripts/make-log-harness.ts`](../../scripts/make-log-harness.ts) derives the
 v5 form — two hand-written copies would drift, and no test could catch it.
 
+**The generated harnesses run locally too.** This engine implements v5, so
+[`conformance/log_harnesses.test.ts`](../log_harnesses.test.ts) compiles and
+runs all seven of them over synthetic bars and checks that each emits one
+well-formed row per bar. Run it before pasting anything into TradingView — a
+harness that does not compile is otherwise discovered in a browser, by hand,
+after the work of setting up the chart.
+
+Two things the generator does that are easy to miss when reading the output:
+
+- `iff(cond, t, f)` is rewritten to `(cond ? t : f)`, because v5 REMOVED `iff`.
+  The v3 harness keeps testing `iff` and the v5 one tests the ternary it became.
+- Row concatenation puts the `+` at the END of each line. Pine accepts either
+  side, but this engine's indentation-aware token source recognises a
+  continuation only from the previous line's last token, so a line BEGINNING
+  with `+` is read as an indented block.
+
 ## Route A — Export chart data (PRO+ / Premium)
 
 ### Recipe

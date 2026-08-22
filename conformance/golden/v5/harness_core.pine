@@ -83,39 +83,39 @@ _v27 = ta.percentrank(src, 20)
 if barstate.isfirst
     log.info("OPSHEAD|time,open,high,low,close,volume,sma_20,ema_20,rma_20,wma_20,vwma_20,swma,rsi_14,atr_14,tr_true,stdev_20,variance_20,dev_20,cci_20,mom_10,roc_10,change_1,highest_20,lowest_20,highestbars_20,lowestbars_20,linreg_20_0,correlation_20,stoch_14,cog_20,wpr_14_manual,mfi_14_manual,alma_20,percentrank_20")
 
-_row = str.tostring(time, "#")
-      + "," + str.tostring(open, "#.##########")
-      + "," + str.tostring(high, "#.##########")
-      + "," + str.tostring(low, "#.##########")
-      + "," + str.tostring(close, "#.##########")
-      + "," + str.tostring(volume, "#.##########")
-      + "," + str.tostring(_v0, "#.##########")
-      + "," + str.tostring(_v1, "#.##########")
-      + "," + str.tostring(_v2, "#.##########")
-      + "," + str.tostring(_v3, "#.##########")
-      + "," + str.tostring(_v4, "#.##########")
-      + "," + str.tostring(_v5, "#.##########")
-      + "," + str.tostring(_v6, "#.##########")
-      + "," + str.tostring(_v7, "#.##########")
-      + "," + str.tostring(_v8, "#.##########")
-      + "," + str.tostring(_v9, "#.##########")
-      + "," + str.tostring(_v10, "#.##########")
-      + "," + str.tostring(_v11, "#.##########")
-      + "," + str.tostring(_v12, "#.##########")
-      + "," + str.tostring(_v13, "#.##########")
-      + "," + str.tostring(_v14, "#.##########")
-      + "," + str.tostring(_v15, "#.##########")
-      + "," + str.tostring(_v16, "#.##########")
-      + "," + str.tostring(_v17, "#.##########")
-      + "," + str.tostring(_v18, "#.##########")
-      + "," + str.tostring(_v19, "#.##########")
-      + "," + str.tostring(_v20, "#.##########")
-      + "," + str.tostring(_v21, "#.##########")
-      + "," + str.tostring(_v22, "#.##########")
-      + "," + str.tostring(_v23, "#.##########")
-      + "," + str.tostring(_v24, "#.##########")
-      + "," + str.tostring(_v25, "#.##########")
-      + "," + str.tostring(_v26, "#.##########")
-      + "," + str.tostring(_v27, "#.##########")
+_row = str.tostring(time, "#") + "," +
+      str.tostring(open, "#.##########") + "," +
+      str.tostring(high, "#.##########") + "," +
+      str.tostring(low, "#.##########") + "," +
+      str.tostring(close, "#.##########") + "," +
+      str.tostring(volume, "#.##########") + "," +
+      str.tostring(_v0, "#.##########") + "," +
+      str.tostring(_v1, "#.##########") + "," +
+      str.tostring(_v2, "#.##########") + "," +
+      str.tostring(_v3, "#.##########") + "," +
+      str.tostring(_v4, "#.##########") + "," +
+      str.tostring(_v5, "#.##########") + "," +
+      str.tostring(_v6, "#.##########") + "," +
+      str.tostring(_v7, "#.##########") + "," +
+      str.tostring(_v8, "#.##########") + "," +
+      str.tostring(_v9, "#.##########") + "," +
+      str.tostring(_v10, "#.##########") + "," +
+      str.tostring(_v11, "#.##########") + "," +
+      str.tostring(_v12, "#.##########") + "," +
+      str.tostring(_v13, "#.##########") + "," +
+      str.tostring(_v14, "#.##########") + "," +
+      str.tostring(_v15, "#.##########") + "," +
+      str.tostring(_v16, "#.##########") + "," +
+      str.tostring(_v17, "#.##########") + "," +
+      str.tostring(_v18, "#.##########") + "," +
+      str.tostring(_v19, "#.##########") + "," +
+      str.tostring(_v20, "#.##########") + "," +
+      str.tostring(_v21, "#.##########") + "," +
+      str.tostring(_v22, "#.##########") + "," +
+      str.tostring(_v23, "#.##########") + "," +
+      str.tostring(_v24, "#.##########") + "," +
+      str.tostring(_v25, "#.##########") + "," +
+      str.tostring(_v26, "#.##########") + "," +
+      str.tostring(_v27, "#.##########")
 
 log.info("OPS|" + _row)

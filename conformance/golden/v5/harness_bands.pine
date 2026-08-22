@@ -61,22 +61,22 @@ _v10 = ta.rsi(ta.ema(src, 10), 14)
 if barstate.isfirst
     log.info("OPSHEAD|time,open,high,low,close,volume,macd_line,macd_signal,macd_hist,bb_mid,bb_upper,bb_lower,tsi_25_13,triple_ema_9,sma_of_ema_10,ema_of_sma_10,rsi_of_ema_10")
 
-_row = str.tostring(time, "#")
-      + "," + str.tostring(open, "#.##########")
-      + "," + str.tostring(high, "#.##########")
-      + "," + str.tostring(low, "#.##########")
-      + "," + str.tostring(close, "#.##########")
-      + "," + str.tostring(volume, "#.##########")
-      + "," + str.tostring(_v0, "#.##########")
-      + "," + str.tostring(_v1, "#.##########")
-      + "," + str.tostring(_v2, "#.##########")
-      + "," + str.tostring(_v3, "#.##########")
-      + "," + str.tostring(_v4, "#.##########")
-      + "," + str.tostring(_v5, "#.##########")
-      + "," + str.tostring(_v6, "#.##########")
-      + "," + str.tostring(_v7, "#.##########")
-      + "," + str.tostring(_v8, "#.##########")
-      + "," + str.tostring(_v9, "#.##########")
-      + "," + str.tostring(_v10, "#.##########")
+_row = str.tostring(time, "#") + "," +
+      str.tostring(open, "#.##########") + "," +
+      str.tostring(high, "#.##########") + "," +
+      str.tostring(low, "#.##########") + "," +
+      str.tostring(close, "#.##########") + "," +
+      str.tostring(volume, "#.##########") + "," +
+      str.tostring(_v0, "#.##########") + "," +
+      str.tostring(_v1, "#.##########") + "," +
+      str.tostring(_v2, "#.##########") + "," +
+      str.tostring(_v3, "#.##########") + "," +
+      str.tostring(_v4, "#.##########") + "," +
+      str.tostring(_v5, "#.##########") + "," +
+      str.tostring(_v6, "#.##########") + "," +
+      str.tostring(_v7, "#.##########") + "," +
+      str.tostring(_v8, "#.##########") + "," +
+      str.tostring(_v9, "#.##########") + "," +
+      str.tostring(_v10, "#.##########")
 
 log.info("OPS|" + _row)

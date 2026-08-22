@@ -113,24 +113,24 @@ _v12 = outerBreak
 if barstate.isfirst
     log.info("OPSHEAD|time,open,high,low,close,volume,loop_mean_20,builtin_sma_20,loop_break_first_down,loop_continue_up_count,loop_max_high_20,builtin_highest_20,loop_step_5,nested_loops,loop_dynamic_bound,probe_empty_range,probe_ema_inside_loop,builtin_ema_10,nested_break")
 
-_row = str.tostring(time, "#")
-      + "," + str.tostring(open, "#.##########")
-      + "," + str.tostring(high, "#.##########")
-      + "," + str.tostring(low, "#.##########")
-      + "," + str.tostring(close, "#.##########")
-      + "," + str.tostring(volume, "#.##########")
-      + "," + str.tostring(_v0, "#.##########")
-      + "," + str.tostring(_v1, "#.##########")
-      + "," + str.tostring(_v2, "#.##########")
-      + "," + str.tostring(_v3, "#.##########")
-      + "," + str.tostring(_v4, "#.##########")
-      + "," + str.tostring(_v5, "#.##########")
-      + "," + str.tostring(_v6, "#.##########")
-      + "," + str.tostring(_v7, "#.##########")
-      + "," + str.tostring(_v8, "#.##########")
-      + "," + str.tostring(_v9, "#.##########")
-      + "," + str.tostring(_v10, "#.##########")
-      + "," + str.tostring(_v11, "#.##########")
-      + "," + str.tostring(_v12, "#.##########")
+_row = str.tostring(time, "#") + "," +
+      str.tostring(open, "#.##########") + "," +
+      str.tostring(high, "#.##########") + "," +
+      str.tostring(low, "#.##########") + "," +
+      str.tostring(close, "#.##########") + "," +
+      str.tostring(volume, "#.##########") + "," +
+      str.tostring(_v0, "#.##########") + "," +
+      str.tostring(_v1, "#.##########") + "," +
+      str.tostring(_v2, "#.##########") + "," +
+      str.tostring(_v3, "#.##########") + "," +
+      str.tostring(_v4, "#.##########") + "," +
+      str.tostring(_v5, "#.##########") + "," +
+      str.tostring(_v6, "#.##########") + "," +
+      str.tostring(_v7, "#.##########") + "," +
+      str.tostring(_v8, "#.##########") + "," +
+      str.tostring(_v9, "#.##########") + "," +
+      str.tostring(_v10, "#.##########") + "," +
+      str.tostring(_v11, "#.##########") + "," +
+      str.tostring(_v12, "#.##########")
 
 log.info("OPS|" + _row)

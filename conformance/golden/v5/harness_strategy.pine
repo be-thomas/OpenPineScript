@@ -75,18 +75,18 @@ _v6 = ta.barssince(goLong)
 if barstate.isfirst
     log.info("OPSHEAD|time,open,high,low,close,volume,signal_long,signal_flat,position_size,opentrades,equity,expected_in_position,bars_since_entry_signal")
 
-_row = str.tostring(time, "#")
-      + "," + str.tostring(open, "#.##########")
-      + "," + str.tostring(high, "#.##########")
-      + "," + str.tostring(low, "#.##########")
-      + "," + str.tostring(close, "#.##########")
-      + "," + str.tostring(volume, "#.##########")
-      + "," + str.tostring(_v0, "#.##########")
-      + "," + str.tostring(_v1, "#.##########")
-      + "," + str.tostring(_v2, "#.##########")
-      + "," + str.tostring(_v3, "#.##########")
-      + "," + str.tostring(_v4, "#.##########")
-      + "," + str.tostring(_v5, "#.##########")
-      + "," + str.tostring(_v6, "#.##########")
+_row = str.tostring(time, "#") + "," +
+      str.tostring(open, "#.##########") + "," +
+      str.tostring(high, "#.##########") + "," +
+      str.tostring(low, "#.##########") + "," +
+      str.tostring(close, "#.##########") + "," +
+      str.tostring(volume, "#.##########") + "," +
+      str.tostring(_v0, "#.##########") + "," +
+      str.tostring(_v1, "#.##########") + "," +
+      str.tostring(_v2, "#.##########") + "," +
+      str.tostring(_v3, "#.##########") + "," +
+      str.tostring(_v4, "#.##########") + "," +
+      str.tostring(_v5, "#.##########") + "," +
+      str.tostring(_v6, "#.##########")
 
 log.info("OPS|" + _row)
