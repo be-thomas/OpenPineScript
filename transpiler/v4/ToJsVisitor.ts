@@ -24,8 +24,8 @@
 import type { PineVersion } from "../version";
 import { V3ToJsVisitor } from "../v3/ToJsVisitor";
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
-import { BASE_REGISTRY, V4_REGISTRY, V4_NAMESPACE_REGISTRY } from "../../runtime/v1/stdlib";
-import { V4_RENAMES, V4_REMOVED } from "../../runtime/v1/stdlib/renames";
+import { V4_VIEW } from "../../runtime/v1/stdlib";
+import { V4_RENAMES } from "../../runtime/v1/stdlib/renames";
 import {
   Var_defContext,
   Var_defsContext,
@@ -40,18 +40,10 @@ interface SourceLocated {
 /** A declaration's `var` / `varip` modifier, or null when it has neither. */
 type Persistence = "var" | "varip" | null;
 
-/**
- * v4's stdlib view, built once: base − removed + namespaced.
- *
- * Module scope rather than per-instance — it is derived from two constants and
- * cannot vary between scripts, and rebuilding a ~250-entry table per compile
- * would be pure waste.
- */
-const V4_VIEW: Record<string, StdlibEntry> = (() => {
-  const view: Record<string, StdlibEntry> = { ...BASE_REGISTRY };
-  for (const name of V4_REMOVED) delete view[name];
-  return { ...view, ...V4_NAMESPACE_REGISTRY, ...V4_REGISTRY };
-})();
+// v4's stdlib view — base − removed + namespaced + aliases — is built once in
+// runtime/v1/stdlib/index.ts and imported here. It lives there rather than in
+// this file because v5 is derived FROM it: a registry view is data about the
+// language, and an emitter is one of its consumers rather than its owner.
 
 /** v3 spelling → the v4 spelling that replaced it, for the diagnostic. */
 const REPLACEMENT = new Map<string, string>(

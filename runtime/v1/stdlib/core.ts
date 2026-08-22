@@ -55,8 +55,24 @@ export function iff(cond: any, t: any, f: any): any {
 
 const asNumber = (x: any): number => Number(val(x));
 
-export function safe_add(a: any, b: any): number {
-    return asNumber(a) + asNumber(b);
+/**
+ * `+` — numeric addition, or STRING CONCATENATION when either side is a string.
+ *
+ * Pine overloads `+` exactly as JavaScript does, and this used to coerce
+ * unconditionally: `"a" + "b"` came out as `NaN`, because `Number("a")` is NaN.
+ * Nothing caught it, because v1–v4 have almost no reason to build a string —
+ * `tostring` exists and is rarely used, and a plot cannot show one.
+ *
+ * v5 makes it central. Pine Logs are how this project collects golden data
+ * without a paid TradingView plan (see runtime/v1/stdlib/logging.ts), every
+ * generated harness builds its CSV row with `str.tostring(x) + "," + …`, and
+ * all seven of them logged the single string "NaN".
+ */
+export function safe_add(a: any, b: any): number | string {
+    const x = val(a);
+    const y = val(b);
+    if (typeof x === "string" || typeof y === "string") return String(x) + String(y);
+    return Number(x) + Number(y);
 }
 
 export function safe_sub(a: any, b: any): number {

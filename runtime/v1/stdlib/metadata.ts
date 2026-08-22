@@ -6,11 +6,18 @@ import * as chart from "./chart";
 import * as color from "./color";
 import * as core from "./core";
 import * as drawings from "./drawings";
+import * as errors from "./errors";
 import * as input from "./input";
+import * as inputs from "./inputs";
+import * as logging from "./logging";
+import * as maps from "./maps";
+import * as math from "./math";
+import * as matrix from "./matrix";
 import * as mtf from "./mtf";
-import * as renames from "./renames";
+import * as request from "./request";
 import * as scale from "./scale";
 import * as sources from "./sources";
+import * as str from "./str";
 import * as strategy from "./strategy";
 import * as ta from "./ta";
 import * as time from "./time";
@@ -432,6 +439,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: barstate.islast
+      },
+      "barstate.isfirst": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: barstate.isfirst
       },
       "period": {
           uses_context: true,
@@ -1865,6 +1880,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: drawings.text["align_bottom"]
       },
+      "runtime.error": {
+          uses_context: true,
+          args: ["message"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: errors.runtime["error"]
+      },
       "input": {
           uses_context: true,
           args: ["defval","title","type"],
@@ -1937,6 +1960,534 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: input.symbol
       },
+      "input.int": {
+          uses_context: true,
+          args: ["defval","title","minval","maxval","step"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["int"]
+      },
+      "input.float": {
+          uses_context: true,
+          args: ["defval","title","minval","maxval","step"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["float"]
+      },
+      "input.bool": {
+          uses_context: true,
+          args: ["defval","title"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["bool"]
+      },
+      "input.string": {
+          uses_context: true,
+          args: ["defval","title","options"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["string"]
+      },
+      "input.color": {
+          uses_context: true,
+          args: ["defval","title"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["color"]
+      },
+      "input.timeframe": {
+          uses_context: true,
+          args: ["defval","title","options"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["timeframe"]
+      },
+      "input.session": {
+          uses_context: true,
+          args: ["defval","title","options"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["session"]
+      },
+      "input.symbol": {
+          uses_context: true,
+          args: ["defval","title"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["symbol"]
+      },
+      "input.source": {
+          uses_context: true,
+          args: ["defval","title"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["source"]
+      },
+      "input.time": {
+          uses_context: true,
+          args: ["defval","title"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["time"]
+      },
+      "input.price": {
+          uses_context: true,
+          args: ["defval","title"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["price"]
+      },
+      "input.text_area": {
+          uses_context: true,
+          args: ["defval","title"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["text_area"]
+      },
+      "log.info": {
+          uses_context: true,
+          args: ["message","args"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: logging.log["info"]
+      },
+      "log.warning": {
+          uses_context: true,
+          args: ["message","args"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: logging.log["warning"]
+      },
+      "log.error": {
+          uses_context: true,
+          args: ["message","args"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: logging.log["error"]
+      },
+      "map.new": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["new"]
+      },
+      "map.get": {
+          uses_context: false,
+          args: ["id","k"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["get"]
+      },
+      "map.contains": {
+          uses_context: false,
+          args: ["id","k"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["contains"]
+      },
+      "map.size": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["size"]
+      },
+      "map.put": {
+          uses_context: false,
+          args: ["id","k","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["put"]
+      },
+      "map.put_all": {
+          uses_context: false,
+          args: ["id","id2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["put_all"]
+      },
+      "map.remove": {
+          uses_context: false,
+          args: ["id","k"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["remove"]
+      },
+      "map.clear": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["clear"]
+      },
+      "map.keys": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["keys"]
+      },
+      "map.values": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["values"]
+      },
+      "map.copy": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: maps.map["copy"]
+      },
+      "math.random": {
+          uses_context: true,
+          args: ["min","max","seed"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: math.math["random"]
+      },
+      "math.todegrees": {
+          uses_context: false,
+          args: ["radians"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: math.math["todegrees"]
+      },
+      "math.toradians": {
+          uses_context: false,
+          args: ["degrees"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: math.math["toradians"]
+      },
+      "math.round_to_mintick": {
+          uses_context: true,
+          args: ["number"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: math.math["round_to_mintick"]
+      },
+      "matrix.new": {
+          uses_context: false,
+          args: ["rows","columns","initial_value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["new"]
+      },
+      "matrix.rows": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["rows"]
+      },
+      "matrix.columns": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["columns"]
+      },
+      "matrix.elements_count": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["elements_count"]
+      },
+      "matrix.is_square": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["is_square"]
+      },
+      "matrix.is_zero": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["is_zero"]
+      },
+      "matrix.get": {
+          uses_context: false,
+          args: ["id","row","column"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["get"]
+      },
+      "matrix.set": {
+          uses_context: false,
+          args: ["id","row","column","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["set"]
+      },
+      "matrix.row": {
+          uses_context: false,
+          args: ["id","row"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["row"]
+      },
+      "matrix.col": {
+          uses_context: false,
+          args: ["id","column"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["col"]
+      },
+      "matrix.add_row": {
+          uses_context: false,
+          args: ["id","row","array_id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["add_row"]
+      },
+      "matrix.add_col": {
+          uses_context: false,
+          args: ["id","column","array_id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["add_col"]
+      },
+      "matrix.remove_row": {
+          uses_context: false,
+          args: ["id","row"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["remove_row"]
+      },
+      "matrix.remove_col": {
+          uses_context: false,
+          args: ["id","column"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["remove_col"]
+      },
+      "matrix.swap_rows": {
+          uses_context: false,
+          args: ["id","row1","row2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["swap_rows"]
+      },
+      "matrix.swap_columns": {
+          uses_context: false,
+          args: ["id","column1","column2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["swap_columns"]
+      },
+      "matrix.fill": {
+          uses_context: false,
+          args: ["id","value","from_row","to_row","from_column","to_column"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["fill"]
+      },
+      "matrix.copy": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["copy"]
+      },
+      "matrix.transpose": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["transpose"]
+      },
+      "matrix.submatrix": {
+          uses_context: false,
+          args: ["id","from_row","to_row","from_column","to_column"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["submatrix"]
+      },
+      "matrix.reshape": {
+          uses_context: false,
+          args: ["id","rows","columns"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["reshape"]
+      },
+      "matrix.concat": {
+          uses_context: false,
+          args: ["id1","id2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["concat"]
+      },
+      "matrix.sum": {
+          uses_context: false,
+          args: ["id1","id2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["sum"]
+      },
+      "matrix.diff": {
+          uses_context: false,
+          args: ["id1","id2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["diff"]
+      },
+      "matrix.mult": {
+          uses_context: false,
+          args: ["id1","id2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["mult"]
+      },
+      "matrix.det": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["det"]
+      },
+      "matrix.inv": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["inv"]
+      },
+      "matrix.kron": {
+          uses_context: false,
+          args: ["id1","id2"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["kron"]
+      },
+      "matrix.rank": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["rank"]
+      },
+      "matrix.pinv": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["pinv"]
+      },
+      "matrix.trace": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["trace"]
+      },
+      "matrix.avg": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["avg"]
+      },
+      "matrix.max": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["max"]
+      },
+      "matrix.min": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["min"]
+      },
+      "matrix.sort": {
+          uses_context: false,
+          args: ["id","column","order"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["sort"]
+      },
+      "MATRIX_TAG": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: matrix.MATRIX_TAG
+      },
       "security": {
           uses_context: true,
           args: ["symbol","resolution","expression","gaps","lookahead"],
@@ -1945,29 +2496,53 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: mtf.security
       },
-      "V4_ONLY_NAMESPACES": {
+      "requestKey": {
           uses_context: false,
-          args: [],
+          args: ["parts"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
-          is_value: true,
-          ref: renames.V4_ONLY_NAMESPACES
+          is_value: false,
+          ref: request.requestKey
       },
-      "V4_RENAMES": {
-          uses_context: false,
-          args: [],
+      "request.financial": {
+          uses_context: true,
+          args: ["symbol","financial_id","period","gaps"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
-          is_value: true,
-          ref: renames.V4_RENAMES
+          is_value: false,
+          ref: request.request["financial"]
       },
-      "V4_REMOVED": {
-          uses_context: false,
-          args: [],
+      "request.dividends": {
+          uses_context: true,
+          args: ["ticker","field","rest"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
-          is_value: true,
-          ref: renames.V4_REMOVED
+          is_value: false,
+          ref: request.request["dividends"]
+      },
+      "request.splits": {
+          uses_context: true,
+          args: ["ticker","field","rest"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: request.request["splits"]
+      },
+      "request.earnings": {
+          uses_context: true,
+          args: ["ticker","field","rest"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: request.request["earnings"]
+      },
+      "request.quandl": {
+          uses_context: true,
+          args: ["ticker","gaps","index"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: request.request["quandl"]
       },
       "scale.right": {
           uses_context: false,
@@ -2016,6 +2591,126 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: sources.ohlc4
+      },
+      "str.tostring": {
+          uses_context: false,
+          args: ["value","format"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["tostring"]
+      },
+      "str.tonumber": {
+          uses_context: false,
+          args: ["string"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["tonumber"]
+      },
+      "str.format": {
+          uses_context: false,
+          args: ["formatString","args"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["format"]
+      },
+      "str.length": {
+          uses_context: false,
+          args: ["string"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["length"]
+      },
+      "str.contains": {
+          uses_context: false,
+          args: ["source","str"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["contains"]
+      },
+      "str.startswith": {
+          uses_context: false,
+          args: ["source","str"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["startswith"]
+      },
+      "str.endswith": {
+          uses_context: false,
+          args: ["source","str"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["endswith"]
+      },
+      "str.pos": {
+          uses_context: false,
+          args: ["source","str"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["pos"]
+      },
+      "str.substring": {
+          uses_context: false,
+          args: ["source","begin_pos","end_pos"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["substring"]
+      },
+      "str.replace_all": {
+          uses_context: false,
+          args: ["source","target","replacement"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["replace_all"]
+      },
+      "str.upper": {
+          uses_context: false,
+          args: ["source"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["upper"]
+      },
+      "str.lower": {
+          uses_context: false,
+          args: ["source"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["lower"]
+      },
+      "str.split": {
+          uses_context: false,
+          args: ["string","separator"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["split"]
+      },
+      "str.repeat": {
+          uses_context: false,
+          args: ["string","repeat","separator"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["repeat"]
+      },
+      "str.match": {
+          uses_context: false,
+          args: ["source","regex"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["match"]
       },
       "strategy.order": {
           uses_context: true,
@@ -2616,6 +3311,86 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"series","type":"float"},
           is_value: false,
           ref: ta.percentile_linear_interpolation
+      },
+      "bbw": {
+          uses_context: true,
+          args: ["source","length","mult"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.bbw
+      },
+      "kc": {
+          uses_context: true,
+          args: ["source","length","mult","useTrueRange"],
+          is_getter: false,
+          returns: {"kind":"tuple","itemTypes":[{"kind":"series","type":"float"},{"kind":"series","type":"float"},{"kind":"series","type":"float"}]},
+          is_value: false,
+          ref: ta.kc
+      },
+      "kcw": {
+          uses_context: true,
+          args: ["source","length","mult","useTrueRange"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.kcw
+      },
+      "hma": {
+          uses_context: true,
+          args: ["source","length"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.hma
+      },
+      "cmo": {
+          uses_context: true,
+          args: ["source","length"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.cmo
+      },
+      "dmi": {
+          uses_context: true,
+          args: ["diLength","adxSmoothing"],
+          is_getter: false,
+          returns: {"kind":"tuple","itemTypes":[{"kind":"series","type":"float"},{"kind":"series","type":"float"},{"kind":"series","type":"float"}]},
+          is_value: false,
+          ref: ta.dmi
+      },
+      "supertrend": {
+          uses_context: true,
+          args: ["factor","atrPeriod"],
+          is_getter: false,
+          returns: {"kind":"tuple","itemTypes":[{"kind":"series","type":"float"},{"kind":"series","type":"float"}]},
+          is_value: false,
+          ref: ta.supertrend
+      },
+      "range": {
+          uses_context: true,
+          args: ["source","length"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.range
+      },
+      "median": {
+          uses_context: true,
+          args: ["source","length"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.median
+      },
+      "mode": {
+          uses_context: true,
+          args: ["source","length"],
+          is_getter: false,
+          returns: {"kind":"series","type":"float"},
+          is_value: false,
+          ref: ta.mode
       },
       "timestamp": {
           uses_context: false,

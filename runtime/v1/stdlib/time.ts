@@ -207,12 +207,24 @@ function parseSession(spec: string): { ranges: Array<[number, number]>; days: Se
  * re-aggregating the chart into that timeframe, which is the same missing
  * engine that blocks `heikinashi()`.
  *
+ * ⚠ THE DEFAULT SESSION IS NOT APPLIED. Omitting `session` returns the bar
+ * time unfiltered. TradingView instead applies the SYMBOL's session, and the
+ * v4 → v5 guide records its literal fallback widening from `"23456"` (Mon-Fri)
+ * to `"1234567"` (Sun-Sat) — a difference this engine therefore does not model.
+ *
+ * Applying either literal was tried and reverted. It needs the same exchange
+ * calendar the timezone note above is missing, and Mon-Fri broke a published
+ * script in the corpus outright: sunday.pine marks Sunday opens by testing
+ * `dayofweek(time('D'))`, and a weekday mask makes that `na` on every bar it
+ * exists to find. See the note in transpiler/profiles/index.ts.
+ *
  * @returns {series float} The bar's UNIX time in ms, or na.
  */
 export function time(ctx: any, _resolution?: any, session?: any): number {
     const unwrap = (x: any) => (x != null && typeof x.valueOf === "function" ? x.valueOf() : x);
     const t = Number(unwrap(ctx?.vars?.get?.("opsv2_time")) ?? NaN);
     if (!Number.isFinite(t)) return NaN;
+
     if (session == null) return t;
 
     const { ranges, days } = parseSession(String(unwrap(session)));

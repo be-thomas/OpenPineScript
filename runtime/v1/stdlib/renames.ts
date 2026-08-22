@@ -143,11 +143,17 @@ export const V4_ONLY_NAMESPACES: readonly string[] = [
  * golden/v4/harness_builtins.pine unrunnable while v4 had no pipeline. It has
  * one now, so the gate costs nothing.
  *
- * Only the three this engine implements are listed; the other March 2020
- * additions (bbw, kc, kcw, dmi, hma, supertrend, cmo, and the obv/pvt/nvi/pvi
- * family) are absent from the registry entirely, so there is nothing to remove.
+ * The volume family — obv, pvt, nvi, pvi, accdist, iii, wad, wvad — is still
+ * absent from the registry, so there is nothing to gate for those. Each has
+ * published variants that disagree on the SEED value, and a seed guessed wrong
+ * produces a series that is the right shape and the wrong number forever;
+ * an absent name is refused instead.
  */
-export const V4_ONLY_NAMES: readonly string[] = ["bb", "wpr", "mfi"];
+export const V4_ONLY_NAMES: readonly string[] = [
+    "bb", "wpr", "mfi",
+    "bbw", "kc", "kcw", "hma", "cmo", "dmi", "supertrend",
+    "range", "median", "mode",
+];
 
 export const V4_RENAMES: readonly RenameSpec[] = [
   ...COLORS,

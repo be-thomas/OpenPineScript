@@ -54,7 +54,11 @@ function generateConfig(stdlibPath: string) {
     const files = fs.readdirSync(absolutePath).filter(file => {
         const ext = path.extname(file);
         const name = path.basename(file, ext);
-        return [".ts", ".js"].includes(ext) && !["index", "metadata", "registry"].includes(name);
+        // `renames`/`renames5` are rename TABLES, not stdlib members. Scanning
+        // them put V4_RENAMES, V4_REMOVED and V4_ONLY_NAMESPACES into the
+        // registry as though a script could spell them.
+        return [".ts", ".js"].includes(ext)
+            && !["index", "metadata", "registry", "renames", "renames5"].includes(name);
     });
 
     project.addSourceFilesAtPaths(files.map(f => path.join(absolutePath, f)));

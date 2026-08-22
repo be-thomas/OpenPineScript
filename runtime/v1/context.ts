@@ -1,6 +1,7 @@
 import { PREFIX, removePrefix, extractFunctionName } from "../../utils/v2/common";
 import { Series, SeriesSnapshot } from "./Series";
 import { REGISTRY } from "./stdlib";
+import { MATRIX_TAG } from "./stdlib/matrix";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/profiles";
 
 // Define Trade Types
@@ -18,6 +19,22 @@ export interface Trade {
 export interface Position {
     size: number;      // + for Long, - for Short
     avgPrice: number;
+}
+
+/**
+ * One line emitted by v5's `log.*` functions.
+ *
+ * Declared here rather than beside the functions in stdlib/logging.ts so the
+ * dependency runs one way: every stdlib module already imports the Context, and
+ * having the Context import a stdlib module back would close the cycle.
+ */
+export interface LogEntry {
+    readonly level: "info" | "warning" | "error";
+    readonly message: string;
+    /** The bar the line was emitted on, so a log can be aligned to a series. */
+    readonly bar: number;
+    /** The bar's timestamp, which is what the generated CSV rows are keyed by. */
+    readonly time: number;
 }
 
 // --- Plot Data: Discriminated Union ---
@@ -74,8 +91,22 @@ export interface InputDef {
  * Script-level metadata declared by the `study()` / `strategy()` directive.
  * `kind` drives mode-specific behavior (e.g. study mode disables the broker).
  */
+/**
+ * The directive kinds a script can declare.
+ *
+ * `indicator` is v5's rename of `study` and nothing else — same parameters,
+ * same meaning. Both spellings are kept rather than normalised so a host
+ * reading `scriptMeta.kind` sees the keyword the author actually wrote, which
+ * is also what every diagnostic quotes back at them.
+ *
+ * `library` is v5's third kind. A library declares functions for other scripts
+ * to import and plots nothing itself, so a host must be able to tell one from
+ * an indicator before it tries to render anything.
+ */
+export type ScriptKind = 'study' | 'indicator' | 'strategy' | 'library';
+
 export interface ScriptMeta {
-    kind: 'study' | 'strategy';
+    kind: ScriptKind;
     title: string;
     shorttitle: string;
     overlay: boolean;
@@ -119,6 +150,19 @@ export interface Drawing {
     /** The bar the drawing was created on. */
     bar: number;
     props: Record<string, any>;
+}
+
+/**
+ * One observation of a non-price series — a dividend, a quarterly figure.
+ *
+ * These are EVENTS, not bars: a value is published on one date and stands until
+ * the next, so a request reads as a step function over its samples rather than
+ * as one value per bar.
+ */
+export interface RequestSample {
+    /** UNIX ms. The value applies to this bar and every later one until the next sample. */
+    time: number;
+    value: number;
 }
 
 /** A higher-timeframe candle supplied for `security()` evaluation (P1). */
@@ -197,6 +241,26 @@ export class Context {
 
     /** The chart's symbol, as `tickerid` / `ticker` report it. */
     public symbol: string = "SYMBOL";
+
+    /**
+     * The instrument's minimum price increment, read by `math.round_to_mintick`.
+     *
+     * A property of the SYMBOL, so a host that charts anything other than the
+     * sample dataset must set it. The default is the two-decimal tick of a
+     * typical equity, which is a starting point rather than a claim about the
+     * data supplied — the same stance `resolution` takes above.
+     */
+    public mintick: number = 0.01;
+
+    /**
+     * Lines emitted by `log.info` / `log.warning` / `log.error` (v5).
+     *
+     * Kept on the Context rather than written to the console because they are
+     * OUTPUT: scripts/make-log-harness.ts generates harnesses whose entire
+     * result is a log line per bar, and a host has to be able to read them back
+     * to reproduce locally what TradingView's Pine Logs pane shows.
+     */
+    public logs: LogEntry[] = [];
 
     /**
      * Wall-clock time reported by `timenow`, in ms.
@@ -282,6 +346,123 @@ export class Context {
             const at = order.indexOf(key);
             if (at >= 0) order.splice(at, 1);
         }
+    }
+
+    // --- v5 user-defined types and method-call syntax ---------------------
+    //
+    // Lives on the shared base for the same reason `var_def` does: the runtime
+    // is one implementation across versions by design
+    // (dev-docs/00-architecture-assessment.md §5.6), and only V5ToJsVisitor can
+    // emit a call to any of it — no earlier version has a `type` keyword or the
+    // `receiver.method()` form to reach it with.
+
+    /**
+     * Reads a field off a user-defined-type instance.
+     *
+     * Unwraps a Series first: a UDT instance held in a variable is wrapped by
+     * `ctx.new_var` exactly as a number is, so `p.x` reaches this with the
+     * wrapper rather than the object.
+     *
+     * A missing field, or a read through `na`, gives `na` rather than throwing.
+     * Pine's type checker catches a misspelt field at COMPILE time and this
+     * engine does not model field types, so throwing here would turn a
+     * legitimate `na` object — the state every UDT variable starts in — into a
+     * crash.
+     */
+    public field(target: any, name: string): any {
+        const o = target instanceof Series ? target.valueOf() : target;
+        if (o === null || o === undefined || typeof o !== "object") return NaN;
+        const v = (o as any)[name];
+        return v === undefined ? NaN : v;
+    }
+
+    /**
+     * Writes a field on a user-defined-type instance, and returns the value.
+     *
+     * Writing through `na` is an ERROR, unlike reading. `p.x := 1` when `p` has
+     * never been constructed cannot mean anything, and silently discarding the
+     * write would leave a script that looks like it is accumulating state and
+     * is not — the failure this engine exists to prevent.
+     */
+    public setField(target: any, name: string, value: any): any {
+        const o = target instanceof Series ? target.valueOf() : target;
+        if (o === null || o === undefined || typeof o !== "object") {
+            throw new Error(
+                `cannot set field '${name}': the object is na. Construct it first ` +
+                `(e.g. 'p = Point.new()').`,
+            );
+        }
+        (o as any)[name] = value instanceof Series ? value.valueOf() : value;
+        return (o as any)[name];
+    }
+
+    /**
+     * `obj.copy()` — a SHALLOW copy, which is what Pine specifies.
+     *
+     * Shallow matters: a UDT holding an array shares that array with its copy,
+     * and a script relying on the opposite would diverge from TradingView.
+     */
+    public copyObject(target: any): any {
+        const o = target instanceof Series ? target.valueOf() : target;
+        if (o === null || o === undefined || typeof o !== "object") return NaN;
+        if (o instanceof Map) return new Map(o);
+        if (Array.isArray(o)) return o.slice();
+        return { ...(o as object) };
+    }
+
+    /**
+     * `receiver.name(args)` where `name` is a BUILT-IN method — v5's method-call
+     * syntax for the collection and drawing namespaces.
+     *
+     * `a.push(1)` and `array.push(a, 1)` are the same call in Pine, and the
+     * emitter cannot tell them apart statically: it does not track types, so it
+     * does not know whether `a` is an array, a matrix or a map. The receiver
+     * does know, at run time, so the dispatch happens here.
+     *
+     * A matrix is the one case a value cannot answer for itself — it is an
+     * array of arrays, which is also a valid array — so `matrix.new` marks its
+     * result. See `MATRIX_TAG` in runtime/v1/stdlib/matrix.ts.
+     */
+    public builtinMethod(id: string, receiver: any, name: string, ...args: any[]): any {
+        const v = receiver instanceof Series ? receiver.valueOf() : receiver;
+
+        // `copy` is the one method every kind answers, and each answers it
+        // differently — a matrix copies its rows, an array and a map copy
+        // themselves, and a user-defined type copies its fields. Only the value
+        // knows which it is, so the split happens here rather than at emit time.
+        if (name === "copy" && args.length === 0 && !Array.isArray(v) && !(v instanceof Map)) {
+            return this.copyObject(v);
+        }
+
+        const namespace = Context.receiverNamespace(v);
+
+        if (!namespace) {
+            throw new Error(
+                `'.${name}()' cannot be called on this value: it is ` +
+                `${v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? "na" : typeof v} ` +
+                `and has no methods.`,
+            );
+        }
+
+        const key = `${namespace}.${name}`;
+        const entry = REGISTRY[key];
+        if (!entry || entry.is_value) {
+            throw new Error(`'${namespace}' has no method '${name}'.`);
+        }
+
+        return this.call(`${key}${id}`, entry.ref, v, ...args);
+    }
+
+    /** Which built-in namespace owns this value's methods, or null. */
+    private static receiverNamespace(v: any): string | null {
+        if (v instanceof Map) return "map";
+        if (Array.isArray(v)) return (v as any)[MATRIX_TAG] ? "matrix" : "array";
+        if (typeof v === "string") {
+            const kind = /^(line|label|box|table)_\d+$/.exec(v);
+            if (kind) return kind[1];
+            return "str";
+        }
+        return null;
     }
 
     /** Looks a drawing up, or throws — a stale id is a bug, not a no-op. */
@@ -389,6 +570,13 @@ export class Context {
         this.drawings.clear();
         this.drawingOrder.clear();
         this.drawingCounter = 0;
+        // Logs are output for the same reason drawings are: a second pass that
+        // inherited the first's lines would report every bar twice.
+        this.logs = [];
+        // A seeded random stream restarts too, or a re-run of the same script
+        // over the same bars would draw different numbers — which is precisely
+        // what a seed exists to prevent.
+        this.randomStreams.clear();
 
         // 5. Reset Strategy State
         this.position = { size: 0, avgPrice: 0 };
@@ -413,7 +601,7 @@ export class Context {
      * in directive-declaration order, with keyword args (prefix-stripped) taking
      * precedence. Idempotent across bars.
      */
-    public declareScript(kind: 'study' | 'strategy', positional: any[] = [], kwargs: Record<string, any> = {}): void {
+    public declareScript(kind: ScriptKind, positional: any[] = [], kwargs: Record<string, any> = {}): void {
         const unwrap = (x: any): any =>
             x !== null && x !== undefined && typeof x.valueOf === 'function' ? x.valueOf() : x;
 
@@ -437,7 +625,11 @@ export class Context {
         const shorttitle = arg('shorttitle') !== undefined ? String(arg('shorttitle')) : title;
         const overlay = arg('overlay') !== undefined ? Boolean(arg('overlay')) : false;
 
-        if (kind === 'study') {
+        // `indicator` is v5's spelling of `study` — one branch serves both, and
+        // testing for 'strategy' rather than for 'study' is what keeps the new
+        // spelling from silently falling into the strategy branch and being
+        // given a pyramiding setting it never declared.
+        if (kind !== 'strategy') {
             this.scriptMeta = {
                 kind, title, shorttitle, overlay,
                 precision: arg('precision') !== undefined ? Number(arg('precision')) : undefined,
@@ -933,6 +1125,63 @@ export class Context {
     public provideSecurityData(symbol: string, resolution: string, candles: SecurityCandle[]): void {
         this.securityData.set(this.secKey(symbol, resolution), candles);
         this.requestedSecurities.delete(this.secKey(symbol, resolution));
+    }
+
+    /**
+     * Seeded pseudo-random state, one stream per seed.
+     *
+     * Held on the Context rather than in the stdlib module so that two Contexts
+     * — a backtest and a re-run of it — do not share a stream, and so that
+     * `reset()` restarts the sequence. A seeded run that changed its numbers
+     * because something else had drawn from the generator first would not be
+     * reproducible, which is the only thing a seed is for.
+     */
+    private randomStreams: Map<number, number> = new Map();
+
+    /**
+     * The next number in the stream for `seed`, in [0, 1).
+     *
+     * mulberry32 — small, fast, and with a period far beyond any chart. NOT
+     * TradingView's generator, which is unpublished; see `math.random`.
+     */
+    public seededRandom(seed: number): number {
+        let state = this.randomStreams.get(seed);
+        if (state === undefined) state = seed >>> 0;
+
+        state = (state + 0x6d2b79f5) | 0;
+        this.randomStreams.set(seed, state);
+
+        let t = Math.imul(state ^ (state >>> 15), 1 | state);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+
+    // --- Non-price request data (v5 `request.*`) --------------------------
+
+    /**
+     * Timestamped samples for `request.financial` / `.dividends` / `.splits` /
+     * `.earnings` / `.quandl`, keyed by kind and by the arguments that select a
+     * series.
+     *
+     * Supplied by the host, like `securityData` above and for the same reason:
+     * this engine has no connection to TradingView, and a request it cannot
+     * answer must be refused rather than resolved to `na`.
+     */
+    private requestData: Map<string, RequestSample[]> = new Map();
+
+    /**
+     * Supplies one non-price series.
+     *
+     * `key` is what runtime/v1/stdlib/request.ts builds from the call's
+     * arguments — `"NASDAQ:AAPL|TOTAL_REVENUE|FQ"`. Samples are sorted here, so
+     * a host may provide them in any order.
+     */
+    public provideRequestData(kind: string, key: string, samples: RequestSample[]): void {
+        this.requestData.set(`${kind}::${key}`, [...samples].sort((a, b) => a.time - b.time));
+    }
+
+    public getRequestData(kind: string, key: string): RequestSample[] | undefined {
+        return this.requestData.get(`${kind}::${key}`);
     }
 
     public getSecurityData(symbol: string, resolution: string): SecurityCandle[] | undefined {
