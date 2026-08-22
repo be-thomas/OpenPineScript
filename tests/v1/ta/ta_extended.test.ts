@@ -13,6 +13,20 @@
  *      event/boolean indicators (falling/rising, pivots) and edge cases.
  *   3. Property tests — for tsi (EMA-recursive), assert bounds and sign.
  */
+/**
+ * ── Why the call ids are spelled `$probe_<name>@test` ───────────────────────
+ *
+ * These tests drive the raw stdlib functions through `ctx.call`, passing `ctx`
+ * themselves, so the id is only there to key per-call-site state. It must NOT
+ * be a real registry name: `Context.call` looks the id's leading name up in the
+ * registry and, when it finds an entry marked `uses_context`, injects the
+ * Context a SECOND time.
+ *
+ * The ids used to read `ta.sma@test`, which was safe only because `ta.*` was
+ * not yet a namespace. v5 made it one, and every one of these tests started
+ * calling `sma(ctx, ctx, close, len)`. `$` cannot occur in a Pine identifier,
+ * so `$probe_` can never collide with a registry key at any version.
+ */
 import { describe, it } from "vitest";
 import assert from "node:assert";
 import { Context } from "../../../runtime/v1/context";
@@ -90,18 +104,18 @@ describe("ta extended — differential stress", () => {
                 feedCtx(ctx, b);
                 naive.add(b.close, b.volume, b.high, b.low);
 
-                const cum  = ctx.call("ta.cum@t",  ta.cum,  ctx, b.close);
-                const roc  = ctx.call("ta.roc@t",  ta.roc,  ctx, b.close, len);
-                const chg  = ctx.call("ta.chg@t",  ta.change, ctx, b.close, len);
-                const dev  = ctx.call("ta.dev@t",  ta.dev,  ctx, b.close, len);
-                const vari = ctx.call("ta.var@t",  ta.variance, ctx, b.close, len);
-                const std  = ctx.call("ta.std@t",  ta.stdev, ctx, b.close, len);
-                const corr = ctx.call("ta.cor@t",  ta.correlation, ctx, b.close, b.volume, len);
-                const prnk = ctx.call("ta.prk@t",  ta.percentrank, ctx, b.close, len);
-                const alma = ctx.call("ta.alma@t", ta.alma, ctx, b.close, len, 0.85, 6);
-                const cog  = ctx.call("ta.cog@t",  ta.cog,  ctx, b.close, len);
-                const wpr  = ctx.call("ta.wpr@t",  ta.wpr,  ctx, len);
-                const mfi  = ctx.call("ta.mfi@t",  ta.mfi,  ctx, b.close, len);
+                const cum  = ctx.call("$probe_cum@t",  ta.cum,  ctx, b.close);
+                const roc  = ctx.call("$probe_roc@t",  ta.roc,  ctx, b.close, len);
+                const chg  = ctx.call("$probe_chg@t",  ta.change, ctx, b.close, len);
+                const dev  = ctx.call("$probe_dev@t",  ta.dev,  ctx, b.close, len);
+                const vari = ctx.call("$probe_var@t",  ta.variance, ctx, b.close, len);
+                const std  = ctx.call("$probe_std@t",  ta.stdev, ctx, b.close, len);
+                const corr = ctx.call("$probe_cor@t",  ta.correlation, ctx, b.close, b.volume, len);
+                const prnk = ctx.call("$probe_prk@t",  ta.percentrank, ctx, b.close, len);
+                const alma = ctx.call("$probe_alma@t", ta.alma, ctx, b.close, len, 0.85, 6);
+                const cog  = ctx.call("$probe_cog@t",  ta.cog,  ctx, b.close, len);
+                const wpr  = ctx.call("$probe_wpr@t",  ta.wpr,  ctx, len);
+                const mfi  = ctx.call("$probe_mfi@t",  ta.mfi,  ctx, b.close, len);
 
                 if (i > WARMUP) {
                     assertClose("cum", cum, naive.cum(), i, len);
@@ -136,8 +150,8 @@ describe("ta extended — boolean & pivot differential", () => {
                 feedCtx(ctx, b);
                 naive.add(b.close, b.volume, b.high, b.low);
 
-                const fall = ctx.call("ta.fall@t", ta.falling, ctx, b.close, len);
-                const rise = ctx.call("ta.rise@t", ta.rising, ctx, b.close, len);
+                const fall = ctx.call("$probe_fall@t", ta.falling, ctx, b.close, len);
+                const rise = ctx.call("$probe_rise@t", ta.rising, ctx, b.close, len);
 
                 if (i > 10) {
                     assert.strictEqual(fall, naive.falling(len), `falling bar=${i} len=${len}`);
@@ -158,8 +172,8 @@ describe("ta extended — boolean & pivot differential", () => {
                 feedCtx(ctx, b);
                 naive.add(b.close, b.volume, b.high, b.low);
 
-                const ph = ctx.call("ta.ph@t", ta.pivothigh, ctx, b.high, left, right);
-                const pl = ctx.call("ta.pl@t", ta.pivotlow, ctx, b.low, left, right);
+                const ph = ctx.call("$probe_ph@t", ta.pivothigh, ctx, b.high, left, right);
+                const pl = ctx.call("$probe_pl@t", ta.pivotlow, ctx, b.low, left, right);
 
                 if (i > left + right + 2) {
                     assertClose("pivothigh", ph, naive.pivothigh(left, right), i, left + right);
@@ -284,8 +298,8 @@ describe("ta extended — composite (stoch/macd/cci) differential", () => {
                 feedCtx(ctx, b);
                 naive.add(b.close, b.volume, b.high, b.low);
 
-                const stoch = ctx.call("ta.stoch@t", ta.stoch, ctx, b.close, b.high, b.low, len);
-                const cci = ctx.call("ta.cci@t", ta.cci, ctx, b.close, len);
+                const stoch = ctx.call("$probe_stoch@t", ta.stoch, ctx, b.close, b.high, b.low, len);
+                const cci = ctx.call("$probe_cci@t", ta.cci, ctx, b.close, len);
 
                 if (i > WARMUP) {
                     assertClose("stoch", stoch, naive.stoch(len), i, len);
@@ -306,7 +320,7 @@ describe("ta extended — composite (stoch/macd/cci) differential", () => {
                 feedCtx(ctx, b);
                 naive.add(b.close, b.volume, b.high, b.low);
 
-                const [m, s, h] = ctx.call("ta.macd@t", ta.macd, ctx, b.close, fast, slow, sig) as [number, number, number];
+                const [m, s, h] = ctx.call("$probe_macd@t", ta.macd, ctx, b.close, fast, slow, sig) as [number, number, number];
                 const [rm, rs, rh] = naive.macd(fast, slow, sig);
 
                 if (i > WARMUP) {
@@ -365,7 +379,7 @@ describe("ta extended — recursive smoothers differential", () => {
                 const b = bars[i];
                 feedCtx(ctx, b);
                 naive.add(b.close, b.volume, b.high, b.low);
-                const vwma = ctx.call("ta.vwma@t", ta.vwma, ctx, b.close, len);
+                const vwma = ctx.call("$probe_vwma@t", ta.vwma, ctx, b.close, len);
                 if (i > WARMUP) assertClose("vwma", vwma, naive.vwma(len), i, len);
             }
         });
@@ -380,8 +394,8 @@ describe("ta extended — recursive smoothers differential", () => {
                 const b = bars[i];
                 feedCtx(ctx, b);
                 naive.add(b.close, b.volume, b.high, b.low);
-                const trix = ctx.call("ta.trix@t", ta.trix, ctx, b.close, len);
-                const rsi = ctx.call("ta.rsi@t", ta.rsi, ctx, b.close, len);
+                const trix = ctx.call("$probe_trix@t", ta.trix, ctx, b.close, len);
+                const rsi = ctx.call("$probe_rsi@t", ta.rsi, ctx, b.close, len);
                 // Recursive references must advance their state every bar.
                 const refTrix = naive.trix(len);
                 const refRsi = naive.rsi(len);
@@ -402,7 +416,7 @@ describe("ta extended — recursive smoothers differential", () => {
                 const b = bars[i];
                 feedCtx(ctx, b);
                 naive.add(b.close, b.volume, b.high, b.low);
-                const tsi = ctx.call("ta.tsi@t", ta.tsi, ctx, b.close, lng, sht);
+                const tsi = ctx.call("$probe_tsi@t", ta.tsi, ctx, b.close, lng, sht);
                 const refTsi = naive.tsi(lng, sht); // advance state every bar
                 if (i > WARMUP) assertClose("tsi", tsi, refTsi, i, lng);
             }
@@ -414,7 +428,7 @@ describe("ta extended — recursive smoothers differential", () => {
         const bars = genBars(300, 999);
         for (let i = 0; i < bars.length; i++) {
             feedCtx(ctx, bars[i]);
-            const r = ctx.call("ta.rsi@t", ta.rsi, ctx, bars[i].close, 14) as number;
+            const r = ctx.call("$probe_rsi@t", ta.rsi, ctx, bars[i].close, 14) as number;
             if (i > 20) assert.ok(r >= -EPSILON && r <= 100 + EPSILON, `rsi out of range: ${r}`);
         }
     });
@@ -428,7 +442,7 @@ describe("ta extended — tsi properties", () => {
         let last = NaN;
         for (const c of closes) {
             feedCtx(ctx, { open: c, high: c, low: c, close: c, volume: 1 });
-            last = ctx.call("ta.tsi@t", ta.tsi, ctx, c, long, short);
+            last = ctx.call("$probe_tsi@t", ta.tsi, ctx, c, long, short);
         }
         return last;
     }

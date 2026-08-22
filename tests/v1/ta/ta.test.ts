@@ -10,6 +10,20 @@
  * The data is generated from a SEEDED PRNG. A failure here reproduces
  * exactly on the next run — with Math.random() it would not.
  */
+/**
+ * ── Why the call ids are spelled `$probe_<name>@test` ───────────────────────
+ *
+ * These tests drive the raw stdlib functions through `ctx.call`, passing `ctx`
+ * themselves, so the id is only there to key per-call-site state. It must NOT
+ * be a real registry name: `Context.call` looks the id's leading name up in the
+ * registry and, when it finds an entry marked `uses_context`, injects the
+ * Context a SECOND time.
+ *
+ * The ids used to read `ta.sma@test`, which was safe only because `ta.*` was
+ * not yet a namespace. v5 made it one, and every one of these tests started
+ * calling `sma(ctx, ctx, close, len)`. `$` cannot occur in a Pine identifier,
+ * so `$probe_` can never collide with a registry key at any version.
+ */
 import { describe, it, expect } from "vitest";
 import { Context } from "../../../runtime/v1/context";
 import * as ta from "../../../runtime/v1/stdlib/ta";
@@ -99,17 +113,17 @@ function collectDivergences(mode: Mode, seed: number): Divergence[] {
     const len = lengthFor(mode, i, rand);
 
     const actual = {
-      SMA:       ctx.call("ta.sma@test", ta.sma, ctx, ctx.close, len),
-      WMA:       ctx.call("ta.wma@test", ta.wma, ctx, ctx.close, len),
-      BBbasis:   ctx.call("ta.bb@test", ta.bb, ctx, ctx.close, len, 2.0)[0],
-      Highest:   ctx.call("ta.highest@test", ta.highest, ctx, ctx.close, len),
-      Lowest:    ctx.call("ta.lowest@test", ta.lowest, ctx, ctx.close, len),
-      ATR:       ctx.call("ta.atr@test", ta.atr, ctx, len),
-      VWAP:      ctx.call("ta.vwap@test", ta.vwap, ctx, ctx.close),
-      Linreg:    ctx.call("ta.linreg@test", ta.linreg, ctx, ctx.close, len, 0),
-      SAR:       ctx.call("ta.sar@test", ta.sar, ctx, 0.02, 0.02, 0.2),
-      ValueWhen: ctx.call("ta.valuewhen@test", ta.valuewhen, ctx, isBullish, ctx.close, 0),
-      BarsSince: ctx.call("ta.barssince@test", ta.barssince, ctx, isBullish),
+      SMA:       ctx.call("$probe_sma@test", ta.sma, ctx, ctx.close, len),
+      WMA:       ctx.call("$probe_wma@test", ta.wma, ctx, ctx.close, len),
+      BBbasis:   ctx.call("$probe_bb@test", ta.bb, ctx, ctx.close, len, 2.0)[0],
+      Highest:   ctx.call("$probe_highest@test", ta.highest, ctx, ctx.close, len),
+      Lowest:    ctx.call("$probe_lowest@test", ta.lowest, ctx, ctx.close, len),
+      ATR:       ctx.call("$probe_atr@test", ta.atr, ctx, len),
+      VWAP:      ctx.call("$probe_vwap@test", ta.vwap, ctx, ctx.close),
+      Linreg:    ctx.call("$probe_linreg@test", ta.linreg, ctx, ctx.close, len, 0),
+      SAR:       ctx.call("$probe_sar@test", ta.sar, ctx, 0.02, 0.02, 0.2),
+      ValueWhen: ctx.call("$probe_valuewhen@test", ta.valuewhen, ctx, isBullish, ctx.close, 0),
+      BarsSince: ctx.call("$probe_barssince@test", ta.barssince, ctx, isBullish),
     };
 
     const expected = {

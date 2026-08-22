@@ -23,9 +23,18 @@
  *
  * ── What this actually asserts today ────────────────────────────────────────
  *
- * v1, v2 and v3 are implemented, so their cells assert real verdicts. The
- * v4-v5 `expected` entries are RECORDED INTENT from the delta spec — not
- * exercised, because those versions refuse to transpile at all.
+ * Every version is implemented, so every `expected` cell is exercised. There is
+ * no recorded-intent tier left; a rule with no entry for a version simply is
+ * not asserted there.
+ *
+ * ── Rules whose SOURCE differs by version ───────────────────────────────────
+ *
+ * A row normally runs one source against every version, which is the point —
+ * the same code, five verdicts. Two rules cannot: v5 renamed `study()` to
+ * `indicator()` and moved the whole TA library under `ta.`, so the v1-v4 source
+ * would be rejected at v5 for the RENAME rather than for the rule under test,
+ * and the row would pass while asserting nothing. Those rows carry a `sources`
+ * override for v5.
  *
  * Source for each rule: dev-docs/01-version-delta-spec.md §5.
  */
@@ -43,6 +52,8 @@ type Verdict = "accept" | "guard" | "syntax";
 interface Rule {
   name: string;
   source: string;
+  /** Per-version source override, for constructs a version spells differently. */
+  sources?: Partial<Record<PineVersion, string>>;
   /** Expected verdict per version, for versions that are implemented. */
   expected: Partial<Record<PineVersion, Verdict>>;
   /** Pattern a `guard` rejection message must match. */
@@ -95,8 +106,11 @@ const RULES: Rule[] = [
   {
     name: "strategy.* under study()",
     source: 'study("X")\nstrategy.entry("L", strategy.long)\n',
+    // v5 renamed the directive, so the v1-v4 source is rejected there for
+    // naming `study` and never reaches the rule. The rule itself is unchanged.
+    sources: { 5: 'indicator("X")\nstrategy.entry("L", strategy.long)\n' },
     expected: { 1: "guard", 2: "guard", 3: "guard", 4: "guard", 5: "guard" },
-    because: /unavailable in a study\(\) script/,
+    because: /unavailable in an? (study|indicator)\(\) script/,
   },
   {
     name: "user function returning a tuple",
@@ -110,6 +124,31 @@ const RULES: Rule[] = [
     // v3 removed self-reference: declare first, then assign with ':='.
     expected: { 1: "accept", 2: "accept", 3: "guard", 4: "guard", 5: "guard" },
     because: /cannot reference itself/,
+  },
+  {
+    name: "'while' loop",
+    source: "i = 0\nwhile i < 3\n    i := i + 1\n",
+    // Added in v5. Before that the keyword does not exist, so `while i < 3` is
+    // read as two statements and fails to parse.
+    expected: { 1: "syntax", 2: "syntax", 3: "syntax", 4: "syntax", 5: "accept" },
+  },
+  {
+    name: "'switch' expression",
+    source: "x = 1\nd = switch x\n    1 => 10\n    => 20\n",
+    expected: { 1: "syntax", 2: "syntax", 3: "syntax", 4: "syntax", 5: "accept" },
+  },
+  {
+    name: "flat TA spelling (sma)",
+    source: "plot(sma(close, 10))\n",
+    // v5 moved the whole library under `ta.`; the flat name is gone.
+    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "guard" },
+    because: /'sma' was renamed to 'ta\.sma' in Pine Script v5/,
+  },
+  {
+    name: "a v5 reserved word as a variable name",
+    source: "range = 5\nplot(range)\n",
+    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "guard" },
+    because: /'range' is a reserved word in Pine Script v5/,
   },
   {
     name: "implicit bool→number arithmetic",
@@ -141,7 +180,7 @@ describe("language rules across versions", () => {
         if (expected === undefined) continue;
 
         it(`v${version}: ${expected}`, () => {
-          const result = attempt(version, rule.source);
+          const result = attempt(version, rule.sources?.[version] ?? rule.source);
 
           if (expected === "accept") {
             expect(result.ok, result.ok ? "" : `rejected: ${result.message}`).toBe(true);
@@ -173,25 +212,26 @@ describe("language rules across versions", () => {
   }
 });
 
-describe("recorded intent for unimplemented versions", () => {
-  // These cells are not exercised (those versions refuse to transpile), so
-  // guard them structurally instead — otherwise they rot silently until the
-  // v4 work tries to rely on them.
-  it("every unimplemented version refuses regardless of the rule", () => {
-    for (const version of UNIMPLEMENTED_VERSIONS) {
-      for (const rule of RULES) {
-        const result = attempt(version, rule.source);
-        expect(result.ok, `v${version} accepted "${rule.name}"`).toBe(false);
-      }
-    }
-  });
-
-  it("reports how much of the matrix is live", () => {
-    // Fails when a version is implemented without revisiting this file.
+describe("matrix coverage", () => {
+  it("every version this engine implements is exercised here", () => {
+    // Fails when a version is implemented without revisiting this file, which
+    // is what turned the old v4 and v5 intent cells into real assertions.
     expect(
       IMPLEMENTED_VERSIONS.length,
       "a version became implemented — turn its intent cells into real assertions",
-    ).toBe(4);
+    ).toBe(5);
+  });
+
+  it("an unimplemented version, if one ever exists again, refuses every rule", () => {
+    // Vacuous today: everything in ALL_VERSIONS is built. Kept because it is
+    // the assertion that would catch a version being ADDED to PineVersion
+    // without a pipeline, which is the state v4 and v5 were both in.
+    for (const version of UNIMPLEMENTED_VERSIONS) {
+      for (const rule of RULES) {
+        const result = attempt(version, rule.sources?.[version] ?? rule.source);
+        expect(result.ok, `v${version} accepted "${rule.name}"`).toBe(false);
+      }
+    }
   });
 });
 

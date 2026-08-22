@@ -133,11 +133,16 @@ describe("Session version state", () => {
     it("does not report a stale version after a failed compile", () => {
         // Previously profile/pineVersion were written only on success, so a
         // failed compile left the PREVIOUS script's version visible.
+        //
+        // The failing script used to be `//@version=5`, which failed because v5
+        // had no pipeline. It has one now, so the failure has to come from
+        // somewhere that will not be implemented later — an annotation naming a
+        // version Pine does not have.
         const s = new Session();
         s.compile("//@version=2\nplot(close)\n");
         assert.strictEqual(s.pineVersion, 2);
 
-        const result = s.compile("//@version=5\nplot(close)\n");
+        const result = s.compile("//@version=9\nplot(close)\n");
         assert.ok(result.errors.length > 0);
         assert.notStrictEqual(s.pineVersion, 2);
         assert.strictEqual(s.pineVersion, 1);

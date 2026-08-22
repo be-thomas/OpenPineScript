@@ -8,21 +8,31 @@ Requires Node.js 20+.
 
 ## Status
 
-**Pine Script v1 and v2 are implemented and passing 393 tests.** That covers the
-full v2 language, roughly 130 standard-library functions, the strategy broker
-emulator, multi-timeframe `security()`, and the real-time tick model.
+**Pine Script v1 through v5 are implemented, passing 1,234 tests.** That covers
+the language at every version, roughly 270 standard-library names, user-defined
+types, methods and libraries, the strategy broker emulator, multi-timeframe
+`security()`, and the real-time tick model.
 
 The `//@version` annotation selects the language version; a script without one
-is v1. A script declaring a version that is not implemented is refused rather
-than run under the wrong rules.
+is v1. Each version has its own grammar and its own emitter, built by
+inheritance from the one before it, so a v2 script is parsed by a parser that
+has never heard of `var` — and a v5 script cannot spell `sma`.
 
 | Version | State |
 |---------|-------|
 | **v1** | **Implemented** — TradingView states v1 and v2 are the same language, and the test suite asserts that over the whole corpus |
-| **v2** | **Implemented** |
-| v3 | Planned — a five-item delta from v2 |
-| v4 | Planned — `var`, `while`, `switch`, arrays, drawings, namespace migration |
-| v5 | Planned — `ta.*`/`math.*` namespaces, matrices, maps, user-defined types, libraries |
+| **v2** | **Implemented** — adds `:=` |
+| **v3** | **Implemented** — a five-item tightening of v2 |
+| **v4** | **Implemented** — `var`/`varip`, arrays, drawing objects, the namespace migration |
+| **v5** | **Implemented** — `while`, `switch`, user-defined types, methods, libraries, the `ta.*`/`math.*`/`str.*`/`request.*` migration, matrices, maps, Pine Logs |
+
+A library cannot be fetched from TradingView, so its source is supplied by the
+caller: `compileScript(src, { libraries: { "user/name/1": source } })`. The same
+arrangement covers higher-timeframe candles for `request.security` and the
+non-price series behind `request.financial`.
+
+§8 of the [version delta spec](dev-docs/01-version-delta-spec.md) lists what is
+still missing and why each one is refused rather than approximated.
 
 The plan for v1–v5 lives in [dev-docs/](dev-docs/): an
 [architecture assessment](dev-docs/00-architecture-assessment.md), a
