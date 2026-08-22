@@ -11,6 +11,7 @@
  *   v2        import PineV1* + :=  parser/v2         extends V1
  *   v3        import PineV2*       parser/v3         extends V2
  *   v4        import PineV3* + var parser/v4         extends V3
+ *   v5        import PineV4* + while/switch  parser/v5   extends V4
  *
  * This module is the ONLY place that maps a version number to a pipeline. It is
  * deliberately un-versioned: it belongs to no single version, and adding v4 must
@@ -20,10 +21,12 @@ import { parse as parseV1 } from "../parser/v1";
 import { parse as parseV2 } from "../parser/v2";
 import { parse as parseV3 } from "../parser/v3";
 import { parse as parseV4 } from "../parser/v4";
+import { parse as parseV5 } from "../parser/v5";
 import { V1ToJsVisitor } from "./v1/ToJsVisitor";
 import { V2ToJsVisitor } from "./v2/ToJsVisitor";
 import { V3ToJsVisitor } from "./v3/ToJsVisitor";
 import { V4ToJsVisitor } from "./v4/ToJsVisitor";
+import { V5ToJsVisitor } from "./v5/ToJsVisitor";
 import {
   detectVersion,
   PineVersion,
@@ -35,7 +38,7 @@ import { LanguageProfile, profileFor, UnimplementedVersionError } from "./profil
 /** One version's complete front end. */
 interface Pipeline {
   parse: (source: string) => { tree: any; errorCount: number; errors: unknown[] };
-  createVisitor: () => { visit(tree: any): string };
+  createVisitor: (opts: TranspileOptions) => { visit(tree: any): string };
 }
 
 /**
@@ -49,7 +52,9 @@ const PIPELINES: Readonly<Record<PineVersion, Pipeline | null>> = {
   2: { parse: parseV2, createVisitor: () => new V2ToJsVisitor() },
   3: { parse: parseV3, createVisitor: () => new V3ToJsVisitor() },
   4: { parse: parseV4, createVisitor: () => new V4ToJsVisitor() },
-  5: null,
+  // v5 is the first version whose emitter needs anything from the CALLER: an
+  // `import` names a library this engine cannot fetch, so the host supplies it.
+  5: { parse: parseV5, createVisitor: opts => new V5ToJsVisitor({ libraries: opts.libraries }) },
 };
 
 /** Versions with a working pipeline, ascending. */
@@ -68,6 +73,17 @@ export interface TranspileOptions {
    * cross-version test matrix to run one source under every version.
    */
   version?: PineVersion;
+
+  /**
+   * Sources for the libraries a v5 script `import`s, keyed by path
+   * (`"someuser/somelib/1"`).
+   *
+   * A library lives on TradingView and this engine has no way to fetch one, so
+   * the host provides it — the same arrangement as `Context.provideSecurityData`
+   * for higher-timeframe candles. An import with no source is refused rather
+   * than stubbed out.
+   */
+  libraries?: Readonly<Record<string, string>>;
 }
 
 export interface CompileResult {
@@ -96,7 +112,11 @@ export function compileScript(source: string, opts: TranspileOptions = {}): Comp
     throw error;
   }
 
-  return { js: pipeline.createVisitor().visit(tree), version, profile: profileFor(version) };
+  return {
+    js: pipeline.createVisitor(opts).visit(tree),
+    version,
+    profile: profileFor(version),
+  };
 }
 
 /**

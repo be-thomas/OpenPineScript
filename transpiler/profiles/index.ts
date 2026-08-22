@@ -48,6 +48,27 @@ export interface LanguageProfile {
 }
 
 /**
+ * ── NOT here: the §4d default-session change ────────────────────────────────
+ *
+ * The v4 → v5 guide records the default session for `time()` / `time_close()`
+ * widening from `"0000-0000:23456"` (Mon–Fri) to `"0000-0000:1234567"`
+ * (Sun–Sat), and an earlier draft of this file carried it as a third default.
+ *
+ * It is not here, because applying EITHER value as a day mask is wrong for this
+ * engine. TradingView's actual default is the SYMBOL's session
+ * (`syminfo.session`), which needs an exchange calendar this engine does not
+ * have — see the timezone note on `time()` in runtime/v1/stdlib/time.ts, which
+ * is the same missing piece. Filtering by Mon–Fri instead produced a concrete
+ * regression: conformance/corpus/…/sunday.pine, a published v1 script whose
+ * whole job is to mark Sunday opens, went permanently `na`.
+ *
+ * So `time()` applies no default mask, which is the behaviour every version has
+ * had, and the version difference is recorded as unimplemented rather than
+ * guessed at. Adding a field here that nothing could correctly read would only
+ * let a test assert the constant against itself.
+ */
+
+/**
  * The bar counter is spelled `n` up to v3 and `bar_index` from v4. Whichever
  * name does not belong to this version must THROW rather than silently read as
  * `na` — a bar counter that is quietly absent produces plausible wrong numbers
@@ -109,11 +130,9 @@ export const LANGUAGE_PROFILES: Readonly<Record<PineVersion, LanguageProfile>> =
     defaults: { scriptDirective: "study", securityLookahead: "off" },
   },
 
-  // Declared so profileFor() is TOTAL. Whether a version actually RUNS is decided
-  // by transpiler/index.ts (PIPELINES), not here — a profile is data, and data
-  // cannot tell you whether a parser exists.
-  //
-  // v5 keeps v4's rename but renames the DIRECTIVE: study() becomes indicator().
+  // v5 keeps v4's bar-counter rename and renames the DIRECTIVE: study()
+  // becomes indicator(). securityLookahead stays "off" — v3 flipped it and
+  // neither v4 nor v5 flips it back.
   5: {
     ...profile(5),
     banned: bannedBarCounter(5),
@@ -131,7 +150,7 @@ export class UnimplementedVersionError extends Error {
   constructor(public readonly version: PineVersion) {
     super(
       `Pine Script v${version} support is not yet implemented. ` +
-      `OpenPineScript currently implements v1, v2, v3, and v4.`
+      `OpenPineScript currently implements v1, v2, v3, v4, and v5.`
     );
     this.name = "UnimplementedVersionError";
   }

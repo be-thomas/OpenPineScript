@@ -150,10 +150,22 @@ class Collector {
         if (name) { this.functions.add(name); this.bound.add(name); }
         // Parameters are bound inside the body; record them so a reference to a
         // parameter is never mistaken for a forward reference to a global.
+        //
+        // Two shapes, because v5 gave parameters types and defaults:
+        //
+        //   v1-v4   fun_head : LPAR ( id ( COMMA id )* )? RPAR
+        //   v5      fun_head : LPAR ( fun_param ( COMMA fun_param )* )? RPAR
+        //
+        // Reading only `head.id()` therefore found NOTHING at v5, so every
+        // parameter looked unbound — which took `self` in a method body with
+        // it, and a method's whole job is to read `self.field`.
         const head = node.fun_head?.();
-        for (const p of head?.id?.() ?? []) {
-          this.bound.add(textOf(p));
-          this.functionScoped.add(textOf(p));
+        const params = head?.fun_param?.()?.map((p: any) => p.id?.()) ?? head?.id?.() ?? [];
+        for (const p of params) {
+          const name = textOf(p);
+          if (!name) continue;
+          this.bound.add(name);
+          this.functionScoped.add(name);
         }
 
         // Walk the body with fnDepth raised so its LOCAL declarations are not
