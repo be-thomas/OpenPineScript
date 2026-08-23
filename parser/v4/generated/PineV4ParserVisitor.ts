@@ -1,5 +1,5 @@
 
-import { AbstractParseTreeVisitor } from "antlr4ng";
+import { ParseTreeVisitor } from "antlr4ng";
 
 
 import { Decl_modContext } from "./PineV4Parser.js";
@@ -60,7 +60,7 @@ import { Other_literalContext } from "./PineV4Parser.js";
  * @param <Result> The return type of the visit operation. Use `void` for
  * operations with no return type.
  */
-export class PineV4ParserVisitor<Result> extends AbstractParseTreeVisitor<Result> {
+export class PineV4ParserVisitor<Result> extends ParseTreeVisitor<Result> {
     /**
      * Visit a parse tree produced by `PineV4Parser.decl_mod`.
      * @param ctx the parse tree
