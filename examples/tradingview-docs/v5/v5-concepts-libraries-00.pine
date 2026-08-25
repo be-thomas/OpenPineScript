@@ -1,0 +1,28 @@
+//@version=5
+
+// @description <library_description>
+library(title, overlay)
+
+<script_code>
+
+//@type <type_description>
+//@field <field_name> <field_description>
+// ...
+export type <UDT_identifier>
+    <field_type> <field_name>[ = <value>]   
+    ... 
+
+//@enum <enum_description>
+//@field <field_name> <field_description>
+// ...
+export enum <enum_name>
+    <field_name>[ = <field_title>]
+    ...
+
+//@function <function_description>
+//@param <parameter> <parameter_description>
+//@returns <return_value_description>
+export <function_name>([simple/series] <parameter_type> <parameter_name> [= <default_value>] [, ...]) =>
+    <function_code>
+
+<script_code>

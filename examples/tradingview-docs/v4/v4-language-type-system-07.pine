@@ -1,0 +1,10 @@
+//@version=4
+study(title="Shading the chart's background", overlay=true)
+c = color.navy
+bgColor = (dayofweek == dayofweek.monday) ? color.new(c, 50) :
+            (dayofweek == dayofweek.tuesday) ? color.new(c, 60) :
+            (dayofweek == dayofweek.wednesday) ? color.new(c, 70) :
+            (dayofweek == dayofweek.thursday) ? color.new(c, 80) :
+            (dayofweek == dayofweek.friday) ? color.new(c, 90) :
+            color.new(color.blue, 80)
+bgcolor(color=bgColor)

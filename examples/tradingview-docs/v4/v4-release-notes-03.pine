@@ -1,0 +1,7 @@
+//@version=4
+study("My Script", overlay = true)
+length = input(10, "Length", input.integer, minval = 1, maxval = 100)
+avgBar = avg(highestbars(length), lowestbars(length))
+float dynLen = nz(abs(avgBar) + 1, length)
+dynSma = sma(close, int(dynLen))
+plot(dynSma)

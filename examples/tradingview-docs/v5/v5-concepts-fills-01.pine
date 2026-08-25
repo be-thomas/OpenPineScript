@@ -1,0 +1,16 @@
+//@version=5
+indicator("Example 2")
+
+//@variable The 10-bar moving average of `close` prices.
+float ma = ta.sma(close, 10)
+//@variable The distance from the `ma` to the `close` price, as a percentage of the `ma`.
+float oscillator = 100 * (ma - close) / ma
+
+//@variable The ID of the `oscillator` plot for use in the `fill()` function.
+oscPlotID = plot(oscillator, "Oscillator")
+//@variable The ID of the zero level plot for use in the `fill()` function. 
+//          Requires a "plot" ID since the `fill()` function can't use "plot" and "hline" IDs at the same time.
+zeroPlotID = plot(0, "Zero level", color.silver, 1, plot.style_circles)
+
+// Filll the space between the `oscPlotID` and `zeroPlotID` with 90% transparent blue. 
+fill(oscPlotID, zeroPlotID, color.new(color.blue, 90), "Oscillator fill")

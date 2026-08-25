@@ -1,0 +1,5 @@
+//@version=4
+study("Test")
+// This line is a comment
+a = close // This is also a comment
+plot(a)

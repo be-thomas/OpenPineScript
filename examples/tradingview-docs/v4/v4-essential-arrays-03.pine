@@ -1,0 +1,22 @@
+//@version=4
+study("Distance from high", "", true)
+i_lookBack = input(100)
+c_fillColor = color.green
+var c_fills = array.new_color(5)
+// Initialize the array elements with progressively lighter shades of the fill color.
+array.set(c_fills, 0, color.new(c_fillColor, 70))
+array.set(c_fills, 1, color.new(c_fillColor, 75))
+array.set(c_fills, 2, color.new(c_fillColor, 80))
+array.set(c_fills, 3, color.new(c_fillColor, 85))
+array.set(c_fills, 4, color.new(c_fillColor, 90))
+
+// Find the offset to highest high. Change its sign because the function returns a negative value.
+lastHiBar = - highestbars(high, i_lookBack)
+// Convert the offset to an array index, capping it to 4 to avoid a runtime error.
+// The index used by `array.get()` will be the equivalent of `floor(fillNo)`.
+fillNo = min(lastHiBar / (i_lookBack / 5), 4)
+// Set background to a progressively lighter fill with increasing distance from location of highest high.
+bgcolor(array.get(c_fills, fillNo))
+// Plot key values to the Data Window for debugging.
+plotchar(lastHiBar, "lastHiBar", "", location.top, size = size.tiny)
+plotchar(fillNo, "fillNo", "", location.top, size = size.tiny)

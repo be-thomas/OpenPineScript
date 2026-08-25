@@ -1,0 +1,39 @@
+//@version=5
+indicator("`while` loop demo", "Price window boxes", true)
+
+//@variable The length of the channel.
+int lengthInput = input.int(20, "Channel length", 1, 4999)
+//@variable The width multiplier of the channel. 
+float widthInput = input.float(2.0, "Width multiplier", 0)
+
+//@variable The `lengthInput`-bar EMA of `close` prices.
+float ma = ta.ema(close, lengthInput)
+//@variable The `lengthInput`-bar ATR, multiplied by the `widthInput`.
+float atr = ta.atr(lengthInput) * widthInput
+//@variable The lower bound of the channel.
+float channelLow = ma - atr
+//@variable The upper bound of the channel. 
+float channelHigh = ma + atr
+
+//@variable Is `true` when the `close` price is outside the current channel range, `false` otherwise. 
+bool priceOutsideChannel = close < channelLow or close > channelHigh
+
+// Check if the `close` crossed outside the channel range, then analyze the past bars within the current range. 
+if priceOutsideChannel and not priceOutsideChannel[1]
+    //@variable A box that highlights consecutive past bars within the current channel's price window.  
+    box windowBox = box.new(
+         bar_index, channelHigh, bar_index, channelLow, border_width = 2, bgcolor = color.new(color.gray, 85)
+     )
+    //@variable The lookback index for box adjustment. The `while` loop increments this value on each iteration. 
+    int i = 1
+    // Use a `while` loop to look backward through close` prices. The loop iterates as long as the past `close` 
+    // from `i` bars ago is between the current bar's `channelLow` and `channelHigh`. 
+    while close[i] >= channelLow and close[i] <= channelHigh
+        // Adjust the left side of the box. 
+        windowBox.set_left(bar_index - i)
+        // Add 1 to the `i` value to check the `close` from the next bar back on the next iteration. 
+        i += 1
+
+// Plot the `channelLow` and `channelHigh` for visual reference. 
+plot(channelLow, "Channel low")
+plot(channelHigh, "Channel high")

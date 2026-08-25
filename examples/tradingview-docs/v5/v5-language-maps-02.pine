@@ -1,0 +1,24 @@
+//@version=5
+indicator("var map demo")
+
+//@variable A map associating color values with string keys.
+var colorMap = map.new<string, color>()
+
+// Put `<string, color>` pairs into `colorMap` on the first bar.
+if bar_index == 0
+    colorMap.put("Bull", color.green)
+    colorMap.put("Bear", color.red)
+    colorMap.put("Neutral", color.gray)
+
+//@variable The 14-bar RSI of `close`.
+float oscillator = ta.rsi(close, 14)
+
+//@variable The color of the `oscillator`.
+color oscColor = switch
+    oscillator > 50 => colorMap.get("Bull")
+    oscillator < 50 => colorMap.get("Bear")
+    =>                 colorMap.get("Neutral")
+
+// Plot the `oscillator` using the `oscColor` from our `colorMap`.
+plot(oscillator, "Histogram", oscColor, 2, plot.style_histogram, histbase = 50)
+plot(oscillator, "Line", oscColor, 3)

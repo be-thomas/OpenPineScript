@@ -1,0 +1,20 @@
+//@version=5
+indicator("My script")
+
+//@function Calculates the index of the current bar by adding 1 to its own value from the previous bar.
+// The first bar will have an index of 0.
+calcBarIndex() =>
+    int index = na
+    index := nz(index[1], replacement = -1) + 1
+
+//@variable Returns `true` on every other bar.
+condition = bar_index % 2 == 0
+
+int customIndex = na
+
+// Call `calcBarIndex()` when the `condition` is `true`. This prompts the compiler to raise a warning.
+if condition
+    customIndex := calcBarIndex()
+
+plot(bar_index,   "Bar index",    color = color.green)
+plot(customIndex, "Custom index", color = color.red, style = plot.style_cross)

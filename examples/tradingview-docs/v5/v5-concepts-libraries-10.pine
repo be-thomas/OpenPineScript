@@ -1,0 +1,19 @@
+//@version=5
+indicator("")
+
+import userName/Signal/1 as Signal
+
+// Calculate the median and quarter range values. 
+float medianValue = ta.median(close, 100)
+float rangeValue  = ta.range(close, 100) * 0.25
+// Calculate upper and lower channel values.
+float upper = medianValue + rangeValue
+float lower = medianValue - rangeValue
+
+//@variable Returns `Signal.State.long`, `Signal.State.short`, or `Signal.State.neutral` based on the price action.
+Signal.State mySignal = switch
+    close > upper => Signal.State.long
+    close < lower => Signal.State.short
+    =>               Signal.State.neutral
+
+plot(close, color = mySignal == Signal.State.long ? color.green : mySignal == Signal.State.short ? color.red : na)

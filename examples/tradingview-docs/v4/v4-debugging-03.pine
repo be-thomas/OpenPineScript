@@ -1,0 +1,3 @@
+//@version=4
+study("Simple label", "", true)
+label.new(bar_index, high, syminfo.ticker)

@@ -1,0 +1,30 @@
+//@version=5
+indicator(title="CCI line gradient", precision=2, timeframe="")
+var color GOLD_COLOR   = #CCCC00
+var color VIOLET_COLOR = #AA00FF  
+var color GREEN_BG_COLOR = color.new(color.green, 70)
+var color RED_BG_COLOR   = color.new(color.maroon, 70)
+float srcInput      = input.source(close, "Source")
+int   lenInput      = input.int(20, "Length", minval = 5)
+int   stepsInput    = input.int(50, "Gradient levels", minval = 1)
+color bullColorInput   = input.color(GOLD_COLOR, "Line: Bull", inline = "11")
+color bearColorInput   = input.color(VIOLET_COLOR, "Bear", inline = "11")
+color bullBgColorInput = input.color(GREEN_BG_COLOR, "Background: Bull", inline = "12")
+color bearBgColorInput = input.color(RED_BG_COLOR, "Bear", inline = "12")
+
+// Plot colored signal line.
+float signal = ta.cci(srcInput, lenInput)
+color signalColor = color.from_gradient(signal, -200, 200, color.new(bearColorInput, 0), color.new(bullColorInput, 0))
+plot(signal, "CCI", signalColor, 2)
+
+// Detect crosses of the centerline.
+bool signalX = ta.cross(signal, 0)
+// Count no of bars since cross. Capping it to the no of steps from inputs.
+int gradientStep = math.min(stepsInput, nz(ta.barssince(signalX)))
+// Choose bull/bear end color for the gradient.
+color endColor = signal > 0 ? bullBgColorInput : bearBgColorInput
+// Get color from gradient going from no color to `c_endColor` 
+color bandColor = color.from_gradient(gradientStep, 0, stepsInput, na, endColor)
+bandTopPlotID = hline(100,  "Upper Band", color.silver, hline.style_dashed)
+bandBotPlotID = hline(-100, "Lower Band", color.silver, hline.style_dashed)
+fill(bandTopPlotID, bandBotPlotID, bandColor, title = "Band")

@@ -1,0 +1,5 @@
+//@version=5
+indicator("MA", "", true)
+maLengthInput = input.int(10, options = [3, 5, 7, 10, 14, 20, 50, 100, 200])
+ma = ta.sma(close, maLengthInput)
+plot(ma)

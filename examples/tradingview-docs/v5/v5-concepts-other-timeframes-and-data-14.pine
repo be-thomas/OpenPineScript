@@ -1,0 +1,16 @@
+//@version=5
+indicator("Lower timeframe security demo", overlay = true)
+
+//@variable The valid timeframe closest to 1/4 the size of the chart timeframe.
+string lowerTimeframe = timeframe.from_seconds(int(timeframe.in_seconds() / 4))
+
+//@variable The `close` value on the `lowerTimeframe`. Represents the first intrabar value on each chart bar.
+float firstLTFClose = request.security(syminfo.tickerid, lowerTimeframe, close, lookahead = barmerge.lookahead_on)
+//@variable The `close` value on the `lowerTimeframe`. Represents the last intrabar value on each chart bar.
+float lastLTFClose = request.security(syminfo.tickerid, lowerTimeframe, close)
+
+// Plot the values.
+plot(firstLTFClose, "First intrabar close", color.teal, 3)
+plot(lastLTFClose, "Last intrabar close", color.purple, 3)
+// Highlight the background on realtime bars.
+bgcolor(barstate.isrealtime ? color.new(color.orange, 70) : na, title = "Realtime background highlight")

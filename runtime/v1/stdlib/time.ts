@@ -236,3 +236,91 @@ export function time(ctx: any, _resolution?: any, session?: any): number {
 
     return ranges.some(([a, b]) => minuteOfDay >= a && minuteOfDay < b) ? t : NaN;
 }
+
+/**
+ * The end of the bar's timeframe, given its opening time.
+ *
+ * Pine reports a bar's CLOSING time as the instant the next bar of the same
+ * timeframe opens, so this is calendar arithmetic rather than a fixed offset:
+ * a month is not 30 days and a week is not always 7 × 24 h across a DST
+ * boundary. Days/weeks/months are advanced on the UTC calendar for the same
+ * reason every other accessor in this file reads UTC — see the header.
+ *
+ * Resolution strings follow TradingView's spelling: "1"/"5"/"60" are minutes,
+ * "30S" is seconds, and "D"/"W"/"M" carry an optional multiplier ("2W").
+ */
+function resolutionEnd(openTime: number, resolution: string): number {
+    const spec = String(resolution ?? "").trim().toUpperCase();
+    const m = /^(\d*)([SDWM]?)$/.exec(spec);
+    if (!m) return NaN;
+
+    const count = m[1] === "" ? 1 : parseInt(m[1], 10);
+    const unit = m[2];
+    if (!Number.isFinite(count) || count <= 0) return NaN;
+
+    // Intraday: a plain number is MINUTES, "S" is seconds. Both are fixed spans.
+    if (unit === "") return openTime + count * 60_000;
+    if (unit === "S") return openTime + count * 1_000;
+
+    const d = new Date(openTime);
+    if (unit === "D") d.setUTCDate(d.getUTCDate() + count);
+    else if (unit === "W") d.setUTCDate(d.getUTCDate() + count * 7);
+    else d.setUTCMonth(d.getUTCMonth() + count);
+    return d.getTime();
+}
+
+/**
+ * `time_close(resolution, session, timezone)` — the bar's CLOSING time.
+ *
+ * Added in Pine v4. Where `time` is the instant a bar opened, this is the
+ * instant it closes, which is what a script needs to place a drawing at the
+ * right-hand edge of the current bar rather than its left.
+ *
+ * It is derived from the chart's resolution rather than read from the data,
+ * because the closing time of the bar being evaluated is the OPENING time of a
+ * bar that has not arrived yet — on the last bar there is no next bar to read.
+ *
+ * `session` filters exactly as it does for `time()`, and carries the same
+ * caveat: this engine has no exchange calendar and evaluates in UTC.
+ *
+ * Marked `@getter` because Pine documents it as "both a variable and a
+ * function": bare `time_close` must read as the current bar's closing time,
+ * while `time_close("D")` still resolves through the ordinary call path. `time`
+ * itself does not need the tag only because the runtime binds an `opsv2_time`
+ * SERIES into the sandbox for the bare form to find; there is no such series
+ * here, and without the tag `plot(time_close)` plotted the function object,
+ * which reads as `na`.
+ *
+ * @getter
+ * @returns {series float} The bar's closing UNIX time in ms, or na.
+ */
+export function time_close(ctx: any, resolution?: any, session?: any): number {
+    const open = time(ctx, resolution, session);
+    if (!Number.isFinite(open)) return NaN;
+
+    const unwrap = (x: any) => (x != null && typeof x.valueOf === "function" ? x.valueOf() : x);
+    const spec = resolution == null ? ctx?.resolution : unwrap(resolution);
+    return resolutionEnd(open, String(spec));
+}
+
+/**
+ * `time_tradingday` — the start of the trading day the bar belongs to.
+ *
+ * Added in Pine v4 (February 2021): "the beginning time of the trading day the
+ * current bar belongs to". The v5 manual states it as the 00:00 UTC start of
+ * the last trading day in the bar's final session.
+ *
+ * With no exchange calendar this is UTC midnight of the bar's own day — exact
+ * for a symbol whose session does not straddle midnight, and shifted for one
+ * that does. Same limitation, and same remedy, as the rest of this file:
+ * supply bar timestamps already shifted to the exchange timezone.
+ *
+ * @getter
+ * @returns {series float} UNIX time of the trading day's start, in ms.
+ */
+export function time_tradingday(ctx: any): number {
+    const t = Number(ctx?.time ?? NaN);
+    if (!Number.isFinite(t)) return NaN;
+    const d = new Date(t);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}

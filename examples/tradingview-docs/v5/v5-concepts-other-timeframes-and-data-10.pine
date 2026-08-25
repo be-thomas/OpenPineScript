@@ -1,0 +1,14 @@
+//@version=5
+indicator("Nested requests demo", dynamic_requests = true)
+
+//@variable A concatenated string containing the current `syminfo.tickerid` and `timeframe.period`.
+string info1 = request.security("", "", syminfo.tickerid + "_" + timeframe.period)
+//@variable A concatenated string representing the `info1` value calculated within the "NASDAQ:AAPL, 240" context.
+//          This call evaluates the call on line 5 within its context to determine its result because the script 
+//          allows dynamic requests.
+string info2 = request.security("NASDAQ:AAPL", "240", info1)
+
+// Log the results from both calls in the Pine Logs pane on the last historical bar. 
+if barstate.islastconfirmedhistory
+    log.info("First request: {0}", info1)
+    log.info("Second request: {0}", info2)

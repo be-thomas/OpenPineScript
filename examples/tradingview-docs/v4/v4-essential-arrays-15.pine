@@ -1,0 +1,9 @@
+//@version=4
+study("`array.copy()`")
+a = array.new_float(0)
+array.push(a, 0)
+array.push(a, 1)
+if barstate.islast
+    _b = array.copy(a)
+    array.push(_b, 2)
+    label.new(bar_index, 0, "a: " + tostring(a) + "\n_b: " + tostring(_b), size = size.large)

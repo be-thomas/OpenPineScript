@@ -1,0 +1,35 @@
+//@version=5
+strategy("Bar Magnifier Demo", overlay = true, use_bar_magnifier = false)
+
+//@variable The UNIX timestamp to place the order at.
+int orderTime = timestamp("UTC", 2023, 3, 22, 18)
+
+//@variable Is `color.orange` when `time` crosses the `orderTime`, false otherwise.
+color orderColor = na
+
+// Entry and exit prices.
+float entryPrice = hl2 - (high - low)
+float exitPrice  = entryPrice + (high - low) * 0.25
+
+// Entry and exit lines.
+var line entryLine = na
+var line exitLine  = na
+
+if ta.cross(time, orderTime)
+    // Draw new entry and exit lines.
+    entryLine := line.new(bar_index, entryPrice, bar_index + 1, entryPrice, color = color.green, width = 2)
+    exitLine  := line.new(bar_index, exitPrice, bar_index + 1, exitPrice, color = color.red, width = 2)
+
+    // Update order highlight color.
+    orderColor := color.new(color.orange, 80)
+
+    // Place limit orders at the `entryPrice` and `exitPrice`.
+    strategy.entry("Buy", strategy.long, limit = entryPrice)
+    strategy.exit("Exit", "Buy", limit = exitPrice)
+
+// Update lines while the position is open.
+else if strategy.position_size > 0.0
+    entryLine.set_x2(bar_index + 1)
+    exitLine.set_x2(bar_index + 1)
+
+bgcolor(orderColor)

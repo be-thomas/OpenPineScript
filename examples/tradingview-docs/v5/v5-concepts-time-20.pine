@@ -1,0 +1,53 @@
+//@version=5
+indicator("`timestamp()` demo", overlay = false)
+
+//@variable A `table` that displays the different `timestamp()` calls, their returned timestamps, and formatted results.
+var table displayTable = table.new(
+     position.middle_center, 4, 5, color.white, border_color = color.black, border_width = 2
+ )
+
+//@function Initializes a `displayTable` cell showing the `displayText` with an optional `specialFormat`.
+printCell(int colID, int rowID, string displayText, string specialFormat = "") => 
+    displayTable.cell(colID, rowID, displayText, text_size = size.large)
+    switch specialFormat 
+        "header"  => displayTable.cell_set_bgcolor(colID, rowID, color.rgb(76, 175, 79, 70))
+        "code"    => 
+            displayTable.cell_set_text_font_family(colID, rowID, font.family_monospace)
+            displayTable.cell_set_text_size(colID, rowID, size.normal)
+            displayTable.cell_set_text_halign(colID, rowID, text.align_left)
+
+if barstate.islastconfirmedhistory
+    //@variable The UNIX timestamp corresponding to January 1, 2021 in the UTC+0 time zone. 
+    int dateTimestamp1 = timestamp("2021-01-01")
+    //@variable The UNIX timestamp corresponding to January 1, 2021 in the exchange time zone. 
+    int dateTimestamp2 = timestamp(2021, 1, 1, 0, 0)
+    //@variable The UNIX timestamp corresponding to January 1, 2021 in the "America/New_York" time zone. 
+    int dateTimestamp3 = timestamp("America/New_York", 2021, 1, 1, 0, 0)
+    //@variable The UNIX timestamp corresponding to January 1, 2021 in the "UTC0" (UTC+0) time zone. 
+    int dateTimestamp4 = timestamp("UTC0", 2021, 1, 1, 0, 0)
+
+    // Initialize the top header cells in the `displayTable`. 
+    printCell(0, 0, "Variable",            "header")
+    printCell(1, 0, "Function call",       "header")
+    printCell(2, 0, "Timestamp returned",  "header")
+    printCell(3, 0, "Formatted date/time", "header")
+    // Initialize a table row for `dateTimestamp1` results. 
+    printCell(0, 1, "`dateTimestamp1`", "header")
+    printCell(1, 1, "`timestamp(\"2021-01-01\")`", "code")
+    printCell(2, 1, str.tostring(dateTimestamp1))
+    printCell(3, 1, str.format_time(dateTimestamp1, "yyyy.MM.dd  HH:mm (Z)"))
+    // Initialize a table row for `dateTimestamp2` results. 
+    printCell(0, 2, "`dateTimestamp2`", "header")
+    printCell(1, 2, "`timestamp(2021, 1, 1, 0, 0)`", "code")
+    printCell(2, 2, str.tostring(dateTimestamp2))
+    printCell(3, 2, str.format_time(dateTimestamp2, "yyyy.MM.dd  HH:mm (Z)"))
+    // Initialize a table row for `dateTimestamp3` results. 
+    printCell(0, 3, "`dateTimestamp3`", "header")
+    printCell(1, 3, "`timestamp(\"America/New_York\", 2021, 1, 1, 0, 0)`", "code")
+    printCell(2, 3, str.tostring(dateTimestamp3))
+    printCell(3, 3, str.format_time(dateTimestamp3, "yyyy.MM.dd  HH:mm (Z)"))
+    // Initialize a table row for `dateTimestamp4` results. 
+    printCell(0, 4, "`dateTimestamp4`", "header")
+    printCell(1, 4, "`timestamp(\"UTC0\", 2021, 1, 1, 0, 0)`", "code")
+    printCell(2, 4, str.tostring(dateTimestamp4))
+    printCell(3, 4, str.format_time(dateTimestamp4, "yyyy.MM.dd  HH:mm (Z)"))

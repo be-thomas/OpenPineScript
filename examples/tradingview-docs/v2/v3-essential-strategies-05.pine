@@ -1,0 +1,5 @@
+//@version=2
+strategy("next bar open execution demo")
+if n > 4000
+    strategy.order("buy", strategy.long, when=strategy.position_size == 0)
+    strategy.order("sell", strategy.short, when=strategy.position_size != 0)

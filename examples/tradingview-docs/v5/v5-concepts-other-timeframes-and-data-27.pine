@@ -1,0 +1,55 @@
+//@version=5
+indicator("Tuples of intrabar data demo", "Candle magnifier", max_lines_count = 500)
+
+//@variable The maximum number of intrabars to display.
+int maxIntrabars = input.int(20, "Max intrabars", 1, 250)
+//@variable The width of the drawn candle bodies.
+int candleWidth = input.int(20, "Candle width", 2)
+
+//@variable The largest valid timeframe closest to `maxIntrabars` times smaller than the chart timeframe.
+string lowerTimeframe = timeframe.from_seconds(math.ceil(timeframe.in_seconds() / maxIntrabars))
+
+//@variable An array of lines to represent intrabar wicks.
+var array<line> wicks  = array.new<line>()
+//@variable An array of lines to represent intrabar bodies.
+var array<line> bodies = array.new<line>()
+//@variable A box that surrounds the displayed intrabars.
+var box magnifierBox = box.new(na, na, na, na, bgcolor = na)
+
+// Fill the `wicks` and `bodies` arrays with blank lines on the first bar.
+if barstate.isfirst
+    for i = 1 to maxIntrabars
+        array.push(wicks, line.new(na, na, na, na, color = color.gray))
+        array.push(bodies, line.new(na, na, na, na, width = candleWidth))
+
+//@variable A tuple of "float" arrays containing `open`, `high`, `low`, and `close` prices from the `lowerTimeframe`.
+[oData, hData, lData, cData] = request.security_lower_tf(syminfo.tickerid, lowerTimeframe, [open, high, low, close])
+//@variable The number of intrabars retrieved from the `lowerTimeframe` on the chart bar.
+int numIntrabars = array.size(oData)
+
+if numIntrabars > 0
+    // Define the start and end bar index values for intrabar display.
+    int startIndex = bar_index + 2
+    int endIndex = startIndex + numIntrabars
+    // Loop to update lines.
+    for i = 0 to maxIntrabars - 1
+        line wickLine = array.get(wicks, i)
+        line bodyLine = array.get(bodies, i)
+        if i < numIntrabars
+            //@variable The `bar_index` of the drawing.
+            int candleIndex = startIndex + i
+            // Update the properties of the `wickLine` and `bodyLine`.
+            line.set_xy1(wickLine, startIndex + i, array.get(hData, i))
+            line.set_xy2(wickLine, startIndex + i, array.get(lData, i))
+            line.set_xy1(bodyLine, startIndex + i, array.get(oData, i))
+            line.set_xy2(bodyLine, startIndex + i, array.get(cData, i))
+            line.set_color(bodyLine, bodyLine.get_y2() > bodyLine.get_y1() ? color.teal : color.maroon)
+            continue
+        // Set the coordinates of the `wickLine` and `bodyLine` to `na` if no intrabar data is available at the index.
+        line.set_xy1(wickLine, na, na)
+        line.set_xy2(wickLine, na, na)
+        line.set_xy1(bodyLine, na, na)
+        line.set_xy2(bodyLine, na, na)
+    // Set the coordinates of the `magnifierBox`.
+    box.set_lefttop(magnifierBox, startIndex - 1, array.max(hData))
+    box.set_rightbottom(magnifierBox, endIndex, array.min(lData))

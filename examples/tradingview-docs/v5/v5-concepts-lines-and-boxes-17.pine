@@ -1,0 +1,46 @@
+//@version=5
+indicator("Redrawing polylines demo", "OHLC polygons", true, max_polylines_count = 100)
+
+//@variable The length of the period.
+int length = input.int(100, "Length", 1)
+
+//@variable A `chart.point` representing the start of each period.
+var chart.point openPoint = na
+//@variable A `chart.point` representing the highest point of each period.
+var chart.point highPoint = na
+//@variable A `chart.point` representing the lowest point of each period.
+var chart.point lowPoint = na
+//@variable A `chart.point` representing the current bar's closing point.
+closePoint = chart.point.now(close)
+
+//@variable The current period's polyline drawing.
+var polyline currentDrawing = na
+
+//@variable Is `true` once every `length` bars.
+bool newPeriod = bar_index % length == 0
+
+if newPeriod
+    // Assign new chart points to the `openPoint`, `highPoint`, and `closePoint`.
+    openPoint := chart.point.now(open)
+    highPoint := chart.point.now(high)
+    lowPoint  := chart.point.now(low)
+else
+    // Assign a new `chart.point` to the `highPoint` when the `high` is greater than its `price`.
+    if high > highPoint.price
+        highPoint := chart.point.now(high)
+    // Assign a new `chart.point` to the `lowPoint` when the `low` is less than its `price`.
+    if low < lowPoint.price
+        lowPoint := chart.point.now(low)
+
+//@variable Is teal when the `closePoint.price` is greater than the `openPoint.price`, maroon otherwise.
+color drawingColor = closePoint.price > openPoint.price ? color.teal : color.maroon
+
+// Delete the polyline assigned to the `currentDrawing` if it's not a `newPeriod`.
+if not newPeriod
+    polyline.delete(currentDrawing)
+// Assign a new polyline to the `currentDrawing`.
+// Uses the `index` field from each `chart.point` in its array as x-coordinates.
+currentDrawing := polyline.new(
+     array.from(openPoint, highPoint, closePoint, lowPoint), closed = true,
+     line_color = drawingColor, fill_color = color.new(drawingColor, 60)
+ )

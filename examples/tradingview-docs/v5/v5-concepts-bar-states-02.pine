@@ -1,0 +1,9 @@
+//@version=5
+indicator("", "", true)
+// Create label on the first bar only.
+var label hiLabel = label.new(na, na, "")
+// Update the label's position and text on the last bar,
+// including on all realtime bar updates.
+if barstate.islast
+    label.set_xy(hiLabel, bar_index, high)
+    label.set_text(hiLabel, str.tostring(high, format.mintick))

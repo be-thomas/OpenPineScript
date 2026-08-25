@@ -1,0 +1,45 @@
+//@version=5
+indicator("BOP array in higher timeframe context", "Memory limit demo")
+
+//@variable User-input length for calculating average of BOP values. 
+int avgLength = input.int(5, "Average BOP Length", minval = 1)
+
+//Returns a copy of the `dataArray` on every bar, which uses a lot of memory.
+dataFunction() => 
+    //@variable Persistent array containing the "balance of power" (BOP) values for all bars from the higher timeframe.
+    var array<float> dataArray = array.new_float(0)
+
+    //@variable The "balance of power" percentage calculated for the current bar.
+    float bop = (close - open) / (high - low) * 100
+    dataArray.push(bop)
+
+    //Return the full collection.
+    dataArray
+
+// Request the full BOP array from the 1D timeframe.
+array<float> reqData = request.security(syminfo.tickerid, "1D", dataFunction())
+
+// Plot zero line.
+hline(0, "Zero line", color.gray, hline.style_dotted)
+
+// Latest BOP value and average BOP are calculated in the main context if `reqData` is not `na`.
+//@variable The latest BOP value from the `reqData` array.
+float latestValue = na
+//@variable The average of the last `avgLength` BOP values.
+float avgBOP = na
+
+if not na(reqData)
+    // Retrieve BOP value for the current main context bar.
+    latestValue := reqData.last()
+
+    // Calculate the average BOP for the most-recent values from the higher timeframe array.
+    //@variable Size of the `reqData` array returned from the higher timeframe.
+    int dataSize = reqData.size()
+    //@variable A subset of the latest values from the `reqData` array. Its size is determined by the `avgLength` set.
+    array<float> lastValues = dataSize >= avgLength ? reqData.slice(dataSize - avgLength, dataSize): reqData
+    avgBOP := lastValues.avg()
+
+// Plot the BOP value and average line.
+color plotColor = latestValue >= 0 ? color.aqua : color.orange
+plot(latestValue, "BOP", plotColor, style = plot.style_columns)
+plot(avgBOP, "Avg", color.purple, linewidth = 3)

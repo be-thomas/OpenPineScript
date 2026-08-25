@@ -1,0 +1,13 @@
+//@version=4
+study("Debugging from inside `for` loops", max_lines_count = 500, max_labels_count = 500)
+i_lookBack = input(20, minval = 0)
+
+float val = na
+float trBalance = 0
+for _i = 1 to i_lookBack
+    trBalance := trBalance + sign(tr - tr[_i])
+    if _i == i_lookBack
+        val := tr[_i]
+hline(0)
+plot(trBalance)
+plot(val, "val", color.black)

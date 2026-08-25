@@ -41,9 +41,7 @@
  */
 import type { PineVersion } from "../version";
 import { V1ToJsVisitor } from "../v1/ToJsVisitor";
-import { ScopeInfo, analyseScopes } from "../passes/ScopeAnalysis";
 import {
-  Pine_scriptContext,
   Var_assignContext,
   Global_stmt_contentContext,
   Local_stmt_contentContext,
@@ -58,24 +56,12 @@ interface SourceLocated {
 export class V2ToJsVisitor extends V1ToJsVisitor {
   protected override readonly version: PineVersion = 2;
 
-  /**
-   * Whole-script facts the single-pass emitter cannot derive on its own.
-   *
-   * ':=' needs to know whether a name is bound ANYWHERE, including further down
-   * the file: v2 still permits forward references (v3 is the version that
-   * removes them), so a lexical "seen so far" set would reject valid v2 code.
-   *
-   * v1 never runs this pass — it has no ':=' to check.
-   */
-  protected scopes: ScopeInfo = {
-    declared: new Map(), mutated: new Set(), booleans: new Set(),
-    functions: new Set(), bound: new Set(), functionScoped: new Set(),
-  };
+  // `scopes` and the pass that fills it moved to v1 when `Undeclared
+  // identifier` did: the check has to behave identically at both versions. v2's
+  // own use of it is ':=', which needs to know whether a name is bound ANYWHERE
+  // — forward references are still legal here, so a "seen so far" set would
+  // reject valid code.
 
-  override visitPine_script(ctx: Pine_scriptContext): string {
-    this.scopes = analyseScopes(ctx);
-    return super.visitPine_script(ctx as any);
-  }
 
   /**
    * ':=' assigns to a variable "that has already been defined". Assigning to a

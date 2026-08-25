@@ -1,0 +1,25 @@
+//@version=5
+strategy("Market order demo", overlay = true, margin_long = 100, margin_short = 100)
+
+//@variable Number of bars between long and short entries.
+int lengthInput = input.int(10, "Cycle length", 1)
+
+//@function Displays the specified `txt` in a label on the current bar.
+debugLabel(string txt, color lblColor) => label.new(
+     bar_index, high, text = txt, color = lblColor, textcolor = color.white, 
+     style = label.style_label_lower_right, size = size.large
+ )
+
+//@variable Is `true` every `2 * lengthInput` bars, `false` otherwise.
+longCondition = bar_index % (2 * lengthInput) == 0
+//@variable Is `true` every `lengthInput` bars, `false` otherwise.
+shortCondition = bar_index % lengthInput == 0
+
+// Generate a long market order with a `color.green` label on `longCondition`.
+if longCondition
+    debugLabel("Long market order created", color.green)
+    strategy.entry("My Long Entry Id", strategy.long)
+// Otherwise, generate a short market order with a `color.red` label on `shortCondition`.
+else if shortCondition
+    debugLabel("Short market order created", color.red)
+    strategy.entry("My Short Entry Id", strategy.short)

@@ -1,0 +1,49 @@
+//@version=5
+indicator("Formatting dates and times demo", overlay = false)
+
+//@variable A `table` that displays different date/time `format` strings and their results.
+var table displayTable = table.new(
+     position.middle_center, 2, 15, bgcolor = color.white, 
+     frame_color = color.black, frame_width = 1, border_width = 1
+ )
+
+//@function Initializes a `displayTable` row showing a `formatString` and its formatted result for a specified 
+//          `timeValue` and `timezoneValue`.
+displayText(rowID, formatString, timeValue = time, timezoneValue = syminfo.timezone) =>
+    //@variable Is light blue if the `rowID` is even, white otherwise. Used to set alternating table row colors.
+    color rowColor = rowID % 2 == 0 ? color.rgb(33, 149, 243, 75) : color.white
+    // Display the `formatString` in the row's first cell.
+    displayTable.cell(
+         0, rowID, formatString,
+         text_color = color.black, text_halign = text.align_left, bgcolor = rowColor
+     )
+    // Show the result of formatting the `timeValue` based on the `formatString` and `timezoneValue` in the second cell.
+    displayTable.cell(
+         1, rowID, str.format_time(timeValue, formatString, timezoneValue), 
+         text_color = color.black, text_halign = text.align_right, bgcolor = rowColor
+     )
+
+if barstate.islast
+    // Initialize the table's header cells.
+    displayTable.cell(0, 0, "FORMAT STRINGS")
+    displayTable.cell(1, 0, "FORMATTED DATE/TIME OUTPUT")
+    // Initialize a row to show the default date-time "string" format and its result for `time`. 
+    displayTable.cell(
+         0, 1, "(Default `str.format_time()` format)", 
+         text_color = color.black, text_halign = text.align_left, bgcolor = color.yellow)
+    displayTable.cell(
+         1, 1, str.format_time(time), 
+         text_color = color.black, text_halign = text.align_right, bgcolor = color.yellow)
+
+    // Initialize rows to show different formatting strings and their results for `time`, `time_close`, and `timenow`.
+    displayText(2, "dd/MM/yy")
+    displayText(3, "MMMM dd, yyyy")
+    displayText(4, "hh:mm:ss.SS a", timenow)
+    displayText(5, "HH:mm 'UTC'Z")
+    displayText(6, "H:mm a (zzzz)")
+    displayText(7, "my day / 'my day' ('escaped')")
+    displayText(8, "'Month' M, 'Week' w, 'Day' DDD")
+    displayText(9, "'Bar expected closing time': ha", time_close)
+    displayText(10, "'Current date/time': MMM-d-y HH:mm:ss z", timenow)
+    displayText(11, "'New Time zone': zzzz", timezoneValue = "Australia/Sydney")
+    displayText(12, "'Time zone change': MMM-d-y HH:mm:ss z", timenow, "Australia/Sydney")

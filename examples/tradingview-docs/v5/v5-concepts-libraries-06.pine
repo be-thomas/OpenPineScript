@@ -1,0 +1,4 @@
+//@version=5  
+indicator("") 
+import userName/Point/1 as pt 
+newPoint = pt.point.new() 

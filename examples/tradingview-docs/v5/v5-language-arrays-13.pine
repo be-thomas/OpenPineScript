@@ -1,0 +1,11 @@
+//@version=5
+indicator("Protected `for` loop", overlay = true)
+//@variable An array of `close` prices from the 1-minute timeframe.
+array<float> a = request.security_lower_tf(syminfo.tickerid, "1", close)
+
+//@variable A string representation of the elements in `a`.
+string labelText = ""
+for i = 0 to (array.size(a) == 0 ? na : array.size(a) - 1)
+    labelText += str.tostring(array.get(a, i)) + "\n"
+
+label.new(bar_index, high, text = labelText)

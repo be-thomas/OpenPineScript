@@ -1,0 +1,11 @@
+//@version=5
+indicator("Conditional colors", "", true)
+int   lengthInput = input.int(20, "Length", minval = 2)
+color maBullColorInput = input.color(color.green, "Bull")
+color maBearColorInput = input.color(color.maroon, "Bear")
+float ma = ta.sma(close, lengthInput)
+// Define our states.
+bool maRising  = ta.rising(ma, 1)
+// Build our color.
+color c_ma = maRising ? maBullColorInput : maBearColorInput
+plot(ma, "MA", c_ma, 2)

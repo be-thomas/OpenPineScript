@@ -1,0 +1,82 @@
+//@version=5    
+library("PivotLabels", true)    
+
+// We use this `point` UDT in the library, but it does NOT require exporting because    
+//   1. The exported function's parameters do not use the UDT.  
+//   2. The exported function does not return a UDT result. 
+type point  
+    int x   
+    float y 
+    bool isHi   
+    bool wasBreached = false    
+
+
+fillPivotsArray(qtyLabels, leftLegs, rightLegs) =>  
+    // Create an array of the specified qty of pivots to maintain.  
+    var pivotsArray = array.new<point>(math.max(qtyLabels, 0))  
+
+    // Detect pivots.   
+    float pivotHi = ta.pivothigh(leftLegs, rightLegs)   
+    float pivotLo = ta.pivotlow(leftLegs, rightLegs)    
+
+    // Create a new `point` object when a pivot is found.   
+    point foundPoint = switch   
+        pivotHi => point.new(time[rightLegs], pivotHi, true)    
+        pivotLo => point.new(time[rightLegs], pivotLo, false)   
+        => na   
+
+    // Add new pivot info to the array and remove the oldest pivot. 
+    if not na(foundPoint)   
+        array.push(pivotsArray, foundPoint) 
+        array.shift(pivotsArray)    
+
+    array<point> result = pivotsArray   
+
+
+detectBreaches(pivotsArray) =>  
+    // Detect breaches. 
+    for [i, eachPoint] in pivotsArray   
+        if not na(eachPoint)    
+            if not eachPoint.wasBreached    
+                bool hiWasBreached =     eachPoint.isHi and high[1] <= eachPoint.y and high > eachPoint.y   
+                bool loWasBreached = not eachPoint.isHi and low[1]  >= eachPoint.y and low  < eachPoint.y   
+                if hiWasBreached or loWasBreached   
+                    // This pivot was breached; change its `wasBreached` field. 
+                    point p = array.get(pivotsArray, i) 
+                    p.wasBreached := true   
+                    array.set(pivotsArray, i, p)    
+
+
+drawLabels(pivotsArray) =>  
+    for eachPoint in pivotsArray    
+        if not na(eachPoint)    
+            label.new(  
+              eachPoint.x,  
+              eachPoint.y,  
+              str.tostring(eachPoint.y, format.mintick),    
+              xloc.bar_time,    
+              color = eachPoint.wasBreached ? color.gray : eachPoint.isHi ? color.teal : color.red, 
+              style = eachPoint.isHi ? label.style_label_down: label.style_label_up,    
+              textcolor = eachPoint.wasBreached ? color.silver : color.white)   
+
+
+// @function        Displays a label for each of the last `qtyLabels` pivots.   
+//                  Colors high pivots in green, low pivots in red, and breached pivots in gray.    
+// @param qtyLabels (simple int) Quantity of last labels to display.    
+// @param leftLegs  (simple int) Left pivot legs.   
+// @param rightLegs (simple int) Right pivot legs.  
+// @returns         Nothing.    
+export drawPivots(int qtyLabels, int leftLegs, int rightLegs) =>    
+    // Gather pivots as they occur. 
+    pointsArray = fillPivotsArray(qtyLabels, leftLegs, rightLegs)   
+
+    // Mark breached pivots.    
+    detectBreaches(pointsArray) 
+
+    // Draw labels once.    
+    if barstate.islastconfirmedhistory  
+        drawLabels(pointsArray) 
+
+
+// Example use of the function. 
+drawPivots(20, 10, 5)   

@@ -1,0 +1,7 @@
+//@version=5
+indicator("Using AllTimeHighLow library", "", true)
+import PineCoders/AllTimeHighLow/1 as allTime
+
+plot(allTime.hi())
+plot(allTime.lo())
+plot(allTime.hi(close))

@@ -1,0 +1,3 @@
+//@version=4
+study("My Script", overlay=true)
+box.new(left=bar_index[1], top=low[1], right=bar_index, bottom=high)

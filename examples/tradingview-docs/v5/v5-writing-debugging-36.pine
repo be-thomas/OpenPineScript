@@ -1,0 +1,47 @@
+//@version=5
+indicator("Extracting local variables with reference types demo", "Custom MA", true)
+
+//@variable The number of bars in the `customMA()` calculation.
+int lengthInput = input.int(50, "Length", 2)
+
+//@variable A map with "string" keys and "float" values for debugging the `customMA()`.
+map<string, float> debugData = map.new<string, float>()
+
+//@function      Calculates a moving average that only responds to values outside the first and third quartiles.
+//@param source  The series of values to process.
+//@param length  The number of bars in the calculation.
+//@returns       The moving average value.
+customMA(float source, int length) =>
+    //@variable The custom moving average.
+    var float result = na
+    // Calculate the 25th and 75th `source` percentiles.
+    float q1 = ta.percentile_linear_interpolation(source, length, 25),    map.put(debugData, "q1", q1)
+    float q3 = ta.percentile_linear_interpolation(source, length, 75),    map.put(debugData, "q3", q3)
+    // Calculate the range values.
+    float outerRange = math.max(source - q3, q1 - source, 0.0),           map.put(debugData, "outerRange", outerRange)
+    float totalRange = ta.range(source, length),                          map.put(debugData, "totalRange", totalRange)
+    //@variable Half the ratio of the `outerRange` to the `totalRange`.
+    float alpha = 0.5 * outerRange / totalRange,                          map.put(debugData, "alpha", alpha)
+    // Mix the `source` with the `result` based on the `alpha` value.
+    result := (1.0 - alpha) * nz(result, source) + alpha * source
+    // Return the `result`.
+    result
+
+//@variable The `customMA()` result over `lengthInput` bars.
+float maValue = customMA(close, lengthInput)
+
+// Plot the `maValue`.
+plot(maValue, "Custom MA", color.blue, 3)
+
+//@variable Display location for plots with different scale.
+notOnPane = display.all - display.pane
+
+// Display the extracted `q1` and `q3` values in all plot locations.
+plot(map.get(debugData, "q1"), "q1", color.new(color.maroon, 50))
+plot(map.get(debugData, "q3"), "q3", color.new(color.teal, 50))
+// Display the other extracted values in the status line and Data Window to avoid impacting the scale.
+plot(map.get(debugData, "outerRange"), "outerRange", chart.fg_color, display = notOnPane)
+plot(map.get(debugData, "totalRange"), "totalRange", chart.fg_color, display = notOnPane)
+plot(map.get(debugData, "alpha"), "alpha", chart.fg_color, display = notOnPane)
+// Highlight the chart when the extracted `alpha` is 0, i.e., when the `maValue` does not change.
+bgcolor(map.get(debugData, "alpha") == 0.0 ? color.new(color.orange, 90) : na, title = "`alpha == 0.0` highlight")

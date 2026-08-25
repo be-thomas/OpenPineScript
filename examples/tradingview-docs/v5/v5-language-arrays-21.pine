@@ -1,0 +1,18 @@
+//@version=5
+MAX_LABELS = 100
+indicator("Show Last n High Pivots", "", true, max_labels_count = MAX_LABELS)
+
+pivotCountInput = input.int(5, "How many pivots to show", minval = 0, maxval = MAX_LABELS)
+pivotLegsInput  = input.int(3, "Pivot legs", minval = 1, maxval = 5)
+
+// Create an array containing the user-selected max count of label IDs.
+var labelIds = array.new<label>(pivotCountInput)
+
+pHi = ta.pivothigh(pivotLegsInput, pivotLegsInput)
+if not na(pHi)
+    // New pivot found; plot its label `i_pivotLegs` bars back.
+    pLabel = label.new(bar_index[pivotLegsInput], pHi, str.tostring(pHi, format.mintick), textcolor = color.white)
+    // Queue the new label's ID by appending it to the end of the array.
+    array.push(labelIds, pLabel)
+    // De-queue the oldest label ID from the queue and delete the corresponding label.
+    label.delete(array.shift(labelIds))

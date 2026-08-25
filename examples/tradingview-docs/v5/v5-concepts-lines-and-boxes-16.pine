@@ -1,0 +1,59 @@
+//@version=5
+
+//@variable The maximum number of polylines allowed on the chart.
+const int MAX_POLYLINES_COUNT = 100
+
+indicator("Deleting polylines example", "Spirals", true, max_polylines_count = MAX_POLYLINES_COUNT)
+
+//@variable The number of spiral drawings on the chart.
+int numberOfSpirals = input.int(10, "Spirals shown", 1, MAX_POLYLINES_COUNT)
+//@variable The number of full spiral rotations to draw.
+int rotations = input.int(5, "Rotations", 1)
+//@variable The scale of the horizontal semi-axis.
+float xScale = input.float(1.0, "X scale")
+//@variable The scale of the vertical semi-axis.
+float yScale = input.float(0.2, "Y scale") * ta.atr(2)
+
+//@function Calculates an approximate point from an elliptically-scaled arithmetic spiral.
+//@returns  A `chart.point` with `index` and `price` information.
+spiralPoint(float angle, int xOffset, float yOffset) =>
+    result = chart.point.from_index(
+         int(math.round(angle * xScale * math.cos(angle))) + xOffset,
+         angle * yScale * math.sin(angle) + yOffset
+     )
+
+//@variable An array of polylines.
+var polylines = array.new<polyline>()
+
+//@variable The condition to create a new spiral.
+bool newSpiral = bar_index % int(math.round(4 * math.pi * rotations * xScale)) == 0
+
+if newSpiral
+    //@variable An array of `chart.point` objects for the `spiral` drawing.
+    points = array.new<chart.point>()
+    //@variable The counter-clockwise angle between calculated points, in radians.
+    float step = math.pi / 2
+    //@variable The rotation angle of each calculated point on the spiral, in radians.
+    float theta = 0.0
+    // Loop to create the spiral's points. Creates 4 points per full rotation.
+    for i = 0 to rotations * 4
+        //@variable A new point on the calculated spiral.
+        chart.point newPoint = spiralPoint(theta, bar_index, ohlc4)
+        // Add the `newPoint` to the `points` array.
+        points.push(newPoint)
+        // Add the `step` to the `theta` angle.
+        theta += step
+
+    //@variable A random color for the new `spiral` drawing.
+    color spiralColor = color.rgb(math.random(150, 255), math.random(0, 100), math.random(150, 255))
+    //@variable A new polyline connecting the spiral points. Uses the `index` field from each point as x-coordinates.
+    polyline spiral = polyline.new(points, true, line_color = spiralColor, line_width = 3)
+
+    // Push the new `spiral` into the `polylines` array.
+    polylines.push(spiral)
+    // Shift the first polyline out of the array and delete it when the array's size exceeds the `numberOfSpirals`.
+    if polylines.size() > numberOfSpirals
+        polyline.delete(polylines.shift())
+
+// Highlight the background when `newSpiral` is `true`.
+bgcolor(newSpiral ? color.new(color.blue, 70) : na, title = "New drawing highlight")

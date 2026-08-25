@@ -1,0 +1,28 @@
+//@version=5
+indicator("Keys and values demo")
+
+if bar_index % 50 == 0
+    //@variable A map containing pairs of `string` keys and `float` values.
+    m = map.new<string, float>()
+
+    // Put pairs into `m`. The map will maintain this insertion order.
+    m.put("First", math.round(math.random(0, 100)))
+    m.put("Second", m.get("First") + 1)
+    m.put("Third", m.get("Second") + 1)
+
+    // Overwrite the "Second" pair in `m`. This will NOT affect the insertion order.
+    // The key and value will still appear second in the `keys` and `values` arrays.
+    m.put("Second", -2)
+
+    //@variable An array containing the keys of `m` in their insertion order.
+    array<string> keys = m.keys()
+    //@variable An array containing the values of `m` in their insertion order.
+    array<float> values = m.values()
+
+    //@variable A label displaying the `size` of `m` and the `keys` and `values` arrays.
+    label debugLabel = label.new(
+         bar_index, 0,
+         str.format("Pairs: {0}\nKeys: {1}\nValues: {2}", m.size(), keys, values),
+         color = color.navy, style = label.style_label_center, 
+         textcolor = color.white, size = size.huge
+     )

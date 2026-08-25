@@ -1,0 +1,32 @@
+//@version=5
+indicator("Nested `for...in` loops on matrices demo")
+
+if barstate.islastconfirmedhistory
+    //@variable  A matrix containing numbers to display.
+    matrix<float> displayNumbers = matrix.new<float>()
+    // Populate the `displayNumbers` matrix and reshape to 3x2.
+    displayNumbers.add_row(0, array.from(1, 2, 3, 4, 5, 6))
+    displayNumbers.reshape(3, 2)
+
+    //@variable A table that displays the elements of the `displayNumbers` before modification. 
+    table displayTable = table.new(
+         position = position.middle_center, columns = displayNumbers.columns(), rows = displayNumbers.rows(), 
+         bgcolor = color.purple, border_color = color.white, border_width = 2
+     )
+
+    // Loop through the `displayNumbers`, retrieving the `rowIndex` and the current `row`. 
+    for [rowIndex, row] in displayNumbers
+        // Loop through the current `row` on each outer loop iteration to retrieve the `colIndex` and `element`.
+        for [colIndex, element] in row
+            // Initialize a table cell at the `rowIndex` row and `colIndex` column displaying the current `element`.
+            displayTable.cell(column = colIndex, row = rowIndex, text = str.tostring(element), 
+                 text_color = color.white, text_size = size.huge
+             )
+            // Update the `displayNumbers` value at the `rowIndex` and `colIndex`.
+            displayNumbers.set(rowIndex, colIndex, math.round(math.exp(element), 3))
+
+    // Draw a `label` to display a "string" representation of the updated `displayNumbers` matrix. 
+    label.new( 
+         x = bar_index, y = 0, text = "Matrix now modified: \n" + str.tostring(displayNumbers), color = color.orange, 
+         textcolor = color.white, size = size.huge, style = label.style_label_up 
+     )

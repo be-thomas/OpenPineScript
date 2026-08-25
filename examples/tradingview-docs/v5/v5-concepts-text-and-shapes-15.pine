@@ -1,0 +1,8 @@
+//@version=5
+indicator("", "", true)
+if barstate.islast
+    // Create the label once, the first time the block executes on the last bar.
+    var lbl = label.new(na, na)
+    // On all iterations of the script on the last bar, update the label's information.
+    label.set_xy(lbl, bar_index, high)
+    label.set_text(lbl, str.tostring(high, format.mintick))

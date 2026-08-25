@@ -1,0 +1,28 @@
+//@version=5
+indicator("Utilizing field titles demo")
+
+//@enum An enumeration of cryptocurrency exchanges. All field titles are the same as the field names.
+enum Exchange
+    BINANCE
+    BITSTAMP
+    BITFINEX
+    COINBASE
+    KRAKEN
+
+//@enum An enumeration of cryptocurrency pairs. All the field titles are the same as the field names. 
+enum Pair
+    BTCUSD
+    ETHUSD
+    SOLUSD
+    XRPUSD
+
+//@variable An enumerator (member) of the `Exchange` enum.
+Exchange exchangeInput = input.enum(Exchange.BINANCE, "Exchange")
+//@variable An enumerator (member) of the `Pair` enum.
+Pair pairInput = input.enum(Pair.BTCUSD, "Pair")
+
+//@variable The exchange-symbol pair for the data request. 
+simple string symbol = str.tostring(exchangeInput) + ":" + str.tostring(pairInput)
+
+// Plot the `close` value requested from the `symbol` context.
+plot(request.security(symbol, timeframe.period, close), "Requested close", color.purple, 3)

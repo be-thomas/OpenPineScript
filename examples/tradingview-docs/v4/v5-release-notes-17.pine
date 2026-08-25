@@ -1,0 +1,6 @@
+//@version=4
+study("My Script", overlay=true)
+plotchar(open > close, char="🐻")
+
+
+.. image:: images/ReleaseNotes-Bears_in_plotchar.png

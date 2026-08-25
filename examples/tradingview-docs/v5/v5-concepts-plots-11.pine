@@ -1,0 +1,4 @@
+//@version=5
+indicator("", "", true)
+plot(close, color = color.red, offset = -5)
+plot(close, color = color.lime, offset = 5)

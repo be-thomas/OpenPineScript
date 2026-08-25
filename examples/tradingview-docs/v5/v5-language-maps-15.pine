@@ -1,0 +1,38 @@
+//@version=5
+indicator("Scope and history demo", overlay = true)
+
+//@variable The source value for EMA calculation.
+float source = input.source(close, "Source")
+
+//@variable A map containing global key-value pairs.
+globalData = map.new<int, float>()
+
+//@function Calculates a set of EMAs and updates the key-value pairs in `globalData`.
+update() =>
+    //@variable The previous map instance assigned to `globalData`.
+    map<int, float> previous = globalData[1]
+
+    // Put key-value pairs with keys 10-200 into `globalData` if `previous` is `na`.
+    if na(previous)
+        for i = 10 to 200
+            globalData.put(i, source)
+    else
+        // Iterate each `key` and `value` in the `previous` map.
+        for [key, value] in previous
+            //@variable The smoothing parameter for the `key`-length EMA.
+            float alpha = 2.0 / (key + 1.0)
+            //@variable The `key`-length EMA value.
+            float ema = (1.0 - alpha) * value + alpha * source
+            // Put the `key`-length `ema` into the `globalData` map.
+            globalData.put(key, ema)
+
+// Update the `globalData` map.
+update()
+
+//@variable The array of values from `globalData` in their insertion order.
+array<float> values = globalData.values()
+
+// Plot the max EMA, min EMA, and 50-bar EMA values.
+plot(values.max(), "Max EMA", color.green, 2)
+plot(values.min(), "Min EMA", color.red, 2)
+plot(globalData.get(50), "50-bar EMA", color.orange, 3)

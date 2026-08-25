@@ -1,0 +1,14 @@
+//@version=5
+indicator("Avoiding LTF repainting demo", overlay = true)
+
+//@variable The lower timeframe of the requested data.
+string lowerTimeframe = input.timeframe("1", "Timeframe")
+
+//@variable The first intrabar `close` requested from the `lowerTimeframe` on each bar.
+//          Only works as intended on historical bars.
+float requestedClose = request.security(syminfo.tickerid, lowerTimeframe, close, lookahead = barmerge.lookahead_on)
+
+// Plot the `requestedClose`.
+plot(requestedClose, "First intrabar close", linewidth = 3)
+// Highlight the background on realtime bars.
+bgcolor(barstate.isrealtime ? color.new(color.orange, 60) : na, title = "Realtime bar Highlight")

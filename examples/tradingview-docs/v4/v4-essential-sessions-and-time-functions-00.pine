@@ -1,0 +1,3 @@
+//@version=4
+study("Bar date/time")
+plot(time)

@@ -1,0 +1,45 @@
+//@version=5
+indicator("`for` loop with collections demo", "Table of TA Indexes", overlay = true)
+
+// Calculate the RSI and momentum of `close` values with constant lengths of 10, 20, and 50.
+float rsi10 = ta.rsi(close, 10)
+float rsi20 = ta.rsi(close, 20)
+float rsi50 = ta.rsi(close, 50)
+float mom10 = ta.mom(close, 10)
+float mom20 = ta.mom(close, 20)
+float mom50 = ta.mom(close, 50)
+ 
+if barstate.islast
+    //@variable A `table` that displays indicator values in the top-right corner of the chart. 
+    var table displayTable = table.new(
+         position.top_right, columns = 5, rows = 4, border_color = color.black, border_width = 1 
+     )
+    //@variable An array containing the "string" titles to display within the side header of each table row. 
+    array<string> sideHeaderTitles = array.from("TA Index", "RSI", "Momentum")
+    //@variable An array containing the "string" titles to representing the length of each displayed indicator. 
+    array<string> topHeaderTitles = array.from("10", "20", "50")
+    //@variable A matrix containing the values to display within the table. 
+    matrix<float> taMatrix = matrix.new<float>()
+    // Populate the `taMatrix` with indicator values. The first row contains RSI data and the second contains momentum.
+    taMatrix.add_row(0, array.from(rsi10, rsi20, rsi50, mom10, mom20, mom50))
+    taMatrix.reshape(2, 3)
+
+    // Initialize top header cells.
+    displayTable.cell(1, 0, "Bars Length", text_color = color.white, bgcolor = color.blue)
+    displayTable.merge_cells(1, 0, 3, 0)
+
+    // Initialize additional header cells within a `for` loop. 
+    for i = 0 to 2
+        displayTable.cell(0, i + 1, sideHeaderTitles.get(i), text_color = color.white, bgcolor = color.blue)
+        displayTable.cell(i + 1, 1, topHeaderTitles.get(i), text_color = color.white, bgcolor = color.purple)
+
+    // Use nested `for` loops to iterate through the row and column indices of the `taMatrix`.
+    for i = 0 to taMatrix.rows() - 1 
+        for j = 0 to taMatrix.columns() - 1
+            //@variable The value stored in the `taMatrix` at the `i` row and `j` column. 
+            float elementValue =  taMatrix.get(i, j)
+            // Initialize a cell in the `displayTable` at the `i + 2` row and `j + 1` column showing a "string" 
+            // representation of the `elementValue`.
+            displayTable.cell(
+                 column = j + 1, row = i + 2, text = str.tostring(elementValue, "#.##"), text_color = chart.fg_color
+             )

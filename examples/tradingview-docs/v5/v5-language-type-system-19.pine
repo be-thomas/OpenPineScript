@@ -1,0 +1,15 @@
+//@version=5
+indicator("plot fill demo", overlay = true)
+
+//@variable A "series float" value representing a 10-bar EMA of `close`.
+float emaFast = ta.ema(close, 10)
+//@variable A "series float" value representing a 20-bar EMA of `close`.
+float emaSlow = ta.ema(close, 20)
+
+//@variable The plot of the `emaFast` value.
+emaFastPlot = plot(emaFast, "Fast EMA", color.orange, 3)
+//@variable The plot of the `emaSlow` value.
+emaSlowPlot = plot(emaSlow, "Slow EMA", color.gray, 3)
+
+// Fill the space between the `emaFastPlot` and `emaSlowPlot`.
+fill(emaFastPlot, emaSlowPlot, color.new(color.purple, 50), "EMA Fill")

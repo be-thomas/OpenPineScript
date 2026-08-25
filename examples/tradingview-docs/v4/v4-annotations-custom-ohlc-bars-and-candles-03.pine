@@ -1,0 +1,10 @@
+//@version=4
+study("Example 4")
+len = input(9)
+smooth(x) =>
+    sma(x, len)
+o = smooth(open)
+h = smooth(high)
+l = smooth(low)
+c = smooth(close)
+plotcandle(o, h, l, c)

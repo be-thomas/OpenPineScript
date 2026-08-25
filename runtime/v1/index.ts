@@ -7,6 +7,7 @@
 import { createStdlib } from "./stdlib";
 import { Context } from "./context";
 import { PREFIX } from "../../utils/v2/common";
+import { UNIMPLEMENTED_BUILTINS } from "./stdlib/renames";
 export { Context };
 
 /**
@@ -90,7 +91,33 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         sandbox[`${PREFIX}n`] = barCounter;
         sandbox[`${PREFIX}bar_index`] = barCounter;
 
-        // POISON PILLS: identifiers that exist in the engine but are not spellable
+        // POISON PILLS, part 1: Pine names this engine knowingly does not
+        // implement. The volume family — accdist, obv, pvt and the rest — has
+        // published variants that disagree on the seed value, so no
+        // implementation is offered rather than a plausible wrong one.
+        //
+        // They are BOUND rather than left absent so that the emitter can tell
+        // "real Pine, not implemented here" from "not a Pine name at all" and
+        // report each correctly. Throwing on READ rather than at compile time
+        // is what keeps a script runnable when it only mentions one in a branch
+        // the user's inputs never select — which is exactly what
+        // conformance/corpus/v3/cci_commodity_channel_index.pine does.
+        for (const name of UNIMPLEMENTED_BUILTINS) {
+            Object.defineProperty(sandbox, `${PREFIX}${name}`, {
+                get() {
+                    throw new Error(
+                        `'${name}' is a Pine built-in that OpenPineScript does not ` +
+                        `implement. Its published definitions disagree on the seed ` +
+                        `value, and a wrong seed produces a series that is the right ` +
+                        `shape and the wrong number forever. See ` +
+                        `runtime/v1/stdlib/renames.ts.`,
+                    );
+                },
+                configurable: true, enumerable: false,
+            });
+        }
+
+        // POISON PILLS, part 2: identifiers that exist in the engine but are not spellable
         // at this language version — v1–v3 mandate 'n' and ban 'bar_index'; v4+
         // invert that. As own getters they resolve through `with(sandbox)` and are
         // hit before the outer scope, so the throw happens on read.

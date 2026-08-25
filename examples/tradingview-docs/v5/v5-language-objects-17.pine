@@ -1,0 +1,21 @@
+//@version=5
+indicator("Shallow Copy")
+
+type InfoLabel
+    string info
+    label  lbl
+
+method set(InfoLabel this, int x = na, int y = na, string info = na) =>
+    if not na(x)
+        this.lbl.set_x(x)
+    if not na(y)
+        this.lbl.set_y(y)
+    if not na(info)
+        this.info := info
+        this.lbl.set_text(this.info)
+
+var parent  = InfoLabel.new("", label.new(0, 0))
+var shallow = parent.copy()
+
+parent.set(bar_index, 0, "Parent")
+shallow.set(bar_index, 1, "Shallow Copy")

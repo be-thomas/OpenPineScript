@@ -1,0 +1,6 @@
+//@version=4
+study("Example 6", overlay=true)
+t = tickerid(syminfo.prefix, syminfo.ticker, session.regular)
+ha_t = heikinashi(t)
+ha_low = security(ha_t, timeframe.period, low, gaps=barmerge.gaps_on)
+plot(ha_low, style=plot.style_linebr)

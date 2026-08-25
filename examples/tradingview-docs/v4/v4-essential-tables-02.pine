@@ -1,0 +1,13 @@
+//@version=4
+study("Chart background", "", true)
+i_c_bull = input(color.new(color.green, 95), "Bull", inline = "1")
+i_c_bear = input(color.new(color.red, 95), "Bear", inline = "1")
+// ————— Function colors chart bg on RSI bull/bear state.
+f_colorChartBg(_c_bull, _c_bear) =>
+    var table _chartBg = table.new(position.middle_center, 1, 1)
+    float _r = rsi(close, 20)
+    color _c_bg = _r > 50 ? _c_bull : _r < 50 ? _c_bear : na
+    if barstate.islast
+        table.cell(_chartBg, 0, 0, width = 100, height = 100, bgcolor = _c_bg)
+
+f_colorChartBg(i_c_bull, i_c_bear)

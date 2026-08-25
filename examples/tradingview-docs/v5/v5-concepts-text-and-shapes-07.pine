@@ -1,0 +1,6 @@
+//@version=5
+indicator("Chaikin Oscillator Arrows", overlay = true)
+fastLengthInput = input.int(3,  minval = 1)
+slowLengthInput = input.int(10, minval = 1)
+osc = ta.ema(ta.accdist, fastLengthInput) - ta.ema(ta.accdist, slowLengthInput)
+plotarrow(osc)

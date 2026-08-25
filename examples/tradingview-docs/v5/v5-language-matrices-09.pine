@@ -1,0 +1,46 @@
+//@version=5
+indicator("Rows and columns demo")
+
+//@function Displays the rows of a matrix in a label with a note.
+//@param    this The matrix to display.
+//@param    barIndex The `bar_index` to display the label at.
+//@param    bgColor The background color of the label.
+//@param    textColor The color of the label's text.
+//@param    note The text to display above the rows.
+method debugLabel(
+     matrix<float> this, int barIndex = bar_index, color bgColor = color.blue,
+     color textColor = color.white, string note = ""
+ ) =>
+    labelText = note + "\n" + str.tostring(this)
+    if barstate.ishistory
+        label.new(
+             barIndex, 0, labelText, color = bgColor, style = label.style_label_center,
+             textcolor = textColor, size = size.huge
+         )
+
+//Create an empty matrix.
+var m = matrix.new<float>()
+
+if bar_index == last_bar_index - 1
+    debugLabel(m, bar_index - 30, note = "Empty matrix")
+
+    // Insert an array at row 0. `m` will now have 1 row and 3 columns.
+    m.add_row(0, array.from(5, 6, 7))
+    debugLabel(m, bar_index - 20, note = "New row at\nindex 0")
+
+    // Insert an array at row 1. `m` will now have 2 rows and 3 columns.
+    m.add_row(1, array.from(9, 10, 11))
+    debugLabel(m, bar_index - 10, note = "New row at\nindex 1")
+
+    // Insert another array at row 0. `m` will now have 3 rows and 3 columns.
+    // The values previously on row 0 will now be on row 1, and the values from row 1 will be on row 2.
+    m.add_row(0, array.from(1, 2, 3))
+    debugLabel(m, bar_index, note = "New row at\nindex 0")
+
+    // Insert an array at column 3. `m` will now have 3 rows and 4 columns.
+    m.add_col(3, array.from(4, 8, 12))
+    debugLabel(m, bar_index + 10, note = "New column at\nindex 3")
+
+    // Insert an array at row 3. `m` will now have 4 rows and 4 columns.
+    m.add_row(3, array.from(13, 14, 15, 16))
+    debugLabel(m, bar_index + 20, note = "New row at\nindex 3")

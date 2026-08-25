@@ -1,0 +1,4 @@
+//@version=5
+indicator("Example 2")
+paletteColor = close >= open ? color.lime : color.red
+plotbar(open, high, low, close, color = paletteColor)

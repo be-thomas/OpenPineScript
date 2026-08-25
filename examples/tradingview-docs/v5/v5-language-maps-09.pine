@@ -1,0 +1,56 @@
+//@version=5
+indicator("Combining maps demo", "Hex map")
+
+//@variable An array of string hex digits.
+var array<string> hexDigits = str.split("0123456789ABCDEF", "")
+
+//@function Returns a hexadecimal string for the specified `value`.
+hex(int value) =>
+    //@variable A string representing the hex form of the `value`.
+    string result = ""
+    //@variable A temporary value for digit calculation.
+    int tempValue = value  
+    while tempValue > 0
+        //@variable The next integer digit.
+        int digit = tempValue % 16
+        // Add the hex form of the `digit` to the `result`.
+        result := hexDigits.get(digit) + result
+        // Divide the `tempValue` by the base.
+        tempValue := int(tempValue / 16)
+    result
+
+//@function Returns a map holding the `numbers` as keys and their `hex` strings as values.  
+hexMap(array<int> numbers) =>
+    //@variable A map associating `int` keys with `string` values.
+    result = map.new<int, string>()
+    for number in numbers
+        // Put a pair containing the `number` and its `hex()` representation into the `result`.
+        result.put(number, hex(number))
+    result
+
+//@function Returns a label to display the keys and values of a hex map.
+debugLabel(
+     map<int, string> this, int barIndex = bar_index, color bgColor = color.blue, 
+     string style = label.style_label_center, string note = ""
+ ) =>
+    string repr = str.format(
+         "{0}\nDecimal: {1}\nHex: {2}", 
+         note, str.tostring(this.keys()), str.tostring(this.values())
+     )
+    label.new(
+         barIndex, 0, repr, color = bgColor, style = style,
+         textcolor = color.white, size = size.huge
+     )
+
+if bar_index == last_bar_index - 1
+    //@variable A map with decimal `int` keys and hexadecimal `string` values.
+    map<int, string> mapA = hexMap(array.from(101, 202, 303, 404))
+    debugLabel(mapA, bar_index, color.navy, label.style_label_down, "A")
+
+    //@variable A map containing key-value pairs to add to `mapA`.
+    map<int, string> mapB = hexMap(array.from(303, 404, 505, 606, 707, 808))
+    debugLabel(mapB, bar_index, color.maroon, label.style_label_up, "B")
+
+    // Put all pairs from `mapB` into `mapA`.
+    mapA.put_all(mapB)
+    debugLabel(mapA, bar_index + 10, color.purple, note = "Merge B into A")

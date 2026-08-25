@@ -1,0 +1,3 @@
+//@version=5
+indicator("MA", "", true)
+plot(ta.sma(close, 20))

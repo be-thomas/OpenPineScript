@@ -1,0 +1,15 @@
+//@version=5
+indicator("Scopes demo")
+
+var x = 0
+
+if close > 0
+    x += 0
+if close > 1
+    x += 1
+// ... Repeat this `if close > n` pattern until `n = 299`.
+if close > 299
+    x += 299
+
+plot(x)
+plot(request.security(syminfo.tickerid, "1D", x)) // Causes compilation error since the scope count is now 602.

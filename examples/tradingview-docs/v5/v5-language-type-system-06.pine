@@ -1,0 +1,15 @@
+//@version=5
+indicator("series demo", overlay = true)
+
+//@variable The source value to calculate on. Qualified as "series float".
+series float sourceInput = input.source(close, "Source")
+//@variable The number of bars in the calculation. Qualified as "input int".
+lengthInput = input.int(20, "Length")
+
+//@variable The highest `sourceInput` value over `lengthInput` bars. Qualified as "series float".
+series float highest = ta.highest(sourceInput, lengthInput)
+//@variable The lowest `sourceInput` value over `lengthInput` bars. Qualified as "series float".
+lowest = ta.lowest(sourceInput, lengthInput)
+
+plot(highest, "Highest source", color.green)
+plot(lowest, "Lowest source", color.red)

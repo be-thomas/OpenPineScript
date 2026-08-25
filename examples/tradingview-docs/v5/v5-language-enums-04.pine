@@ -1,0 +1,24 @@
+//@version=5
+indicator("Using enums demo")
+
+//@enum An enumeration of oscillator choices.
+enum OscType
+    rsi = "Relative Strength Index"
+    mfi = "Money Flow Index"
+    cci = "Commodity Channel Index"
+
+//@variable An enumerator (member) of the `OscType` enum.
+OscType oscInput = input.enum(OscType.rsi, "Oscillator type")
+
+//@function         Calculates one of three oscillators based on a specified `selection`.
+//@param source     The series of values to process.
+//@param length     The number of bars in the calculation.
+//@param selection  Determines which oscillator to calculate.
+calcOscillator(float source, simple int length, OscType selection) =>
+    result = switch selection
+        OscType.rsi => ta.rsi(source, length)
+        OscType.mfi => ta.mfi(source, length)
+        OscType.cci => ta.cci(source, length)
+
+// Plot the value of a `calcOscillator()` call with `oscInput` as the `selection`.
+plot(calcOscillator(close, 20, oscInput))

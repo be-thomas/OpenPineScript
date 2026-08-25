@@ -153,6 +153,20 @@ export const V4_ONLY_NAMES: readonly string[] = [
     "bb", "wpr", "mfi",
     "bbw", "kc", "kcw", "hma", "cmo", "dmi", "supertrend",
     "range", "median", "mode",
+
+    // The rest of the March-2020 and 2021 batches, from the v4 release notes:
+    //
+    //   "todegrees(radians) … toradians(degrees) … random(min, max, seed) -
+    //    returns a pseudo-random value."
+    //   "New function was added: round_to_mintick(x)"
+    //   "New variable was added: time_tradingday" (February 2021)
+    //   "New argument for time and time_close functions was added: timezone"
+    //    (July 2021 — so time_close predates it, and it is absent from the v3
+    //    documentation, which places it in v4)
+    //   "max_bars_back function to control series variables internal history
+    //    buffer sizes" and "functions for explicit type casting" (June 2019)
+    "random", "todegrees", "toradians", "round_to_mintick",
+    "time_close", "time_tradingday", "max_bars_back", "int",
 ];
 
 export const V4_RENAMES: readonly RenameSpec[] = [
@@ -186,3 +200,24 @@ export const V4_REMOVED: readonly string[] = (() => {
   removed.delete("line");
   return [...removed];
 })();
+
+/**
+ * Pine names this engine knows about and deliberately does NOT implement.
+ *
+ * The volume family has published variants that disagree on the SEED value,
+ * and a seed guessed wrong produces a series that is the right shape and the
+ * wrong number forever — so no implementation is offered. See the note in
+ * runtime/v1/stdlib/renames.ts.
+ *
+ * They are listed here because "absent from the registry" and "not a Pine name
+ * at all" must not produce the same diagnostic. `accdist` is real Pine, so
+ * `Undeclared identifier` would be a lie; it also cannot be allowed to compile
+ * into a silent `undefined`. runtime/v1/index.ts binds each one as a poison pill that
+ * throws only when READ, which is what lets
+ * conformance/corpus/v3/cci_commodity_channel_index.pine keep running: it
+ * mentions `accdist` in a branch selected by an input, and every other branch
+ * still works.
+ */
+export const UNIMPLEMENTED_BUILTINS: ReadonlySet<string> = new Set([
+  "accdist", "iii", "nvi", "obv", "pvi", "pvt", "wad", "wvad",
+]);

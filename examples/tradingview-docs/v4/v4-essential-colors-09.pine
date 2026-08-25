@@ -1,0 +1,9 @@
+//@version=4
+study("Calculated colors", "", true)
+float ma = sma(close, 20)
+float maHeight = percentrank(ma, 100)
+float transparency = min(80, 100 - maHeight)
+// This plot uses a calculated color.
+plot(ma, "MA1", color.rgb(156, 39, 176, transparency), 2)
+// This plot does not use a calculated color.
+plot(close, "Close", color.blue)

@@ -1,0 +1,31 @@
+//@version=5
+indicator("Debugging functions demo", "Custom MA", true)
+
+//@variable The number of bars in the `customMA()` calculation.
+int lengthInput = input.int(50, "Length", 2)
+
+//@function      Calculates a moving average that only responds to values outside the first and third quartiles.
+//@param source  The series of values to process.
+//@param length  The number of bars in the calculation.
+//@returns       The moving average value.
+customMA(float source, int length) =>
+    //@variable The custom moving average.
+    var float result = na
+    // Calculate the 25th and 75th `source` percentiles.
+    float q1 = ta.percentile_linear_interpolation(source, length, 25)
+    float q3 = ta.percentile_linear_interpolation(source, length, 75)
+    // Calculate the range values.
+    float outerRange = math.max(source - q3, q1 - source, 0.0)
+    float totalRange = ta.range(source, length)
+    //@variable Half the ratio of the `outerRange` to the `totalRange`.
+    float alpha = 0.5 * outerRange / totalRange
+    // Mix the `source` with the `result` based on the `alpha` value.
+    result := (1.0 - alpha) * nz(result, source) + alpha * source
+    // Return the `result`.
+    result
+
+//@variable The `customMA()` result over `lengthInput` bars.
+float maValue = customMA(close, lengthInput)
+
+// Plot the `maValue`.
+plot(maValue, "Custom MA", color.blue, 3)

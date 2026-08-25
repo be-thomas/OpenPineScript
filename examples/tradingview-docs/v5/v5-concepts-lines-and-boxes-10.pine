@@ -1,0 +1,30 @@
+//@version=5
+indicator("Cloning boxes demo", overlay = true, max_boxes_count = 500)
+
+//@variable The number of bars between each new mainLine assignment.
+int length = input.int(20, "Length", 2)
+
+//@variable The `chart.point` for the top-left of the `originalBox`. Contains `time` and `index` information.
+topLeft = chart.point.now(high)
+//@variable The `chart.point` for the bottom-right of the `originalBox`. Does not contain `time` information.
+bottomRight = chart.point.from_index(bar_index + 1, low)
+
+//@variable A new box with `topLeft` and `bottomRight` corners on every `length` bars.
+var box originalBox = na
+
+//@variable Is teal when the bar is rising, maroon when it's falling.
+color originalColor = close > open ? color.teal : color.maroon
+
+if bar_index % length == 0
+    // Assign a new box using the `topLeft` and `bottomRight` info to the `originalBox`.
+    // This box uses the `index` fields from the points as x-coordinates.
+    originalBox := box.new(topLeft, bottomRight, originalColor, 2, bgcolor = color.new(originalColor, 60))
+else
+    //@variable A clone of the `originalBox`.
+    box copiedBox = box.copy(originalBox)
+    // Modify the `copiedBox`. These changes do not affect the `originalBox`.
+    box.set_top(copiedBox, high)
+    box.set_bottom_right_point(copiedBox, bottomRight)
+    box.set_border_color(copiedBox, color.gray)
+    box.set_border_width(copiedBox, 1)
+    box.set_bgcolor(copiedBox, na)

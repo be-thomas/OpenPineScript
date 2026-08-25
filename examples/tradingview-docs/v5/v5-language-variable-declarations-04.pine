@@ -1,0 +1,17 @@
+//@version=5
+indicator("", "", true)
+sensitivityInput = input.int(2, "Sensitivity", minval = 1, tooltip = "Higher values make color changes less sensitive.")
+ma = ta.sma(close, 20)
+maUp = ta.rising(ma, sensitivityInput)
+maDn = ta.falling(ma, sensitivityInput)
+
+// On first bar only, initialize color to gray
+var maColor = color.gray
+if maUp
+    // MA has risen for two bars in a row; make it lime.
+    maColor := color.lime
+else if maDn
+    // MA has fallen for two bars in a row; make it fuchsia.
+    maColor := color.fuchsia
+
+plot(ma, "MA", maColor, 2)

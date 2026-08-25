@@ -1,0 +1,18 @@
+//@version=5
+
+// The following global variables are all of the "const string" qualified type:
+
+//@variable The title of the indicator.
+INDICATOR_TITLE = "const demo"
+//@variable The title of the first plot.
+var PLOT1_TITLE = "High"
+//@variable The title of the second plot.
+const string PLOT2_TITLE = "Low"
+//@variable The title of the third plot.
+PLOT3_TITLE = "Midpoint between " + PLOT1_TITLE + " and " + PLOT2_TITLE
+
+indicator(INDICATOR_TITLE, overlay = true)
+
+plot(high, PLOT1_TITLE)
+plot(low, PLOT2_TITLE)
+plot(hl2, PLOT3_TITLE)

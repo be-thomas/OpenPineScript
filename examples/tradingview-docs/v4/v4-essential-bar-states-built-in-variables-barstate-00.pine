@@ -1,0 +1,16 @@
+//@version=4
+study("Bar States", overlay = true)
+first = barstate.isfirst
+last = barstate.islast
+
+hist = barstate.ishistory
+rt = barstate.isrealtime
+
+new = barstate.isnew
+conf = barstate.isconfirmed
+
+t = new ? "new" : conf ? "conf" : "intra-bar"
+t := t + (hist ? "\nhist" : rt ? "\nrt" : "")
+t := t + (first ? "\nfirst" : last ? "\nlast" : "")
+label.new(bar_index, na, yloc=yloc.abovebar, text=t,
+            color=hist ? color.green : color.red)

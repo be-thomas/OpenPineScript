@@ -1,0 +1,23 @@
+//@version=5
+indicator("Auto-casting demo", overlay = true)
+
+//@variable A random rounded value between -1 and 1.
+float randomValue = math.round(math.random(-1, 1))
+//@variable The color of the chart background.
+color bgColor = na
+
+// This raises a compiler warning since `randomValue` is a "float", but `if` expects a "bool".
+if randomValue
+    bgColor := color.new(color.blue, 60)
+// This does not raise a warning, as the `bool()` function explicitly casts the `randomValue` to "bool".
+if bool(randomValue)
+    bgColor := color.new(color.blue, 60)
+
+// Display unicode characters on the chart based on the `randomValue`.
+// Whenever `math.random()` returns 0, no character will appear on the chart because 0 converts to `false`.
+plotchar(randomValue)
+// We recommend explicitly casting the number with the `bool()` function to make the type transformation more obvious.
+plotchar(bool(randomValue))
+
+// Highlight the background with the `bgColor`.
+bgcolor(bgColor)

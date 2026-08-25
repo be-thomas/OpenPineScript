@@ -1,0 +1,26 @@
+//@version=5
+indicator("Looping through map demo")
+
+if barstate.islastconfirmedhistory
+    //@variable A map of "string" keys and "float" values to render within a `label`.
+    map<string, float> simpleMap = map.new<string, float>()
+
+    //@variable An array of "string" values representing the keys to put into the map. 
+    array<string> newKeys = array.from("A", "B", "C", "D", "E")
+    // Put key-value pairs into the `simpleMap`. 
+    for key in newKeys
+        simpleMap.put(key, math.random(1, 20))
+
+    //@variable A "string" representation of the `simpleMap` contents. Modified within a loop. 
+    string displayText = "simpleMap content: \n "
+
+    // Loop through each key-value pair within the `simpleMap`. 
+    for [key, value] in simpleMap
+        // Add a "string" representation of the pair to the `displayText`.
+        displayText += key + ": " + str.tostring(value, "#.##") + "\n "
+    
+    // Draw a `label` showing the `displayText` on the current bar. 
+    label.new( 
+         x = bar_index, y = 0, text = displayText, color = color.green, textcolor = color.white, 
+         size = size.huge, textalign = text.align_left, style = label.style_label_center
+     )

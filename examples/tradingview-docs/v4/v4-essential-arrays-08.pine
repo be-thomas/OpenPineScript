@@ -1,0 +1,16 @@
+//@version=4
+study("Bands", "", true)
+i_factor = 1 + (input(-2., "Step %") / 100)
+// Use the lowest average OHLC in last 50 bars from 10 bars back as the our base level.
+level = array.new_float(1, lowest(ohlc4, 50)[10])
+
+f_nextLevel(_val) =>
+    _newLevel = array.get(level, 0) * _val
+    // Write new level to the global array so it can be used as the base in the next call to this function.
+    array.set(level, 0, _newLevel)
+    _newLevel
+
+plot(f_nextLevel(1))
+plot(f_nextLevel(i_factor))
+plot(f_nextLevel(i_factor))
+plot(f_nextLevel(i_factor))

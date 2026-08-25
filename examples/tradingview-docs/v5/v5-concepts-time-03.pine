@@ -1,0 +1,24 @@
+//@version=5
+indicator("Time zone strings in UNIX timestamp functions demo", overlay = true)
+
+//@variable The `timezone` argument of the `timestamp()` call, which sets the time zone of all date and time parameters.
+string timezoneInput = input.string("Etc/UTC", "Time zone")
+
+//@variable The UNIX timestamp corresponding to a specific calendar date and time.
+//          The specified `year`, `month`, `day`, `hour`, `minute`, and `second` represent calendar values in the 
+//          `timezoneInput` time zone. 
+//          Different `timezone` arguments produce different UNIX timestamps because an identical date in another 
+//          time zone does NOT represent the same absolute point in time.
+int unixTimestamp = timestamp(
+     timezone = timezoneInput, year = 2024, month = 10, day = 31, hour = 0, minute = 0, second = 0
+ )
+
+//@variable The `close` value when the bar's opening time crosses the `unixTimestamp`.
+float labelPrice = ta.valuewhen(ta.cross(time, unixTimestamp), close, 0)
+
+// On the last historical bar, draw a label showing the `unixTimestamp` value at the corresponding bar location.
+if barstate.islastconfirmedhistory
+    label.new(
+         unixTimestamp, nz(labelPrice, close), "UNIX timestamp: " + str.tostring(unixTimestamp), 
+         xloc.bar_time, yloc.price, chart.fg_color, label.style_label_down, chart.bg_color, size.large
+     )

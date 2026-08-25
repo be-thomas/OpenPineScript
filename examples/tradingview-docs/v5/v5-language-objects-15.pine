@@ -1,0 +1,12 @@
+//@version=5
+indicator("")
+type pivotPoint
+    int x
+    float y
+pivot1 = pivotPoint.new()
+pivot1.x := 1000
+pivot2 = pivot1
+pivot2.x := 2000
+// Both plot the value 2000.
+plot(pivot1.x)
+plot(pivot2.x)

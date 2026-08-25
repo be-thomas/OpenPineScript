@@ -1,0 +1,76 @@
+//@version=5
+indicator("Calculating time span demo")
+
+// Assign the number of milliseconds in weekly and smaller units to "const" variables for convenience.
+const int ONE_WEEK   = 604800000
+const int ONE_DAY    =  86400000 
+const int ONE_HOUR   =   3600000
+const int ONE_MINUTE =     60000
+const int ONE_SECOND =      1000
+
+//@variable A UNIX timestamp calculated from the user-input start date and time. 
+int startTimeInput = input.time(timestamp("1 May 2022 00:00 -0400"), "Start date and time", group = "Time between")
+//@variable A UNIX timestamp calculated from the user-input end date and time. 
+int endTimeInput =   input.time(timestamp("7 Sep 2024 20:37 -0400"), "End date and time", group = "Time between")
+// Create "bool" inputs to toggle weeks, days, hours, minutes, seconds, and milliseconds in the calculation.
+bool weeksInput        = input.bool(true, "Weeks",        group = "Time units", inline = "A")
+bool daysInput         = input.bool(true, "Days",         group = "Time units", inline = "A")
+bool hoursInput        = input.bool(true, "Hours",        group = "Time units", inline = "B")
+bool minutesInput      = input.bool(true, "Minutes",      group = "Time units", inline = "B")
+bool secondsInput      = input.bool(true, "Seconds",      group = "Time units", inline = "B")
+bool millisecondsInput = input.bool(true, "Milliseconds", group = "Time units", inline = "B")
+
+//@function Calculates the difference between two UNIX timestamps as the number of complete time units in 
+//          descending order of size, formatting the results into a "string". The "int" parameters accept timestamps, 
+//          and the "bool" parameters determine which units the function uses in its calculations. 
+formatTimeSpan(
+      int startTimestamp, int endTimestamp, bool calculateWeeks, bool calculateDays, bool calculateHours, 
+      bool calculateMinutes, bool calculateSeconds, bool calculateMilliseconds
+ ) =>
+    //@variable The milliseconds between the `startTimestamp` and `endTimestamp`.
+    int timeDifference = math.abs(endTimestamp - startTimestamp) 
+    //@variable A "string" representation of the interval in mixed time units. 
+    string formattedString = na
+    // Calculate complete units within the interval for each toggled unit, reducing the `timeDifference` by those sizes.
+    if calculateWeeks
+        int totalWeeks = math.floor(timeDifference / ONE_WEEK)
+        timeDifference %= ONE_WEEK
+        formattedString += str.tostring(totalWeeks) + (totalWeeks == 1 ? " week " : " weeks ") 
+    if calculateDays
+        int totalDays = math.floor(timeDifference / ONE_DAY)
+        timeDifference %= ONE_DAY
+        formattedString += str.tostring(totalDays) + (totalDays == 1 ? " day " : " days ")
+    if calculateHours
+        int totalHours = math.floor(timeDifference / ONE_HOUR)
+        timeDifference %= ONE_HOUR
+        formattedString += str.tostring(totalHours) + (totalHours == 1 ? " hour " : " hours ")
+    if calculateMinutes
+        int totalMinutes = math.floor(timeDifference / ONE_MINUTE)
+        timeDifference %= ONE_MINUTE
+        formattedString += str.tostring(totalMinutes) + (totalMinutes == 1 ? " minute " : " minutes ")
+    if calculateSeconds
+        int totalSeconds = math.floor(timeDifference / ONE_SECOND)
+        timeDifference %= ONE_SECOND
+        formattedString += str.tostring(totalSeconds) + (totalSeconds == 1 ? " second " : " seconds ")  
+    if calculateMilliseconds
+        // `timeDifference` is in milliseconds already, so add it to the `formattedString` directly.
+        formattedString += str.tostring(timeDifference) + (timeDifference == 1 ? " millisecond" : " milliseconds")
+    // Return the `formattedString`.
+    formattedString
+
+if barstate.islastconfirmedhistory
+    //@variable A table that that displays formatted start and end times and their custom-formatted time difference. 
+    var table displayTable = table.new(position.middle_center, 1, 2, color.aqua)
+    //@variable A "string" containing formatted `startTimeInput` and `endTimeInput` values. 
+    string timeText = "Start date and time: "    + str.format_time(startTimeInput, "dd/MM/yy HH:mm:ss (z)")
+                     + "\n  End date and time: " + str.format_time(endTimeInput, "dd/MM/yy HH:mm:ss (z)")
+    //@variable A "string" representing the span between `startTimeInput` and `endTimeInput` in mixed time units.
+    string userTimeSpan = formatTimeSpan(
+         startTimeInput, endTimeInput, weeksInput, daysInput, hoursInput, minutesInput, secondsInput, millisecondsInput
+      )
+    // Display the `timeText` in the table.
+    displayTable.cell(0, 0, timeText, 
+         text_color = color.white, text_size = size.large, text_halign = text.align_left)
+    // Display the `userTimeSpan` in the table.
+    displayTable.cell(0, 1, "Time span: " + userTimeSpan, 
+          text_color = color.white, text_size = size.large, text_halign = text.align_left, bgcolor = color.navy)

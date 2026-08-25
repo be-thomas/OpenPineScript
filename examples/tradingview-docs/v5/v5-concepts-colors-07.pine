@@ -1,0 +1,63 @@
+//@version=5
+indicator("CCI DC", precision = 6)
+color GOLD_COLOR   = #CCCC00ff
+color VIOLET_COLOR = #AA00FFff
+int lengthInput = input.int(20, "Length", minval = 5)
+color bullColorInput = input.color(GOLD_COLOR,   "Bull")
+color bearColorInput = input.color(VIOLET_COLOR, "Bear")
+
+// ————— Function clamps `val` between `min` and `max`.
+clamp(val, min, max) =>
+    math.max(min, math.min(max, val))
+
+// ————— Volatility expressed as 0-100 value.
+float v = ta.atr(lengthInput / 5) / ta.atr(lengthInput * 5)
+float vPct = ta.percentrank(v, lengthInput * 5)
+
+// ————— Calculate dynamic lookback for DC. It increases/decreases on low/high volatility.
+bool highVolatility = vPct > 50
+var int lookBackMin = lengthInput * 2
+var int lookBackMax = lengthInput * 10
+var float lookBack = math.avg(lookBackMin, lookBackMax)
+lookBack += highVolatility ? -2 : 2
+lookBack := clamp(lookBack, lookBackMin, lookBackMax)
+
+// ————— Dynamic lookback length Donchian channel of signal.
+float signal = ta.cci(close, lengthInput)
+// `lookBack` is a float; need to cast it to int to be used a length.
+float hiTop  = ta.highest(signal, int(lookBack))
+float loBot  = ta.lowest( signal, int(lookBack))
+// Get margin of 25% of the DC height to build high and low bands.
+float margin = (hiTop - loBot) / 4
+float hiBot  = hiTop - margin
+float loTop  = loBot + margin
+// Center of DC.
+float center = math.avg(hiTop, loBot)
+
+// ————— Create colors.
+color signalColor = color.from_gradient(signal, -200, 200, bearColorInput, bullColorInput)
+// Bands: Calculate transparencies so the longer since the hi/lo has changed, 
+//        the darker the color becomes. Cap highest transparency to 90.
+float hiTransp = clamp(100 - (100 * math.max(1, nz(ta.barssince(ta.change(hiTop)) + 1)) / 255), 60, 90)
+float loTransp = clamp(100 - (100 * math.max(1, nz(ta.barssince(ta.change(loBot)) + 1)) / 255), 60, 90)
+color hiColor = color.new(bullColorInput, hiTransp)
+color loColor = color.new(bearColorInput, loTransp)
+// Background: Rescale the 0-100 range of `vPct` to 0-25 to create 75-100 transparencies.
+color bgColor = color.new(color.gray, 100 - (vPct / 4))
+
+// ————— Plots
+// Invisible lines for band fills.
+hiTopPlotID = plot(hiTop, color = na)
+hiBotPlotID = plot(hiBot, color = na)
+loTopPlotID = plot(loTop, color = na)
+loBotPlotID = plot(loBot, color = na)
+// Plot signal and centerline.
+p_signal = plot(signal, "CCI", signalColor, 2)
+plot(center, "Centerline", color.silver, 1)
+
+// Fill the bands.
+fill(hiTopPlotID, hiBotPlotID, hiColor)
+fill(loTopPlotID, loBotPlotID, loColor)
+
+// ————— Background.
+bgcolor(bgColor)

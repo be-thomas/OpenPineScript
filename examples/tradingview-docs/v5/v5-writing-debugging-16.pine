@@ -1,0 +1,29 @@
+//@version=5
+indicator("Conditional drawings demo", "Volume-based filter", true)
+
+//@variable The number of bars in the volume average.
+int lengthInput = input.int(20, "Volume average length", 1)
+
+//@variable The average `volume` over `lengthInput` bars.
+float avgVolume = ta.sma(volume, lengthInput)
+
+//@variable A custom price filter based on volume activity.
+float filter = close
+//@variable The smoothing parameter of the filter calculation. Its value depends on multiple volume conditions.
+float alpha = na
+
+// Set the `alpha` to 1 if `volume` exceeds its `lengthInput`-bar moving average.
+if volume > avgVolume
+    alpha := 1.0
+// Set the `alpha` to 0.5 if `volume` exceeds its previous value.
+else if volume > volume[1]
+    alpha := 0.5
+// Set the `alpha` to 0.01 otherwise.
+else
+    alpha := 0.01
+
+// Calculate the new `filter` value.
+filter := (1.0 - alpha) * nz(filter[1], filter) + alpha * close
+
+// Plot the `filter`.
+plot(filter, "Filter", linewidth = 3)

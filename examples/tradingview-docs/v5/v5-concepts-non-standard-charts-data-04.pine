@@ -1,0 +1,5 @@
+//@version=5
+indicator("", "", true)
+lineBreakTicker = ticker.linebreak(syminfo.tickerid, 3)
+lineBreakClose = request.security(lineBreakTicker, timeframe.period, close)
+plot(lineBreakClose)

@@ -1,0 +1,21 @@
+//@version=5
+indicator("Invalid realtime request demo", dynamic_requests = true)
+ 
+//@variable A "series" that cycles through four different symbol strings. Its value changes every five bars.  
+string symbolSeries = switch int(bar_index / 5) % 4
+    1 => "NASDAQ:MSFT"
+    2 => "NASDAQ:AMD"
+    3 => "NASDAQ:INTC"
+    =>   "AMEX:SPY"
+
+// Request the `close` of the `symbolSeries` from the chart's timeframe on historical bars and the "240" (4H) timeframe 
+// on realtime bars. Causes a runtime error on the first realtime tick because the script did not previously access 
+// data from the "240" timeframe on any historical bars. 
+float requestedClose = request.security(symbolSeries, barstate.isrealtime ? "240" : timeframe.period, close)
+
+// Plot the `requestedClose`.
+plot(requestedClose, "Requested close", color.purple, 3)
+
+// Draw a label displaying the requested symbol each time the `symbolSeries` changes.
+if symbolSeries != symbolSeries[1]
+    label.new(bar_index, requestedClose, symbolSeries, textcolor = color.white)

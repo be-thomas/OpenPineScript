@@ -1,0 +1,21 @@
+//@version=5
+indicator("Pivot labels", overlay = true)
+int legsInput = input(10)
+
+// Define the `pivotPoint` UDT.
+type pivotPoint
+    int x
+    float y
+    string xloc = xloc.bar_time
+
+// Detect high pivots.
+pivotHighPrice = ta.pivothigh(legsInput, legsInput)
+if not na(pivotHighPrice)
+    // A new high pivot was found; display a label where it occurred `legsInput` bars back.
+    foundPoint = pivotPoint.new(time[legsInput], pivotHighPrice)
+    label.new(
+      foundPoint.x,
+      foundPoint.y,
+      str.tostring(foundPoint.y, format.mintick),
+      foundPoint.xloc,
+      textcolor = color.white)

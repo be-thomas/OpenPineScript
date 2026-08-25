@@ -1,0 +1,15 @@
+//@version=4
+study("ATR", "", true)
+i_atrP = input(14,  "ATR period", minval = 1, tooltip = "Using a period of 1 yields True Range.")
+
+// ————— Produces a string format usable with `tostring()` to restrict precision to ticks.
+f_tickFormat() =>
+    _s = tostring(syminfo.mintick)
+    _s := str.replace_all(_s, "25", "00")
+    _s := str.replace_all(_s, "5",  "0")
+    _s := str.replace_all(_s, "1",  "0")
+
+var table atrDisplay = table.new(position.top_right, 1, 1, bgcolor = color.gray, frame_width = 2, frame_color = color.black)
+myAtr = atr(i_atrP)
+if barstate.islast
+    table.cell(atrDisplay, 0, 0, tostring(myAtr, f_tickFormat()), text_color = color.white)

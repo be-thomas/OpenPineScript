@@ -1,0 +1,8 @@
+//@version=2
+study("My Script")
+s = close >= open
+s1 = close[1] >= open[1]
+s2 = close[2] >= open[2]
+sum = s + s1 + s2
+col = sum == 1 ? white : sum == 2 ? blue : sum == 3 ? red : na
+bgcolor(col)

@@ -309,7 +309,12 @@ export function trix(ctx: Context, sourceInput: any, lengthInput: any): number {
     const state = ctx.getPersistentState<{ prevE3: number | undefined }>(() => ({ prevE3: undefined }));
     // Same rule as ema — do not latch a NaN as the comparison point.
     if (isNaN(e3)) return NaN;
-    if (state.prevE3 === undefined || isNaN(state.prevE3)) { state.prevE3 = e3; return 0; }
+    // na, not 0. trix is a CHANGE, and a change with no predecessor is
+    // undefined — `ta.change` reports na there. Returning 0 put a real value on
+    // the chart one bar before TradingView has one, and 0 is a meaningful
+    // reading for an oscillator that crosses zero. rsi and tsi were corrected
+    // for this above; trix was missed.
+    if (state.prevE3 === undefined || isNaN(state.prevE3)) { state.prevE3 = e3; return NaN; }
     const result = 100 * (e3 - state.prevE3) / state.prevE3;
     state.prevE3 = e3;
     return result;
@@ -1195,14 +1200,32 @@ export function tsi(ctx: Context, sourceInput: any, longLenInput: any, shortLenI
 }
 
 /**
+ * Pine gives both pivot functions two overloads:
+ *
+ *   ta.pivothigh(source, leftbars, rightbars)
+ *   ta.pivothigh(leftbars, rightbars)            // source defaults to `high`
+ *
+ * The registry cannot express an overload, so the shorter form arrives here as
+ * (5, 5, undefined) and every downstream length is NaN — the function returned
+ * `na` on every bar rather than failing, which is the worst way to be wrong.
+ * Normalise the arguments first; `defaultSource` is `high` for pivothigh and
+ * `low` for pivotlow, per the reference.
+ */
+const pivotArgs = (
+    a: any, b: any, c: any, defaultSource: number,
+): [number, number, number] =>
+    c === undefined || c === null
+        ? [defaultSource, Math.floor(val(a)), Math.floor(val(b))]
+        : [val(a), Math.floor(val(b)), Math.floor(val(c))];
+
+/**
  * pivothigh: Pivot High. Returns the value of the pivot high point, NaN otherwise.
  * Looks for a high that is higher than `leftbars` bars to the left and `rightbars` bars to the right.
  * @returns series float
  */
 export function pivothigh(ctx: Context, sourceInput: any, leftbarsInput: any, rightbarsInput: any): number {
-    const source = val(sourceInput);
-    const leftbars = Math.floor(val(leftbarsInput));
-    const rightbars = Math.floor(val(rightbarsInput));
+    const [source, leftbars, rightbars] =
+        pivotArgs(sourceInput, leftbarsInput, rightbarsInput, ctx.high);
     const totalLen = leftbars + rightbars + 1;
     const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
     state.buffer.push(source);
@@ -1227,9 +1250,8 @@ export function pivothigh(ctx: Context, sourceInput: any, leftbarsInput: any, ri
  * @returns series float
  */
 export function pivotlow(ctx: Context, sourceInput: any, leftbarsInput: any, rightbarsInput: any): number {
-    const source = val(sourceInput);
-    const leftbars = Math.floor(val(leftbarsInput));
-    const rightbars = Math.floor(val(rightbarsInput));
+    const [source, leftbars, rightbars] =
+        pivotArgs(sourceInput, leftbarsInput, rightbarsInput, ctx.low);
     const totalLen = leftbars + rightbars + 1;
     const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
     state.buffer.push(source);

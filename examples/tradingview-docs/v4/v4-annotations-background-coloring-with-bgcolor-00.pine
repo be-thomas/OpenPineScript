@@ -1,0 +1,11 @@
+//@version=4
+study("bgcolor example", overlay=true)
+timeinrange(res, sess) => time(res, sess) != 0
+premarket = #0050FF
+regular = #0000FF
+postmarket = #5000FF
+color notrading = na
+sessioncolor = timeinrange("30", "0400-0930") ? premarket :
+  timeinrange("30", "0930-1600") ? regular :
+  timeinrange("30", "1600-2000") ? postmarket : notrading
+bgcolor(sessioncolor, transp=75)

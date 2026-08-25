@@ -1,0 +1,43 @@
+//@version=5
+indicator("Sorting columns example")
+
+//@function Displays the rows of a matrix in a label with a note.
+//@param    this The matrix to display.
+//@param    barIndex The `bar_index` to display the label at.
+//@param    bgColor The background color of the label.
+//@param    textColor The color of the label's text.
+//@param    note The text to display above the rows.
+method debugLabel(
+     matrix<float> this, int barIndex = bar_index, color bgColor = color.blue,
+     color textColor = color.white, string note = ""
+ ) =>
+    labelText = note + "\n" + str.tostring(this)
+    if barstate.ishistory
+        label.new(
+             barIndex, 0, labelText, color = bgColor, style = label.style_label_center,
+             textcolor = textColor, size = size.huge
+         )
+
+//@function Sorts the columns of `this` matrix based on the values in the specified `row`.
+method sortColumns(matrix<int> this, int row = 0, bool ascending = true) =>
+    //@variable The transpose of `this` matrix.
+    matrix<int> thisT = this.transpose()
+    //@variable Is `order.ascending` when `ascending` is `true`, `order.descending` otherwise.
+    order = ascending ? order.ascending : order.descending
+    // Sort the rows of `thisT` using the `row` column.
+    thisT.sort(row, order)
+    //@variable A copy of `this` matrix with sorted columns.
+    result = thisT.transpose()
+
+//@variable A 3x3 matrix.
+matrix<int> m = matrix.new<int>()
+
+if bar_index == last_bar_index - 1
+    // Add rows to `m`.
+    m.add_row(0, array.from(3, 2, 4))
+    m.add_row(1, array.from(1, 9, 6))
+    m.add_row(2, array.from(7, 8, 9))
+    m.debugLabel(note = "Original")
+
+    // Sort the columns of `m` based on the first row and display the result.
+    m.sortColumns(0).debugLabel(bar_index + 10, note = "Sorted using row 0\n(Ascending)")

@@ -1,0 +1,26 @@
+//@version=5
+indicator("Cloning lines demo", overlay = true, max_lines_count = 500)
+
+//@variable The number of bars between each new mainLine assignment.
+int length = input.int(20, "Length", 2, 500)
+
+//@variable The first `chart.point` used by the `mainLine`. Contains `index` and `time` information.
+firstPoint = chart.point.now(open)
+//@variable The second `chart.point` used by the `mainLine`. Does not contain `time` information.
+secondPoint = chart.point.from_index(bar_index + length, open)
+
+//@variable A horizontal line drawn at the `open` price once every `length` bars.
+var line mainLine = na
+
+if bar_index % length == 0
+    // Assign a new line to the `mainLine` that connects the `firstPoint` to the `secondPoint`.
+    // This line uses the `index` fields from both points as x-coordinates.
+    mainLine := line.new(firstPoint, secondPoint, color = color.purple, width = 2)
+
+//@variable A copy of the `mainLine`. Changes to this line do not affect the original.
+line copiedLine = line.copy(mainLine)
+
+// Update the color, style, and second point of the `copiedLine`.
+line.set_color(copiedLine, color.orange)
+line.set_style(copiedLine, line.style_dotted)
+line.set_second_point(copiedLine, chart.point.now(close))

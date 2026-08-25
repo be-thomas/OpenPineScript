@@ -1,0 +1,23 @@
+//@version=4
+study("Selective `alert()` calls")
+i_detectLongs  = input(true,  "Detect Longs")
+i_detectShorts = input(true,  "Detect Shorts")
+i_repaint      = input(false, "Allow Repainting")
+
+r = rsi(close, 20)
+// Detect crosses.
+xUp = crossover( r, 50)
+xDn = crossunder(r, 50)
+// Only generate entries when the trade's direction is allowed in inputs.
+enterLong  = i_detectLongs  and xUp and (i_repaint or barstate.isconfirmed)
+enterShort = i_detectShorts and xDn and (i_repaint or barstate.isconfirmed)
+// Trigger the alerts only when the compound condition is met.
+if enterLong
+    alert("Go long (RSI is " + tostring(r, "#.00)"))
+else if enterShort
+    alert("Go short (RSI is " + tostring(r, "#.00)"))
+
+plotchar(enterLong,  "Go Long",  "▲", location.bottom, color.lime, size = size.tiny)
+plotchar(enterShort, "Go Short", "▼", location.top,    color.red,  size = size.tiny)
+hline(50)
+plot(r)

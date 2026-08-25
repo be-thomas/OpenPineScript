@@ -1,0 +1,19 @@
+//@version=5
+indicator("`alertcondition()` on multiple conditions")
+detectLongsInput  = input.bool(true, "Detect Longs")
+detectShortsInput = input.bool(true, "Detect Shorts")
+
+r = ta.rsi(close, 20)
+// Detect crosses.
+xUp = ta.crossover( r, 50)
+xDn = ta.crossunder(r, 50)
+// Only generate entries when the trade's direction is allowed in inputs.
+enterLong  = detectLongsInput  and xUp
+enterShort = detectShortsInput and xDn
+
+plot(r)
+plotchar(enterLong,  "Go Long",  "▲", location.bottom, color.lime, size = size.tiny)
+plotchar(enterShort, "Go Short", "▼", location.top,    color.red,  size = size.tiny)
+hline(50)
+// Trigger the alert when one of the conditions is met.
+alertcondition(enterLong or enterShort, "Compound alert", "Entry")

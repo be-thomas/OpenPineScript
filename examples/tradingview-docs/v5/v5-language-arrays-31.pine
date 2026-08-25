@@ -1,0 +1,7 @@
+//@version=5
+indicator("Protected `for` loop")
+sizeInput = input.int(0, "Array size", minval = 0, maxval = 100000)
+a = array.new<float>(sizeInput)
+for i = 0 to (array.size(a) == 0 ? na : array.size(a) - 1)
+    array.set(a, i, i)
+plot(array.pop(a))

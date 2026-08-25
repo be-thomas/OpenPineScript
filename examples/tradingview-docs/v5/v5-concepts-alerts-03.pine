@@ -1,0 +1,27 @@
+//@version=5
+strategy("Strategy with selective `alert()` calls")
+r = ta.rsi(close, 20)
+
+// Detect crosses.
+xUp = ta.crossover( r, 50)
+xDn = ta.crossunder(r, 50)
+// Place orders on crosses.
+if xUp
+    strategy.entry("Long", strategy.long)
+else if xDn
+    strategy.entry("Short", strategy.short)
+
+// Trigger an alert when RSI diverges from our trade's direction.
+divInLongTrade  = strategy.position_size > 0 and ta.falling(r, 3)
+divInShortTrade = strategy.position_size < 0 and ta.rising( r, 3)
+if divInLongTrade 
+    alert("WARNING: Falling RSI", alert.freq_once_per_bar_close)
+if divInShortTrade
+    alert("WARNING: Rising RSI", alert.freq_once_per_bar_close)
+
+plotchar(xUp, "Go Long",  "▲", location.bottom, color.lime, size = size.tiny)
+plotchar(xDn, "Go Short", "▼", location.top,    color.red,  size = size.tiny)
+plotchar(divInLongTrade,  "WARNING: Falling RSI", "•", location.top,    color.red,  size = size.tiny)
+plotchar(divInShortTrade, "WARNING: Rising RSI",  "•", location.bottom, color.lime, size = size.tiny)
+hline(50)
+plot(r)

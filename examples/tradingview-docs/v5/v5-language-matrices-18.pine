@@ -1,0 +1,34 @@
+//@version=5
+indicator("Shallow copy demo")
+
+//@function Displays the rows of a matrix in a label with a note.
+//@param    this The matrix to display.
+//@param    barIndex The `bar_index` to display the label at.
+//@param    bgColor The background color of the label.
+//@param    textColor The color of the label's text.
+//@param    note The text to display above the rows.
+method debugLabel(
+     matrix<float> this, int barIndex = bar_index, color bgColor = color.blue,
+     color textColor = color.white, string note = ""
+ ) =>
+    labelText = note + "\n" + str.tostring(this)
+    if barstate.ishistory
+        label.new(
+             barIndex, 0, labelText, color = bgColor, style = label.style_label_center,
+             textcolor = textColor, size = size.huge
+         )
+
+//@variable A 2x2 `float` matrix.
+matrix<float> myMatrix = matrix.new<float>()
+myMatrix.add_col(0, array.from(1.0, 3.0))
+myMatrix.add_col(1, array.from(2.0, 4.0))
+
+//@variable A shallow copy of `myMatrix`.
+matrix<float> myCopy = myMatrix.copy()
+// Add a row to the last index of `myCopy`.
+myCopy.add_row(myCopy.rows(), array.from(5.0, 6.0))
+
+if bar_index == last_bar_index - 1
+    // Display the rows of both matrices in separate labels.
+    myMatrix.debugLabel(note = "Original")
+    myCopy.debugLabel(bar_index + 10, color.green, note = "Shallow Copy")

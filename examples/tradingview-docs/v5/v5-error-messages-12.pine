@@ -1,0 +1,6 @@
+//@version=5
+indicator("Requires max_bars_back")
+test = 0.0
+if bar_index > 1000
+    test := ta.roc(close, 20)
+plot(test)

@@ -1,0 +1,28 @@
+//@version=5
+indicator("Enum types demo", overlay = true)
+
+//@enum       An enumeration of named values for moving average selection.
+//@field sma  Selects a Simple Moving Average.
+//@field ema  Selects an Exponential Moving Average.
+//@field wma  Selects a Weighted Moving Average.
+//@field hma  Selects a Hull Moving Average.
+enum maChoice
+    sma  = "Simple Moving Average"
+    ema  = "Exponential Moving Average"
+    wma  = "Weighted Moving Average"
+    hma  = "Hull Moving Average"
+
+//@variable The `maChoice` member representing a selected moving average name.
+maChoice maInput = input.enum(maChoice.sma, "Moving average type")
+//@variable The length of the moving average.
+int lengthInput = input.int(20, "Length", 1, 4999)
+
+//@variable The moving average selected by the `maInput`. 
+float selectedMA = switch maInput
+    maChoice.sma => ta.sma(close, lengthInput)
+    maChoice.ema => ta.ema(close, lengthInput)
+    maChoice.wma => ta.wma(close, lengthInput)
+    maChoice.hma => ta.hma(close, lengthInput)
+
+// Plot the `selectedMA`.
+plot(selectedMA, "Selected moving average", color.teal, 3)

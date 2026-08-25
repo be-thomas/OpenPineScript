@@ -452,7 +452,10 @@ describe("ta extended — tsi properties", () => {
         const v = runTsi(closes, 25, 13);
         assert.ok(Number.isFinite(v), `tsi should be finite, got ${v}`);
         assert.ok(v > 0, `tsi should be > 0 for rising series, got ${v}`);
-        assert.ok(v <= 100 + EPSILON, `tsi should not exceed 100, got ${v}`);
+        // Pine's `ta.tsi` is the RATIO, in [-1, 1] — the [-100, 100] scale is
+        // applied by the caller. The old bound here was 100, which is true of
+        // both conventions and so could not catch the oracle being 100× out.
+        assert.ok(v <= 1 + EPSILON, `tsi should not exceed 1, got ${v}`);
     });
 
     it("is negative for a strongly falling series", () => {
@@ -460,6 +463,6 @@ describe("ta extended — tsi properties", () => {
         const v = runTsi(closes, 25, 13);
         assert.ok(Number.isFinite(v), `tsi should be finite, got ${v}`);
         assert.ok(v < 0, `tsi should be < 0 for falling series, got ${v}`);
-        assert.ok(v >= -100 - EPSILON, `tsi should not go below -100, got ${v}`);
+        assert.ok(v >= -1 - EPSILON, `tsi should not go below -1, got ${v}`);
     });
 });

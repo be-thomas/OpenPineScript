@@ -1,0 +1,9 @@
+//@version=5
+indicator("`input()`", "", true)
+a = input(1, "input int")
+b = input(1.0, "input float")
+c = input(true, "input bool")
+d = input(color.orange, "input color")
+e = input("1", "input string")
+f = input(close, "series float")
+plot(na)

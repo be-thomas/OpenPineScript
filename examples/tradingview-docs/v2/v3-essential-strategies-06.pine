@@ -1,0 +1,6 @@
+//@version=2
+strategy("Priced Entry demo")
+c = year > 2014 ? nz(c[1]) + 1 : 0
+if c == 1
+    strategy.entry("LE1", strategy.long, 2, stop = high + 35 * syminfo.mintick)
+    strategy.entry("LE2", strategy.long, 2, stop = high + 2 * syminfo.mintick)

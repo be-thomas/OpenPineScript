@@ -1,0 +1,14 @@
+//@version=5
+indicator("", "", true)
+plotColor = switch syminfo.type
+    "stock"     => color.purple
+    "futures"   => color.red
+    "index"     => color.gray
+    "forex"     => color.fuchsia
+    "crypto"    => color.lime
+    "fund"      => color.orange
+    "dr"        => color.aqua
+    "cfd"       => color.blue
+plot(close, color = plotColor)
+printTable(txt) => var table t = table.new(position.middle_right, 1, 1), table.cell(t, 0, 0, txt, bgcolor = color.yellow)
+printTable(syminfo.type)

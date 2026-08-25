@@ -1,0 +1,15 @@
+//@version=5
+indicator("Securities count")
+a = request.security(syminfo.tickerid, '42', close)  // (1) first unique security call
+b = request.security(syminfo.tickerid, '42', close)  // same call as above, will not produce new security call after optimizations
+
+plot(a)
+plot(a + 2)
+plot(b)
+
+sym(p) =>  // no security call on this line
+    request.security(syminfo.tickerid, p, close)
+plot(sym('D'))  // (2) one indirect call to security
+plot(sym('W'))  // (3) another indirect call to security
+
+request.security(syminfo.tickerid, timeframe.period, open)  // result of this line is never used, and will be optimized out

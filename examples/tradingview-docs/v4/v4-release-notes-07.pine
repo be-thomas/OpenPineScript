@@ -1,0 +1,3 @@
+//@version=4
+study("My Script", overlay=true)
+plotchar(open > close, char="🐻")

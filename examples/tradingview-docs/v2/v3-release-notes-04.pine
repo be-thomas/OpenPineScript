@@ -1,0 +1,4 @@
+//@version=2
+study("My Script")
+a = barstate.isrealtime or barstate.islast ? close : na
+plot(a)

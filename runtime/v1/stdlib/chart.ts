@@ -144,3 +144,65 @@ export function heikinashi(symbol: any): string {
 
 /** Marker understood by Context.getSecurityData(). */
 export const HEIKINASHI_PREFIX = "heikinashi:";
+
+/**
+ * The non-standard chart-type ticker constructors — `renko()`, `linebreak()`,
+ * `kagi()` and `pointfigure()`, and their v5 `ticker.*` spellings.
+ *
+ * ── Present so they are RECOGNISED, refusing so they are not APPROXIMATED ───
+ *
+ * Like `heikinashi()` above, each returns a ticker id that `security()` then
+ * evaluates against transformed candles:
+ *
+ *     renko_t   = renko(syminfo.tickerid, "ATR", 10)
+ *     renko_low = security(renko_t, timeframe.period, low)
+ *
+ * Unlike Heikin-Ashi, none of these transforms is a per-bar formula over the
+ * chart's OHLCV. Renko and Point & Figure DISCARD time — a brick or a column is
+ * emitted when price moves far enough, so one chart bar may produce several
+ * bricks or none — and Kagi and Line Break rebuild the bar series from a
+ * reversal rule. Reconstructing any of them needs intrabar prices this engine
+ * is not given.
+ *
+ * Returning the plain symbol would be the silent failure: `security()` would
+ * hand back ordinary candles and the script would run to completion with
+ * numbers that are wrong in a way nothing could detect. So these refuse, the
+ * same way an unsupplied `request.financial` refuses.
+ *
+ * Leaving the names UNBOUND was the previous behaviour, and it was worse still:
+ * four of TradingView's own v4 documentation examples died with
+ * "opsv2_renko is not defined", which reads as an engine crash rather than as
+ * the unsupported feature it is.
+ *
+ * Source: https://www.tradingview.com/pine-script-docs/v4/essential/non-standard-chart-types-data/
+ */
+function refuseChartType(name: string, detail: string): never {
+  throw new Error(
+    `${name}: OpenPineScript cannot build ${detail} from OHLCV bars — the ` +
+    `transform needs intrabar prices this engine is not given, and returning ` +
+    `the untransformed symbol would silently produce standard candles. ` +
+    `See runtime/v1/stdlib/chart.ts.`,
+  );
+}
+
+/** @returns {string} Never returns — Renko bricks cannot be rebuilt here. */
+export function renko(_symbol: any, _style?: any, _param?: any): string {
+  return refuseChartType("renko", "Renko bricks");
+}
+
+/** @returns {string} Never returns — Line Break bars cannot be rebuilt here. */
+export function linebreak(_symbol: any, _lines?: any): string {
+  return refuseChartType("linebreak", "Line Break bars");
+}
+
+/** @returns {string} Never returns — Kagi lines cannot be rebuilt here. */
+export function kagi(_symbol: any, _reversal?: any): string {
+  return refuseChartType("kagi", "Kagi lines");
+}
+
+/** @returns {string} Never returns — P&F columns cannot be rebuilt here. */
+export function pointfigure(
+  _symbol: any, _source?: any, _style?: any, _param?: any, _reversal?: any,
+): string {
+  return refuseChartType("pointfigure", "Point & Figure columns");
+}

@@ -1,0 +1,17 @@
+//@version=5
+indicator("Opening high/low", overlay = true)
+
+sessionInput = input.session("0930-0935")
+
+sessionBegins(sess) =>
+    t = time("", sess)
+    timeframe.isintraday and (not barstate.isfirst) and na(t[1]) and not na(t)
+
+var float hi = na
+var float lo = na
+if sessionBegins(sessionInput)
+    hi := high
+    lo := low
+
+plot(lo, "lo", color.fuchsia, 2, plot.style_circles)
+plot(hi, "hi", color.lime,    2, plot.style_circles)

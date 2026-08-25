@@ -1,0 +1,32 @@
+//@version=5
+indicator("Lows from new highs", "", true)
+var lows = array.new<float>(0)
+flushLows = false
+
+// Remove last element from the stack when `_cond` is true.
+array_pop(id, cond) => cond and array.size(id) > 0 ? array.pop(id) : float(na)
+
+if ta.rising(high, 1)
+    // Rising highs; push a new low on the stack.
+    lows.push(low)
+    // Force the return type of this `if` block to be the same as that of the next block.
+    bool(na)
+else if lows.size() >= 4 or low < array.min(lows)
+    // We have at least 4 lows or price has breached the lowest low;
+    // sort lows and set flag indicating we will plot and flush the levels.
+    array.sort(lows, order.ascending)
+    flushLows := true
+
+// If needed, plot and flush lows.
+lowLevel = array_pop(lows, flushLows)
+plot(lowLevel, "Low 1", low > lowLevel ? color.silver : color.purple, 2, plot.style_linebr)
+lowLevel := array_pop(lows, flushLows)
+plot(lowLevel, "Low 2", low > lowLevel ? color.silver : color.purple, 3, plot.style_linebr)
+lowLevel := array_pop(lows, flushLows)
+plot(lowLevel, "Low 3", low > lowLevel ? color.silver : color.purple, 4, plot.style_linebr)
+lowLevel := array_pop(lows, flushLows)
+plot(lowLevel, "Low 4", low > lowLevel ? color.silver : color.purple, 5, plot.style_linebr)
+
+if flushLows
+    // Clear remaining levels after the last 4 have been plotted.
+    lows.clear()

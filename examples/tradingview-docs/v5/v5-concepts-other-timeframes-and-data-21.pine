@@ -1,0 +1,23 @@
+//@version=5
+indicator("Requesting tuples demo", "Percent rank cross")
+
+//@variable The timeframe of the request.
+string timeframe = input.timeframe("240", "Timeframe")
+//@variable The number of bars in the calculation.
+int length = input.int(20, "Length")
+
+//@variable The previous bar's percent rank of the `close` price over `length` bars.
+float rank = ta.percentrank(close, length)[1]
+
+// Request the `rank` value from another `timeframe`, and two "bool" values indicating the `rank` from the `timeframe`
+// crossed over or under 50.
+[requestedRank, crossOver, crossUnder] = request.security(
+     syminfo.tickerid, timeframe, [rank, ta.crossover(rank, 50), ta.crossunder(rank, 50)],
+     lookahead = barmerge.lookahead_on
+ )
+
+// Plot the `requestedRank` and create a horizontal line at 50.
+plot(requestedRank, "Percent Rank", linewidth = 3)
+hline(50, "Cross line", linewidth = 2)
+// Highlight the background of all bars where the `timeframe`'s `crossOver` or `crossUnder` value is `true`.
+bgcolor(crossOver ? color.new(color.green, 50) : crossUnder ? color.new(color.red, 50) : na)

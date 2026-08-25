@@ -1,0 +1,31 @@
+//@version=5
+indicator("for...in loop demo", "Average OHLC", overlay = true)
+
+//@variable The number of terms in the average.
+int length = input.int(20, "Length", minval = 1)
+
+//@function Calculates the average of each matrix row.
+method rowWiseAvg(matrix<float> this) =>
+    //@variable An array with elements corresponding to each row's average.
+    array<float> result = array.new<float>()
+    // Iterate over each `row` of `this` matrix.
+    for row in this
+        // Push the average of each `row` into the `result`.
+        result.push(row.avg())
+    result // Return the resulting array.
+
+//@variable A 4x`length` matrix of values.
+var matrix<float> m = matrix.new<float>(4, length)
+
+// Add a new column containing OHLC values to the matrix.
+m.add_col(m.columns(), array.from(open, high, low, close))
+// Remove the first column.
+m.remove_col(0)
+
+//@variable An array containing averages of `open`, `high`, `low`, and `close` over `length` bars.
+array<float> averages = m.rowWiseAvg()
+
+plot(averages.get(0), "Average Open",  color.blue,   2)
+plot(averages.get(1), "Average High",  color.green,  2)
+plot(averages.get(2), "Average Low",   color.red,    2)
+plot(averages.get(3), "Average Close", color.orange, 2)

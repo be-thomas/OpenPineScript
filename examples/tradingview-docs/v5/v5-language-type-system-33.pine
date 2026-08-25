@@ -1,0 +1,11 @@
+//@version=5
+indicator("na protection demo", overlay = true)
+
+//@variable The result of calculating the all-time high price with an initial value of `na`.
+var float allTimeHigh = na
+
+// Reassign the value of the `allTimeHigh`.
+// We've used `nz()` to prevent the initial `na` value from persisting throughout the calculation.
+allTimeHigh := math.max(nz(allTimeHigh), high)
+
+plot(allTimeHigh)

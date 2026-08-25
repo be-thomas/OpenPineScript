@@ -1,0 +1,11 @@
+//@version=4
+study("Bollinger Bands", overlay = true)
+[middle, upper, lower] = bb(close, 5, 4)
+plot(middle, color=color.blue)
+p1PlotID = plot(upper, color=color.green)
+p2PlotID = plot(lower, color=color.green)
+crossUp = crossover(high, upper)
+crossDn = crossunder(low, lower)
+// Both `fill()` and `bgcolor()` have a default `transp` of 90
+fill(p1PlotID, p2PlotID, color = color.green)
+bgcolor(crossUp ? color.green : crossDn ? color.red : na)

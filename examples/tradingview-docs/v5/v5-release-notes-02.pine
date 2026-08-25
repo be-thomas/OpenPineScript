@@ -1,0 +1,11 @@
+//@version=5
+indicator("My script")
+
+//@variable A constant `string` used as the `title` in the `plot()` function.
+const string plotTitle = "My plot"
+//@variable An `int` variable whose value is consistent after the first chart bar.
+simple int a = 10
+//@variable An `int` variable whose value can change on every bar.
+series int b = bar_index
+
+plot(b % a, title = plotTitle)

@@ -1,0 +1,4 @@
+//@version=5
+indicator("Inefficient version", "", true)
+closeLine = line.new(bar_index - 1, close, bar_index, close, extend = extend.right, width = 3)
+line.delete(closeLine[1])

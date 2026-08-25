@@ -1,0 +1,81 @@
+//@version=5
+indicator("Calculating time span for larger units demo")
+
+//@variable The starting date and time of the time span, input by the user.
+int startTimeInput = input.time(timestamp("3 Apr 2022 20:00 -0400"), "Start date", group = "Time between")
+//@variable The ending date and time of the time span, input by the user.
+int endTimeInput =   input.time(timestamp("3 Sep 2024 15:45 -0400"), "End date",   group = "Time between")
+
+//@function Returns the number of days in the `monthNumber` month of the `yearNumber` year.
+daysPerMonth(int yearNumber, int monthNumber) =>
+    //@variable Is `true` if the `yearNumber` represents a leap year.
+    bool leapYear = (yearNumber % 4 == 0 and yearNumber % 100 != 0) or (yearNumber % 400 == 0)
+    //@variable The number of days calculated for the month.
+    int result = switch
+        monthNumber == 2 => leapYear ? 29 : 28
+        =>                  31 - (monthNumber - 1) % 7 % 2
+
+//@function Calculates the relative time difference between two timestamps, covering monthly and larger units.
+formatTimeDifference(int timestamp1, int timestamp2) =>
+    // The starting time and ending time.
+    int startTime = math.min(timestamp1, timestamp2), int endTime = math.max(timestamp1, timestamp2)
+    // The year, month, and day of the `startTime` and `endTime`.
+    int startYear = year(startTime), int startMonth = month(startTime), int startDay = dayofmonth(startTime)
+    int endYear   = year(endTime),   int endMonth   = month(endTime),   int endDay   = dayofmonth(endTime)
+    // Calculate the total number of days, hours, minutes, seconds, and milliseconds in the interval.
+    int milliseconds = endTime - startTime
+    int days         = math.floor(milliseconds / 86400000), milliseconds %= 86400000
+    int hours        = math.floor(milliseconds / 3600000),  milliseconds %= 3600000
+    int minutes      = math.floor(milliseconds / 60000),    milliseconds %= 60000
+    int seconds      = math.floor(milliseconds / 1000),     milliseconds %= 1000
+    // Calculate the number of days in the `startMonth` and `endMonth`.
+    int daysInStartMonth = daysPerMonth(startYear, startMonth), int daysInEndMonth = daysPerMonth(endYear, endMonth)
+    //@variable The number of days remaining in the `startMonth`. 
+    int remainingInMonth = daysInStartMonth - startDay + 1
+    // Subtract `remainingInMonth` from the `days`, and offset the `startDay` and `startMonth`.
+    days -= remainingInMonth, startDay := 1, startMonth += 1
+    // Set `startMonth` to 1, and increase the `startYear` if the `startMonth` exceeds 12.
+    if startMonth > 12
+        startMonth := 1, startYear += 1
+    // Initialize variables to count the total number of months and years in the interval.
+    int months = 0, int years  = 0
+    // Loop to increment `months` and `years` values based on the `days`.
+    while days > 0
+        //@variable The number of days in the current `startMonth`.
+        int daysInMonth = daysPerMonth(startYear, startMonth)
+        // Break the loop if the number of remaining days is less than the `daysInMonth`.
+        if days < daysInMonth
+            break
+        // Reduce the `days` by the `daysInMonth` and increment the `months`.
+        days -= daysInMonth, months += 1
+        // Increase the `years` and reset the `months` to 0 when `months` is 12.
+        if months == 12
+            months := 0, years += 1
+        // Increase the `startMonth` and adjust the `startMonth` and `startYear` if its value exceeds 12.
+        startMonth += 1
+        if startMonth > 12
+            startMonth := 1, startYear += 1
+    // Re-add the `remainingInMonth` value to the number of `days`. Adjust the `days`, `months`, and `years` if the 
+    // new value exceeds the `daysInStartMonth` or `daysInEndMonth`, depending on the `startDay`.
+    days += remainingInMonth
+    if days >= (startDay < daysInStartMonth / 2 ? daysInStartMonth : daysInEndMonth) 
+        months += 1
+        if months == 12
+            months := 0, years += 1
+        days -= remainingInMonth
+    // Format the calculated values into a "string" and return the result.
+    str.format(
+         " Years:   {0}\n Months: {1}\n Days:    {2}\n Hours:    {3}\n Minutes:  {4}\n Seconds: {5}
+         \n Milliseconds: {6}", years, months, days, hours, minutes, seconds, milliseconds
+     )
+
+if barstate.islastconfirmedhistory
+    //@variable A "string" representing the time between the `startTimeInput` and `endTimeInput` in mixed units. 
+    string userTimeSpan = formatTimeDifference(startTimeInput, endTimeInput)
+    //@variable Text shown in the label.
+    string labelText = "Start time: " + str.format_time(startTimeInput, "dd/MM/yy HH:mm:ss (z)") + "\n  End time: "
+         +  str.format_time(endTimeInput, "dd/MM/yy HH:mm:ss (z)") + "\n---------\nTime difference:\n" + userTimeSpan
+    label.new(
+         bar_index, high, labelText, color = #FF946E, size = size.large, 
+         textalign = text.align_left, style = label.style_label_center
+     )

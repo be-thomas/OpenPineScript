@@ -1,0 +1,19 @@
+//@version=5
+indicator("", "", true)
+
+// Find the highest `high` in last 50 bars and its offset. Change it's sign so it is positive.
+LOOKBACK = 50
+hi = ta.highest(LOOKBACK)
+highestBarOffset = - ta.highestbars(LOOKBACK)
+
+// Create label on bar zero only.
+var lbl = label.new(na, na, "", color = color.orange, style = label.style_label_lower_left)
+// When a new high is found, move the label there and update its text and tooltip.
+if ta.change(hi)
+    // Build label and tooltip strings.
+    labelText = "High: " + str.tostring(hi, format.mintick)
+    tooltipText = "Offest in bars: " + str.tostring(highestBarOffset) + "\nLow: " + str.tostring(low[highestBarOffset], format.mintick)
+    // Update the label's position, text and tooltip.
+    label.set_xy(lbl, bar_index[highestBarOffset], hi)
+    label.set_text(lbl, labelText)
+    label.set_tooltip(lbl, tooltipText)

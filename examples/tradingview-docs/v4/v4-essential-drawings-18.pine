@@ -1,0 +1,5 @@
+//@version=4
+study("My Script", overlay=true)
+
+if barstate.isrealtime
+    label.new(bar_index[10], na, text="Label", yloc=yloc.abovebar)

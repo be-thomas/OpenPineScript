@@ -1,0 +1,18 @@
+//@version=5
+indicator("Objects using `varip` fields demo")
+
+//@type A custom type that counts the bars and ticks in the script's execution.
+type Counter
+    int       bars  = 0
+    varip int ticks = 0
+
+//@variable A `Counter` object whose reference persists throughout all bars.
+var Counter counter = Counter.new()
+
+// Add 1 to the `bars` and `ticks` fields. The `ticks` field is not subject to rollback on unconfirmed bars.
+counter.bars  += 1
+counter.ticks += 1
+
+// Plot both fields for comparison. 
+plot(counter.bars, "Bar counter", color.blue, 3)
+plot(counter.ticks, "Tick counter", color.purple, 3)

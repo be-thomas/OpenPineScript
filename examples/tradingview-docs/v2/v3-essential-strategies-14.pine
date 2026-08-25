@@ -1,0 +1,6 @@
+//@version=2
+strategy("allow_entry_in demo", overlay=true)
+if year > 2014
+    strategy.entry("LE", strategy.long, when=strategy.position_size <= 0)
+    strategy.entry("SE", strategy.short, when=strategy.position_size > 0)
+strategy.risk.allow_entry_in(strategy.direction.long)

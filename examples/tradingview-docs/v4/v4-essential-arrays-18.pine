@@ -1,0 +1,9 @@
+//@version=4
+study("`array.reverse()`")
+a = array.new_float(0)
+array.push(a, 0)
+array.push(a, 1)
+array.push(a, 2)
+if barstate.islast
+    array.reverse(a)
+    label.new(bar_index, 0, "a: " + tostring(a))

@@ -1,0 +1,45 @@
+//@version=5
+indicator("Local drawings and logs demo", "Custom MA", true, max_labels_count = 500)
+
+//@variable The number of bars in the `customMA()` calculation.
+int lengthInput = input.int(50, "Length", 2)
+
+//@function      Calculates a moving average that only responds to values outside the first and third quartiles.
+//@param source  The series of values to process.
+//@param length  The number of bars in the calculation.
+//@returns       The moving average value.
+customMA(float source, int length) =>
+    //@variable The custom moving average.
+    var float result = na
+    // Calculate the 25th and 75th `source` percentiles.
+    float q1 = ta.percentile_linear_interpolation(source, length, 25)
+    float q3 = ta.percentile_linear_interpolation(source, length, 75)
+    // Calculate the range values.
+    float outerRange = math.max(source - q3, q1 - source, 0.0)
+    float totalRange = ta.range(source, length)
+    //@variable Half the ratio of the `outerRange` to the `totalRange`.
+    float alpha = 0.5 * outerRange / totalRange
+    // Mix the `source` with the `result` based on the `alpha` value.
+    result := (1.0 - alpha) * nz(result, source) + alpha * source
+
+    //@variable A formatted string containing representations of all local variables.
+    string debugText = str.format(
+         "\n`customMA()` data\n----------\nsource: {0, number, #.########}\nlength: {1}\nq1: {2, number, #.########}
+         \nq3: {3, number, #.########}\nouterRange: {4, number, #.########}\ntotalRange: {5, number, #.########}
+         \nalpha{6, number, #.########}\nresult: {7, number, #.########}",
+         source, length, q1, q3, outerRange, totalRange, alpha, result
+     )
+    // Draw a label with a tooltip displaying the `debugText`.
+    label.new(bar_index, high, color = color.new(chart.fg_color, 80), tooltip = debugText)
+    // Print an "info" message in the Pine Logs pane when the bar is confirmed.
+    if barstate.isconfirmed
+        log.info(debugText)
+
+    // Return the `result`.
+    result
+
+//@variable The `customMA()` result over `lengthInput` bars.
+float maValue = customMA(close, lengthInput)
+
+// Plot the `maValue`.
+plot(maValue, "Custom MA", color.blue, 3)

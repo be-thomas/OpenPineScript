@@ -1,0 +1,29 @@
+//@version=5
+indicator("`for` loop demo", "VWMA differences", true, max_labels_count = 500)
+
+//@variable Display color for indicator visuals.
+const color DISPLAY_COLOR = color.rgb(17, 127, 218)
+
+//@variable The number of bars in the `vwmaOpen` calculation.
+int maLengthInput = input.int(20, "VWMA length", 1)
+//@variable The number of past bars to look back through and compare to the current bar.
+int lookbackInput = input.int(15, "Lookback length", 1, 500)
+
+//@variable The volume-weighted moving average of `open` values over `maLengthInput` bars. 
+float vwmaOpen = ta.vwma(open, maLengthInput)
+
+//On last bar, loop through `lengthInput` most recent historical bars and output `label` of differences in `vwmaOpen`.
+if barstate.islastconfirmedhistory
+    for i = lookbackInput to 1
+        //@variable The difference between the `vwmaOpen` from `i` bars ago and the current `vwmaOpen`.
+        float vwmaDifference = vwmaOpen[i] - vwmaOpen
+        //@variable A "string" representation of the `vwmaDifference` with sign specification and rounding. 
+        string displayText = (vwmaDifference > 0 ? "+" : "") + str.tostring(vwmaDifference, "0.00")
+        // Draw a `label` showing the `displayText` at the `open` of the bar from `i` bars back.
+        label.new(
+             bar_index - i, open[i], displayText, textcolor = color.white, color = DISPLAY_COLOR,
+             style = label.style_label_lower_right, size = size.normal
+         )
+
+// Plot the `vwmaOpen`.
+plot(vwmaOpen, "VWMA", color = DISPLAY_COLOR, linewidth = 2)

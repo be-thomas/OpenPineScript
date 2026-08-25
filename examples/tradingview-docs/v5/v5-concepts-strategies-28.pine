@@ -1,0 +1,13 @@
+//@version=5
+strategy("Buy low, sell high", overlay = true, default_qty_type = strategy.cash, default_qty_value = 5000)
+
+int   length      = input.int(20, "Length", 1)
+float longAmount  = input.float(0.0, "Long Amount", 0.0)
+float shortAmount = input.float(0.0, "Short Amount", 0.0)
+
+float highest = ta.highest(length)
+float lowest  = ta.lowest(length)
+
+switch
+    low == lowest   => strategy.entry("Buy", strategy.long, longAmount == 0.0 ? na : longAmount)
+    high == highest => strategy.entry("Sell", strategy.short, shortAmount == 0.0 ? na : shortAmount)

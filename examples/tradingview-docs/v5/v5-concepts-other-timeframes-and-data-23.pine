@@ -1,0 +1,27 @@
+//@version=5
+indicator("Requesting chart points demo", "HTF Boxes", true, max_boxes_count = 500)
+
+//@variable The timeframe to request data from.
+string higherTimeframe = input.timeframe("1D", "Timeframe")
+
+// Raise a runtime error if the `higherTimeframe` is smaller than the chart's timeframe.
+if timeframe.in_seconds(higherTimeframe) < timeframe.in_seconds(timeframe.period)
+    runtime.error("The selected timeframe is too small. Choose a higher timeframe.")
+
+//@variable A `chart.point` containing top-left coordinates from the last confirmed bar.
+topLeft = chart.point.now(high)[1]
+//@variable A `chart.point` containing bottom-right coordinates from the last confirmed bar.
+bottomRight = chart.point.from_time(time_close, low)[1]
+
+// Request the last confirmed `topLeft` and `bottomRight` chart points from the `higherTimeframe`.
+[requestedTopLeft, requestedBottomRight] = request.security(
+     syminfo.tickerid, higherTimeframe, [topLeft, bottomRight], lookahead = barmerge.lookahead_on
+ )
+
+// Draw a new box when a new `higherTimeframe` bar starts.
+// The box uses the `time` fields from the `requestedTopLeft` and `requestedBottomRight` as x-coordinates.
+if timeframe.change(higherTimeframe)
+    box.new(
+         requestedTopLeft, requestedBottomRight, color.purple, 3, 
+         xloc = xloc.bar_time, bgcolor = color.new(color.purple, 90)
+     )

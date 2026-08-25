@@ -1,0 +1,18 @@
+//@version=5
+indicator("My script")
+
+//@variable Returns `true` on every second bar.
+condition = bar_index % 2 == 0
+
+controlSMA = ta.sma(close, 20)
+float globalSMA = na
+float localSMA  = na
+
+// Update `globalSMA` and `localSMA` when `condition` is `true`.
+if condition
+    globalSMA := controlSMA        // No warning.
+    localSMA  := ta.sma(close, 20) // Raises warning. This function depends on its history to work as intended.
+
+plot(controlSMA, "Control SMA", color = color.green)
+plot(globalSMA,  "Global SMA",  color = color.blue, style = plot.style_cross)
+plot(localSMA,   "Local SMA",   color = color.red,  style = plot.style_cross)

@@ -1,0 +1,20 @@
+//@version=5
+indicator("Requesting financial data demo", format = format.volume)
+
+//@variable The size of the fiscal reporting period. Some options may not be available, depending on the instrument.
+string fiscalPeriod = input.string("FQ", "Period", ["FQ", "FH", "FY", "TTM"])
+
+//@variable The operating income after expenses reported for the stock's issuing company.
+float operatingIncome = request.financial(syminfo.tickerid, "OPER_INCOME", fiscalPeriod)
+//@variable The total revenue reported for the stock's issuing company.
+float totalRevenue = request.financial(syminfo.tickerid, "TOTAL_REVENUE", fiscalPeriod)
+//@variable The total operating expenses reported for the stock's issuing company.
+float totalExpenses = request.financial(syminfo.tickerid, "TOTAL_OPER_EXPENSE", fiscalPeriod)
+
+//@variable Is aqua when the `totalRevenue` exceeds the `totalExpenses`, fuchsia otherwise.
+color incomeColor = operatingIncome > 0 ? color.new(color.aqua, 50) : color.new(color.fuchsia, 50)
+
+// Display the requested data.
+plot(operatingIncome, "Operating income", incomeColor, 1, plot.style_area)
+plot(totalRevenue, "Total revenue", color.green, 3)
+plot(totalExpenses, "Total operating expenses", color.red, 3)

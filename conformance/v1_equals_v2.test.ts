@@ -95,6 +95,16 @@ const EXPECTED_FAILURES: Record<string, FailureKind> = {
   "tests/v2/parser/fixtures/if_then.pine": "restriction",          // 'y' never declared
   "tests/v2/parser/fixtures/break_continue.pine": "restriction",   // 'x' never declared
 
+  // Same rule, reached through a READ rather than an assignment. These three
+  // are call-syntax probes for the parser — `f(1,2)`, `x=arr[0]` — and name
+  // nothing that exists. TradingView answers `Undeclared identifier` for a read
+  // exactly as it does for a ':=' target; the emitter did not, and every
+  // unimplemented built-in surfaced as a JavaScript ReferenceError on bar 1
+  // instead. See checkUndeclaredRead in transpiler/v1/ToJsVisitor.ts.
+  "tests/v2/parser/fixtures/call.pine": "restriction",             // 'f' never declared
+  "tests/v2/parser/fixtures/call_kw_args.pine": "restriction",     // 'f' never declared
+  "tests/v2/parser/fixtures/subscript_call.pine": "restriction",   // 'arr' never declared
+
   "tests/v2/parser/fixtures/array_literal.pine": "restriction",    // user fn tuple return
   "tests/v2/parser/fixtures/destructuring.pine": "restriction",    // user fn tuple return
 };

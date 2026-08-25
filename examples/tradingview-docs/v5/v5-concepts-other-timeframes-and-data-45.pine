@@ -1,0 +1,18 @@
+//@version=5
+indicator("Requesting economic data demo")
+
+//@variable The GDP growth rate for the US economy.
+float gdpqq = request.economic("US", "GDPQQ")
+
+//@variable The all-time maximum growth rate.
+float maxRate = ta.max(gdpqq)
+//@variable The all-time minimum growth rate.
+float minRate = ta.min(gdpqq)
+
+//@variable The color of the `gdpqq` plot.
+color rateColor = switch
+    gdpqq >= 0 => color.from_gradient(gdpqq, 0, maxRate, color.purple, color.blue)
+    =>            color.from_gradient(gdpqq, minRate, 0, color.red, color.purple)
+
+// Plot the results.
+plot(gdpqq, "US GDP Growth Rate", rateColor, style = plot.style_area)

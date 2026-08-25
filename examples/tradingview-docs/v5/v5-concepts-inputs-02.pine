@@ -1,0 +1,4 @@
+//@version=5
+indicator("Input in an expression`", "", true)
+bool plotDisplayInput = input.string("On", "Plot Display", options = ["On", "Off"]) == "On"
+plot(plotDisplayInput ? close : na)

@@ -5,6 +5,7 @@ import * as barstate from "./barstate";
 import * as chart from "./chart";
 import * as color from "./color";
 import * as core from "./core";
+import * as dataset from "./dataset";
 import * as drawings from "./drawings";
 import * as errors from "./errors";
 import * as input from "./input";
@@ -520,6 +521,38 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: chart.heikinashi
       },
+      "renko": {
+          uses_context: false,
+          args: ["symbol","style","param"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"Never returns — Renko bricks cannot be rebuilt here."},
+          is_value: false,
+          ref: chart.renko
+      },
+      "linebreak": {
+          uses_context: false,
+          args: ["symbol","lines"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"Never returns — Line Break bars cannot be rebuilt here."},
+          is_value: false,
+          ref: chart.linebreak
+      },
+      "kagi": {
+          uses_context: false,
+          args: ["symbol","reversal"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"Never returns — Kagi lines cannot be rebuilt here."},
+          is_value: false,
+          ref: chart.kagi
+      },
+      "pointfigure": {
+          uses_context: false,
+          args: ["symbol","source","style","param","reversal"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"Never returns — P&F columns cannot be rebuilt here."},
+          is_value: false,
+          ref: chart.pointfigure
+      },
       "sunday": {
           uses_context: false,
           args: [],
@@ -832,6 +865,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: core.avg
       },
+      "int": {
+          uses_context: false,
+          args: ["x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"int} `x` truncated toward zero, or na."},
+          is_value: false,
+          ref: core.int
+      },
+      "max_bars_back": {
+          uses_context: false,
+          args: ["series","num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.max_bars_back
+      },
       "red": {
           uses_context: false,
           args: [],
@@ -967,6 +1016,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: true,
           ref: core.silver
+      },
+      "last_bar_index": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"The last bar's index, known from the first bar."},
+          is_value: false,
+          ref: dataset.last_bar_index
+      },
+      "last_bar_time": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"The last bar's opening time, known from the first bar."},
+          is_value: false,
+          ref: dataset.last_bar_time
       },
       "line.new": {
           uses_context: true,
@@ -2168,37 +2233,37 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: maps.map["copy"]
       },
-      "math.random": {
+      "random": {
           uses_context: true,
           args: ["min","max","seed"],
           is_getter: false,
-          returns: {"kind":"scalar","type":"any"},
+          returns: {"kind":"scalar","type":"float} A pseudo-random value in [min, max)."},
           is_value: false,
-          ref: math.math["random"]
+          ref: math.random
       },
-      "math.todegrees": {
+      "todegrees": {
           uses_context: false,
           args: ["radians"],
           is_getter: false,
-          returns: {"kind":"scalar","type":"any"},
+          returns: {"kind":"scalar","type":"float} The angle in degrees."},
           is_value: false,
-          ref: math.math["todegrees"]
+          ref: math.todegrees
       },
-      "math.toradians": {
+      "toradians": {
           uses_context: false,
           args: ["degrees"],
           is_getter: false,
-          returns: {"kind":"scalar","type":"any"},
+          returns: {"kind":"scalar","type":"float} The angle in radians."},
           is_value: false,
-          ref: math.math["toradians"]
+          ref: math.toradians
       },
-      "math.round_to_mintick": {
+      "round_to_mintick": {
           uses_context: true,
           args: ["number"],
           is_getter: false,
-          returns: {"kind":"scalar","type":"any"},
+          returns: {"kind":"scalar","type":"float} `x` rounded to the nearest multiple of the mintick."},
           is_value: false,
-          ref: math.math["round_to_mintick"]
+          ref: math.round_to_mintick
       },
       "matrix.new": {
           uses_context: false,
@@ -2591,6 +2656,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: sources.ohlc4
+      },
+      "hlcc4": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} The double-weighted close average."},
+          is_value: false,
+          ref: sources.hlcc4
       },
       "str.tostring": {
           uses_context: false,
@@ -3471,6 +3544,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"float} The bar's UNIX time in ms, or na."},
           is_value: false,
           ref: time.time
+      },
+      "time_close": {
+          uses_context: true,
+          args: ["resolution","session"],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} The bar's closing UNIX time in ms, or na."},
+          is_value: false,
+          ref: time.time_close
+      },
+      "time_tradingday": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} UNIX time of the trading day's start, in ms."},
+          is_value: false,
+          ref: time.time_tradingday
       },
       "plot": {
           uses_context: true,

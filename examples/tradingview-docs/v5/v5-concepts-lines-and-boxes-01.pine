@@ -1,0 +1,30 @@
+//@version=5
+indicator("Creating lines demo", "Simple projection fan", true, max_lines_count = 500)
+
+//@variable The number of fan lines drawn on each chart bar.
+int linesPerBar = input.int(20, "Line drawings per bar", 2, 100)
+
+//@variable The distance between each y point on the current bar.
+float step = (high - low) / (linesPerBar - 1)
+
+//@variable The `chart.point` for the start of each line. Does not contain `time` information.
+firstPoint = chart.point.from_index(bar_index - 1, hl2[1])
+//@variable The `chart.point` for the end of each line. Does not contain `time` information.
+secondPoint = chart.point.from_index(bar_index + 1, float(na))
+
+//@variable The stepped y value on the current bar for `secondPoint.price` calculation, starting from the `low`.
+float barValue = low
+// Loop to draw the fan.
+for i = 1 to linesPerBar
+    // Update the `price` of the `secondPoint` using the difference between the `barValue` and `firstPoint.price`.
+    secondPoint.price := 2.0 * barValue - firstPoint.price
+    //@variable Is `color.aqua` when the line's slope is positive, `color.fuchsia` otherwise.
+    color lineColor = secondPoint.price > firstPoint.price ? color.aqua : color.fuchsia
+    // Draw a new `lineColor` line connecting the `firstPoint` and `secondPoint` coordinates.
+    // This line uses the `index` field from each point for its x-coordinates.
+    line.new(firstPoint, secondPoint, color = lineColor)
+    // Add the `step` to the `barValue`.
+    barValue += step
+
+// Color the background on the unconfirmed bar.
+bgcolor(barstate.isconfirmed ? na : color.new(color.orange, 70), title = "Unconfirmed bar highlight")

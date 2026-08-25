@@ -1,0 +1,3 @@
+//@version=5
+strategy("S")
+bgcolor(barstate.islast ? color.silver : na)

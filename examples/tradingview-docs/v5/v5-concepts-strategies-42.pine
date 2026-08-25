@@ -1,0 +1,33 @@
+//@version=5
+strategy(
+     "Verify price for limits example", overlay = true,
+     default_qty_type = strategy.percent_of_equity, default_qty_value = 2
+ )
+
+int length = input.int(25, title = "Length")
+
+//@variable Draws a line at the limit price of the most recent entry order.
+var line limitLine = na
+
+// Highest high and lowest low
+highest = ta.highest(length)
+lowest  = ta.lowest(length)
+
+// Place an entry order and draw a new line when the the `high` equals the `highest` value and `limitLine` is `na`.
+if high == highest and na(limitLine)
+    float limitPrice = hlcc4
+    strategy.entry("Long", strategy.long, limit = limitPrice)
+    limitLine := line.new(bar_index, limitPrice, bar_index + 1, limitPrice)
+
+// Close the open market position, cancel orders, and set `limitLine` to `na` when the `low` equals the `lowest` value.
+if low == lowest
+    strategy.cancel_all()
+    limitLine := na
+    strategy.close_all()
+
+// Update the `x2` value of `limitLine` if it isn't `na`.
+if not na(limitLine)
+    limitLine.set_x2(bar_index + 1) 
+
+plot(highest, "Highest High", color = color.new(color.green, 50))
+plot(lowest, "Lowest Low", color = color.new(color.red, 50))

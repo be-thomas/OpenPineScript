@@ -1,0 +1,12 @@
+//@version=5
+indicator("My Script")
+int[] a1 = array.from(1, 3, 6, 3, 8, 0, -9, 5)
+
+highest(array) =>
+    var int highestNum = na
+    for item in array
+            if na(highestNum) or item > highestNum
+        highestNum := item
+    highestNum
+
+plot(highest(a1))

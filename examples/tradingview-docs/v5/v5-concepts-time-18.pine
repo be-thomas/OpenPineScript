@@ -1,0 +1,17 @@
+//@version=5
+indicator("`dayofmonth()` demo", overlay = false)
+
+//@variable The UNIX timestamp corresponding to August 29, 2024 at 00:00:00 UTC.
+const int fixedTimestamp = timestamp("29 Aug 2024")
+//@variable The day of the month calculated from the `fixedTimestamp`, expressed in the exchange time zone. 
+//          If the exchange time zone has a negative UTC offset, this variable's value is 28 instead of 29.
+int dayFromTimestamp = dayofmonth(fixedTimestamp)
+
+//@variable An "int" representing the current bar's opening calendar day in the exchange time zone. 
+//          Equivalent to the `dayofmonth` variable. 
+int openingDay = dayofmonth(time)
+
+// Plot the `openingDay`.
+plot(openingDay, "Opening day of month", linewidth = 3)
+// Highlight the background when the `openingDay` equals the `dayFromTimestamp`.
+bgcolor(openingDay == dayFromTimestamp ? color.orange : na, title = "Day detected highlight")

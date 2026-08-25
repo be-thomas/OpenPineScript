@@ -1,0 +1,24 @@
+//@version=5
+indicator("CCI Background")
+
+bullColor = input.color(color.lime, "🠅", inline = "1")
+bearColor = input.color(color.fuchsia, "🠇", inline = "1")
+
+// Calculate CCI.
+myCCI = ta.cci(hlc3, 20)
+// Get relative position of CCI in last 100 bars, on a 0-100% scale.
+myCCIPosition = ta.percentrank(myCCI, 100)
+// Generate a bull gradient when position is 50-100%, bear gradient when position is 0-50%.
+backgroundColor = if myCCIPosition >= 50
+    color.from_gradient(myCCIPosition, 50, 100, color.new(bullColor, 75), bullColor)
+else
+    color.from_gradient(myCCIPosition, 0, 50, bearColor, color.new(bearColor, 75))
+
+// Wider white line background.
+plot(myCCI, "CCI", color.white, 3)
+// Think black line.
+plot(myCCI, "CCI", color.black, 1)
+// Zero level.
+hline(0)
+// Gradient background.
+bgcolor(backgroundColor)

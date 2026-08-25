@@ -1,0 +1,16 @@
+//@version=4
+study("History referencing")
+a = array.new_float(1)
+array.set(a, 0, close)
+previousClose1 = array.get(a, 0)[1]
+previousClose2 = close[1]
+plot(previousClose1, "previousClose1", color.gray, 6)
+plot(previousClose2, "previousClose2", color.white, 2)
+
+ma1 = sma(array.get(a, 0), 20)
+ma2 = sma(close, 20)
+plot(ma1, "MA 1", color.aqua, 6)
+plot(ma2, "MA 2", color.white, 2)
+
+// Last set having no impact.
+array.set(a, 0, 10.0)

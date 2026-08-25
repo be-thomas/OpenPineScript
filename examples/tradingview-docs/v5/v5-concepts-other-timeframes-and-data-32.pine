@@ -1,0 +1,16 @@
+//@version=5
+indicator("Custom contexts demo 1", "Adjusted prices", true)
+
+//@variable A custom ticker ID representing the chart's symbol with the dividend adjustment modifier.
+string adjustedTickerID = ticker.modify(syminfo.tickerid, adjustment = adjustment.dividends)
+
+// Request the adjusted prices for the chart's symbol.
+[o, h, l, c] = request.security(adjustedTickerID, timeframe.period, [open, high, low, close])
+
+//@variable The color of the candles on the chart.
+color candleColor = c > o ? color.teal : color.maroon
+
+// Plot the adjusted prices.
+plotcandle(o, h, l, c, "Adjusted Prices", candleColor)
+// Highlight the background when `c` is different from `close`.
+bgcolor(c != close ? color.new(color.orange, 80) : na)

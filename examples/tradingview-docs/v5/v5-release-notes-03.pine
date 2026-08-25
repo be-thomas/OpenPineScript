@@ -1,0 +1,4 @@
+//@version=5
+// @strategy_alert_message My Default Alert Message
+strategy("My Strategy")
+plot(close)

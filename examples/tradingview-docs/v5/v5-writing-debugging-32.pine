@@ -1,0 +1,37 @@
+//@version=5
+indicator("Logging historical and realtime data demo", "Average bar ratio")
+
+//@variable The current bar's change from the `open` to `close`.
+float numerator = close - open
+//@variable The current bar's `low` to `high` range.
+float denominator = high - low
+//@variable The ratio of the bar's open-to-close range to its full range.
+float ratio = numerator / denominator
+//@variable The average `ratio` over 10 non-na values.
+float average = ta.sma(ratio, 10)
+
+// Plot the `average`.
+plot(average, "average", color.purple, 3)
+
+if barstate.isconfirmed
+    // Log a division by zero error if the `denominator` is 0.
+    if denominator == 0.0
+        log.error("Division by 0 in confirmed results!")
+    // Otherwise, log the confirmed values.
+    else
+        log.info(
+             "Values (confirmed):\nnumerator: {1, number, #.########}\ndenominator: {2, number, #.########}
+             \nratio: {0, number, #.########}\naverage: {3, number, #.########}",
+             ratio, numerator, denominator, average
+         )
+else
+    // Log a division by zero error if the `denominator` is 0.
+    if denominator == 0.0
+        log.error("Division by 0 on unconfirmed bar.")
+    // Otherwise, log the unconfirmed values.
+    else
+        log.warning(
+             "Values (unconfirmed):\nnumerator: {1, number, #.########}\ndenominator: {2, number, #.########}
+             \nratio: {0, number, #.########}\naverage: {3, number, #.########}",
+             ratio, numerator, denominator, average
+         )

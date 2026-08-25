@@ -1,0 +1,11 @@
+//@version=5
+library("DynamicRequests", dynamic_requests = true)
+
+//@function        Requests a tuple containing confirmed HTF OHLC data for a specified `tickerID` and `timeframe`.
+//@param tickerID  The ticker identifier to request data for. 
+//@param timeframe The timeframe of the requested data.
+//@returns         A tuple containing the last confirmed `open`, `high`, `low`, and `close` from the requested context.
+export htfPrices(string tickerID, string timeframe) =>
+    if timeframe.in_seconds() >= timeframe.in_seconds(timeframe)
+        runtime.error("The `timeframe` argument of `getHTFPrices()` must be higher than the chart's timeframe.")
+    request.security(tickerID, timeframe, [open[1], high[1], low[1], close[1]], lookahead = barmerge.lookahead_on)

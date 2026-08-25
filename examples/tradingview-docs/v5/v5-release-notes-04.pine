@@ -1,0 +1,5 @@
+//@version=5
+strategy("strategy.exit() example", overlay = true)
+strategy.entry("Long", strategy.long, qty = 100)
+strategy.exit("Exit Long1", "Long", trail_points = 50, trail_offset = 0, qty_percent = 20)
+strategy.exit("Exit Long2", "Long", trail_points = 100, trail_offset = 0, qty_percent = 20)

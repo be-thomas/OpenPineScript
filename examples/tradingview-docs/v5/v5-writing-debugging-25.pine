@@ -1,0 +1,24 @@
+//@version=5
+indicator("Labels on successive bars demo", "Inspecting multiple series", true, max_labels_count = 500)
+
+//@variable The number of bars in the calculation window.
+int lengthInput = input.int(50, "Length", 1)
+
+//@variable The highest `close` over `lengthInput` bars.
+float highestClose = ta.highest(close, lengthInput)
+//@variable The percent rank of the current `close` compared to previous values over `lengthInput` bars.
+float percentRank = ta.percentrank(close, lengthInput)
+//@variable The number of bars since the `close` was equal to the `highestClose`.
+int barsSinceHigh = ta.barssince(close == highestClose)
+//@variable Is `true` when the `percentRank` is 0, i.e., when the `close` is the lowest.
+bool isLow = percentRank == 0.0
+
+//@variable A multi-line string representing the `time`, `highestClose`, `percentRank`, `barsSinceHigh`, and `isLow`.
+string debugString = str.format(
+     "time (GMT): {0, time, yyyy-MM-dd'T'HH:mm:ss}\nhighestClose: {1, number, #.####}
+     \npercentRank: {2, number, #.##}%\nbarsSinceHigh: {3, number, integer}\nisLow: {4}",
+     time, highestClose, percentRank, barsSinceHigh, isLow
+ )
+
+//@variable Draws a label showing the `debugString` at each bar's `high`.
+label debugLabel = label.new(chart.point.now(high), debugString, textcolor = color.white)

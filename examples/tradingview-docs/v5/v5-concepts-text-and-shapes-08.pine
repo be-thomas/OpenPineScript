@@ -1,0 +1,3 @@
+//@version=5
+indicator("", "", true)
+label.new(bar_index, high)

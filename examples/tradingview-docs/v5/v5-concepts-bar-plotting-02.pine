@@ -1,0 +1,11 @@
+//@version=5
+indicator("Smoothed candles", overlay = true)
+lenInput = input.int(9)
+smooth(source, length) =>
+    ta.sma(source, length)
+o = smooth(open, lenInput)
+h = smooth(high, lenInput)
+l = smooth(low, lenInput)
+c = smooth(close, lenInput)
+ourWickColor = close > c ? color.green : color.red
+plotcandle(o, h, l, c, wickcolor = ourWickColor)

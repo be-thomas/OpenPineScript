@@ -1,0 +1,4 @@
+//@version=5
+indicator("Source input", "", true)
+srcInput = input.source(high, "Source")
+plot(srcInput, "Src", color.new(color.purple, 70), 6)

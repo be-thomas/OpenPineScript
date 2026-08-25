@@ -1,0 +1,5 @@
+//@version=4
+study("My Script", overlay=true)
+var l=label.new(bar_index, close, yloc=yloc.abovebar, text="Label")
+label.set_x(l,bar_index)
+label.set_tooltip(l, "Label Tooltip")

@@ -1,0 +1,18 @@
+//@version=5
+strategy("Donchian Channel Break", overlay = true, calc_on_every_tick = true, pyramiding = 20)
+
+int length = input.int(15, "Length")
+
+float highest = ta.highest(close, length)
+float lowest  = ta.lowest(close, length)
+
+if close == highest
+    strategy.entry("Buy", strategy.long)
+if close == lowest
+    strategy.entry("Sell", strategy.short)
+
+// Highlight the background of realtime bars.
+bgcolor(barstate.isrealtime ? color.new(color.orange, 80) : na)
+
+plot(highest, "Highest", color = color.lime)
+plot(lowest, "Lowest", color = color.red)

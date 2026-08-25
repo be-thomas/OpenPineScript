@@ -1,0 +1,5 @@
+//@version=5
+indicator("", "", true)
+renkoTicker = ticker.renko(syminfo.tickerid, "ATR", 10)
+renkoLow = request.security(renkoTicker, timeframe.period, low)
+plot(renkoLow)

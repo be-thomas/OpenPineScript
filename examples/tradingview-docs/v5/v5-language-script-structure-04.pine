@@ -1,0 +1,5 @@
+//@version=5
+indicator("")
+// This line is a comment
+a = close // This is also a comment
+plot(a)

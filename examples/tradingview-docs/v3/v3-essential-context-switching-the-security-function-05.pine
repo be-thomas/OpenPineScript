@@ -1,0 +1,6 @@
+//@version=3
+study('My Script', overlay=true)
+a = security(tickerid, '60', low, lookahead=barmerge.lookahead_off)
+plot(a, color=red)
+b = security(tickerid, '60', low, lookahead=barmerge.lookahead_on)
+plot(b, color=lime)

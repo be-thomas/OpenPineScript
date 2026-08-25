@@ -1,0 +1,3 @@
+//@version=5
+indicator("My Script")
+    plot(1)

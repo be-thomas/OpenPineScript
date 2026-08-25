@@ -1,0 +1,5 @@
+//@version=5
+indicator("Out of bounds index")
+array<int> a = na
+array.push(a, 111)
+label.new(bar_index, 0, "a: " + str.tostring(a))

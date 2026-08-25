@@ -1,0 +1,8 @@
+//@version=5    
+library("Point")    
+
+export type point   
+    int x   
+    float y 
+    bool isHi   
+    bool wasBreached = false    

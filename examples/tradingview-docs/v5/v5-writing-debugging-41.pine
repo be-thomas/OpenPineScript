@@ -1,0 +1,32 @@
+//@version=5
+indicator("Inspecting multiple iterations demo", "Aggregate ROC")
+
+//@variable The number of bars in the calculation.
+int lookbackInput = input.int(20, "Lookback", 1)
+
+//@variable The average ROC of `close` over lags from 1 to `lookbackInput` bars.
+float aroc = 0.0
+
+// Calculation loop.
+for length = 1 to lookbackInput
+    //@variable The `close` value `length` bars ago.
+    float pastClose = close[length]
+    //@variable The `close` rate of change over `length` bars.
+    float roc = (close - pastClose) / pastClose
+    // Add the `roc` to `aroc`.
+    aroc += roc
+    if barstate.isconfirmed
+        log.info(
+             "{0}\nlength (counter): {1}\npastClose: {2, number, #.#####}\n
+             distance to pastClose: {3, number, #.########}\nroc: {4, number, #.########}\n
+             aroc (before division): {5, number, #.########}\n{6}",
+             length == 1 ? "LOOP START" : "",
+             length, pastClose, close - pastClose, roc, aroc,
+             length == lookbackInput ? "LOOP END" : ""
+         )
+
+// Divide `aroc` by the `lookbackInput`.
+aroc /= lookbackInput
+
+// Plot the `aroc`.
+plot(aroc, "aroc", color.blue, 3)

@@ -253,6 +253,48 @@ export class Context {
     public mintick: number = 0.01;
 
     /**
+     * How many bars the host is going to feed, and when the last one opens.
+     *
+     * ── Why the host has to say ─────────────────────────────────────────────
+     *
+     * `last_bar_index` and `last_bar_time` (v5, December 2021) are documented
+     * as "known at the beginning of the script's calculation" — on bar 1 a
+     * script can already ask how far the dataset runs, which is how the common
+     * `bar_index == last_bar_index - 1` idiom works at all.
+     *
+     * This engine streams bars: `setBar` is called one at a time and the
+     * Context has no way to know how many more are coming. Only the caller
+     * knows, so the caller declares it. `mock_run` reads it off the CSV; the
+     * session API takes it from the candle array it was handed.
+     *
+     * ── When it is not declared ─────────────────────────────────────────────
+     *
+     * The fallback is the highest bar seen SO FAR, which is correct on the last
+     * bar and an underestimate before it. That is a real divergence from
+     * TradingView rather than a hidden approximation, and it is why
+     * `provideDatasetExtent` exists: a host that can be exact should be.
+     */
+    public datasetSize: number | null = null;
+    public datasetLastTime: number | null = null;
+
+    /** Declare the extent of the run before the first bar. */
+    public provideDatasetExtent(barCount: number, lastBarTime?: number): void {
+        this.datasetSize = Number.isFinite(barCount) && barCount > 0 ? Math.trunc(barCount) : null;
+        this.datasetLastTime = lastBarTime != null && Number.isFinite(lastBarTime)
+            ? Number(lastBarTime) : null;
+    }
+
+    /** Bar index of the last bar in the dataset — `last_bar_index`. */
+    public get lastBarIndex(): number {
+        return this.datasetSize != null ? this.datasetSize - 1 : this.currentBarIndex;
+    }
+
+    /** Opening time of the last bar in the dataset — `last_bar_time`. */
+    public get lastBarTime(): number {
+        return this.datasetLastTime != null ? this.datasetLastTime : this.time;
+    }
+
+    /**
      * Lines emitted by `log.info` / `log.warning` / `log.error` (v5).
      *
      * Kept on the Context rather than written to the console because they are

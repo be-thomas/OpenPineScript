@@ -1,0 +1,3 @@
+//@version=3
+study("Bar Count", overlay=true, scale=scale.none)
+plot(n + 1, style=histogram)

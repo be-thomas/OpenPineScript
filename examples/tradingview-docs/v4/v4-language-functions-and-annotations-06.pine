@@ -1,0 +1,7 @@
+//@version=4
+study("My Script")
+va = 0.0
+for i = 1 to 2 by 1
+    if (i + bar_index) % 2 == 0
+        va := lowest(bar_index, 10)  // same context on each call
+plot(va)

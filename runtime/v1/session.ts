@@ -237,6 +237,11 @@ export class Session {
         const exec = compile(this.js, ctx, Object.create(null));
         Object.assign(ctx.userInputs, this.inputValues);
         for (const s of this.securities) ctx.provideSecurityData(s.symbol, s.resolution, s.candles);
+        // `last_bar_index` / `last_bar_time` are documented as known from the
+        // first bar, and only the caller knows how long the run is.
+        if (candles.length > 0) {
+            ctx.provideDatasetExtent(candles.length, candles[candles.length - 1].time);
+        }
         this.ctx = ctx; this.exec = exec;
 
         const errors: EngineError[] = [];

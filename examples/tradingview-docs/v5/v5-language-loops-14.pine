@@ -1,0 +1,25 @@
+//@version=5
+indicator("`for element in array` demo", "Intrabar strength")
+
+//@variable A valid timeframe closest to one-tenth of the current chart's timeframe, "1" if the timeframe is too small.
+var string lowerTimeframe = timeframe.from_seconds(math.max(int(timeframe.in_seconds() / 10), 60))
+//@variable An array of intrabar `hl2` prices calculated from the `lowerTimeframe`.
+array<float> intrabarPrices = request.security_lower_tf("", lowerTimeframe, hl2)
+
+//@variable The excess trend strength of `intrabarPrices`. 
+float strength = 0.0
+
+// Loop directly through the `intrabarPrices` array. Each iteration's `price` represents an array element.
+for price in intrabarPrices
+    // Subtract 1 from the `strength` if the retrieved `price` is above the current bar's `close` price. 
+    if price > close
+        strength -= 1
+    // Add 1 to the `strength` if the retrieved `price` is below the current bar's `close` price. 
+    else if price < close
+        strength += 1
+
+//@variable Is `color.teal` when the `strength` is positive, `color.maroon` otherwise.
+color strengthColor = strength > 0 ? color.teal : color.maroon
+
+// Plot the `strength` as columns colored by the `strengthColor`.
+plot(strength, "Intrabar strength", strengthColor, 1, plot.style_columns)

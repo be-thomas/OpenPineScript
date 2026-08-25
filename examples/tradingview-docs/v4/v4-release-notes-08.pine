@@ -1,0 +1,3 @@
+//@version=4
+study("My Script")
+plotcandle(open, high, low, close, title='Title', color = open < close ? color.green : color.red, wickcolor=color.black, bordercolor=color.orange)

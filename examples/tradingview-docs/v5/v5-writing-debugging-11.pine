@@ -1,0 +1,16 @@
+//@version=5
+indicator("Conditions as numbers demo", "MA signal")
+
+//@variable The number of bars in the moving average calculation.
+int lengthInput = input.int(20, "Length", 1)
+
+//@variable The ratio of the `ohlc4` price to its `lengthInput`-bar moving average.
+float ratio = ohlc4 / ta.sma(ohlc4, lengthInput)
+
+//@variable The condition to inspect. Is `true` when `ohlc4` is above its moving average, `false` otherwise.
+bool priceAbove = ratio > 1.0
+//@variable Returns 1 when the `priceAbove` condition is `true`, 0 otherwise.
+int debugValue = priceAbove ? 1 : 0
+
+// Plot the `debugValue.
+plot(debugValue, "Conditional number", color.teal, 3)

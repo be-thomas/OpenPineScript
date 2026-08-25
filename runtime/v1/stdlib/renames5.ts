@@ -69,13 +69,15 @@ const TA = group("ta", [
 /**
  * The maths library.
  *
- * `random`, `todegrees`, `toradians` and `round_to_mintick` are NOT here: they
- * have no v1–v4 spelling to inherit from, so they are implemented directly in
- * ./math.ts and reach v5 through V5_ONLY_NAMESPACES instead.
+ * `random`, `todegrees`, `toradians` and `round_to_mintick` ARE here. They were
+ * previously excluded on the grounds that they had no v1–v4 spelling to inherit
+ * from; TradingView's v4 release notes list all four as v4 additions, so they
+ * are ordinary renames like the rest of the library. See ./math.ts.
  */
 const MATH = group("math", [
     "abs", "acos", "asin", "atan", "avg", "ceil", "cos", "exp", "floor", "log",
     "log10", "max", "min", "pow", "round", "sign", "sin", "sqrt", "sum", "tan",
+    "random", "todegrees", "toradians", "round_to_mintick",
 ]);
 
 /**
@@ -101,6 +103,14 @@ const REQUEST: RenameSpec[] = [{ to: "request.security", from: "security" }];
 const TICKER: RenameSpec[] = [
     { to: "ticker.heikinashi", from: "heikinashi" },
     { to: "ticker.new", from: "syminfo.tickerid" },
+    // The non-standard chart types. All four are documented on the v3 page as
+    // well as the v4 one, so they are v1–v4 flat names that v5 namespaced —
+    // the same shape as heikinashi. Their implementations refuse rather than
+    // approximate; see runtime/v1/stdlib/chart.ts.
+    { to: "ticker.renko", from: "renko" },
+    { to: "ticker.linebreak", from: "linebreak" },
+    { to: "ticker.kagi", from: "kagi" },
+    { to: "ticker.pointfigure", from: "pointfigure" },
 ];
 
 /** Strings. The rest of `str.*` is new at v5 and lives in ./str.ts. */
@@ -130,7 +140,8 @@ export const V5_ONLY_NAMESPACES: readonly string[] = [
 ];
 
 /**
- * EXACT keys that exist only from v5 — the typed input functions.
+ * EXACT keys that exist only from v5 — the typed input functions, and the
+ * dataset-extent variables.
  *
  * Separate from V5_ONLY_NAMESPACES because `input.*` is not a v5-only
  * namespace: v4 has `input.float` as a CONSTANT and v5 has it as a FUNCTION, so
@@ -141,6 +152,13 @@ export const V5_ONLY_NAMES: readonly string[] = [
     "input.int", "input.float", "input.bool", "input.string", "input.color",
     "input.timeframe", "input.session", "input.symbol", "input.source",
     "input.time", "input.price", "input.text_area",
+
+    // Added December 2021, per the v5 release notes: "Added new built-in
+    // variables that return the bar_index and time values of the last bar in
+    // the dataset. Their values are known at the beginning of the script's
+    // calculation." Flat names rather than a namespace, so they are listed
+    // here rather than in V5_ONLY_NAMESPACES. See ./dataset.ts.
+    "last_bar_index", "last_bar_time", "hlcc4",
 ];
 
 export const V5_RENAMES: readonly RenameSpec[] = [

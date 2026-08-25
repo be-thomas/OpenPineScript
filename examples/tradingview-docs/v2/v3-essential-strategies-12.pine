@@ -1,0 +1,7 @@
+//@version=2
+strategy("My Script")
+if year > 2014 and year < 2016
+    strategy.entry("Buy", strategy.long, oca_name="My oca", oca_type=strategy.oca.reduce)
+    strategy.exit("FromBy", "Buy", profit=100, loss=200, oca_name="My oca")
+    strategy.entry("Sell", strategy.short, oca_name="My oca", oca_type=strategy.oca.cancel)
+    strategy.order("Order", strategy.short, oca_name="My oca", oca_type=strategy.oca.none)

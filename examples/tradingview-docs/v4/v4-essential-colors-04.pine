@@ -1,0 +1,8 @@
+//@version=4
+study("Holiday candles", "", true)
+float r = random(0, 255)
+float g = random(0, 255)
+float b = random(0, 255)
+float t = random(0, 100)
+color c_holiday = color.rgb(r, g, b, t)
+plotcandle(open, high, low, close, color = c_holiday, wickcolor = c_holiday, bordercolor = c_holiday)

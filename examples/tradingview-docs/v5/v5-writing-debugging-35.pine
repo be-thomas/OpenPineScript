@@ -1,0 +1,44 @@
+//@version=5
+indicator("Extracting local variables with tuples demo", "Custom MA", true)
+
+//@variable The number of bars in the `customMA()` calculation.
+int lengthInput = input.int(50, "Length", 2)
+
+//@function      Calculates a moving average that only responds to values outside the first and third quartiles.
+//@param source  The series of values to process.
+//@param length  The number of bars in the calculation.
+//@returns       The moving average value.
+customMA(float source, int length) =>
+    //@variable The custom moving average.
+    var float result = na
+    // Calculate the 25th and 75th `source` percentiles.
+    float q1 = ta.percentile_linear_interpolation(source, length, 25)
+    float q3 = ta.percentile_linear_interpolation(source, length, 75)
+    // Calculate the range values.
+    float outerRange = math.max(source - q3, q1 - source, 0.0)
+    float totalRange = ta.range(source, length)
+    //@variable Half the ratio of the `outerRange` to the `totalRange`.
+    float alpha = 0.5 * outerRange / totalRange
+    // Mix the `source` with the `result` based on the `alpha` value.
+    result := (1.0 - alpha) * nz(result, source) + alpha * source
+    // Return a tuple containing the `result` and other local variables.
+    [result, q1, q3, outerRange, totalRange, alpha]
+
+// Declare a tuple containing all values returned by `customMA()`.
+[maValue, q1Debug, q3Debug, outerRangeDebug, totalRangeDebug, alphaDebug] = customMA(close, lengthInput)
+
+// Plot the `maValue`.
+plot(maValue, "Custom MA", color.blue, 3)
+
+//@variable Display location for plots with different scale.
+notOnPane = display.all - display.pane
+
+// Display the extracted `q1` and `q3` values in all plot locations.
+plot(q1Debug, "q1", color.new(color.maroon, 50))
+plot(q3Debug, "q3", color.new(color.teal, 50))
+// Display the other extracted values in the status line and Data Window to avoid impacting the scale.
+plot(outerRangeDebug, "outerRange", chart.fg_color, display = notOnPane)
+plot(totalRangeDebug, "totalRange", chart.fg_color, display = notOnPane)
+plot(alphaDebug, "alpha", chart.fg_color, display = notOnPane)
+// Highlight the chart when `alphaDebug` is 0, i.e., when the `maValue` does not change.
+bgcolor(alphaDebug == 0.0 ? color.new(color.orange, 90) : na, title = "`alpha == 0.0` highlight")

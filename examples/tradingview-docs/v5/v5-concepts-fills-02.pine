@@ -1,0 +1,18 @@
+//@version=5
+indicator("Example 3", overlay = true)
+
+//@variable The 5-bar moving average of `close` prices.
+float ma1 = ta.sma(close, 5)
+//@variable The 20-bar moving average of `close` prices.
+float ma2 = ta.sma(close, 20)
+
+//@variable The 90% transparent color of the space between MA plots. Green if `ma1 > ma2`, red otherwise. 
+color fillColor = ma1 > ma2 ? color.new(color.green, 90) : color.new(color.red, 90) 
+
+//@variable The ID of the `ma1` plot for use in the `fill()` function.
+ma1PlotID = plot(ma1, "5-bar SMA")
+//@variable The ID of the `ma2` plot for use in the `fill()` function.
+ma2PlotID = plot(ma2, "20-bar SMA")
+
+// Fill the space between the `ma1PlotID` and `ma2PlotID` using the `fillColor`.
+fill(ma1PlotID, ma2PlotID, fillColor, "SMA plot fill")

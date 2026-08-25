@@ -1,0 +1,8 @@
+//@version=5
+indicator("RSI")
+myRSI = ta.rsi(close, 20)
+bullColor = color.from_gradient(myRSI, 50, 80, color.new(color.lime, 70), color.new(color.lime, 0))
+bearColor = color.from_gradient(myRSI, 20, 50, color.new(color.red,   0), color.new(color.red, 70))
+myRSIColor = myRSI > 50 ? bullColor : bearColor
+plot(myRSI, "RSI", myRSIColor, 3)
+hline(50)

@@ -1,0 +1,46 @@
+//@version=5
+indicator("Dividends, splits, and earnings demo", overlay = true)
+
+//@variable The size of the table's text.
+string tableSize = input.string(
+     size.large, "Table size", [size.auto, size.tiny, size.small, size.normal, size.large, size.huge]
+ )
+
+//@variable The color of the table's text and frame.
+var color tableColor = chart.fg_color
+//@variable A `table` displaying the latest dividend, split, and EPS information.
+var table infoTable = table.new(position.top_right, 3, 4, frame_color = tableColor, frame_width = 1)
+
+// Add header cells on the first bar.
+if barstate.isfirst
+    table.cell(infoTable, 0, 0, "Field", text_color = tableColor, text_size = tableSize)
+    table.cell(infoTable, 1, 0, "Value", text_color = tableColor, text_size = tableSize)
+    table.cell(infoTable, 2, 0, "Date", text_color = tableColor, text_size = tableSize)
+    table.cell(infoTable, 0, 1, "Dividend", text_color = tableColor, text_size = tableSize)
+    table.cell(infoTable, 0, 2, "Split", text_color = tableColor, text_size = tableSize)
+    table.cell(infoTable, 0, 3, "EPS", text_color = tableColor, text_size = tableSize)
+
+//@variable The amount of the last reported dividend as of the current bar.
+float latestDividend = request.dividends(syminfo.tickerid, dividends.gross, barmerge.gaps_on)
+//@variable The numerator of that last reported split ratio as of the current bar.
+float latestSplitNum = request.splits(syminfo.tickerid, splits.numerator, barmerge.gaps_on)
+//@variable The denominator of the last reported split ratio as of the current bar.
+float latestSplitDen = request.splits(syminfo.tickerid, splits.denominator, barmerge.gaps_on)
+//@variable The last reported earnings per share as of the current bar.
+float latestEPS = request.earnings(syminfo.tickerid, earnings.actual, barmerge.gaps_on)
+
+// Update the "Value" and "Date" columns when new values come in.
+if not na(latestDividend)
+    table.cell(
+         infoTable, 1, 1, str.tostring(math.round(latestDividend, 3)), text_color = tableColor, text_size = tableSize
+     )
+    table.cell(infoTable, 2, 1, str.format_time(time, "yyyy-MM-dd"), text_color = tableColor, text_size = tableSize)
+if not na(latestSplitNum)
+    table.cell(
+         infoTable, 1, 2, str.format("{0}-for-{1}", latestSplitNum, latestSplitDen), text_color = tableColor,
+         text_size = tableSize
+     )
+    table.cell(infoTable, 2, 2, str.format_time(time, "yyyy-MM-dd"), text_color = tableColor, text_size = tableSize)
+if not na(latestEPS)
+    table.cell(infoTable, 1, 3, str.tostring(latestEPS), text_color = tableColor, text_size = tableSize)
+    table.cell(infoTable, 2, 3, str.format_time(time, "yyyy-MM-dd"), text_color = tableColor, text_size = tableSize)

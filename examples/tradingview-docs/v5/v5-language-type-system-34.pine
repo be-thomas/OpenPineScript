@@ -1,0 +1,9 @@
+//@version=5
+indicator("Type templates demo")
+
+//@variable A variable initially assigned to `na` that accepts arrays of "int" values.
+array<int> intArray = na
+//@variable An empty matrix that holds "float" values.
+floatMatrix = matrix.new<float>()
+//@variable An empty map that holds "string" keys and "color" values.
+stringColorMap = map.new<string, color>()

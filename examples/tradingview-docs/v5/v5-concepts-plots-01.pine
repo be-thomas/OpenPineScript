@@ -1,0 +1,21 @@
+//@version=5
+indicator("Volume change", format = format.volume)
+
+color GREEN         = #008000
+color GREEN_LIGHT   = color.new(GREEN, 50)
+color GREEN_LIGHTER = color.new(GREEN, 85)
+color PINK          = #FF0080
+color PINK_LIGHT    = color.new(PINK, 50)
+color PINK_LIGHTER  = color.new(PINK, 90)
+
+bool  barUp = ta.rising(close, 1)
+bool  barDn = ta.falling(close, 1)
+float volumeChange = ta.change(volume)
+
+volumeColor = barUp ? GREEN_LIGHTER : barDn ? PINK_LIGHTER : color.gray
+plot(volume, "Volume columns", volumeColor, style = plot.style_columns)
+
+volumeChangeColor = barUp ? volumeChange > 0 ? GREEN : GREEN_LIGHT : volumeChange > 0 ? PINK : PINK_LIGHT
+plot(volumeChange, "Volume change columns", volumeChangeColor, 12, plot.style_histogram)
+
+plot(0, "Zero line", color.gray)

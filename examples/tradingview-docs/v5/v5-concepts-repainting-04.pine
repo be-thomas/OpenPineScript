@@ -1,0 +1,7 @@
+//@version=5
+indicator("Repainting", "", true)
+ma = ta.ema(close, 5)
+xUp = ta.crossover(open, ma[1])
+xDn = ta.crossunder(open, ma[1])
+plot(ma, "MA", color.black, 2)
+bgcolor(xUp ? color.new(color.lime, 80) : xDn ? color.new(color.fuchsia, 80) : na)

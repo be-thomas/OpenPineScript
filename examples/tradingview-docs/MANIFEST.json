@@ -1,0 +1,4580 @@
+[
+ {
+  "file": "v2/v3-annotations-alert-conditions-00.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/annotations/alert-conditions/",
+  "sha256": "d31ea3096985700571203e4f87b6b13bd15f2e0f57dbeddf7ebcec50e7e90889"
+ },
+ {
+  "file": "v2/v3-annotations-filling-in-the-background-with-fill-02.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/annotations/filling-in-the-background-with-fill/",
+  "sha256": "4c1a8fb664160539a6817261aa310ac94408f23ad1bf30d33ab99c76cfd2feb5"
+ },
+ {
+  "file": "v2/v3-appendix-howtos-00.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/howtos/",
+  "sha256": "de157b1c00887337ddb3686ca13f1898579faa8be4587de9f7af43df0bac84e2"
+ },
+ {
+  "file": "v2/v3-appendix-howtos-01.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/howtos/",
+  "sha256": "e9497c669de09d0bdf8da3484020eb7b842d5bf9b823bd0c2c0693281433f381"
+ },
+ {
+  "file": "v2/v3-appendix-howtos-04.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/howtos/",
+  "sha256": "ff731b7d54be052aba872a2222b675ae1a427e108c153c7b4e751d88bd82b043"
+ },
+ {
+  "file": "v2/v3-appendix-howtos-05.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/howtos/",
+  "sha256": "5472f96f78b03783b5148d0dcd052d7babab8796534cf3cb004352c232c5a651"
+ },
+ {
+  "file": "v2/v3-appendix-pine-version-3-migration-guide-07.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/pine-version-3-migration-guide/",
+  "sha256": "6f8a4c0a4ad2c723dd0d6f12c8ea2a5ef60fc1ebe074eae5f4e25bbb6772d42c"
+ },
+ {
+  "file": "v2/v3-essential-strategies-00.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "dbd8446215a7ae65349d7450bfcedfdbfa3ddc4c7949defd6a408fc9b8f96ba0"
+ },
+ {
+  "file": "v2/v3-essential-strategies-02.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "b89bfc4d22caf4618b70abfa2d0c75c2637b8d2914a12c6fbf29be4cf122ea32"
+ },
+ {
+  "file": "v2/v3-essential-strategies-04.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "29f23d5f7c52ba5bb37af51f257e08c08041ddb0480fbf093a49c283b7ddca0c"
+ },
+ {
+  "file": "v2/v3-essential-strategies-05.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "724282580d801e9719c662f2b1eae6cc9d082329a7a04fa5df8b914e862d9354"
+ },
+ {
+  "file": "v2/v3-essential-strategies-06.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "e30d2cc8aecb715c5049c9cfa03920e98d3c210bc6c6bafe94633b9afddfb719"
+ },
+ {
+  "file": "v2/v3-essential-strategies-07.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "1ea35da9e393ccd55cc451767d6d97178304c5dda993c8b0ffa4ebd39586413c"
+ },
+ {
+  "file": "v2/v3-essential-strategies-10.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "2a5cd09d090e6334b48ddcb66c8dccf1866abbad4cd96888cebf93f88b41ce0a"
+ },
+ {
+  "file": "v2/v3-essential-strategies-11.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "052e1740f284e24497098ce58b98dcb32d7eed1ff0792901c4379d9660d60e35"
+ },
+ {
+  "file": "v2/v3-essential-strategies-12.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "accccd0508b0f435715458a11cdafc565f625060f50e1390edc90c7b6cf8f92f"
+ },
+ {
+  "file": "v2/v3-essential-strategies-13.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "b5ae5806fa9a0ce0109f150e6bce8ccb91df46a981b2339e2690966a01700f19"
+ },
+ {
+  "file": "v2/v3-essential-strategies-14.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "cb9696b1fbc7e16f96b84c592da46d42191809c0787b3c65d57b0e3ca1efcdd3"
+ },
+ {
+  "file": "v2/v3-essential-strategies-15.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/strategies/",
+  "sha256": "434a0ebb0b340ab63b664d1d469d72f24febace877e5892d5b883840ac04594b"
+ },
+ {
+  "file": "v2/v3-language-expressions-declarations-and-statements-03.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/language/expressions-declarations-and-statements/",
+  "sha256": "2498eefa8b62a539338c59f8a59532b3431534a9908c2b36ede70132df6146a1"
+ },
+ {
+  "file": "v2/v3-language-expressions-declarations-and-statements-04.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/language/expressions-declarations-and-statements/",
+  "sha256": "0d660fcd084036164d76768802ac8e7159633f70b3b307606f0a4b9b3f4db208"
+ },
+ {
+  "file": "v2/v3-language-expressions-declarations-and-statements-16.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/language/expressions-declarations-and-statements/",
+  "sha256": "4259889d36246c282e36cd1ec3d0bd791007b3915b87a428f368b318df29e2bf"
+ },
+ {
+  "file": "v2/v3-language-lines-wrapping-04.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/language/lines-wrapping/",
+  "sha256": "6caadf67343981299c0de2dfe968b58e8997e85feffe149876f783813617f565"
+ },
+ {
+  "file": "v2/v3-language-literals-07.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/language/literals/",
+  "sha256": "10329be3fa64898152a5874464d22bb7613e30083c3dbfb3ac384a8f56b1934c"
+ },
+ {
+  "file": "v2/v3-release-notes-04.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/release-notes/",
+  "sha256": "8acdc85aa024089bdccc3b179e02b92567f4c25a8b899c072e45f23f0120aa6f"
+ },
+ {
+  "file": "v2/v3-release-notes-05.pine",
+  "version": 2,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/release-notes/",
+  "sha256": "4abeddca753b1063eccefa63893122303a3c5d6533dabf4eab813700614f3b43"
+ },
+ {
+  "file": "v3/v3-appendix-howtos-07.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/howtos/",
+  "sha256": "4e864afcf4eb0c626ec392f35a633abca217c37d68dd69953d3ca4895435d675"
+ },
+ {
+  "file": "v3/v3-appendix-howtos-08.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/howtos/",
+  "sha256": "7691479b6799a20f8c1852510d687f086caf6bba8ed947a60020a0c0dab3ecf6"
+ },
+ {
+  "file": "v3/v3-appendix-howtos-09.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/howtos/",
+  "sha256": "0c6179e379fd62870c2a225cb40962362535011fda6df1dff255d786bb58ade8"
+ },
+ {
+  "file": "v3/v3-appendix-howtos-10.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/howtos/",
+  "sha256": "084b4c9532b7cb25af6721c06b375dea197e19bf862b2b12572d91bf8cdc7753"
+ },
+ {
+  "file": "v3/v3-appendix-howtos-11.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/howtos/",
+  "sha256": "f9e3aaa7262fc2d31537fe54699ccfa97afd85ff398fbb7d037365e24296b667"
+ },
+ {
+  "file": "v3/v3-appendix-pine-version-3-migration-guide-08.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/appendix/pine-version-3-migration-guide/",
+  "sha256": "26a4103aedab307428ac4dde51e6599d5b8737e1b2e36afde17afead49bc8eb1"
+ },
+ {
+  "file": "v3/v3-essential-context-switching-the-security-function-05.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/context-switching-the-security-function/",
+  "sha256": "8699ad3191a63a8b6ebcf7317d646a68540dd4ce310aa225c7c6b7cf50f5e71e"
+ },
+ {
+  "file": "v3/v3-essential-sessions-and-time-functions-03.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/essential/sessions-and-time-functions/",
+  "sha256": "f1c92627c4f18ed5e3c0a9722d740920e3407f5dfd6fa5f1e6508b91487ecce3"
+ },
+ {
+  "file": "v3/v3-language-expressions-declarations-and-statements-05.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/language/expressions-declarations-and-statements/",
+  "sha256": "4806d3a4448a481cf771ae504c5c51358e089e640771794dbe6f92ef087894de"
+ },
+ {
+  "file": "v3/v3-language-expressions-declarations-and-statements-06.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/language/expressions-declarations-and-statements/",
+  "sha256": "90ae77505a969cd5f9771f6e3a2bd12664f92cbfeb6db2de14c883521269ea8d"
+ },
+ {
+  "file": "v3/v3-language-expressions-declarations-and-statements-17.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/language/expressions-declarations-and-statements/",
+  "sha256": "f77e1d8b4d51f5ee57a68a08a62ac9a1a771d2a5313a7cc0d7dc8b098ca4361e"
+ },
+ {
+  "file": "v3/v3-quickstart-guide-00.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/quickstart-guide/",
+  "sha256": "0dd76bc431938350bb7f2e6472aa939686b6150d48979d09ee92ee373befb3d0"
+ },
+ {
+  "file": "v3/v3-release-notes-00.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/release-notes/",
+  "sha256": "e0c5f58eb9638ca494391995fff52897193662defe153a5d2b1bb25fb50c5d4e"
+ },
+ {
+  "file": "v3/v3-release-notes-01.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/release-notes/",
+  "sha256": "ee3769bc44b3c041544024f713bd7a5a77ac387f2c6ffbcd56eaecc5e909d18e"
+ },
+ {
+  "file": "v3/v3-release-notes-02.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v3/release-notes/",
+  "sha256": "fc24eb36ae1f1d388bf2313fdf43de7de62f6532a4a97a80243a5bd62bcc8675"
+ },
+ {
+  "file": "v3/v4-language-expressions-declarations-and-statements-03.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/expressions-declarations-and-statements/",
+  "sha256": "8af1bc40d17adde7975f3b9568063a914cc3dc97e76fafebd7e22ffcc8e1070e"
+ },
+ {
+  "file": "v3/v4-release-notes-09.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/release-notes/",
+  "sha256": "bfeefbf1586c63565c82b586db066396fe0756ae46c1111e39cb12e3182f8090"
+ },
+ {
+  "file": "v3/v5-release-notes-19.pine",
+  "version": 3,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "541812c36d9a88d0c84991c23fad17ddb32fdb4e2e5e68b04e4ced9a3931a3e1"
+ },
+ {
+  "file": "v4/v4-annotations-background-coloring-with-bgcolor-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/background-coloring-with-bgcolor/",
+  "sha256": "926450afb2ed29d7b95e5888f1481c6f40ce6ac29a05758346a915c9624f3d80"
+ },
+ {
+  "file": "v4/v4-annotations-barcoloring-a-series-with-barcolor-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/barcoloring-a-series-with-barcolor/",
+  "sha256": "ec104899cfcca7b506b3b3e23ecca10b3423d3de27f7eede8570f3a967f17c90"
+ },
+ {
+  "file": "v4/v4-annotations-custom-ohlc-bars-and-candles-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/custom-ohlc-bars-and-candles/",
+  "sha256": "f8c90d93f099a5a73f484a79820bca8e42afe851bfc7749f7053ab01725aa5d7"
+ },
+ {
+  "file": "v4/v4-annotations-custom-ohlc-bars-and-candles-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/custom-ohlc-bars-and-candles/",
+  "sha256": "b15570f34568fd0049030c61b0d87e52e71746dcda90ee1123bba331cf481463"
+ },
+ {
+  "file": "v4/v4-annotations-custom-ohlc-bars-and-candles-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/custom-ohlc-bars-and-candles/",
+  "sha256": "a8ad3425b54467875418122fe8412ad6cc9b86f56d0c09f306b0ff60e6c0fd8f"
+ },
+ {
+  "file": "v4/v4-annotations-custom-ohlc-bars-and-candles-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/custom-ohlc-bars-and-candles/",
+  "sha256": "9b94b9d776e894a8c6dd6c74c2cd74d8342a74593382c31c4bc4405345e053ea"
+ },
+ {
+  "file": "v4/v4-annotations-filling-in-the-background-with-fill-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/filling-in-the-background-with-fill/",
+  "sha256": "e3c9919c10a7f32d2e2b786bca3e01bb4e03ca609c5e7a155f57e5d000e36d77"
+ },
+ {
+  "file": "v4/v4-annotations-filling-in-the-background-with-fill-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/filling-in-the-background-with-fill/",
+  "sha256": "6a390238d8babd1aa420384162e698d99656c71a596ff13292948087120f453e"
+ },
+ {
+  "file": "v4/v4-annotations-filling-in-the-background-with-fill-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/filling-in-the-background-with-fill/",
+  "sha256": "fd4e2da0fee76340eeab5b3ffbf886aa4d8efcef47ad1f74353b57d931c84689"
+ },
+ {
+  "file": "v4/v4-annotations-plotting-shapes-chars-and-arrows-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/plotting-shapes-chars-and-arrows/",
+  "sha256": "6997575f8b5ea70c0731f65fdc286e5b81da86d0ab516b52d99a6f23f9ecb681"
+ },
+ {
+  "file": "v4/v4-annotations-price-levels-hline-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/annotations/price-levels-hline/",
+  "sha256": "385b92488e0db5f7058da4112a78800cfefb76e84000af476b58e0488096b078"
+ },
+ {
+  "file": "v4/v4-appendix-howtos-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/appendix/howtos/",
+  "sha256": "dded573010326274cb7c7a8db3f5ab7679f384d386bf477609618647972f0a8d"
+ },
+ {
+  "file": "v4/v4-appendix-howtos-06.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/appendix/howtos/",
+  "sha256": "f30ba975b3ad9ed95bf3c01436b085b8ed6238c1240506a59b8e185a39ca157b"
+ },
+ {
+  "file": "v4/v4-appendix-howtos-08.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/appendix/howtos/",
+  "sha256": "a56fcbe4627745e31fe557153ab6f20c7a4594b4555b44b1f9510d56a2d174d8"
+ },
+ {
+  "file": "v4/v4-appendix-howtos-09.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/appendix/howtos/",
+  "sha256": "08c3ea30ffd9cfa44b3aa35efbe8043880d0c9b000bdebe6eeade5a42f46c935"
+ },
+ {
+  "file": "v4/v4-appendix-howtos-10.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/appendix/howtos/",
+  "sha256": "4bcf6f7438edd7483b864061ca0a8969f28312dbfcb0f75e8e21018f6a2d13ec"
+ },
+ {
+  "file": "v4/v4-appendix-howtos-11.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/appendix/howtos/",
+  "sha256": "effecd327929da13756250488e95a42d373c1235df835f7300154b4461ea1784"
+ },
+ {
+  "file": "v4/v4-debugging-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "4078b3e318a5f62eaf9f124e4366301c75ab5199138af9eb727832da4c8b20fb"
+ },
+ {
+  "file": "v4/v4-debugging-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "294fdf21f45fdb3d9598388dae41ad50c66ecf3737bde0841b72ad6131e79c10"
+ },
+ {
+  "file": "v4/v4-debugging-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "7ca36cf273960bb61ac3131dcc3ca212a8d2206462d5bd93121576271adfd228"
+ },
+ {
+  "file": "v4/v4-debugging-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "053f55e562162e2669f54374ba67dd0845b85181e81e94b27f928dfcf0c38b90"
+ },
+ {
+  "file": "v4/v4-debugging-05.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "da5a506d903d32694317531bff1ba0590ff901263c75899f2ac1cde8f2f12565"
+ },
+ {
+  "file": "v4/v4-debugging-06.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "bc0eba36fc2929fa11a5619fa81efced495adb5016ee88f7eeb8030628975f16"
+ },
+ {
+  "file": "v4/v4-debugging-07.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "702cf76e6eed86dfa2fd6b8686c1e0a10c5877e86f023093411d5852abeb0242"
+ },
+ {
+  "file": "v4/v4-debugging-08.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "eb698991c0aa42ac7933ebef1c89eed0c52805dcb423bbaaea21981e2142b5d1"
+ },
+ {
+  "file": "v4/v4-debugging-09.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "4254b23317a6bc4d8c099edc7bc669e95ece8199f397c1c53d31a2c67dd5d11e"
+ },
+ {
+  "file": "v4/v4-debugging-10.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "917b0f44b5c801f694979336d6d29305490a1efad2bda9f1485bbfd468b79e58"
+ },
+ {
+  "file": "v4/v4-debugging-11.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "51306610fb94712761ea4b9997911ccc50bd84cf58ae323e447475189c85b0f7"
+ },
+ {
+  "file": "v4/v4-debugging-12.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "405df5ca8487d7549dd96e63e20ff36dd5219c4bbbce6e872c9000030bda90c5"
+ },
+ {
+  "file": "v4/v4-debugging-13.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "e33516fa5857512a219c45e044b64b7e777347c44cc1bd2c37c7b2f46ba79063"
+ },
+ {
+  "file": "v4/v4-debugging-14.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/debugging/",
+  "sha256": "1ce7e5a3aebc903c17dfe7289cedd0d0cd76cb78daa406559c7fc97cd0ecd83e"
+ },
+ {
+  "file": "v4/v4-essential-alerts-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/alerts/",
+  "sha256": "640e5396f0f8ff680dd625eb2e8aaea216e5fd1dc25af5311fc349856eb11ba8"
+ },
+ {
+  "file": "v4/v4-essential-alerts-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/alerts/",
+  "sha256": "a229efafbf092ad8674874d3ca5180d10a5d4057408c0fb43e4d56b7f565854c"
+ },
+ {
+  "file": "v4/v4-essential-alerts-04.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/alerts/",
+  "sha256": "6a61c0e5fea60b65f9b1c20d0bbfb69da09cfc43798731773fd3fac31e4f58ff"
+ },
+ {
+  "file": "v4/v4-essential-alerts-05.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/alerts/",
+  "sha256": "8cf86fe6e6d80d4f5e8266f36241e1ef7a9cafb69492a8b6699d9816da980f02"
+ },
+ {
+  "file": "v4/v4-essential-alerts-07.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/alerts/",
+  "sha256": "ea6d7bccc77d091a89112f5aee141478418844be7f461d872cb36c71c67e7e5d"
+ },
+ {
+  "file": "v4/v4-essential-alerts-09.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/alerts/",
+  "sha256": "3fc3656545347aa263b4a2103d6d86397a183ed729ec97a7e4fbfb3b488b69a0"
+ },
+ {
+  "file": "v4/v4-essential-alerts-11.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/alerts/",
+  "sha256": "a85cf3c0121b4068fcf31bb8d3fdb34de148f2392c1772adf8b82c653ade4ec9"
+ },
+ {
+  "file": "v4/v4-essential-arrays-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "5fce90dbcc65dda4030743d724f5ff5b4ea4064b30cecec050b0a30c7dc42f9f"
+ },
+ {
+  "file": "v4/v4-essential-arrays-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "557a30673b19cf960d0b79b44f575be2f685bf0b347b578e24179faf13373a30"
+ },
+ {
+  "file": "v4/v4-essential-arrays-08.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "8cc4931b0033709979001cd40b32b7b3265ec2cae093b0990fec30ad21faa883"
+ },
+ {
+  "file": "v4/v4-essential-arrays-09.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "844221e8e4719d2231ecaba45e917d7d3e5966fff4b43a4732a18425523073d5"
+ },
+ {
+  "file": "v4/v4-essential-arrays-10.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "81bed13ab26073ef115c5cbde45858e23cd21700fdc84c532b8253e91e253b8d"
+ },
+ {
+  "file": "v4/v4-essential-arrays-11.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "7340eb1c9a835ab9afeddd9514f7f4fd5f9569091d3631e877f4144eaae76b08"
+ },
+ {
+  "file": "v4/v4-essential-arrays-12.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "f38f4f79a4297c72ae9d2ab493c099c9d0b7bf22482958844792918e95d0999e"
+ },
+ {
+  "file": "v4/v4-essential-arrays-13.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "1b65dd1b5d595034e5c73f6305c19eb8a68c9267760cec73589b3ad8e07cda75"
+ },
+ {
+  "file": "v4/v4-essential-arrays-14.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "97db0d877822972ebe2258c891bb7fc4e0f66a3f29cc64ec98fc13ad9f86d7de"
+ },
+ {
+  "file": "v4/v4-essential-arrays-15.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "0623e4ad0512b668c70b2b6e8941fe74274567ec9742d4ec5e74669c7e37c503"
+ },
+ {
+  "file": "v4/v4-essential-arrays-16.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "8a1e9d6afa27e0672d2ffc09f5983f38b0aa6dd4d02179d3c8afc4599983898e"
+ },
+ {
+  "file": "v4/v4-essential-arrays-17.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "dcb0bb6a240f0b1c4f55cbc6f435e985e2110beb8d0090732079e8c00a797f4c"
+ },
+ {
+  "file": "v4/v4-essential-arrays-18.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "fe8a369b68d1e2bdba98ba0bd43ae1db9562c4e566c1f9d551977001b50eb68c"
+ },
+ {
+  "file": "v4/v4-essential-arrays-19.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "21ef270c83c72b6358b534aa64f16706d715502675acf1992dea050ac03cd783"
+ },
+ {
+  "file": "v4/v4-essential-arrays-20.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "b95c21e57dc3535dfd8fa80273729627b5bc671d608586af39205eaac8eb9fb6"
+ },
+ {
+  "file": "v4/v4-essential-arrays-21.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "d1cb2f6e1bf93659dee506c6f2a682aa0a43b0a6f071feb0637b30c5a35501d4"
+ },
+ {
+  "file": "v4/v4-essential-arrays-22.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "affd7331ae0cd0b51da5ea5e6af043e642000a004e93bec54132e44dd2e3bfce"
+ },
+ {
+  "file": "v4/v4-essential-arrays-23.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/arrays/",
+  "sha256": "44ea90154f5a05a0d74ffbd779bf765beaa643125d9a39e589d7323a6d7b2b6f"
+ },
+ {
+  "file": "v4/v4-essential-bar-states-built-in-variables-barstate-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/bar-states-built-in-variables-barstate/",
+  "sha256": "bc179a869dfef8ff033db6d2f0f176ada1b5afd7e218817a94f1680c358de4c1"
+ },
+ {
+  "file": "v4/v4-essential-colors-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/colors/",
+  "sha256": "ec8f7121b6dbd61487e2ae070ba604238d19b0ec0e8b728cf7538a7be7d7f6ee"
+ },
+ {
+  "file": "v4/v4-essential-colors-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/colors/",
+  "sha256": "56cfe5ad017b86ea512a4fe01cac254ecfd43f49e0e8ad4fd0aa0ad33e1f4dde"
+ },
+ {
+  "file": "v4/v4-essential-colors-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/colors/",
+  "sha256": "f81d2ca265d5c86a30fb95e72dbe73e54d110de4f9df16f61458af1f4162c438"
+ },
+ {
+  "file": "v4/v4-essential-colors-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/colors/",
+  "sha256": "e1047d7711556ab487b50053cd013d57e34ba79e56aec9e9db5b6e044cf65e81"
+ },
+ {
+  "file": "v4/v4-essential-colors-04.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/colors/",
+  "sha256": "ce8795b8a58e9a63fa9d7e788856a0eebb6856ee223124dfa407aac122c546ab"
+ },
+ {
+  "file": "v4/v4-essential-colors-07.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/colors/",
+  "sha256": "96bd9c7f51311a2ab193f1a2e1646d44608c2dd0617f60b0870c0ea42e4a0e3a"
+ },
+ {
+  "file": "v4/v4-essential-colors-08.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/colors/",
+  "sha256": "f2e26db026f25e6d2ff965d93c7c051203305702123fa8a2af17443a3aef72f1"
+ },
+ {
+  "file": "v4/v4-essential-colors-09.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/colors/",
+  "sha256": "01b4e071345280ef4b514b1815a86b48e1034fdb86e0c9bd54b8722ad41b7daf"
+ },
+ {
+  "file": "v4/v4-essential-colors-10.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/colors/",
+  "sha256": "a021d9ee37db83a0be852ae66d99e6974b10affac6e9cfd4f03f8b513ea9f47c"
+ },
+ {
+  "file": "v4/v4-essential-context-switching-the-security-function-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/context-switching-the-security-function/",
+  "sha256": "ec377efa661f024303d55cf99e3e30b7f67a00d9e14025595a9f5377ef746cb7"
+ },
+ {
+  "file": "v4/v4-essential-drawings-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "83463be10385a7e9c36b2e1c51995b6fa5d645e9f5e7beb20f01ac93be8844d6"
+ },
+ {
+  "file": "v4/v4-essential-drawings-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "dc527c448689c003c1a809adc858340cc53a715c9fc314482996dcb0ba588e0c"
+ },
+ {
+  "file": "v4/v4-essential-drawings-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "afe403afc3318a7841a7503c828a68e40111f34e1c148457b035a3a2d6510ccf"
+ },
+ {
+  "file": "v4/v4-essential-drawings-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "2622a312170da81b9fb43f340fb6015a27b5e995dddf9ec4e7e37481c6dbac9d"
+ },
+ {
+  "file": "v4/v4-essential-drawings-05.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "c97c12c3e759305f63dc6e9a35e0342ac25746147a7184dfad9641db02123b68"
+ },
+ {
+  "file": "v4/v4-essential-drawings-06.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "f9b8b0c759433a101168dcb4a047baef39364d76eb13406483e464b578a99974"
+ },
+ {
+  "file": "v4/v4-essential-drawings-07.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "0977353c824a5d8299b3d5889a01662ac68479b7914fda91ea992d0d70485deb"
+ },
+ {
+  "file": "v4/v4-essential-drawings-08.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "e3d727c6b917f0cb96a9ef3b7e5ef97ea43d1e22287477fb456accfd16b2ece0"
+ },
+ {
+  "file": "v4/v4-essential-drawings-10.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "852a9552f07bbad033d726df57c238c2324399105f14077e6cf5100f679997de"
+ },
+ {
+  "file": "v4/v4-essential-drawings-11.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "d8f9317aad3fef35b9ebede743d367313685dcefcfe88a01f5db7280c6aad5a6"
+ },
+ {
+  "file": "v4/v4-essential-drawings-12.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "2e5feb4135f100b52d4899eefc12623223039a188595de25f88b71c4f1d21d1b"
+ },
+ {
+  "file": "v4/v4-essential-drawings-13.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "44c67048b9bcf45dbc581675000727bae6ec3c161aa5b479ef8129ecb427c449"
+ },
+ {
+  "file": "v4/v4-essential-drawings-14.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "02728f3a5333a5775bff17f3b665dd331892c99574b10041f33f119801714287"
+ },
+ {
+  "file": "v4/v4-essential-drawings-15.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "1d4985ab612a219398925177cdbcd9272ed1b65d9fd915f5b8d84c5fd2c1c28f"
+ },
+ {
+  "file": "v4/v4-essential-drawings-17.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "73e83ab4d652530cde4bc7f6c83f2765807dcd4f6aa962291432274a90edde60"
+ },
+ {
+  "file": "v4/v4-essential-drawings-18.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "e975cf2c18c1af41ea5a80b15e0f8e393409c8be99c7fa2a03966807fb03a8fa"
+ },
+ {
+  "file": "v4/v4-essential-drawings-19.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/drawings/",
+  "sha256": "f9a8fd33c1f8f560785a8fb091bdd85f83738ba5aa25caa374a08189e4141746"
+ },
+ {
+  "file": "v4/v4-essential-extended-and-regular-sessions-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/extended-and-regular-sessions/",
+  "sha256": "1216094e5d22d7c3fc8d70e8917fda09ec102855a60e76e8181899e8e011423e"
+ },
+ {
+  "file": "v4/v4-essential-extended-and-regular-sessions-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/extended-and-regular-sessions/",
+  "sha256": "c7629aa763a1de97d43cd414addf2b5bd9d36586e021b71f86e7bd0f0a9696b6"
+ },
+ {
+  "file": "v4/v4-essential-extended-and-regular-sessions-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/extended-and-regular-sessions/",
+  "sha256": "7b309971a34e588c3893574e7762c2a24363f93f24b7e04ce99a7b5d0214416a"
+ },
+ {
+  "file": "v4/v4-essential-non-standard-chart-types-data-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/non-standard-chart-types-data/",
+  "sha256": "b9e813547770400ae07d9b6a61dc75e31b68e139068898785434eef3e87e7c3a"
+ },
+ {
+  "file": "v4/v4-essential-non-standard-chart-types-data-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/non-standard-chart-types-data/",
+  "sha256": "5585a9bbe6f46020f6fcfd013cbc20b7dc894064219d9d4b77ec39e1186a9b96"
+ },
+ {
+  "file": "v4/v4-essential-non-standard-chart-types-data-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/non-standard-chart-types-data/",
+  "sha256": "e707e8fd1c7dc8d742bd313e9f8460603ea0852c57ef0583777fb0a050dc6c73"
+ },
+ {
+  "file": "v4/v4-essential-non-standard-chart-types-data-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/non-standard-chart-types-data/",
+  "sha256": "cb533d9dddafed2e7f93324ccce582a537141bbc0b803bea67f7580f981e2198"
+ },
+ {
+  "file": "v4/v4-essential-non-standard-chart-types-data-04.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/non-standard-chart-types-data/",
+  "sha256": "c527069423cc02ce8bb703178cd7abf1791076da06fd7b089ab392efc3a17498"
+ },
+ {
+  "file": "v4/v4-essential-non-standard-chart-types-data-05.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/non-standard-chart-types-data/",
+  "sha256": "223f506cff72d0b6356bce6e5c84bc32ff884db271752db1692bf0428a5adc7b"
+ },
+ {
+  "file": "v4/v4-essential-non-standard-chart-types-data-06.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/non-standard-chart-types-data/",
+  "sha256": "5e29eedc6d62c0b59293ea48d035a317bcfb2985f16c98c023b5235a81e3b816"
+ },
+ {
+  "file": "v4/v4-essential-sessions-and-time-functions-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/sessions-and-time-functions/",
+  "sha256": "c99be3c235d5176a28b1166f6c67a3e2d475befb9f48a16255c638c68ab8dcfd"
+ },
+ {
+  "file": "v4/v4-essential-sessions-and-time-functions-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/sessions-and-time-functions/",
+  "sha256": "0eaa49f2f3a48579b2933ef76c65e72ace68b2ad7e3aba2a5e7a803e835e299f"
+ },
+ {
+  "file": "v4/v4-essential-sessions-and-time-functions-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/sessions-and-time-functions/",
+  "sha256": "6c7dcd95cbf15d4488d103135cc8b189b0277343710b4f4d64f77f34ad322c47"
+ },
+ {
+  "file": "v4/v4-essential-strategies-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "8a899064cc1138a78a61fa7ffd5ca55982f4e2434701909b426f9f6cc8a65016"
+ },
+ {
+  "file": "v4/v4-essential-strategies-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "754df7212f67391dd406216ade556c2c8a0f01508e69a3351ec82eea20da85a3"
+ },
+ {
+  "file": "v4/v4-essential-strategies-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "4fbc46bb79fe7cce6efb5a45021f6e0e039b895aa0653302ca7b2854dc149d7d"
+ },
+ {
+  "file": "v4/v4-essential-strategies-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "d3cd9960254edb7d498a47abd3f09ab7250743d46a88a0f6bd16feeaeababe08"
+ },
+ {
+  "file": "v4/v4-essential-strategies-04.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "7949c42b18cc4b342fd601c7ca5ec28177bdeb9948da18bf85036c0849961910"
+ },
+ {
+  "file": "v4/v4-essential-strategies-05.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "8b7de57b735fdbc4cf4a812f80e5dbba26a9174ebcd492ac1208b7bfbd9e61fa"
+ },
+ {
+  "file": "v4/v4-essential-strategies-06.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "9ff23599b26e25481332f20f7b1326bdf5965e89ccd197c65302c10f1e20f13c"
+ },
+ {
+  "file": "v4/v4-essential-strategies-07.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "67980d3c6f546d5e5551a8fb430ba3a7aae69d4c2bf8042e9f58ddfa730b6450"
+ },
+ {
+  "file": "v4/v4-essential-strategies-08.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "e40e87a9b98b5367b6bedbb0c8db1d12baed9d9f7f8a1117e9de147c865a1afa"
+ },
+ {
+  "file": "v4/v4-essential-strategies-09.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "9702b948b1a2327a215f87d88e3016ba017eb2118bf244500d1cb70cc4e56462"
+ },
+ {
+  "file": "v4/v4-essential-strategies-10.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "40a9072e7038144c06da40775ca5d575a1a720a6f5f27ede6677398522206ec9"
+ },
+ {
+  "file": "v4/v4-essential-strategies-11.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "d143d4eeb71a883cffe044efd5991b9e8645f9f12b9f079e80419d3e2e5b6be3"
+ },
+ {
+  "file": "v4/v4-essential-strategies-12.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "82042d1c9454ced4ebc70d0c2cd0532f34cf5d87296b494ed0fa68bd12cc48fb"
+ },
+ {
+  "file": "v4/v4-essential-strategies-13.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "1fa1c4c88762e7be917ba920316c2daf9b74e1779925dcecbd541b1b7c6465f9"
+ },
+ {
+  "file": "v4/v4-essential-strategies-14.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "6095be234ac1bf882015520d9139cb63fcbe96f9487c1066e4e8addac71fad6e"
+ },
+ {
+  "file": "v4/v4-essential-strategies-15.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/strategies/",
+  "sha256": "de77b6fc399e4249415218886d3428c14e31b3dcbb21177945d2e20f087508e8"
+ },
+ {
+  "file": "v4/v4-essential-tables-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/tables/",
+  "sha256": "145480853d86e7de98acd238a2f52057e56d07e5160b507de5859a5a50f10343"
+ },
+ {
+  "file": "v4/v4-essential-tables-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/tables/",
+  "sha256": "55932e954c276aa4d2cb77a06e85f706232bc468a1b676ed37cb270f39b586cc"
+ },
+ {
+  "file": "v4/v4-essential-tables-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/tables/",
+  "sha256": "67a3782868b5b27cdd019ca8e3524bd68af878ff1e72d77ca91641ca47dab7fb"
+ },
+ {
+  "file": "v4/v4-essential-tables-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/tables/",
+  "sha256": "3f240d1b46cc700a39585b5cfcaaff821b8ddbc0cac42c3a388fd9973ba6c386"
+ },
+ {
+  "file": "v4/v4-essential-tables-04.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/essential/tables/",
+  "sha256": "7bbaea07f76dffe8d172e2661150d60e38215bf6954f973173c50fb7820b6a03"
+ },
+ {
+  "file": "v4/v4-language-comments-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/comments/",
+  "sha256": "fd8a4755a905e128d222803437636dffcbadcc0415fdd5033653173570f8b14f"
+ },
+ {
+  "file": "v4/v4-language-execution-model-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/execution-model/",
+  "sha256": "4844ec6f5a0c6eeffa7282067cb0e2eefd243734b05db09458b9f83bf92a8454"
+ },
+ {
+  "file": "v4/v4-language-expressions-declarations-and-statements-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/expressions-declarations-and-statements/",
+  "sha256": "1913f6a9d4a1b76cb2a0f7bc0f6de3c2c6e7798df4cc7ec5e5705838d8512245"
+ },
+ {
+  "file": "v4/v4-language-expressions-declarations-and-statements-07.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/expressions-declarations-and-statements/",
+  "sha256": "36c0a0a910c4e66b91a62699d03e5460e820065780b63cd4dfa1675e90b7330a"
+ },
+ {
+  "file": "v4/v4-language-expressions-declarations-and-statements-13.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/expressions-declarations-and-statements/",
+  "sha256": "18047ab9828a132d278acd1aee0f7f815116916dc368e76bc2d213808f613f84"
+ },
+ {
+  "file": "v4/v4-language-expressions-declarations-and-statements-14.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/expressions-declarations-and-statements/",
+  "sha256": "2b45ddf5355223993ad4962e9b336bec12d6be0923d671ab20900ce69ef2df6d"
+ },
+ {
+  "file": "v4/v4-language-functions-and-annotations-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/functions-and-annotations/",
+  "sha256": "3cada611ee3ae05d9d957986d545ccfdb32cc7a0295f842c52ea39f83be18c6a"
+ },
+ {
+  "file": "v4/v4-language-functions-and-annotations-04.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/functions-and-annotations/",
+  "sha256": "e1894712608a72e599dd2f655ae2e31d578824418d37cab8365b9dd54a25007a"
+ },
+ {
+  "file": "v4/v4-language-functions-and-annotations-05.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/functions-and-annotations/",
+  "sha256": "5dd64fd2662ccb0948b461679c5993a7667573ef6a770d31c2f6b77e84d3ae0f"
+ },
+ {
+  "file": "v4/v4-language-functions-and-annotations-06.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/functions-and-annotations/",
+  "sha256": "30b2a56a684388737e465b9d3f83f21d5dd7a1b81348aedc082eb35b3be25645"
+ },
+ {
+  "file": "v4/v4-language-line-wrapping-04.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/line-wrapping/",
+  "sha256": "ccb928a5cbad9ed73cb9f13f246a00d05e97b19aa06973af0ca535bf140c4adb"
+ },
+ {
+  "file": "v4/v4-language-structure-of-the-script-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/structure-of-the-script/",
+  "sha256": "5e94a164b06392e3adea43ceda4c7e36b81f2831f3d3dd077049e7bdf36f7945"
+ },
+ {
+  "file": "v4/v4-language-structure-of-the-script-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/structure-of-the-script/",
+  "sha256": "8d5d6617bacaca4a566809468ef80cd8e2f0342a5c4d449b7eea074804e32ace"
+ },
+ {
+  "file": "v4/v4-language-type-system-07.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/type-system/",
+  "sha256": "b0972938a200283fe88da214cfc1f8d468a650813d4f48297e0453931cfa79ad"
+ },
+ {
+  "file": "v4/v4-language-type-system-14.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/type-system/",
+  "sha256": "edb162b9ef19002b6f7ac24fac303214af9f7a57f5b134055fc0dcecd0ae5d42"
+ },
+ {
+  "file": "v4/v4-language-type-system-15.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/type-system/",
+  "sha256": "801978e711e61cfe426aea87f74d1ec83cd776e4d9916415fb203d91831de2b5"
+ },
+ {
+  "file": "v4/v4-language-type-system-16.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/language/type-system/",
+  "sha256": "4c306b146eba7a1241d03b58f28cd05935f56f9e91fdbbb13227b4e8461964f5"
+ },
+ {
+  "file": "v4/v4-quickstart-guide-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/quickstart-guide/",
+  "sha256": "354d703e33e08a77240660d5f0f0af64975098b7dcf015af8300a0d0bd771b2b"
+ },
+ {
+  "file": "v4/v4-release-notes-01.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/release-notes/",
+  "sha256": "701c1596c553804994aedfd238697fa8c58879201bb1d4380a75e914a16e4607"
+ },
+ {
+  "file": "v4/v4-release-notes-02.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/release-notes/",
+  "sha256": "abb19768fc8191dd7b41505fde80ea746c21279632c4babe8144888d99f54831"
+ },
+ {
+  "file": "v4/v4-release-notes-03.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/release-notes/",
+  "sha256": "c7691f3d5edc782acbc6eed53b31fde5c6807efa9a5284d713a836553ea90957"
+ },
+ {
+  "file": "v4/v4-release-notes-04.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/release-notes/",
+  "sha256": "ff41fa7108b58f8806db2cf151d8adf9a9cef736e9cde6991f4519db784cd24b"
+ },
+ {
+  "file": "v4/v4-release-notes-05.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/release-notes/",
+  "sha256": "684adca5d7093d455549b47dc138a0880be26dbe9b3c9585d409db5a185245c0"
+ },
+ {
+  "file": "v4/v4-release-notes-06.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/release-notes/",
+  "sha256": "37e57d2d4fec65a5829c569131979db8602bd4e46ea61a93c0a9a276a2b7b7b8"
+ },
+ {
+  "file": "v4/v4-release-notes-07.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/release-notes/",
+  "sha256": "f39bb663260e04ee6b68b80b648ab9503bc98bb68aa02dbdb1a891964dc4e2d1"
+ },
+ {
+  "file": "v4/v4-release-notes-08.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v4/release-notes/",
+  "sha256": "669a6126626e73dd21dc155b684116198b572f0fc1c8606b8ea82abfcca78351"
+ },
+ {
+  "file": "v4/v5-migration-guides-to-pine-version-4-00.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/migration-guides/to-pine-version-4/",
+  "sha256": "e7330a3e78579296464b16123efdd692d62dfeeb57d36b764ece84e821df80a2"
+ },
+ {
+  "file": "v4/v5-migration-guides-to-pine-version-5-08.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/migration-guides/to-pine-version-5/",
+  "sha256": "de0b1340629ff810259d59dc67a5bdb2a3d58d320462db2d1d0a30a5e0d8c276"
+ },
+ {
+  "file": "v4/v5-release-notes-16.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "aa0db2997768323945e32a485a62f21a5eac5b252cec96391486f3e6a54113f6"
+ },
+ {
+  "file": "v4/v5-release-notes-17.pine",
+  "version": 4,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "09d0422cd4bcd5e6295ba4a92c1d67cc8aa581c6a69264832861eaeb9e5767b1"
+ },
+ {
+  "file": "v5/v5-concepts-alerts-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/alerts/",
+  "sha256": "fda78c262d46e011c1e566f374605082cd76d8436597b1b9caa936878d70dcec"
+ },
+ {
+  "file": "v5/v5-concepts-alerts-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/alerts/",
+  "sha256": "0e0e7b16f3181a6e90073594b515bc8380930eb59d56530dde82b1a7a90a2d5c"
+ },
+ {
+  "file": "v5/v5-concepts-alerts-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/alerts/",
+  "sha256": "dae0da21c4a86f0fde0ecca83d970cd3b65b26a8d6c9a78bf4d02daefe0b14a7"
+ },
+ {
+  "file": "v5/v5-concepts-alerts-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/alerts/",
+  "sha256": "3c711b93d38540fdfef46c3b11181983e969ccc69da9b4a8ada0f9649b44103b"
+ },
+ {
+  "file": "v5/v5-concepts-alerts-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/alerts/",
+  "sha256": "558eec5f01dff7fa4a2f058328cd181f38e47d966f3061f275c2c61ce9d44363"
+ },
+ {
+  "file": "v5/v5-concepts-alerts-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/alerts/",
+  "sha256": "8c64d22560a245386d3a05822f6fee5c11cc4e254812f67ee3ec561376b80e3f"
+ },
+ {
+  "file": "v5/v5-concepts-alerts-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/alerts/",
+  "sha256": "0d1550c314ec51bd5aff22017038f8690f98c29217280474044f700b205bbb7a"
+ },
+ {
+  "file": "v5/v5-concepts-backgrounds-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/backgrounds/",
+  "sha256": "6664515e998f45f85e06bc747f4bd95bfc7edbf8b2dbedef5f0453a61a193c86"
+ },
+ {
+  "file": "v5/v5-concepts-backgrounds-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/backgrounds/",
+  "sha256": "256cb56de85988fcea0e70c9d5f5a76654d7324ca1c4957afe92e550809a11e4"
+ },
+ {
+  "file": "v5/v5-concepts-bar-coloring-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-coloring/",
+  "sha256": "3d790659bb40e2ecf56e6c59d57c94c4f4dc44d6b3155545c25bb2919ca61a56"
+ },
+ {
+  "file": "v5/v5-concepts-bar-plotting-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-plotting/",
+  "sha256": "9cdc41da5ec28ac75308c520c8099f1dd85be0fed58cb0c3df1099fc549f7dfb"
+ },
+ {
+  "file": "v5/v5-concepts-bar-plotting-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-plotting/",
+  "sha256": "cdfeac04e93ce780188fc2fbe0e58b150fd0754f85ca2d15d0a2c8bf009c9a17"
+ },
+ {
+  "file": "v5/v5-concepts-bar-plotting-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-plotting/",
+  "sha256": "1864e43967c26b18a2554d399c1bfbdd2d9af0157761392b50d2bdb51644c8a2"
+ },
+ {
+  "file": "v5/v5-concepts-bar-plotting-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-plotting/",
+  "sha256": "c96f73cbe5bd3f0fc9ff730f2a224a1e64103f466baf7d3b79ded3af70f5a243"
+ },
+ {
+  "file": "v5/v5-concepts-bar-states-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-states/",
+  "sha256": "24d644b8852545d7d8537da1cefe493571dc1b98a6fffe0519739f5c8f366443"
+ },
+ {
+  "file": "v5/v5-concepts-bar-states-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-states/",
+  "sha256": "8b7a2c6cce199313adf8eab3b08ac0e19106298435413f6975223150c2314646"
+ },
+ {
+  "file": "v5/v5-concepts-bar-states-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-states/",
+  "sha256": "8f1832a8b76adebe313774ad2c9e5277f4496b309167237cbbe617654d35500b"
+ },
+ {
+  "file": "v5/v5-concepts-bar-states-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-states/",
+  "sha256": "5fb95980212c6da0f96575c9e336e9775e87c5f208f496f02d58bbb6c297ac6f"
+ },
+ {
+  "file": "v5/v5-concepts-bar-states-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/bar-states/",
+  "sha256": "ec97468bda8db4b926feac46379066ab31ec08da04e6a799d81a172d8d98a5eb"
+ },
+ {
+  "file": "v5/v5-concepts-chart-information-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/chart-information/",
+  "sha256": "84c0839497b488968b310aa9e1301eb577a372e283b953ce4046fe0bb37078ac"
+ },
+ {
+  "file": "v5/v5-concepts-colors-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "e7e41ee510a38d382090b23e09c8c73fdedea07f471b98c21176d60866489243"
+ },
+ {
+  "file": "v5/v5-concepts-colors-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "5d3c360c717c57224033c6d1f73e928f1b971d2e239cd8d50bd6558feafe2875"
+ },
+ {
+  "file": "v5/v5-concepts-colors-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "302bd49c81999967279ded83fe719a69fa43f6829a22f3f5d9b8ee3c88318c0f"
+ },
+ {
+  "file": "v5/v5-concepts-colors-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "07969ee3cfcfab171bd90d9c9882e206f1993dd81a90eb886b5d423feb64b64c"
+ },
+ {
+  "file": "v5/v5-concepts-colors-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "4fc0efe5b7539bb7266701596a0cc61020a7e4988e3dfbbf1d043697629d41e3"
+ },
+ {
+  "file": "v5/v5-concepts-colors-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "e6f4e2616ae51543b5307ba184b386bd31443ec691bf8a29b605fe083bce454b"
+ },
+ {
+  "file": "v5/v5-concepts-colors-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "02d80a4b6eb908fcd9d641df465600a64d1094318c1876f5cc1e9a334ccf658b"
+ },
+ {
+  "file": "v5/v5-concepts-colors-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "684f40a15e81d67b9518729c7eae89060485fbf73b1312d5fc3fd96e3f76ef4b"
+ },
+ {
+  "file": "v5/v5-concepts-colors-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "f105575dff3447c0f3eaab56e993b01067710060cb9098de98ab1b82caaae703"
+ },
+ {
+  "file": "v5/v5-concepts-colors-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "d8af176795055149a5c27ca92431f95d2b87b03dc141c9e285885bc8307888f0"
+ },
+ {
+  "file": "v5/v5-concepts-colors-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "cb2b231b7be97bcc0d01fe63b4b3329a3823d6219c80f4ca75450d2ef44559f0"
+ },
+ {
+  "file": "v5/v5-concepts-colors-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/colors/",
+  "sha256": "4e2b377908a22ceaa06167a6884eb83b89376886f1f25ff09cac54fea3d92040"
+ },
+ {
+  "file": "v5/v5-concepts-fills-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/fills/",
+  "sha256": "afa8dc9b9b090f164c7f75259dce0a43c1cd20b3b4bb218ae2377329d1546497"
+ },
+ {
+  "file": "v5/v5-concepts-fills-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/fills/",
+  "sha256": "ca3569a8ae9ac24948eccf7b575256a076b0750170c1e6bac8fb5c2ade0dee68"
+ },
+ {
+  "file": "v5/v5-concepts-fills-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/fills/",
+  "sha256": "495f29c0a88286e457916f6224fdb02f216b8b1ee20d21adbbd7798ecceb130b"
+ },
+ {
+  "file": "v5/v5-concepts-fills-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/fills/",
+  "sha256": "8787cc4ee639e7f205e63cc177d837916137c33cf066e8ff1082e775e1dd6ed5"
+ },
+ {
+  "file": "v5/v5-concepts-fills-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/fills/",
+  "sha256": "8155d635e02f5f028e9470769f1921f91506d2a17256179b16fad1c6885ccb02"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "7859f70f8ca9c80d20647b31947e0bcb06ed75268609acf89fc574e1a6a3728d"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "5ea0dc7f79682d3c5b99b383887e0b729240a5cbe6d0770d5b093a8613b90850"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "2bdece8d3a6585ac00688d1d62995fadd42245a43da138d5acb707d7dad6d4ca"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "4872090d142f01549ff73f7288b19c6f1bce2c7841db2d142eff1c2c6593a6c3"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "d23e88a71c8d8859c6537f043092cd7decad90100bb9a686b53d4026f9394091"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "f6dc6478b86f0dceccdf9bf03590ddba931f93443f6c9371e1ce5177226cf2d5"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "7a75549764d33c7211944cb2327ef82927e0417d0a98c2ccb18a270bb95a868d"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "ae4f4ac2e30377805d4e126ce2cfa9e77aab668936088243902252275437de36"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "e3b80f39b969ed0629f576ad452c660f780b71ad77930976914da15cb8ce105a"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "0523f68c407c495a66747f45c08ad27cb57a0bc542461bd3b08d9a81c26cb2fe"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "c77ae72bbb6bab72e9f13ed317e22964105dfe375e5ef476e894d37d635493a5"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "07de6e7ab8e7357bebcae1e83c080ed6fd32a13b64e3ff04e8cf5a52aab33ed6"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "71c0e7ae362338863d43ceb7cd4bf100a7bf0df30b98d51abeb813b76bc38ed9"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "0cbd5aec9b67d8f01d117bc6cc2d784bc7bc9d610d5c749ee1cda70d976f08fd"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "7dfee6d8f352530d4724f764304a06f94b9374d02768447b4cc4d1b04d7137e9"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "911e2b9c6478a44068a237be851d58fdb838b383c8719f9fe37f2694d1c0dbbc"
+ },
+ {
+  "file": "v5/v5-concepts-inputs-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/inputs/",
+  "sha256": "dbd09e26439566ff0fd54a252112f6bf538d7e2519583e90c91f1e25038c987f"
+ },
+ {
+  "file": "v5/v5-concepts-levels-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/levels/",
+  "sha256": "136c44a007dd55dd7209ded6548fc6dc0ffd78b527fae2a31375cda12b6a5b2e"
+ },
+ {
+  "file": "v5/v5-concepts-levels-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/levels/",
+  "sha256": "4dc1bb0592d982740756ef21c010068d07f87bf721576d25ca02d7a932f04ca7"
+ },
+ {
+  "file": "v5/v5-concepts-libraries-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/libraries/",
+  "sha256": "2ce5c9ed833a524625cce12195ec0d3918a5eb6e0de45663f6dea3fd437abfb4"
+ },
+ {
+  "file": "v5/v5-concepts-libraries-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/libraries/",
+  "sha256": "b3b748eb59f2e4e41ff4b7a5073796b1dee5e09b3d0e785f14f9112f0822ab0d"
+ },
+ {
+  "file": "v5/v5-concepts-libraries-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/libraries/",
+  "sha256": "b9e0e859a67ce11add10cbf61163968da4267847981f3f885c7b3405b8bfcb35"
+ },
+ {
+  "file": "v5/v5-concepts-libraries-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/libraries/",
+  "sha256": "639a91c7f3b46bf5230b780dcc5d93f849566d2b520d19c55ff98d56639300ea"
+ },
+ {
+  "file": "v5/v5-concepts-libraries-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/libraries/",
+  "sha256": "939556d3b551e53798e04ffa5f830887b80dd378501288b72a9626227718762c"
+ },
+ {
+  "file": "v5/v5-concepts-libraries-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/libraries/",
+  "sha256": "9123f1a861f87fb313351483209007e57f68cbea6e3d389fafadac33778a2bac"
+ },
+ {
+  "file": "v5/v5-concepts-libraries-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/libraries/",
+  "sha256": "064f67e6d4907cc2dcfcf5048999ed77e37a28efd8cf72dff16ae6cdc53e7f71"
+ },
+ {
+  "file": "v5/v5-concepts-libraries-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/libraries/",
+  "sha256": "66da6fd89bbfc4cae7828a5d29219c6801e28132c8398bc17cd45713d807148b"
+ },
+ {
+  "file": "v5/v5-concepts-libraries-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/libraries/",
+  "sha256": "ee5fd190b8368f8eecd410a92019c36234aa4b7d48e23c83159e8439c5c7ce7f"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "3269680ee4abd0bad3a048c35c2f865564a8d3a07654bde38bb5c5e09bc91960"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "bb3a0358c6d0d1fbf69d88a7af4d9c8deadefce274cc938798d8a9cddd467eec"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "5f5fe74a4e033efd7f25b64dae30fadb850c46da8b20a888692869b5f7b074ae"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "f8f9eb2444f2d5dbe3520e85f770734c47b16aee09ffb1351b080a5651df2d56"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "7d963fd27f40cf7d7e8b96b582ee9327680c9ef45b1ecef13e22bee015435b2c"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "c9dc5b6f3d812082f2fb6ad7ea119b5071161d458bf9dbb6f354b11a2344caae"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "25d6b229e5864820120d88ea895e5bd442cf83fbda96e2cc799052a6a20c610e"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "ca4093e69426b90484d0ec3bc91043793779a671433813423463dde1e8b9fa8a"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "1b884f3ecd085593bfd8fd1cca74c3f2975fc317a494cd7cd55331f016e64c60"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "d063e738c259671cc15eee7c3cff5e293fd45fc33170be1333e8407674221a15"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "67ffe04d93868993e06d37cb49aaa069b4027f537322e7770a88f53b7a0e9ed6"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "3e472695495762dc2abeea888c50a104e6f61a9af701295f73ef1891dc4278b7"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "a02b62557f4d8ee024b5fddcbddd3dbc98b7268de9ee2a6c2057f9d1b4336234"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "65ccfd527e4f0e4514bb2f91b2d0f6196e9e732e06b4e46e32c3cc4d396ec3cf"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "9e9b303117a09e34338818350305c5f0a90e3f1dcbc7aeb4a4cd42ed6e732b51"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "089730e7092be3316fe311abd0b96fd4f64f7513e5fc9f4f0475d0ef69f09419"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "a211eccc76613296044d7f179324f421437b04d39517fa583be66464e1ca9ad5"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "f8191d96c1f5610a7876d378ea4ad530bd551ada90fbea00a76f88b96f359094"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "d175749ad6faaa04ade7a2a5117d47f8b55a73810a9c15fe2e77aa2f3cb4ef2c"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-19.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "11f23657686cdb2cc3d24d749d5a5c9b2869a77de6b933c630d40fa8da99deca"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "75f43a593588a7caf541fc07c3f97a70967170cc26c1283b509370bca792667a"
+ },
+ {
+  "file": "v5/v5-concepts-lines-and-boxes-21.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/lines-and-boxes/",
+  "sha256": "ced3cebc90779e13b042c6f36361a74cbf746ab8fb8d67a91c251c0a83d4822b"
+ },
+ {
+  "file": "v5/v5-concepts-non-standard-charts-data-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/non-standard-charts-data/",
+  "sha256": "f5014da04c00a49b8ed09c11d77f35b4364daf66519c235a0496bf094dc584d5"
+ },
+ {
+  "file": "v5/v5-concepts-non-standard-charts-data-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/non-standard-charts-data/",
+  "sha256": "0827d922a0931aead0b9201cfc8d46e06a785e5462c4845c26d110bdd1c48bb9"
+ },
+ {
+  "file": "v5/v5-concepts-non-standard-charts-data-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/non-standard-charts-data/",
+  "sha256": "2a35555bfe69a02dc22ea3468980cd405f96aeaff6364802f0edc01aaaddfa0c"
+ },
+ {
+  "file": "v5/v5-concepts-non-standard-charts-data-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/non-standard-charts-data/",
+  "sha256": "ca334eebd82ea5bef8fd0a432b2f7add8c90d0274735fb0c10fdae8dc1ca2745"
+ },
+ {
+  "file": "v5/v5-concepts-non-standard-charts-data-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/non-standard-charts-data/",
+  "sha256": "9a472b8b423a5bd060e3eca831a196ca7fc960ad808e9915b8c88cb430af24a9"
+ },
+ {
+  "file": "v5/v5-concepts-non-standard-charts-data-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/non-standard-charts-data/",
+  "sha256": "572653066d56bac7ea8c035b615af102e2d0691ed8e7fe99f4699735462fa2ae"
+ },
+ {
+  "file": "v5/v5-concepts-non-standard-charts-data-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/non-standard-charts-data/",
+  "sha256": "7290a1984cbe4bd4a0ab3baef0577da5211bb39e1b618852fc059fb3f8490f2a"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "05f5d3ab3a0382f91675e41fe62dc17b5c9eea172f0167a055f02f8d6e70335a"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "a8d641cd84419eb17563e8d7d6610605e760ca985a7176dc874fd5f3a9175100"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "8fe51cf561690c9ec060e3f1bb8748417b8ad0ddd0cb53a3530a1db30114d3e1"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "3b29e70be3eba9d060118d56cc5a6d5e9926e4c6d48ebfa3d7c2c117e39e71b9"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "67fa88784bbe646cf625a8eff03ff909967e531266d777c54b1b520be8a33fc4"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "d92254221484ec71c82b5ed4a491cebe0751ff2b96af317e23f7c6b01a25f65a"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "4ae50f3b15cc730bf0c90492c10ed85013b2f0076539467dd52ccdcefa86aaa9"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "b01e884dbf565b1380017796fd645ed9b4e460b7644a293f0df7a7139bcd6d4e"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "2bac8d59a225720f119d5430ee5d7eef8f72b1c7a13e79cb42905f9060dfdae4"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "0ad2a0bf9b47ae2beb2b644ab23926379b902357e1c02e6e73828b8a036927cd"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "edf962708e00208184b573079eb606d99923547e5c97e3c39c805fc565e59ca0"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "82e3897a3ff05335738d0e73a8bade8541845350d4d12b561f4f001b40c3dda1"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "0efaf15e99901148ac41aa0cd9a9de968bcbdc6eef04f5a2aa86c08587065eb8"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "d6f07f4d0d71a3414d6eec40da1b2bff3ff493fa8726d39887ff030d3c07b899"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "8c875a191216f0b49acbfbbcf9ef310c72da948d8e978a67986cfa0c385ddc66"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "51ed75307fbfa0394e9ef75e4d45fb64e09884a4ba1cdd2261b55adbec5541d0"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "9df1b34260dc40da35881e7bed127d34451c39bb4b3050474fceab66a4dbb7fe"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-21.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "7de64ce3854e159b560ba9aa6c13e0cf5d951286597e680c143c2c020b3ea491"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-22.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "210cf5a056d7509534a7913738c723b293c3a4c55e3d47880622a2de15ae9ada"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-23.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "75f15c2da841dee2473e07dfcdd8f4940a88fda408ce98743360cd1ac029fcf2"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-24.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "8948d69e35bcffa6f0eef7a5934c4815623978881de982f25157b330de9728bf"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-25.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "05d147c57b72ac5ec43695c45c34eccf8a58b7095db822ee602fbf83e82ac418"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-26.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "e405dacb573f841be953ee9e72c1d21070f352b09f539dbe3bd11a4e480062f2"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-27.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "8eed40ca863a2ed7ecd5b7426083c36a4ea3823e3235aa9dfa091a2584806447"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-31.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "1123aa3253db89bd3a868e706cca7348897cae28e5eb71a96a4948ffcb3ff0be"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-32.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "d1f0636202d61457b65bc5246f9dbcae98e3df71065ff22e1a2d90b5743e235c"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-33.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "972b391e85a0cd1bdb9c74de64f9c253f54bcc37068aabe46b0f4d24211276a1"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-34.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "e323ebb6c66c30814dd6b32ca1765b7971bab8b9313b00bbf4a67f1f38e45043"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-35.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "7dd03dab03af9ea4dd6a93ada4a33e47fa347d6b7ec6c0fcf1b8d5837de4d3f2"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-36.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "5936b3c8cc7cce26b3959104d6dfdb5e244fa0a173855735a73317c8d97016c6"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-37.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "f910343055d959f257964bc360a8b96e16d5328608c050beb587a69efaf4c761"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-38.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "ecc55739a30d4bf48d8d675c8414b6fe9f3b5afd60a25a5ed4d4ee619834cc7e"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-39.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "99f06dd7d51ed301a5a70a59803ba478e66c585cbb1925d02504ad5c4b99ea01"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-40.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "ae6323a0fa5afdb77911341afd4ebe1531ebd2050d9f519070d279123ac68fc0"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-41.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "f61c983d22d228a5b40b1a8e0b69dd7c538c8c57bcfff784c714c8ddcd6f6244"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-42.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "8fb933b8b863aa634a22e04217f3b3ffabf5726e0d4edd3ec344c40df0982c87"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-43.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "aa97f8d8043ccc9472fd7d00619d89bccfc03ec160c33f52958aaf934b941445"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-44.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "770c5106680571aa5d3519cfb9b788f4b52e73beef70636feb033e148db50778"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-45.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "aca981e3aaf743cd6c2758f7cfa49472ed302203eff7b70d4e4fb1955ed4c25c"
+ },
+ {
+  "file": "v5/v5-concepts-other-timeframes-and-data-46.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/other-timeframes-and-data/",
+  "sha256": "0bdf6e9244efdf47d64600cb9649364a423fe13c3c613f200885d8dd8f572a49"
+ },
+ {
+  "file": "v5/v5-concepts-plots-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "a25e76953a36618485182401574ac6881e6fc32491be344e3804159cc1ad5c81"
+ },
+ {
+  "file": "v5/v5-concepts-plots-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "a2646bce9ac94eb865e69396491d961eb307cf2bd0c0fb5806afb3bd48f0ee91"
+ },
+ {
+  "file": "v5/v5-concepts-plots-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "3a4c7878838f6220ca44605321f4e1b4a9e983e968021649550db51a4d7e8db5"
+ },
+ {
+  "file": "v5/v5-concepts-plots-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "a2bf9a607c7db20af58ba6a87d8a6a5f62cd489291bfd9e00ef2ba1b563153fe"
+ },
+ {
+  "file": "v5/v5-concepts-plots-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "ff1d01c1dffe0d485cd269147a91ef4bdeb8a8e698aa895dad33824b7976886e"
+ },
+ {
+  "file": "v5/v5-concepts-plots-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "22f11e53a950e73ba5e33820427b7eeb890342ec5346accfbd6cd5b7d6db447a"
+ },
+ {
+  "file": "v5/v5-concepts-plots-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "9dd304c8f8f801e3b3f20d6822a3eb327ad5cabe5b66586d222b17b53216ee2c"
+ },
+ {
+  "file": "v5/v5-concepts-plots-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "fbe90a5f661087e4427aa731d50db3283d0bb40d605e2aa6474e7f17f44943f3"
+ },
+ {
+  "file": "v5/v5-concepts-plots-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "fd7b9b774323fa5212b34252190371435625856a495f34386e5f6bacf948cc4a"
+ },
+ {
+  "file": "v5/v5-concepts-plots-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "abfc82853a9945bb56aa14a0cc6a53acf1eb2733e7a45371677a321f4de9b53d"
+ },
+ {
+  "file": "v5/v5-concepts-plots-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "c05dc49b55ca8846c7f4c0d9195208b37440d6a1c66d7895e15624cecb6fe421"
+ },
+ {
+  "file": "v5/v5-concepts-plots-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "991535d32cdccedb6c283283ae6196d996ce435e9518facc428f8986c0f1b64c"
+ },
+ {
+  "file": "v5/v5-concepts-plots-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/plots/",
+  "sha256": "82c85bc3be631842907e63776d8e0bc5f61b266bbe35b1251510dd49828ebe39"
+ },
+ {
+  "file": "v5/v5-concepts-repainting-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/repainting/",
+  "sha256": "4b0f250a0ed648387e75e8061a3ea76c24cbeec2fc6b5df43e7ff5f3beb33b0a"
+ },
+ {
+  "file": "v5/v5-concepts-repainting-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/repainting/",
+  "sha256": "62336e36e25a27cfb7314e12dc8e895a93e3920a211ef34c1be77365b82372a1"
+ },
+ {
+  "file": "v5/v5-concepts-repainting-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/repainting/",
+  "sha256": "619fe8f525e3e85c613554a7dad1d0adf6f4fabd720e07883bc37bfe0662152c"
+ },
+ {
+  "file": "v5/v5-concepts-repainting-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/repainting/",
+  "sha256": "0903ba58c06fd45e17d7af6864a8d3d2d6b9034b0327b6ac9f055cb43adbf1f0"
+ },
+ {
+  "file": "v5/v5-concepts-repainting-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/repainting/",
+  "sha256": "15831b6f5e9604f9e8d68f34de3c64158a36fde6d18c1fff05f4122291160cf2"
+ },
+ {
+  "file": "v5/v5-concepts-repainting-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/repainting/",
+  "sha256": "732149da65d6fed0014f25841e4df683a76dd16614dedbdc9aae3433a75f6542"
+ },
+ {
+  "file": "v5/v5-concepts-repainting-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/repainting/",
+  "sha256": "c020a2b2cbe929d1c522752550fb3e23478cecb498c4357865e2b1143b758f47"
+ },
+ {
+  "file": "v5/v5-concepts-repainting-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/repainting/",
+  "sha256": "5eadaaf11d4fbe3cfebbd153414356ee27a39325351b531611476a870cf1b15f"
+ },
+ {
+  "file": "v5/v5-concepts-sessions-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/sessions/",
+  "sha256": "223ea57aea90f7f77f8042c207a8427da6317fd0f9456a51cac0b05482771b55"
+ },
+ {
+  "file": "v5/v5-concepts-sessions-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/sessions/",
+  "sha256": "418585a09e9a5e1a6b5683d654e14aaf0a0cc855393120a2f03a35ef4c0c18c1"
+ },
+ {
+  "file": "v5/v5-concepts-sessions-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/sessions/",
+  "sha256": "8e73338208baf033f26bb6db4ac2434a778a2930bb20ae103d1b226a4eddda6d"
+ },
+ {
+  "file": "v5/v5-concepts-sessions-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/sessions/",
+  "sha256": "c4c4876389d9ef36d87ae142b82db033d0338f5b9e594b1215b95ac404142389"
+ },
+ {
+  "file": "v5/v5-concepts-sessions-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/sessions/",
+  "sha256": "85300f2c1cbc4a840ddcb0ef2c572ccfc57de08da06eaefafcb527f0048f8295"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "4772fedff7bf92325c697e2a9223fe6d226211f576b1d0cd6c477ba7f0c32fea"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "b6eeef9f4373bbd6b587b0f43768d81af587e5e13f83e29adc0e55d8d7e4f9ee"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "edb824744e7b7f807df31f9f9175bfa200426f9ea646d600d3bce33daacf1ee6"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "3a3da805e239efd78ae8f601c915c5a0149b0ae2d5473ea5b4256ff2c0428486"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "3f356dd6d7a9641c5985c4de3ba55dd0f2b7614076296fd298ba569fff3363c2"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "a836fd6f3573fb962df686a35de325aac6516afecd116f68a33bb1ae335494bb"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "2ad4ca9f726b073192bd967852307e5cd3c557418c7c89bebac2a91fb7e13b36"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "81c67612586ea3895b2759db79d06a7e873c9d0e9a573fdcecfddb5f7b784514"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "d734f1b9e1b2ebc3cf4368627867b2f4cacdc92a1f6fd47fc7c347a40ec030c4"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "92c0639f92eeb3700bf5bba11e79d4e735cf08a7b71dfe57daa762251b511a7a"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "8d19e9e2a74298a09d7e0efad805ae2964d14974f9b4be58ef5574a7c0938ac8"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "b2f4146fa8f6d0dffd9b06786ccc00925115a34335fece676d01663018bb343b"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "398c2a878a8abe897f9505e62f84fdacb6e1f9f4ec7350116d9becd2cdba0c79"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "9a25b55503a95b4b5b09d77b81996b29c979c51ad07e453f0e8e178a79f53181"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "12956cdfeebfd10d32323658b51c702111b3a97cc66deb1d1b775f1a0c5c74b5"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "3577e6a520b0335bd3a8d48c3029a579e18e113c0ed9638dec5116f1173a6a67"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "46593d225d9876d0bd0c55ad3627a526ed052f8692aa629c8c2f9c8e845717b7"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "63b2e51ccf6feb66eff3e9fe2d704e7f3b1f22d5b95ce0f23ac9c3b34182939d"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "7eb1817bfc0606fd8358d3122071dbff2793b344eeab9ae6e492f31f1d46306e"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-19.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "49b85a0b34fe5202b083ef179a807553d68431a218ee5bff126387280cc587c9"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "165113653c26d4e0701a9551a0a3f62931d77956b5ef25cda1bd847eed8ac8d4"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-21.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "0fe651c1ed54b2688afa0de407f81eef8c994bc88da36083d2549cb1d8d72bde"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-22.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "5008c333cd3e6b2efa4c9a38c81ed54095bbc9b9b4d09a369f02a4914a3bed9b"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-23.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "40ea184246462fc36a3a83988f9e414cf10b84c2f795a5c38d93f212b219443e"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-24.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "930310c30abdd838688b0a50d86f031f6428de53eb5bdfa7b3ce1c2b410179fa"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-25.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "56458da698e0320b53711babdf36d79d834fb141530867e6221e732456db102c"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-26.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "143e2ba1eeb0d9892b90228512dec2b55d1b004001019782954361a2d286bd3e"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-27.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "99c6cd87e70892303a9fd3d878b75eec466bee104c07b441415edf7a814513f9"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-28.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "b22c3737cdf0f5dc6f7506ff79ea6b063606a10a4663812592728da675c2ccef"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-29.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "472712c06179b9f26838f61f582c10acb5f2487ba240f6acd2b96b8545daa0bf"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-30.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "c1bd0bec534304ea1a265ac6001e9bf70d9da8b1cf28e064615b2ec5a780f607"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-31.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "cf4d9d63ce9d80b9d2146589c583b3bd2f4db69aa8511e1bf87e080b0aa59eff"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-32.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "2dab39954e203233903b300ee062420716015fc2ce849b6a180e001a82ca7623"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-33.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "e59799905e09c2b5437e9de8eba71e406f7e4612356c2354c24e787e0c71c119"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-34.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "dacd1de4d1dbd5bc258e97262a3b83383b0f91b6e400eb08472935ddc8152b72"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-35.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "87311de067e0949a518f14e47b23d980b315784ca5b2af4df09cbb51138238ea"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-36.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "53b93000f52c8b2e44f91e87ee770d798d52cc461e569328a4e826258b6fb5c0"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-37.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "3ae3a88dec79a3c0589a199daab5b65158336671b5ac0e6e9c29233826b755d6"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-38.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "38675ef2ce8fe880adad099318272dfca7318acd9b06dea51d93189b7c01c248"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-39.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "3dbed24090b36fb00ea982966f1b9cdca24c5fa6cc3f6e174e822485d38ae492"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-40.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "9e830d0464c59315a8626d328d3166b2699219aba4e22767142cd6059d78ff52"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-41.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "979c5899a71281e3f4aa810aa94a22f9066247f986e372cc3096b7cba30845c2"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-42.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "b2b5abf86c21972d2ecc565d0dae4fc6ff4fb6e9005d5d6f622497631607c3c4"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-43.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "f7c3c6ea0b5a5e03c57b605aaf78c890d6c975e242ab2453afe353d50be2b4a8"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-44.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "1cdd5d933ef07ae48b0f784da90141c844f90d526537814b594ae821533a0383"
+ },
+ {
+  "file": "v5/v5-concepts-strategies-45.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/strategies/",
+  "sha256": "00119a425845c6140eb5f59325f2f4a618588621ef2f2ba6a7b380d5e4c12ca1"
+ },
+ {
+  "file": "v5/v5-concepts-tables-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/tables/",
+  "sha256": "83306b41b9cb0be35ac0df80ae08efee38fb3b8ab20df834a3fce3202bb3cc34"
+ },
+ {
+  "file": "v5/v5-concepts-tables-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/tables/",
+  "sha256": "2ce46137f44601ac5c614d6002e1227db25e952286fbc0dbc2f7ac22f193f3c8"
+ },
+ {
+  "file": "v5/v5-concepts-tables-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/tables/",
+  "sha256": "9fbaed5c4f147a217990dbc313aa0edfec9aded8f89a0317c8850f955ffb4bb6"
+ },
+ {
+  "file": "v5/v5-concepts-tables-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/tables/",
+  "sha256": "8ae1b5548e6def4429541be4da3a9acca000b5fa54e2ea7df01d5b10926067a7"
+ },
+ {
+  "file": "v5/v5-concepts-tables-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/tables/",
+  "sha256": "c70e949917ef49aa4b3aa0fcb39eb881ee28b45a005a84b0cf6404405c141160"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "e1e4b1b73f73cb35df4481c18842e80fc0e8f77dc9b069111bb5a7991fd2129a"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "eab7f80f8bdfeea88fd4081e7c6234bb5bb2ebc01ae0f6024d8e84806d17a3c1"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "de4ba92b1c70f77fd78f1fa686900076990cf835019a5acc5ae27c8c16b954ea"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "ac6b69c6a99266bec62cd74208b215f631aab0fc6212308273e668b73c155bda"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "e239a0ad76af5d0fb78d28a14dda7236fbf55429e3acd6d62683c2c90fc362b1"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "77e8359c2cd0f03a7e66b19c6cd4d8c45bfdbfa2f5699438b7000f00c8fef599"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "abf6d37d8d0e24963444d2e89effa636e43e58e2c08ab6218b2f83934bf211bb"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "de90fd7a4be579dfb9a2b61acd6fbad958e40b22e01d6dae235790cbeb2435b1"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "4d69901919e36ebca8b022b3ed7433e355192462d0169190ebc0d9580530aede"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "b58a0e80dcc6e23580f37ae7c27b2f758dcee9a82463f76ff6f4a2b4af90e24d"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "08bbc616b33973b2e97c5c65beff62a1ce6b48850ca1ca77ef70abab1c7581df"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "3e301c8db60f34b50dc889a28d9b11ed2169b1abcfc9a8b945d2b3b3c1b61bbc"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "ba882de631cf6f819f231bce1f3d434732452e1ba28c57bfc8bc03fcb6af997a"
+ },
+ {
+  "file": "v5/v5-concepts-text-and-shapes-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/text-and-shapes/",
+  "sha256": "00bba41936e31efa85a83894549e6536fbba5e77282dd5d834ed3e25098abf6c"
+ },
+ {
+  "file": "v5/v5-concepts-time-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "c75297a2030e1ee8d3c436a580512fa42c08bc287cc36cf5d6dfc8dce2b1b265"
+ },
+ {
+  "file": "v5/v5-concepts-time-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "2cbe5875f44e6ccda02c50ebfe5944ea05b7781ca5029704d77953bd567a8fe0"
+ },
+ {
+  "file": "v5/v5-concepts-time-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "ff38f8b3acc4b272dc7fe0ac0f4cbe03d253cbf9b7bf3912e760bf0346cd6ce9"
+ },
+ {
+  "file": "v5/v5-concepts-time-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "2fd50761b6bd32de451ae185d6dd1ab2da286b7708bb8daa3db5944c77dcf99d"
+ },
+ {
+  "file": "v5/v5-concepts-time-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "e5485b0013d345470aef5735b1310d24d720f93e3852ff4737e5e1ac50285089"
+ },
+ {
+  "file": "v5/v5-concepts-time-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "f55c09039df2c004ccd7f1fa3c1f6c86e6778e68004460c736e147b0a4a6fc31"
+ },
+ {
+  "file": "v5/v5-concepts-time-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "47136c35dd31fba77f121e9b645a3d966cf0c68a95b0ecc45fff2b3fc73fbb83"
+ },
+ {
+  "file": "v5/v5-concepts-time-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "e6eaa925ebf7b6a61f8ac60c7525d8888c4f2b7816e57d76c2a7b4c8e73fe455"
+ },
+ {
+  "file": "v5/v5-concepts-time-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "d5f4610a3fa60adc4f8ff5f9369003ef5d3a5436fe6bfa348d222b37f3221b18"
+ },
+ {
+  "file": "v5/v5-concepts-time-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "309020033c66e0e9e67b02d89f68eda945d192a3b1ddc36ec94840da8a0912d2"
+ },
+ {
+  "file": "v5/v5-concepts-time-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "b145b1debb3a5b8774add18bae2fbea1269c87d0888a849f894761a59ab96f83"
+ },
+ {
+  "file": "v5/v5-concepts-time-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "8b7e4aafeaa5d7d988d2ae0deaca54fb8e067ca3776a98bb234ac5d57e45f2ba"
+ },
+ {
+  "file": "v5/v5-concepts-time-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "c8fc464a4faa52d36fb181752ac07404de50bd3a62d55d77bbd0b0f564fd6737"
+ },
+ {
+  "file": "v5/v5-concepts-time-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "46b7aa5cb289551977db0ad073e760a63ccc5f84236afef5506a0cef2f2e0301"
+ },
+ {
+  "file": "v5/v5-concepts-time-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "2d618f1e5623a903d53c3cb4dbab326138d99e72060b11f537d7fa36ebc13a1e"
+ },
+ {
+  "file": "v5/v5-concepts-time-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "8729be3a1672b7ac5a9cd90b9322a9200eb25daf4634f94842a140151288358f"
+ },
+ {
+  "file": "v5/v5-concepts-time-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "8501fcb5829b560c459c4ccf6d614406874be2b459a1f2ddeb52456e8704f8db"
+ },
+ {
+  "file": "v5/v5-concepts-time-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "1c298684eeda4e3cdd7bec90de2c8f07b1754989eb0623bcb7b2577e2e68ee7d"
+ },
+ {
+  "file": "v5/v5-concepts-time-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "573cf5e1c55569d319ef9d4340627e2f4e8a022670cbadd4475970556aba70ef"
+ },
+ {
+  "file": "v5/v5-concepts-time-19.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "db785f3f998871bf2066936b2fdf18f9c4b96cf4a10a4c001cae391be2c79071"
+ },
+ {
+  "file": "v5/v5-concepts-time-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "559f3061ae6c6ccfd7b4f26866caffe5f4772b89828b63e0f2d50b992804d003"
+ },
+ {
+  "file": "v5/v5-concepts-time-21.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "9a79898f487074cd134caab12afe066f3e192fc6a4e660d4fca7b9d780381622"
+ },
+ {
+  "file": "v5/v5-concepts-time-22.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "7dadfd733ad288b44ea4c4f7f349d58669379d4c0e12b9d42253565280fc3111"
+ },
+ {
+  "file": "v5/v5-concepts-time-23.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "9e9b18b21239dee76f90a04294ceaabcc861a458ccb200f0679b43de66cc0cd1"
+ },
+ {
+  "file": "v5/v5-concepts-time-24.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/time/",
+  "sha256": "0ae03a077db7754985b7850bf9cad622a44b6896d885a6a156f542b56d178f58"
+ },
+ {
+  "file": "v5/v5-concepts-timeframes-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/concepts/timeframes/",
+  "sha256": "5362fceffc3750d2994c94259a33d7e9ddfa97acbf38db7bdf01711fa307b05f"
+ },
+ {
+  "file": "v5/v5-error-messages-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "0d0484dfc65e8c93e23068ab0b1493cc5ff7c7c4fdf1f13af507d0928da0a9a8"
+ },
+ {
+  "file": "v5/v5-error-messages-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "b54a26c3ca1c7cb0dc5c7ec8302367a53759f085b2492435818cd8bb3d710f64"
+ },
+ {
+  "file": "v5/v5-error-messages-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "94b3e4a6e13b2deda7620bffcd5af9546cae07615dca0bd2b851a6bdbe9daa31"
+ },
+ {
+  "file": "v5/v5-error-messages-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "d892f8201fb4bf75581829b3b871761474f4a7eb431dc02406ebdb27a8170033"
+ },
+ {
+  "file": "v5/v5-error-messages-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "35513ebeef00f459dd687b1573a614165af5950542e44bec311ee8731254791d"
+ },
+ {
+  "file": "v5/v5-error-messages-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "8822c9108b57b2b6bb698549fbcd406cee62d3b499dd518f5d283160814defde"
+ },
+ {
+  "file": "v5/v5-error-messages-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "cfb02ede8bf05cf49ef708d090363545332550b028fbcd211c287cc75386e8e5"
+ },
+ {
+  "file": "v5/v5-error-messages-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "32d28cb768d7d156c7374f5148414102f787651b2d3bf441fc7e8eab9b9d004c"
+ },
+ {
+  "file": "v5/v5-error-messages-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "c136806f662391039c1592ce0ca8fcae53cec90901ac511728a7055c2fc447b4"
+ },
+ {
+  "file": "v5/v5-error-messages-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "d47767a95934f81002f44317e97443bac55cefd53fc900344014ccd2c8bbb339"
+ },
+ {
+  "file": "v5/v5-error-messages-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "2080bbc93ed6690dd683d96d3c5973ee0866a6d9c5bae284dfaf92534ba1fa98"
+ },
+ {
+  "file": "v5/v5-error-messages-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "615cef6fe6f26e9b8bbc389cc145c199b175eddf7435e87dc2426046eab8e44c"
+ },
+ {
+  "file": "v5/v5-error-messages-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "3507bb2a945b5247894ad651d79d38faa9f2b5ae180ae4734531ecc4768fc3f2"
+ },
+ {
+  "file": "v5/v5-error-messages-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "1ea813deed30a4469795fe8783c694ca4430ce4a145a373c87233914adc3a160"
+ },
+ {
+  "file": "v5/v5-error-messages-19.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "6d0f8d3a1cd2480cfdb8360e484078cc4d0d1f4d4211c890221f48477057bf6c"
+ },
+ {
+  "file": "v5/v5-error-messages-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/error-messages/",
+  "sha256": "3065d1b16e0e8cb7efb1542e18500bbbfce065081b7d46f03eaa4e21a216f9da"
+ },
+ {
+  "file": "v5/v5-faq-alerts-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/alerts/",
+  "sha256": "92ce2bf24bb84e61d44975d936dd3afa49458ee075a9b7dc026629003a595166"
+ },
+ {
+  "file": "v5/v5-faq-alerts-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/alerts/",
+  "sha256": "d9cb3d5b5730d828579658c14c8ba38c213185f5ff329e6070ed2e9e00a2468d"
+ },
+ {
+  "file": "v5/v5-faq-alerts-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/alerts/",
+  "sha256": "d362244943b36441f87edf08c55712d19a81b7ee3110ef1c69fbff40cca3cd7f"
+ },
+ {
+  "file": "v5/v5-faq-alerts-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/alerts/",
+  "sha256": "3ba94c70d9e6a25b2a935dee5e479f7757760f8f8bf5502160b59e0d111f7269"
+ },
+ {
+  "file": "v5/v5-faq-alerts-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/alerts/",
+  "sha256": "ae4548a4fdc6274f1f6538d9894c75b485938747678fc759492b6ca4136d7fd9"
+ },
+ {
+  "file": "v5/v5-faq-alerts-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/alerts/",
+  "sha256": "81b8def01c56fb0556f7b7933f30c8a65af1720708c631bdc5bd982271e1fba7"
+ },
+ {
+  "file": "v5/v5-faq-alerts-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/alerts/",
+  "sha256": "42eec8b4c1215de03f4792679ec987ce706b33775b95218b7e953517f764e8e3"
+ },
+ {
+  "file": "v5/v5-faq-alerts-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/alerts/",
+  "sha256": "6b1175bf06d4efd6e9f43ef9754e259165178d96f2d3dee2c5e5072da9f9f8ae"
+ },
+ {
+  "file": "v5/v5-faq-alerts-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/alerts/",
+  "sha256": "aa2c9861ed8bc7217384bd3f86007609cc7cdb3c843f8cc16955590e31674363"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "930117907e0e665bb8c0e6533509f6d36d7a38125b5745448e5f7dfc280b20d7"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "6d4e82aa56a3f5a52f78c16a505b2fec050851c051c7ae7702054bd8cfbab6fc"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "429dbdb202a178f2aedbc7ccead616d71d7dcde5be0d0ace9f47df70c9c76914"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "cffd36e44cfcc1dc851d9dbe0446f9b7e3cc70a34021d4896f772202f862690a"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "744ebdfbfde2bc97bd284d6067d4f020d67a72e8f3929874450335e1f71a04f2"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "ab575efd121da99a05dc7a3c1994f0579bc55fcf87aeb02adb5ec858da9b11cf"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "775b42220be4e2afad957ec0bcf5cd2b20e3c483d3d8196d24f9d3694639fc6f"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "9a75e4e74dbc63cb33c301503b8303b161a6ffe9e3442d06f03e159e9710a98c"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "cec8d111a1d62d13d7d76d88ac48c25c5f0b8c7ba71886eb1f66fc47d588260d"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "0dc43b5e19d2c84f5ba0e444f7a5b7716ba07d177100f072bef4212fdcfe88f1"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "a52dd3af92978b39630a71498d971382176282774042a5931a19c2a00422dd35"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "9902ad71f6622b41c28233d6ac6f556150fbb9227f800a75d28159735849bca5"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "36ebf794a03af7bf15ddffe1dbca5449b5d38bedca4588dfa6dbb817c1112245"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "f43f9a90c4d44d9808c8a800a293ebfc51306dc9ca2704732ba895854bbdc141"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "599a027684165af39ef03039a03bd665dc0d8931fac7d713c11e971b27017909"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "74a46c0e8a69f2143b97c4a95e08582beb706b811cf2bad76ea40d19491f6cee"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "f483df29f5e74e8fb8d49ab80782f8f157ce67e5ae219c055e5920c15989da23"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-19.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "e2ff5ab6fa745e5aea5ba7caff76f0a4deb58a49fc142257eff77e310ae37d2c"
+ },
+ {
+  "file": "v5/v5-faq-data-structures-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/data-structures/",
+  "sha256": "3138c239865313d71fb48cdb750a2fbd0cf902f31449e23b8a2072cb63530580"
+ },
+ {
+  "file": "v5/v5-faq-functions-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/functions/",
+  "sha256": "de853166cdbfe8365be92192b929ba46bf4c45b325e71942714bbe6962927841"
+ },
+ {
+  "file": "v5/v5-faq-functions-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/functions/",
+  "sha256": "5d57532da0419ed874f3f0b940b73afac825000d936352552f93899ead3431fc"
+ },
+ {
+  "file": "v5/v5-faq-functions-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/functions/",
+  "sha256": "9273d7d772af7f1879c1b088cc4903fd84185d094973c11d0b195b0fb33f85b5"
+ },
+ {
+  "file": "v5/v5-faq-functions-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/functions/",
+  "sha256": "8ff533b642c2ef158f6ba92b5acc3597c32d78cfbdf492ec0993bc4bca07eae5"
+ },
+ {
+  "file": "v5/v5-faq-functions-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/functions/",
+  "sha256": "de92b1db6baded23ea056ee591b59ea3a579c9bd3c244af209cd1d72012c8fed"
+ },
+ {
+  "file": "v5/v5-faq-functions-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/functions/",
+  "sha256": "c0c8594dee3081729288c25bddcb6b5fce5bd36e68afb003ed3b6a1a1ca203d2"
+ },
+ {
+  "file": "v5/v5-faq-functions-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/functions/",
+  "sha256": "2ea92b0233ead3fa9705fcf9d6f55a105e139a480823ec24180e307cf90373e3"
+ },
+ {
+  "file": "v5/v5-faq-indicators-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/indicators/",
+  "sha256": "78c60bdb8795f3effea1cdfad3c477d75c735ef15f32598837680ed022a35fec"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "9d1da3a45a3adcd6e02f8a5af50158ce405f919dc6a8e09e553220c961b104bd"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "192f7bea1858891f8ca64b34cc78eacd171b05715842d1f44215207c98fee608"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "d3b53b1f69c31cfdcfb10a66643974f108ccac5889024b9ec09476b373b1894a"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "b35bcc2267f5a3f2e8a008ca67c0bb58dcaba51039cf9029a1dbd234e1fb8573"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "e499597d70f0df58fabf00cc064a5c6bcf3d940352656eb12578075eb92d16d2"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "08f0b427bf3ab895ade3d9f4b245a64f407b2fb0be247c656d19691303b1f18f"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "a970f8ea34b5781ed383f667caa20943a9f486c748b01ab67065322e6a4c8fba"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "5876f12613d1135e9c35761cabbeaa0aacf41e358beec610def943556a0ce04a"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "0363d31e508a3a87b7491e30046cfa6361af1106e43f3004e4ab515e1b998f4d"
+ },
+ {
+  "file": "v5/v5-faq-other-data-and-timeframes-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/other-data-and-timeframes/",
+  "sha256": "bb76d34bf200d0ee5175efe497c70ea52224780ccc306d470c674089bbfb1c6c"
+ },
+ {
+  "file": "v5/v5-faq-programming-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/programming/",
+  "sha256": "5249bd5133deec112e468d8935da7ad8a07c1a088eb66c7533184eeda8435d33"
+ },
+ {
+  "file": "v5/v5-faq-programming-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/programming/",
+  "sha256": "5d4e31f8b9c182addabb433a3efe1ebb0253f676b35632116d06bb2590373c11"
+ },
+ {
+  "file": "v5/v5-faq-programming-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/programming/",
+  "sha256": "ac8e2d15203739efb90df01f78331cd1007af03bd6e0b6ed10a5966acb77833a"
+ },
+ {
+  "file": "v5/v5-faq-programming-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/programming/",
+  "sha256": "481f27cae3fc8348effcf688bcf3832dc93ae89041072e173e61ac7e8938483c"
+ },
+ {
+  "file": "v5/v5-faq-programming-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/faq/programming/",
+  "sha256": "33b13587f8e08a9d38dd7af56c1e1b76d9fbcee62043ee94d818b681972528f7"
+ },
+ {
+  "file": "v5/v5-language-arrays-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "0b54f89e4ab77dd1b237e28544965248e62871a6f0b0e789fe25e00b89f97020"
+ },
+ {
+  "file": "v5/v5-language-arrays-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "d0401c1d37a010462cb98df12d6c5b3cedc3ca626bc934113b300420ffa2b681"
+ },
+ {
+  "file": "v5/v5-language-arrays-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "552e10678187b64c55c5afdea6c0d23be3019af61a807f4ae476c3a4b200d0e7"
+ },
+ {
+  "file": "v5/v5-language-arrays-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "7f0a8fc9b3f94bd23dcebc3fe09d668c951ab3729a571bec7ad386760334809c"
+ },
+ {
+  "file": "v5/v5-language-arrays-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "87b27aa3f41377592da7cf3f9ebfbdb564ea8109d9d6884ee8e84b2679a23955"
+ },
+ {
+  "file": "v5/v5-language-arrays-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "1797ecf6d801c8e6d0010891dda07048587ed016d5028e8439ae774239a9dc01"
+ },
+ {
+  "file": "v5/v5-language-arrays-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "3ef55038c0b2e6d911c351c9cd011c07ff53793b36ed71372a807b8447154d4a"
+ },
+ {
+  "file": "v5/v5-language-arrays-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "d01366f15765c7d2e4eac1e222d94e2e5641bbe158653bb85bce612a12d00409"
+ },
+ {
+  "file": "v5/v5-language-arrays-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "ab409bdf39adbbbd46fe254d7d48a775bb33315901476d89cdb791a2a080ddf4"
+ },
+ {
+  "file": "v5/v5-language-arrays-19.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "e777758207a38c5cca30a9c5fff2beb45aa9942335be5432b54b0a1da42583e4"
+ },
+ {
+  "file": "v5/v5-language-arrays-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "c476e597de06cecef2de6ec62bcafd56725dbac0134a1d3b744c6a4c269d205a"
+ },
+ {
+  "file": "v5/v5-language-arrays-21.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "b590d1121384b28580fe29a0992db6f63326bee4acf93419e2e2b42e01a3b928"
+ },
+ {
+  "file": "v5/v5-language-arrays-22.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "59cea9b66ba2bebbff33423a353ea1b09a829386db15d9f26596109ac935f10d"
+ },
+ {
+  "file": "v5/v5-language-arrays-23.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "1e107b78e71b84863b0a65a7dc2dc97cb35d38ecd0c62fdb79cc974438978954"
+ },
+ {
+  "file": "v5/v5-language-arrays-24.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "f78511a5265e93396973cae46b969c687fe2c4113d99b50648c0c990606a14cb"
+ },
+ {
+  "file": "v5/v5-language-arrays-25.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "b12975f886dfff1fde9c467edf016bf1a4edc54e0e072eb064de6779244e6d96"
+ },
+ {
+  "file": "v5/v5-language-arrays-26.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "66f04b09b3c07cac7b79725690b2088a29ed7391a3fb77c6f94d110d88ccd91d"
+ },
+ {
+  "file": "v5/v5-language-arrays-27.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "ecd2d1c0273ace257bd1880c14787ce83ded62db66db34b643b8cbb6f6026151"
+ },
+ {
+  "file": "v5/v5-language-arrays-28.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "76604620ecfcfc4bf6ceba2d4a0683c6218d014755418e2354c8a3cc0dbdd1e8"
+ },
+ {
+  "file": "v5/v5-language-arrays-29.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "369638fb3f8a1bb425647d51d5becef40cc3385ccb52f6a530847da4eb93a8ee"
+ },
+ {
+  "file": "v5/v5-language-arrays-31.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "621eadd479420dacb7036f114c99203e74c652c97dfc7994ef4e2d93ed0bde6e"
+ },
+ {
+  "file": "v5/v5-language-arrays-32.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "a7ccbb40f49661ef38647bddf9a78ebf222353c74b86331e6f3b2d3e906b80b9"
+ },
+ {
+  "file": "v5/v5-language-arrays-33.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "116bdc6a47dbe9492beb0410f7d091a79d0b40b8e654a85072eef46757ed23d3"
+ },
+ {
+  "file": "v5/v5-language-arrays-36.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/arrays/",
+  "sha256": "46b341236ebf2521babac35d6b30810bdefb30edd1784c2d72bde31051b7326e"
+ },
+ {
+  "file": "v5/v5-language-conditional-structures-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/conditional-structures/",
+  "sha256": "d5e65d7720214bd29d84de7dad054eee9f23f1e4aee2f8efa9f463af1443a2d2"
+ },
+ {
+  "file": "v5/v5-language-conditional-structures-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/conditional-structures/",
+  "sha256": "44f16cab4c71ae53e65471f976471514ab14fbe4b6641347d008eb2479200e30"
+ },
+ {
+  "file": "v5/v5-language-conditional-structures-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/conditional-structures/",
+  "sha256": "8c250127909f36d67a30055f763fd5b7b05d385dc1d7d74508b29bcc7c77f18c"
+ },
+ {
+  "file": "v5/v5-language-conditional-structures-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/conditional-structures/",
+  "sha256": "996768d040e90a87684702ccfe969eb779c7d95d8779d64a4e99867572c49e3d"
+ },
+ {
+  "file": "v5/v5-language-conditional-structures-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/conditional-structures/",
+  "sha256": "676e186031a4474211d2a7fa974fe18e4cd2b87af6e25d4536145c4e44c39ccd"
+ },
+ {
+  "file": "v5/v5-language-enums-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/enums/",
+  "sha256": "04de8a02cac2c8fc7d48e97250193a29f95e5bfd7e06eab0f777292b43deb11c"
+ },
+ {
+  "file": "v5/v5-language-enums-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/enums/",
+  "sha256": "9f2b844349ffb85fb27668266170d32d79ee62457a5e0577ec848ccfb5a42e9e"
+ },
+ {
+  "file": "v5/v5-language-enums-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/enums/",
+  "sha256": "bbf83445c8f1136e5e680c587580a164213699918f24dbebb63f15a4aef5bbef"
+ },
+ {
+  "file": "v5/v5-language-enums-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/enums/",
+  "sha256": "050494b20c27cf15e1a7cba9120c99ff09e6092a3a726f25359302a3f7bc217b"
+ },
+ {
+  "file": "v5/v5-language-enums-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/enums/",
+  "sha256": "4668acd529b241302dd2923d75c90329a3b4f90c79741b6acae09cf7bd04ebf4"
+ },
+ {
+  "file": "v5/v5-language-enums-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/enums/",
+  "sha256": "729d2bf6dd08804c6977184d18b4bd0f71d560998667a96b0e8b383e641ea55f"
+ },
+ {
+  "file": "v5/v5-language-execution-model-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/execution-model/",
+  "sha256": "d526599fbe3e457fdea8925612f24a54b9642af251268288a903d9b58288f90e"
+ },
+ {
+  "file": "v5/v5-language-execution-model-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/execution-model/",
+  "sha256": "220aec0a784ff00204bf80f437cdc18679accef65ce3d4b29f117afef77a20f0"
+ },
+ {
+  "file": "v5/v5-language-execution-model-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/execution-model/",
+  "sha256": "26e4f261652a84c3e8e6191e10aa7abc3285c89a493b4222508854ddaee93e32"
+ },
+ {
+  "file": "v5/v5-language-execution-model-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/execution-model/",
+  "sha256": "3dd7c82ddbad38ccf0107a995498b33f040220f58ff6e46dd45c8c0470cf397b"
+ },
+ {
+  "file": "v5/v5-language-loops-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "0945d528558453e5c47c80afb49f0cae3fdc193c9d579d541d198af6ca32ac94"
+ },
+ {
+  "file": "v5/v5-language-loops-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "cab0f6dcd47b9ed7a9aee441de43365c5bf083aa558e5474d1d28299a1777ba2"
+ },
+ {
+  "file": "v5/v5-language-loops-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "d418f4bdfe47c97badfad3f73b5f2efc034c7db81e7da382aa0ff4a5bc4e52bb"
+ },
+ {
+  "file": "v5/v5-language-loops-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "6a70b75e9d9027f9f0d1147e0cc4a91a40d262b3384d88b280a50ca0860b2b8c"
+ },
+ {
+  "file": "v5/v5-language-loops-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "581a5372bac929c37650b817b8f4743cb313e9c5ba0071b390c1ec04279281f7"
+ },
+ {
+  "file": "v5/v5-language-loops-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "e54f0b92c0378076c8557a675926e66d3d90d71b64d31876c7e3dd7872915232"
+ },
+ {
+  "file": "v5/v5-language-loops-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "98d4325c49df399a752222fa6b892591cee8d8ae8418020c244cc7c6d4dec57c"
+ },
+ {
+  "file": "v5/v5-language-loops-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "6929f51929ff9833e3d90fded942ad02490e3f383b290d31280dfb3c05aa9a69"
+ },
+ {
+  "file": "v5/v5-language-loops-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "7e558e1986d39a6f90d3c9b18ab9df964fdf787c835886a8c7396b8bc7b7ac77"
+ },
+ {
+  "file": "v5/v5-language-loops-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "0dfde46b33570aacb0170bfd6c7ba4de44c1ffbe046ba40076ec4123cf826670"
+ },
+ {
+  "file": "v5/v5-language-loops-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "60c7a9a270ff57ea9b8a0757bff7c41a0e71f840bafd99819c4443aaa1147fc9"
+ },
+ {
+  "file": "v5/v5-language-loops-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "6528c4cef150da5686a7db906dd2b85dcbe3f514c467ee4dcfa2e3c913a06738"
+ },
+ {
+  "file": "v5/v5-language-loops-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "e369a54553de5a7a5e4c2f4693e7090ed2357a3cd862a7130bc5d40f633a806e"
+ },
+ {
+  "file": "v5/v5-language-loops-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "c6f68b5bde50d10be052b11af287280fb4e7f7219055fab6c5b22b17db564be9"
+ },
+ {
+  "file": "v5/v5-language-loops-21.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "1b435379d0614045b764816246f93f8ffea182cadf5c3943c3a85f1bd3ae4a01"
+ },
+ {
+  "file": "v5/v5-language-loops-24.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "4c877447b8c5b5d0db6a1b7fd66fbc15abb5168a128648abf61ba695f9b18d09"
+ },
+ {
+  "file": "v5/v5-language-loops-27.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/loops/",
+  "sha256": "fb788f7a3247d97e69eb0d66886b3bf5bdc8f036ea203a32a94b20adb59a9da3"
+ },
+ {
+  "file": "v5/v5-language-maps-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "eb07be94a59d2e427f3081ea049e4f6110ece04a2d11257b192845a088bfefcf"
+ },
+ {
+  "file": "v5/v5-language-maps-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "218f78811cb863cd93e14ab80cd2629bc63e07d2a1130b93e733526e8d1a409b"
+ },
+ {
+  "file": "v5/v5-language-maps-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "d94af648b531d88eec20fe8799937f4c13d9021484414bdb94e7eb21f9820f60"
+ },
+ {
+  "file": "v5/v5-language-maps-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "43d75773d8129e4b652a4317daea9495adf1a43b0b3993fb91849ba44de359bd"
+ },
+ {
+  "file": "v5/v5-language-maps-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "c8fbb9fc618569a93aac9c0a6af8bf6a3ff88d43337a6745ec11e5bbcb3f1d64"
+ },
+ {
+  "file": "v5/v5-language-maps-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "e0235d4c402e102f62f9d3cb5f776999700533a7be8a4746e7e26239bf20f0a9"
+ },
+ {
+  "file": "v5/v5-language-maps-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "7a3bda4df983642a515233002945d22c13f88f89cc158cf565a100e88fc070cf"
+ },
+ {
+  "file": "v5/v5-language-maps-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "ca67d74b56a7bbbe883880f9df2a86d1d6a52b9952d70e9f59eaaf54dc7a41bd"
+ },
+ {
+  "file": "v5/v5-language-maps-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "8448128ffc8b31284495fa08e849fa9a06a5593e85654f3dddcdea1c4caf1f6c"
+ },
+ {
+  "file": "v5/v5-language-maps-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "7f739258b4d0d49dc50061f0ab156fd5bc794dbf1dc0a3de2e07906fdd680955"
+ },
+ {
+  "file": "v5/v5-language-maps-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "6d2e331d6b74e80279c4174ea8478efc267028cc975584da6a21ffb053f27fb2"
+ },
+ {
+  "file": "v5/v5-language-maps-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "7f324bc6c26f39141818db7dfa30ffea4f78b1990351a8e412a244c8881f711a"
+ },
+ {
+  "file": "v5/v5-language-maps-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/maps/",
+  "sha256": "79d6e679dd4e89f460f41514dca0adbe0f73e6143f1b1412cd51dc62800ae87c"
+ },
+ {
+  "file": "v5/v5-language-matrices-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "6b96aaa0b1bd3e124cebc2072598ddb2d8505839b616bff08af32fdfd7f1476b"
+ },
+ {
+  "file": "v5/v5-language-matrices-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "d4fd00fcef7dd2e450e683d5c13c194293ce8649106cfc068dbcf14e9bed21b6"
+ },
+ {
+  "file": "v5/v5-language-matrices-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "d9bc9f90e3e179c03d0de5cd8a39b97b7a43bbc0efd1bd22b3198f37a6181f46"
+ },
+ {
+  "file": "v5/v5-language-matrices-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "9498ccc9e175e948e0ab51422bfd741a7852726fbc487e346aa9b207a9e68fc3"
+ },
+ {
+  "file": "v5/v5-language-matrices-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "aca9939650f47fb3ffd978bc3809d2d9f83d6542843da7599578239b73bc98b0"
+ },
+ {
+  "file": "v5/v5-language-matrices-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "ca3c284a886345ec2dc3900266f5749dbc0313168e99c395514efbc40b742db7"
+ },
+ {
+  "file": "v5/v5-language-matrices-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "58e0a2e88a78096021c3f70ae55c14e80bf2ba1d658beff23365e672cea5793b"
+ },
+ {
+  "file": "v5/v5-language-matrices-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "35d93213ea276b4bd756c48f53591b04308f565165c5f6d355e4f9b905158140"
+ },
+ {
+  "file": "v5/v5-language-matrices-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "2949d935af7f90d030c3a601978943295af56772cd683d27bbe216e68684da30"
+ },
+ {
+  "file": "v5/v5-language-matrices-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "28839a5fffb7b8b04a1773a15a0873e5f50924b8501bd38c3e4cd20368bdefd5"
+ },
+ {
+  "file": "v5/v5-language-matrices-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "b4d4e16d16c9df5d42f9dd257c341e5eac8e4376bb3ac080c6dfc92edc516b73"
+ },
+ {
+  "file": "v5/v5-language-matrices-19.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "0602c95e4d3510afb01092fbc93cf183965e2184f2edadcf669e5eb547635bea"
+ },
+ {
+  "file": "v5/v5-language-matrices-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "bc7de3dd6fa16064e39a0b450b129fbd18f9b0e0a5d3b3da812a1ed048f34831"
+ },
+ {
+  "file": "v5/v5-language-matrices-21.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "02f03e653ae801123f8fafbc7c8573400844ba78b065c9c48817edcc684aac5b"
+ },
+ {
+  "file": "v5/v5-language-matrices-22.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "5f3f6be7dd5b753db6255a770c5267b6dd3f6ac69f55dab90951733ca85b7922"
+ },
+ {
+  "file": "v5/v5-language-matrices-23.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "5926ca72290cd1c202d17540131b9695326c184b6ababa5ddc48f0a26298e6cc"
+ },
+ {
+  "file": "v5/v5-language-matrices-24.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "6a2bee32fd775454974bfee906c0ab5e6f15ac86fa6112d8847bf46fdb12e68a"
+ },
+ {
+  "file": "v5/v5-language-matrices-25.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "ea1d1bc2cba216a4bfc193c3c013e1a987c25e7fa2dcfa8d47da27bffc3400a1"
+ },
+ {
+  "file": "v5/v5-language-matrices-26.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "6dc21ed79d44644332e48eb36da30d91433fb4c3e62e2fccced943261e680850"
+ },
+ {
+  "file": "v5/v5-language-matrices-27.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "cab774abb6e3cfab3b6efe87fff66fc37d46fe922564596fe26593ea4d0ac77e"
+ },
+ {
+  "file": "v5/v5-language-matrices-28.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "5e4520c38e13334e04172c0504600a0519793d077f9925cacc6cd7b8f190667b"
+ },
+ {
+  "file": "v5/v5-language-matrices-29.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "7242c883b536adbb1212cc163f2d236a94799643cc1040aa0844aa7edd3c469f"
+ },
+ {
+  "file": "v5/v5-language-matrices-30.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "3ad11a6838fed384cad04884cadce54e58d414b4ebb0b2f441565a9acc254f05"
+ },
+ {
+  "file": "v5/v5-language-matrices-31.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "d3ea98d6c1d9984189cb1cf44d821acde18b3ff06103d8282aab1227f1706cac"
+ },
+ {
+  "file": "v5/v5-language-matrices-32.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "e0be03c410a8120ab34d7e5f98068d6123794d82b207c75efbc1e695815887a6"
+ },
+ {
+  "file": "v5/v5-language-matrices-33.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "d2c5f186547ecdee2cb57263bd0a2b1e76cddee5ebd8318016ab55d1e050309b"
+ },
+ {
+  "file": "v5/v5-language-matrices-34.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "98291fd6bf29318814c2964f95c491759114eadb7a92359bede96e2f3936294e"
+ },
+ {
+  "file": "v5/v5-language-matrices-35.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "75c8cd135b58ef2c3a3f388345a4aac0b9a5580e61bd6089338adac80ee7fd4b"
+ },
+ {
+  "file": "v5/v5-language-matrices-36.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "3a4a48872c653709986957c7dd3c6cc54785cd86b567f93951d3c2cce7941923"
+ },
+ {
+  "file": "v5/v5-language-matrices-37.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "3059b8b30302fe5baeb81c8bd36faa51639e403ab8ba56e29a396c7f39965e4a"
+ },
+ {
+  "file": "v5/v5-language-matrices-38.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "7148ae47a6a8acea302ed8bd2a7db2b8467d975e259cbeb14e2b469b5cbb8827"
+ },
+ {
+  "file": "v5/v5-language-matrices-39.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "00c3c055d4756c3833634be96e6218fdcbcedd5f4df0a736f5a70148f22e1662"
+ },
+ {
+  "file": "v5/v5-language-matrices-40.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "3b6e7cde1166f5a3cca936cf47a49868ec65926ba338b68d48b8994c8614bfed"
+ },
+ {
+  "file": "v5/v5-language-matrices-41.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "ea1561b85d1c3e7ed199bb2d07858b70805774e37490d7e16d9a232c2de41fae"
+ },
+ {
+  "file": "v5/v5-language-matrices-42.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "e49650331253483310e9ed4d0613429ba774418efa48000f797eeb0179f6cf7d"
+ },
+ {
+  "file": "v5/v5-language-matrices-43.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/matrices/",
+  "sha256": "b87743c0dbb8d06671e1b011900fd951139774ad63be9712a5d7ca18eba7235d"
+ },
+ {
+  "file": "v5/v5-language-methods-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/methods/",
+  "sha256": "a7efbec56925e3238fde58617c10f80cb7f9d2d18581c55b1a8490f61a7b8199"
+ },
+ {
+  "file": "v5/v5-language-methods-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/methods/",
+  "sha256": "abbefd9e251a95ae1118a83d1226f6673ef4dd345fcab2a8e5f1d5a8996446bd"
+ },
+ {
+  "file": "v5/v5-language-methods-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/methods/",
+  "sha256": "657a8ce5f4af9540563c46f953e27ec590ba81e764e07d8391ed1547783cc7b1"
+ },
+ {
+  "file": "v5/v5-language-methods-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/methods/",
+  "sha256": "3c91f9b19631ad0914e5a58a927f910a4fa874d9f29193d527a93b3771abfc8a"
+ },
+ {
+  "file": "v5/v5-language-methods-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/methods/",
+  "sha256": "5f17f0823beb7106521f142ac314f81ecb80db26136202e7d4f0bf57bedad668"
+ },
+ {
+  "file": "v5/v5-language-objects-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/objects/",
+  "sha256": "a2db29399405da0d3461aea2fcda255bc4887a0cd4455d29a6f3ed86a6898479"
+ },
+ {
+  "file": "v5/v5-language-objects-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/objects/",
+  "sha256": "a346ca333a35c5927d84e13f1cf2f4bedcfe8475ab2bb7fae8df94ea37a0764c"
+ },
+ {
+  "file": "v5/v5-language-objects-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/objects/",
+  "sha256": "345335c9ff67ed88d9b8dc3b5a352ca3e956cccb9c7902dbd38e0c75a80d892c"
+ },
+ {
+  "file": "v5/v5-language-objects-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/objects/",
+  "sha256": "3a724000fc3f03b7e470238051672d5e0b6fd7248730667d06b3c15564c51f73"
+ },
+ {
+  "file": "v5/v5-language-objects-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/objects/",
+  "sha256": "b3ed9d9e176e888042cc001b6ea6a08f63b2956015ba9d1f5a917ae24017bf4d"
+ },
+ {
+  "file": "v5/v5-language-objects-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/objects/",
+  "sha256": "c61f49694967c99835e4d3a442b73084d76fa6b8d330245f761f1a944f3742bf"
+ },
+ {
+  "file": "v5/v5-language-objects-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/objects/",
+  "sha256": "efe4089c1ec6ab3e85f927bd2816924a829a17ce5c55c6bb75576b295a38864b"
+ },
+ {
+  "file": "v5/v5-language-objects-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/objects/",
+  "sha256": "80e58c947a4e3653e11484731d04dd5fc4c98c415c763f9d250345cb1bc11da1"
+ },
+ {
+  "file": "v5/v5-language-operators-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/operators/",
+  "sha256": "7394016bd8b18232187b61d00ca65875a3887d1ba141e8eb67e85f18d551b908"
+ },
+ {
+  "file": "v5/v5-language-operators-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/operators/",
+  "sha256": "95b1d0207269867cc3a8544e80453ddc7b732ef3bb15239e63eb2a6f16510564"
+ },
+ {
+  "file": "v5/v5-language-operators-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/operators/",
+  "sha256": "2ae6e9e336df37123ca5b04a3b3acf27228102f52001435323ea46533c1233cc"
+ },
+ {
+  "file": "v5/v5-language-script-structure-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/script-structure/",
+  "sha256": "d36ac7565443b1444371a4f162f6ceeac35117eac1c0e056844e1bfbfd047a66"
+ },
+ {
+  "file": "v5/v5-language-script-structure-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/script-structure/",
+  "sha256": "a557dd540bd4b48b021ab1ccf24151d988e0b63552b1ea6d00af328b4c7e7069"
+ },
+ {
+  "file": "v5/v5-language-script-structure-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/script-structure/",
+  "sha256": "64d11a3801cb6e3ed38a5c642c34737fbab86a84640a9325f60591725b137cd7"
+ },
+ {
+  "file": "v5/v5-language-script-structure-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/script-structure/",
+  "sha256": "e7e75c81337ff527b70ab7decaa0e4799ced844bb3866a7c72cd63cf61e69df9"
+ },
+ {
+  "file": "v5/v5-language-script-structure-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/script-structure/",
+  "sha256": "0cb3f804030d3adddef826b9b000d01fa40dd65ff3df54c689609690e2308ae6"
+ },
+ {
+  "file": "v5/v5-language-script-structure-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/script-structure/",
+  "sha256": "b9fbc11283e62cc18a8190414472454138a850d0b2c51f95e220017d4402c887"
+ },
+ {
+  "file": "v5/v5-language-type-system-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "31702cb608affb3c70680067e0852e601387b754e8139efd8ff99b88014d6efc"
+ },
+ {
+  "file": "v5/v5-language-type-system-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "1a9a87efd1dc1c5ad58cf9cebbb95161bc575cf9d3a067e01a6ae01659e82c92"
+ },
+ {
+  "file": "v5/v5-language-type-system-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "14c77ecec3eae55c2edd42a459190756d342b3297d2d267a1ac7a14ad9dda80c"
+ },
+ {
+  "file": "v5/v5-language-type-system-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "a2a4260c96dc50300df6499dcb94b7a47cbb4d55f3103aceafc0e3a142595005"
+ },
+ {
+  "file": "v5/v5-language-type-system-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "0b1bab14de7b6d4bebb0bcc78ffa4ad309c172fdfc3c1049a8644ccd6eb96743"
+ },
+ {
+  "file": "v5/v5-language-type-system-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "82e2343ac0f25ae54c2dabd99b28baa21335f3d2586857ce5bdf42552ba9c73e"
+ },
+ {
+  "file": "v5/v5-language-type-system-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "5dc88b65a5977ba037388506c5785fd88643dc06584b4b59ee5e308efd5e8aa4"
+ },
+ {
+  "file": "v5/v5-language-type-system-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "7d6d226111b50e9e53103895d8de1ac1a65d41f4e52ea65007c6f296f25988e9"
+ },
+ {
+  "file": "v5/v5-language-type-system-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "76d7ebafdc47d8d97da5626b715dee1611bcbc35261a522f13dea9c26463a6bd"
+ },
+ {
+  "file": "v5/v5-language-type-system-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "d11fd0e23865d4c2242748aaa8d12ac6cf26a685ffd915a75a2ef9f1829eeb89"
+ },
+ {
+  "file": "v5/v5-language-type-system-19.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "439e3304c47e9b171c9cb3c5b69344a2cb5e747849ab1db23c067d18bf928980"
+ },
+ {
+  "file": "v5/v5-language-type-system-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "4f49c0ed9a43da34bda3bdba797350717280346ec89c61bc98f316bb376eaa2e"
+ },
+ {
+  "file": "v5/v5-language-type-system-25.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "b9d8cb0a857d0eeef569d62ce75cc63a3e47124cdcee9ab0e3ecc1974b02b60e"
+ },
+ {
+  "file": "v5/v5-language-type-system-32.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "36d2b73bd7a60876f012d494bec9e625a8ed33985cb5cc4a98fac4ce66f7bed4"
+ },
+ {
+  "file": "v5/v5-language-type-system-33.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "17d9c2d89ebbf578c87aaca71d10f50a7435f968d18c0a182f34702d605d7c98"
+ },
+ {
+  "file": "v5/v5-language-type-system-34.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "f9f9a96760a82c4069e7c381adfdb5c3a605d3e5e4923791bc2e110752a77986"
+ },
+ {
+  "file": "v5/v5-language-type-system-35.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "cba2b83c48d9ca103004ad2cdae2cfcfd49224f04e7667cb829b5ccd595a8bcf"
+ },
+ {
+  "file": "v5/v5-language-type-system-36.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "1a970ecb8fd3fe02358895e5f1e9ccdc3201b5fb796d58af93d6892ac30213be"
+ },
+ {
+  "file": "v5/v5-language-type-system-37.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "e8b99fe9f5ee3c8e7be23ba5f0e4d2934f4e2da364530a57ae5855ff3aacb1ae"
+ },
+ {
+  "file": "v5/v5-language-type-system-47.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/type-system/",
+  "sha256": "448ee5e6337816c3e868157c92b162c36c19a5960dfeac4bd46635950a802167"
+ },
+ {
+  "file": "v5/v5-language-variable-declarations-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/variable-declarations/",
+  "sha256": "57bff91e2e36091c4cbc3e56c85c36754717e9f9005ebbef167707ddc6301253"
+ },
+ {
+  "file": "v5/v5-language-variable-declarations-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/variable-declarations/",
+  "sha256": "8d1f14bcce48efc0782dd4c11d2e1b23ba6584a2e3b3fd4eb7db52ee9af2a26a"
+ },
+ {
+  "file": "v5/v5-language-variable-declarations-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/variable-declarations/",
+  "sha256": "caf98c0199b9dfebd921f6e05e7539a8d1546b50cf08e241c9a920d585c19cf9"
+ },
+ {
+  "file": "v5/v5-language-variable-declarations-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/variable-declarations/",
+  "sha256": "a5c9aa663711631ec05ac05db27ba3f8884a1836f0eba8d934da8e460250f7f6"
+ },
+ {
+  "file": "v5/v5-language-variable-declarations-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/variable-declarations/",
+  "sha256": "d84d48f470c30ffd4ffe1f42cb1498d3d81b7c757af08669226937ae087a4b39"
+ },
+ {
+  "file": "v5/v5-language-variable-declarations-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/variable-declarations/",
+  "sha256": "d695978540693c104d24c6b63468567b694d2294aef8226655bbea2928bb58ab"
+ },
+ {
+  "file": "v5/v5-language-variable-declarations-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/language/variable-declarations/",
+  "sha256": "b4bb40aad5dcf937b6e5922e44636a875cc40238056d133b7c19881b1e5dff0a"
+ },
+ {
+  "file": "v5/v5-migration-guides-to-pine-version-5-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/migration-guides/to-pine-version-5/",
+  "sha256": "f2bb8a632841b8216dd2c376ba985d417006ff65a60ed26cc65df87984ff5275"
+ },
+ {
+  "file": "v5/v5-primer-first-indicator-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/primer/first-indicator/",
+  "sha256": "a81c18889e65eebeaea1a13b6903e327af9de416887ffa1918b562bf605620c9"
+ },
+ {
+  "file": "v5/v5-primer-first-indicator-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/primer/first-indicator/",
+  "sha256": "8f5ce0b66b42d0c9a9b0c8c7225db3e1b754aa3e5b1b970d9ac541eeef6fef23"
+ },
+ {
+  "file": "v5/v5-release-notes-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "7834b10e9fb081734d2f227c35e6c0a0f7193c981f7c2bcf118c6b3c866c569b"
+ },
+ {
+  "file": "v5/v5-release-notes-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "509d957ecd0a88b24e81d8873639215c3429ce5c5326136db4c3404661f383b5"
+ },
+ {
+  "file": "v5/v5-release-notes-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "f8837d8613560e40ca2cf84bede7f2b4ddaf2519257ac054fb6ad5635e087ab5"
+ },
+ {
+  "file": "v5/v5-release-notes-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "d7015c0cbdf141a46fc262c126edb4a4136b648dcb857b72bf30339b178d1588"
+ },
+ {
+  "file": "v5/v5-release-notes-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "b91258d4056d6988cb17c4f25f327440a1f7897ec49349c6d4d5bbb3d38e3b31"
+ },
+ {
+  "file": "v5/v5-release-notes-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "95a8a2265cc7123b65e07f836698035fa580edc187dcad45fe94f368fd79a6ca"
+ },
+ {
+  "file": "v5/v5-release-notes-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "5f2f66c8684720af8cf4d09154a109de4c0c6b21d3ebb674db29fceb0969d663"
+ },
+ {
+  "file": "v5/v5-release-notes-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "09c3eea2fada3d0f10be1956e22e74624b28a0d6ae5b9f9c9c0b14e76d418eef"
+ },
+ {
+  "file": "v5/v5-release-notes-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "e09a1df05d1f0bc4692eb752e1f0be0064e8f409f65d84b5df24dc74e7f482c0"
+ },
+ {
+  "file": "v5/v5-release-notes-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/release-notes/",
+  "sha256": "5fc37e0a72c130cd34237ce4521febecfdd8b90104e5cf7a203706e51d0e4f4b"
+ },
+ {
+  "file": "v5/v5-writing-debugging-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "8eb4ad1024f3f2e591085cb4f9595726da303330bdd6e57f64e3d2fff87dbae3"
+ },
+ {
+  "file": "v5/v5-writing-debugging-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "bed7af1329a97cfdec944bfb7c3291de0396755eb187b6d36d862c11495d7ee6"
+ },
+ {
+  "file": "v5/v5-writing-debugging-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "958156ae42a17fb5142d47fc0493fea7d44637047f956a665dbc4dbf1131a5da"
+ },
+ {
+  "file": "v5/v5-writing-debugging-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "1fce69853162cebc612692c17faf3921ab35a7d2cb4d0ffe3a882d84af8d0f5b"
+ },
+ {
+  "file": "v5/v5-writing-debugging-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "35d3fdcc9b1f06261a30b342a0db20c3bde3b021b301ba547fdff03656368b3e"
+ },
+ {
+  "file": "v5/v5-writing-debugging-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "a8bfecef1beb8f17518f8073138c7dfb4bd4c1c99cd0fbbdb330d7967ea3b868"
+ },
+ {
+  "file": "v5/v5-writing-debugging-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "ba403264f64a41bbe3dd7593be469dd41d654772d2903c27968d0efb88347363"
+ },
+ {
+  "file": "v5/v5-writing-debugging-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "5bebce89b54ceacdb843dc4e8cb2be5a127ab6f7bfe34057bc797278a7ba3d9f"
+ },
+ {
+  "file": "v5/v5-writing-debugging-08.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "25925416f2061ca239efc40f642eb815f14bc6e3eb6c3bbe1ac1439fa5322377"
+ },
+ {
+  "file": "v5/v5-writing-debugging-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "7b929cd600b30ee88375215c908b3bc6bb3a46f85983bf1ed349a23f28d2859c"
+ },
+ {
+  "file": "v5/v5-writing-debugging-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "6d153be8f8c1382e19187100b12dc138900acab6fdaf59c8dee99f1daccd9c47"
+ },
+ {
+  "file": "v5/v5-writing-debugging-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "5354b27cdffc4e71df65024f6bc270e2d69e2e9eea633e1e3df85c86ac08b09c"
+ },
+ {
+  "file": "v5/v5-writing-debugging-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "5760a50ebf133814ca43e7f75b176b08fa2dde292e7b4f3b9ecaa4d885aeeea8"
+ },
+ {
+  "file": "v5/v5-writing-debugging-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "80a0d37d72a5661a24cd9b6cd6b880ecaf3bc2a35c9c77d1a3bede7605e2a0c4"
+ },
+ {
+  "file": "v5/v5-writing-debugging-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "6482c16d5c6ff76a06b7b3a08ff4c1e2f5e41d7d4f730e78f00bab714ca23509"
+ },
+ {
+  "file": "v5/v5-writing-debugging-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "49e427c08cffd794a9f90a3be52ae63137c4be342788c854449173614e9d5b0a"
+ },
+ {
+  "file": "v5/v5-writing-debugging-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "f1f9d8d73e1a4e5c90c62e4008d61ec67cf88f33206099b3a8dee9aa2a60d319"
+ },
+ {
+  "file": "v5/v5-writing-debugging-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "3c62da3f5c1789e3e9a045756ba3f8fd04c0ca7e44714c0ce34da9b65482e3ed"
+ },
+ {
+  "file": "v5/v5-writing-debugging-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "88ca2b9a98f95571f4e1e6ee45839c483348826b5138533b9447c5553d28f7b2"
+ },
+ {
+  "file": "v5/v5-writing-debugging-21.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "5566d5af347aaf0e0741e0192e0df557743f7af111e712f8107781e8c72f0cca"
+ },
+ {
+  "file": "v5/v5-writing-debugging-25.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "4240191e63d0e28bbd8caeb8ce5dc0b786e08ee546ec1f9a5c16ca0e8f28ab9f"
+ },
+ {
+  "file": "v5/v5-writing-debugging-26.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "5ae85221a0809127f73a481dedf51edab160014201908a09a8d6a53baba40996"
+ },
+ {
+  "file": "v5/v5-writing-debugging-28.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "6a2287e542e8f07c936ec9c6e412b27a05a7bb03130cd5bee14c1c3bc644252f"
+ },
+ {
+  "file": "v5/v5-writing-debugging-29.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "5e9b4c1decabc737b69b3403f706ea9904930efb6adeb57056929368d6d5e5b9"
+ },
+ {
+  "file": "v5/v5-writing-debugging-30.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "a313fa5713092909bec4a11bbe60d16adce703fd73de35305ac98d57be59af29"
+ },
+ {
+  "file": "v5/v5-writing-debugging-31.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "bf8b20b47683a1b7b8ab7bbcf615ca494221cfade28cbf18715a5388153e005a"
+ },
+ {
+  "file": "v5/v5-writing-debugging-32.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "fd6b7cf2d40bec2b96ebe3b051d39b9c46fcb95345dc5c5ae95edac555023977"
+ },
+ {
+  "file": "v5/v5-writing-debugging-33.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "401d71d56f543ea72bbd37ebf936fbfb9912f6fba52c5a7ddfeb5a9f06b95bbd"
+ },
+ {
+  "file": "v5/v5-writing-debugging-34.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "870e71e4d368193aa531eee02509d67f33bd3fe7b6a0dfed1d3d9a49ce33c6d7"
+ },
+ {
+  "file": "v5/v5-writing-debugging-35.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "9f06934d7d842220ce519319fb3d3802cd2bcf2fa571aadf0dce9dd6d99a6bbc"
+ },
+ {
+  "file": "v5/v5-writing-debugging-36.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "e4a0514ff74cf169dd44fc19019a4394dfadbc5d7d6bdbefbecab41e0ca50356"
+ },
+ {
+  "file": "v5/v5-writing-debugging-37.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "eeda239f7afbf700f1e4bcfedc8bd19530004238526dea019d42516c8095509a"
+ },
+ {
+  "file": "v5/v5-writing-debugging-38.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "2e78a6127e54fbcd67ca15f2e74712ada474cc783403e00e5ffa65c41f6f83ea"
+ },
+ {
+  "file": "v5/v5-writing-debugging-39.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "c3cdaa63bd74678c40542f0ed5d463054a48effa855ece7e8e25b00c02c76798"
+ },
+ {
+  "file": "v5/v5-writing-debugging-40.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "b83533f00daa682b0f70797f8cfcd9c804fd06e1360df9660fa1214155646ac7"
+ },
+ {
+  "file": "v5/v5-writing-debugging-41.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/debugging/",
+  "sha256": "b36a621260edaf8ed7f68889f134abbaa40a04d5aece79125f7f420d8805c11b"
+ },
+ {
+  "file": "v5/v5-writing-limitations-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "4c2cd8d7fbbea678778eedb80a3b4599c5ba257bc13fec1de620a877d9fac295"
+ },
+ {
+  "file": "v5/v5-writing-limitations-01.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "c4a8d70aefd901a80a92ef1f4c9ca7bc7df58c46775da894a45aa6fff8424598"
+ },
+ {
+  "file": "v5/v5-writing-limitations-02.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "c91a3149ea6aafca4212f3bd8b5fdcdf4cead6f5ba6190908af1f93535aee5f5"
+ },
+ {
+  "file": "v5/v5-writing-limitations-03.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "fa4177b7ebceeb68640973f5580289ced1fbc36766ea7d5d38a796d5922246be"
+ },
+ {
+  "file": "v5/v5-writing-limitations-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "aa34e1aedc06906f7663735123af823904f28e1a78fa5415eeabe473bdd9021e"
+ },
+ {
+  "file": "v5/v5-writing-limitations-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "62aaf0ab067a4cb1be5d47c9360a75dad9d9a40fb6e1b86ce8e0c9a5571d41ff"
+ },
+ {
+  "file": "v5/v5-writing-limitations-06.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "a0a3cea5f365aa2e9e0e9d567837e7ad5a79f867306132dd19873e18b76b2def"
+ },
+ {
+  "file": "v5/v5-writing-limitations-07.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "419933db0012a54069e2bc654e6fb627f2f916eb0ce54388c582af300b5862a7"
+ },
+ {
+  "file": "v5/v5-writing-limitations-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "d086f1d777d64524a28cdf05c8d716f78a46549b7ec5d2bbadca2fd933a4bba4"
+ },
+ {
+  "file": "v5/v5-writing-limitations-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "f2550641797f354da07575ada2437baf978ee31fbefb04ce971004f7b4d5249f"
+ },
+ {
+  "file": "v5/v5-writing-limitations-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "feafe8a76ed1aabd6fd55be495d0f28a7060771c0a2f6b94daaa35ce275d6f3d"
+ },
+ {
+  "file": "v5/v5-writing-limitations-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/limitations/",
+  "sha256": "2a29f89bc192eebaf0d94c11832833adfe7143b50fb7fa475804aac5e7782f18"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-00.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "3f2453a98ff3f246877fb30003ac2de9a6cdf4971ae0aa19ff11e37f8547f6b4"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-05.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "ffe427f9795fa2cf39df5e61e4ced49ee05b18ee4b6355c63ab770db5f15c1f3"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-09.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "7b8759482214b37206c94bd75d8ec397f819ece6f06aeccb12d411f9e3d62ac4"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-10.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "7b25aeb639d255ae76bbb19780ad562e25911a0e7b5389d7afc2a9cee36f7c26"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-11.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "eab4c47b0006c5d574e906995e04aadb623c2c96ad01d835f82aab52d7e0905a"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-12.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "7c6a2ca8525c7b60a8b5798e4792021c19647010ad6ffbee1cfc1047f7cc6553"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-13.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "9396cb66319c54c708383e9a516f3ee3221360a9c7bda09a49db7eb5be730e0a"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-14.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "0f286d617a1c4e5e340fd9511f52d9d11c4ec4b53b3a113fcc9410f1551a90a6"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-15.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "46e9265e0034d802eccf0243366cd87e54cd4b3847dc3568b6c77aaad27dda3c"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-16.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "653a45155d3f6dc01d58862d69c90c50c6401ac32891b192262f76ff32a62b19"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-17.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "4034ee117fa09696c9cbf1daf77215ced82f0ca6698b20ed052cb2924bc34794"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-18.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "b38831227e15bcf66e93db7fa42540b5a8347454592274f65bf0bff9d80aa63e"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-19.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "7e497b9e95ea81e205479146e2f004a58997080b8c7118b6f0c26203f006b121"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-20.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "521a0247800e1166658a3bc6aae5294e92c4633456479241f3157e8e5a37ba36"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-23.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "903befe6680bdff08fb059ab6b0eb6414f4c1dbe9fca6f8b2acd2ced69fe1993"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-25.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "5153b234fa923d1900a5faeef0a5f6caed255afc45fb0a4aa7761e555d3ddcc2"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-26.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "3d07299892a467ff418f2daf84112196734b75ed44cb92eb2bbb0989ae1fb517"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-29.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "d3e27d1304b86205ccb00ed9168c97d30064999eb2893d38d9dcde9cb7c139ec"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-30.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "0ba18f930503b03a165bb4025dc645c4cad3ca7e7db5326cfc9625e822a24acb"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-31.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "1bfd71ebf8d1ca59aeb65bbdda7e17f1aa06768d182740e4459f91361526533f"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-32.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "67f3ad815ab8c58e6f19646ece461e3080f7bf3ae476bb4c7fe2874270e8cd11"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-33.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "a2220c3329ddf5405eaed64d14d26f13bb31b28923a2440abe06219fbae71269"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-34.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "547d9cd4ab65590361dcf1630c9c7f68b3402db3e8f9a510e9cf9d9e9ad20985"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-35.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "2578ffe809a5e876d5f59881eb2935f45fe405d015f0fbe3e6a266cfc7f94ad1"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-36.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "ff2def139f1edd437a3901c76fc5fa3e01592c344222eb78fb5c5628c411f444"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-37.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "8ccc1c6946ac8aea47666f4b41b8273acc71c26a33d925fc005937ec87185a8c"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-38.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "1660e95631a8154ab5af00972b9d36094081e0941d00c15341db6706d654b9bf"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-39.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "640e3834015d6a35ae7ad9c440ed1be985fc5fd885b7e957541503c8ab2eddb3"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-45.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "4f9cb016439928b30156f99142f84cefb82b277e3bff55120c750d3b8f841ac3"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-46.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "0172a51f1c1382d8999dc0b84e5eac3576b28b3a4b9b38dca8af526900eab1ab"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-48.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "59aa9eeda6aad017ba00be646420e689cacd34e6c272305bd2f817398013171a"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-49.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "39af28d1173d62a7491289db0ac53f53d4ceac3c392dd41cfb11d2c1486e1667"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-50.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "f6e3bc7d7714b5195327229318f5e43c10674b03ac55039a62bd34cdfb1137b6"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-51.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "343d6a25cf25d75136557ee4e0477e1deefb15c61ce58637d13c8a046300b1c9"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-52.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "aece5a18642307b403693cf94671a6e4cfef71a599aebdf053339ee3888e76e4"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-53.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "2beb8100a41a435ab6e24410c95d33c582ce176a7879124738d077bd20ae98d8"
+ },
+ {
+  "file": "v5/v5-writing-profiling-and-optimization-54.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/profiling-and-optimization/",
+  "sha256": "13d6ffc5f1720d691457f0075115ad549eb4940c044a828cb4e2468dc68ae88f"
+ },
+ {
+  "file": "v5/v5-writing-style-guide-04.pine",
+  "version": 5,
+  "source": "https://www.tradingview.com/pine-script-docs/v5/writing/style-guide/",
+  "sha256": "6bfd1697cc7643ff4d370924c85de79df3ad9138ee6cdcd08126c3141d04155b"
+ }
+]

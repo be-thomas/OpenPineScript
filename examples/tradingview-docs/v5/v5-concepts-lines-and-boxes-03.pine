@@ -1,0 +1,32 @@
+//@version=5
+indicator("Reading line values demo", overlay = true)
+
+//@variable The number of bars for rising and falling calculations.
+int length = input.int(2, "Length", 2)
+
+//@variable A line that's drawn whenever `hlc3` starts rising or falling over `length` bars.
+var line directionLine = na
+
+//@variable Is `true` when `hlc3` is rising over `length` bars, `false` otherwise.
+bool rising = ta.rising(hlc3, length)
+//@variable Is `true` when `hlc3` is falling over `length` bars, `false` otherwise.
+bool falling = ta.falling(hlc3, length)
+//@variable Is `true` when a rising or falling pattern begins, `false` otherwise.
+bool newDirection = (rising and not rising[1]) or (falling and not falling[1])
+
+// Update the `directionLine` when `newDirection` is `true`. The line uses the default `xloc.bar_index`.
+if newDirection
+    directionLine := line.new(bar_index - length, hlc3[length], bar_index, hlc3, width = 3)
+
+//@variable The slope of the `directionLine`.
+float slope = (directionLine.get_y2() - directionLine.get_y1()) / (directionLine.get_x2() - directionLine.get_x1())
+//@variable The value extrapolated from the `directionLine` at the `bar_index`.
+float lineValue = line.get_price(directionLine, bar_index)
+
+//@variable Is `color.green` when the `slope` is positive, `color.red` otherwise.
+color slopeColor = slope > 0 ? color.green : color.red
+
+// Update the color of the `directionLine`.
+directionLine.set_color(slopeColor)
+// Plot the `lineValue`.
+plot(lineValue, "Extrapolated value", slopeColor, 3, plot.style_circles)

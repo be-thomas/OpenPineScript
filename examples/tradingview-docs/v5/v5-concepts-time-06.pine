@@ -1,0 +1,30 @@
+//@version=5
+indicator("`time_close` on non-time-based chart demo", overlay = true)
+
+//@variable A formatted "string" containing the date and time that `time_close` represents in the exchange time zone.
+string formattedCloseTime = str.format_time(time_close, format = "'Date and time:' yyyy-MM-dd HH:mm:ss")
+//@variable A formatted "string" containing the date and time that `time` represents in the exchange time zone.
+string formattedOpenTime = str.format_time(time, format = "'Date and time:' yyyy-MM-dd HH:mm:ss")
+
+//@variable A "string" containing the `time_close` UNIX timestamp and the `formattedCloseTime`.
+string closeTimeText = str.format("Close timestamp: {0,number,#}\n{1}", time_close, formattedCloseTime)
+//@variable A "string" containing the `time` UNIX timestamp and the `formattedOpenTime`.
+string openTimeText = str.format("Open timestamp: {0,number,#}\n{1}", time, formattedOpenTime)
+
+// Define label colors for historical and realtime bars. 
+color closeLabelColor = barstate.islast ? color.purple : color.aqua
+color openLabelColor  = barstate.islast ? color.green  : color.orange
+
+// Draw a label at the `high` to display the `closeTimeText` and a label at the `low` to display the `openTimeText`, 
+// both anchored to the bar's `time`. 
+label.new(
+      time, high, closeTimeText, xloc.bar_time, color = closeLabelColor, textcolor = color.white, 
+      size = size.large, textalign = text.align_left
+ )
+label.new(
+      time, low, openTimeText, xloc.bar_time, color = openLabelColor, style = label.style_label_up, 
+      size = size.large, textcolor = color.white, textalign = text.align_left
+ )
+
+// Highlight the background yellow on the latest bar. 
+bgcolor(barstate.islast ? #f3de22cb : na, title = "Latest bar highlight")

@@ -1,0 +1,27 @@
+//@version=5
+indicator("`syminfo.timezone` demo", overlay = true, dynamic_requests = true)
+
+//@variable The symbol to request exchange time zone information for. 
+string symbolInput = input.symbol("NSE:BANKNIFTY", "Requested symbol")
+
+//@variable A `table` object displaying the exchange time zone and the time of the script's execution.
+var table t = table.new(position.bottom_right, 2, 3, color.yellow, border_color = color.black, border_width = 1)
+
+//@variable The IANA identifier of the exchange time zone requested for the `symbolInput` symbol.
+var string requestedTimezone = na
+
+if barstate.islastconfirmedhistory
+    // Retrieve the time zone of the user-specified symbol's exchange.
+    requestedTimezone := request.security(symbolInput, "", syminfo.timezone, calc_bars_count = 2)
+    // Initialize the `t` table's header cells.
+    t.cell(0, 0, "Exchange prefix and time zone string", text_size = size.large)
+    t.cell(1, 0, "Last execution date and time", text_size = size.large)
+    t.cell(0, 1, syminfo.prefix(syminfo.tickerid) + " (" + syminfo.timezone + ")", text_size = size.large)
+    t.cell(0, 2, syminfo.prefix(symbolInput) + " (" + requestedTimezone + ")", text_size = size.large)
+
+if barstate.islast
+    //@variable The formatting string for all `str.format_time()` calls. 
+    var string formatString = "HH:mm:ss 'on' MMM dd, YYYY"
+    // Initialize table cells to display the formatted text.
+    t.cell(1, 1, str.format_time(timenow, formatString), text_size = size.large)
+    t.cell(1, 2, str.format_time(timenow, formatString, requestedTimezone), text_size = size.large)

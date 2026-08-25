@@ -265,3 +265,5 @@ export function createStdlib(ctx: Context) {
 
     return sandboxStdlib;
 }
+
+export { UNIMPLEMENTED_BUILTINS } from "./renames";

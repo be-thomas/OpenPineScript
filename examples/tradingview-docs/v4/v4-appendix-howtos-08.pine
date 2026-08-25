@@ -1,0 +1,51 @@
+//@version=4
+study("Range Analysis", overlay=true)
+
+// find which bar is 5 days away from the current time
+milliseconds_in_5days = 1000 * 60 * 60 * 24 * 5  // millisecs * secs * min * hours * days
+// plot(milliseconds_in_5days, title="ms in 5d", style=circles) //debug
+// subtract timestamp of the bar being examined from the current time
+// if value is less than 5 days ago, set variable "leftborder" as true
+// this is set true at the bar being examined as the left border of the 5 days lookback window range
+leftborder = timenow - time < milliseconds_in_5days  // true or na when false
+// plot(leftborder ? 1 : na, title="bar within leftborder")  //debug
+// plot(time, title="bartime") //debug
+// plot(timenow - time, title="timenow minus bartime")  //debug
+
+// treat the last bar (most recent bar) as the right edge of the lookback window range
+rightborder = barstate.islast
+
+// initialize variable "max" as na
+max = float(na)
+
+// if bar being examined is not within the lookback window range (i.e., leftborder = false)
+// change the variable "max" to be na
+// else, test if value of "max" stored in the previous bar is na
+// (bcuz first bar being examined in the lookback window will not have a previous value ),
+// if it is na, use the high of the current bar,
+// else, use the value of "max" stored in the previous bar
+max := not leftborder ? na : na(max[1]) ? high : max[1]
+// plot(max ? max : na, title="max b4 compare")  // debug
+
+// compare high of current bar being examined with previous bar's high
+// if curr bar high is higher than the max bar high in the lookback window range
+if high > max  // we have a new high
+    max := high  // change variable "max" to use current bar's high value
+    max
+// else keep the previous value of max as the high bar within this lookback window range
+// plot(max ? max : na, title="max after compare")  //debug
+
+// if examining the last bar (newest bar, rightborder is true)
+// set variable "val" to the previous value of series variable "max"
+// else set to na so nothing is plotted
+val = rightborder ? max[1] : na
+
+// if val is true (a number, not na)
+// plot character
+// since no character is specified, a "star" will be plotted
+// location.absolute uses the value of val as the y axis value
+// the x axis location will be the last bar (newest bar)
+plotchar(val, size=size.normal, location=location.absolute)
+
+// fill the background of the 5 days lookback window range with aqua color
+bgcolor(leftborder and not rightborder ? color.aqua : na, transp=70)

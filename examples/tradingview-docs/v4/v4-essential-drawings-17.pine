@@ -1,0 +1,3 @@
+//@version=4
+study("My Script", overlay=true, max_labels_count=100)
+label.new(bar_index, high)

@@ -1,0 +1,8 @@
+//@version=5
+indicator("Discontinuous plots", "", true)
+bool plotValues = bar_index % 3 == 0
+plot(plotValues ? high : na, color = color.fuchsia, linewidth = 6, style = plot.style_linebr)
+plot(plotValues ? high : na)
+plot(plotValues ? math.max(open, close) : na, color = color.navy, linewidth = 6, style = plot.style_cross)
+plot(plotValues ? math.min(open, close) : na, color = color.navy, linewidth = 6, style = plot.style_circles)
+plot(plotValues ? low : na, color = plotValues ? color.green : na, linewidth = 6, style = plot.style_stepline)

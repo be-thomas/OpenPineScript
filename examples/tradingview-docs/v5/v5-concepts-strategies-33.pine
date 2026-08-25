@@ -1,0 +1,21 @@
+//@version=5
+strategy("Multiple TP Demo", overlay = true)
+
+var float stop   = na
+var float limit1 = na
+var float limit2 = na
+
+bool longCondition = ta.crossover(ta.sma(close, 5), ta.sma(close, 9))
+if longCondition and strategy.position_size == 0
+    stop   := close * 0.99
+    limit1 := close * 1.01
+    limit2 := close * 1.02
+    strategy.entry("Long",  strategy.long, 6)
+    strategy.order("Stop",  strategy.short, stop = stop, qty = 6)
+    strategy.order("Limit 1", strategy.short, limit = limit1, qty = 3)
+    strategy.order("Limit 2", strategy.short, limit = limit2, qty = 3)
+
+bool showPlot = strategy.position_size != 0
+plot(showPlot ? stop   : na, "Stop",    color.red,   style = plot.style_linebr)
+plot(showPlot ? limit1 : na, "Limit 1", color.green, style = plot.style_linebr)
+plot(showPlot ? limit2 : na, "Limit 2", color.green, style = plot.style_linebr)

@@ -1,0 +1,9 @@
+//@version=5
+strategy("Switch without an expression", "", true)
+
+bool longCondition  = ta.crossover( ta.sma(close, 14), ta.sma(close, 28))
+bool shortCondition = ta.crossunder(ta.sma(close, 14), ta.sma(close, 28))
+
+switch
+    longCondition  => strategy.entry("Long ID", strategy.long)
+    shortCondition => strategy.entry("Short ID", strategy.short)

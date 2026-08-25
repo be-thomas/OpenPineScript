@@ -1,0 +1,11 @@
+//@version=5
+indicator("Pine Seeds demo", format=format.volume)
+
+//@variable The total positive sentiment for BTC extracted from the "seed_crypto_santiment" repository.
+float positiveTotal = request.seed("seed_crypto_santiment", "BTC_SENTIMENT_POSITIVE_TOTAL", close)
+//@variable The total negative sentiment for BTC extracted from the "seed_crypto_santiment" repository.
+float negativeTotal = request.seed("seed_crypto_santiment", "BTC_SENTIMENT_NEGATIVE_TOTAL", close)
+
+// Plot the data.
+plot(positiveTotal, "Positive sentiment", color.teal, 2, plot.style_stepline)
+plot(negativeTotal, "Negative sentiment", color.maroon, 2, plot.style_stepline)

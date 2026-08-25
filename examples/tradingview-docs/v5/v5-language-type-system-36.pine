@@ -1,0 +1,9 @@
+//@version=5
+indicator("Explicit casting demo", overlay = true)
+
+//@variable The length of the SMA calculation. Qualified as "const float".
+float LENGTH = 10.0
+
+float sma = ta.sma(close, LENGTH) // Compilation error. The `length` parameter requires an "int" value.
+
+plot(sma)

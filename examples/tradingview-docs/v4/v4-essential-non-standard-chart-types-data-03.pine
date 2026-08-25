@@ -1,0 +1,5 @@
+//@version=4
+study("Example 7", overlay=true)
+renko_t = renko(syminfo.tickerid, "ATR", 10)
+renko_low = security(renko_t, timeframe.period, low)
+plot(renko_low)

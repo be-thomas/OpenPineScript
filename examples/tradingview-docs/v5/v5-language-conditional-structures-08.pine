@@ -1,0 +1,7 @@
+//@version=5
+strategy("Switch without an expression", "", true)
+
+switch
+    // Compiler warning! Will not calculate correctly!
+    ta.crossover( ta.sma(close, 14), ta.sma(close, 28)) => strategy.entry("Long ID", strategy.long)
+    ta.crossunder(ta.sma(close, 14), ta.sma(close, 28)) => strategy.entry("Short ID", strategy.short)

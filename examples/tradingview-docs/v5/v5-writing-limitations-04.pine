@@ -1,0 +1,12 @@
+//@version=5
+indicator("`request.*()` call limit demo", dynamic_requests = true)
+
+//@variable The sum of values requested from all `request.security()` calls.
+float reqSum = 0.0
+
+// Call `request.security()` 50 times within a loop. 
+// More than 40 `request.*()` calls occur, but each call is identical. Redundant calls do not count toward the limit. 
+for i = 1 to 50
+    reqSum += request.security(syminfo.tickerid, "1D", close)
+
+plot(reqSum)

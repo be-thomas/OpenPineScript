@@ -1,0 +1,8 @@
+//@version=4
+study("Fill example 2")
+src = close, len = 10
+ma = sma(src, len)
+osc = 100 * (ma - src) / ma
+p = plot(osc)
+// NOTE: fill(p, hline(0)) wouldn't work, instead use this:
+fill(p, plot(0))

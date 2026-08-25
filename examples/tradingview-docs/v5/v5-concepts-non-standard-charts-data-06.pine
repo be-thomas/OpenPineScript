@@ -1,0 +1,6 @@
+//@version=5
+indicator("", "", true)
+pnfTicker = ticker.pointfigure(syminfo.tickerid, "hl", "ATR", 14, 3)
+[pnfO, pnfC] = request.security(pnfTicker, timeframe.period, [open, close], barmerge.gaps_on)
+plot(pnfO, "PnF Open", color.green, 4, plot.style_linebr)
+plot(pnfC, "PnF Close", color.red, 4, plot.style_linebr)

@@ -1,0 +1,14 @@
+//@version=5
+indicator("`alertcondition()` on single condition")
+r = ta.rsi(close, 20)
+
+xUp = ta.crossover( r, 50)
+xDn = ta.crossunder(r, 50)
+
+plot(r, "RSI")
+hline(50)
+plotchar(xUp, "Long",  "▲", location.bottom, color.lime, size = size.tiny)
+plotchar(xDn, "Short", "▼", location.top,    color.red,  size = size.tiny)
+
+alertcondition(xUp, "Long Alert",  "Go long")
+alertcondition(xDn, "Short Alert", "Go short ")

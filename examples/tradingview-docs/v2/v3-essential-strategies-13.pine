@@ -1,0 +1,6 @@
+//@version=2
+strategy("multi risk demo", overlay=true, pyramiding=10, calc_on_order_fills = true)
+if year > 2014
+    strategy.entry("LE", strategy.long)
+strategy.risk.max_intraday_filled_orders(5)
+strategy.risk.max_intraday_filled_orders(2)

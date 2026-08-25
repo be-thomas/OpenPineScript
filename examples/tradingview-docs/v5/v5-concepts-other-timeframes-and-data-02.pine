@@ -1,0 +1,14 @@
+//@version=5
+indicator("`gaps` demo", overlay = true)
+
+//@variable The `close` requested from the hourly timeframe without gaps.
+float dataWithoutGaps = request.security(syminfo.tickerid, "60", close, gaps = barmerge.gaps_off)
+//@variable The `close` requested from the hourly timeframe with gaps.
+float dataWithGaps = request.security(syminfo.tickerid, "60", close, gaps = barmerge.gaps_on)
+
+// Plot the requested data.
+plot(dataWithoutGaps, "Data without gaps", color.blue, 3, plot.style_linebr)
+plot(dataWithGaps, "Data with gaps", color.purple, 15, plot.style_linebr)
+
+// Highlight the background for realtime bars.
+bgcolor(barstate.isrealtime ? color.new(color.aqua, 70) : na, title = "Realtime bar highlight")

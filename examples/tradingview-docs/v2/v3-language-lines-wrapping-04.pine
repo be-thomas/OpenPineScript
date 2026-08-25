@@ -1,0 +1,6 @@
+//@version=2
+study("My Script")
+c = open > close ? red :
+    high > high[1] ? lime : // a comment
+    low < low[1] ? blue : black
+bgcolor(c)

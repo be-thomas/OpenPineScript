@@ -1,0 +1,12 @@
+//@version=5
+indicator("Higher timeframe security demo", overlay = true)
+
+//@variable The higher timeframe to request data from.
+string higherTimeframe = input.timeframe("240", "Higher timeframe")
+
+//@variable The `hl2` value from the `higherTimeframe`. Combines lookahead with an offset to avoid repainting.
+float htfPrice = request.security(syminfo.tickerid, higherTimeframe, hl2[1], lookahead = barmerge.lookahead_on)
+
+// Plot the `hl2` from the chart timeframe and the `higherTimeframe`.
+plot(hl2, "Current timeframe HL2", color.teal, 2)
+plot(htfPrice, "Higher timeframe HL2", color.purple, 3)

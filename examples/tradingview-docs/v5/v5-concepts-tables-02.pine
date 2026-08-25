@@ -1,0 +1,13 @@
+//@version=5
+indicator("Chart background", "", true)
+bullColorInput = input.color(color.new(color.green, 95), "Bull", inline = "1")
+bearColorInput = input.color(color.new(color.red, 95), "Bear", inline = "1")
+// ————— Function colors chart bg on RSI bull/bear state.
+colorChartBg(bullColor, bearColor) =>
+    var table bgTable = table.new(position.middle_center, 1, 1)
+    float r = ta.rsi(close, 20)
+    color bgColor = r > 50 ? bullColor : r < 50 ? bearColor : na
+    if barstate.islast
+        table.cell(bgTable, 0, 0, width = 100, height = 100, bgcolor = bgColor)
+
+colorChartBg(bullColorInput, bearColorInput)

@@ -1,0 +1,10 @@
+//@version=5
+indicator("Invalid array size demo")
+
+// Declare an empty matrix.
+m = matrix.new<float>()
+
+m.add_col(0, array.from(1, 2))    // Add a column. Changes the shape of `m` to 2x1.
+m.add_col(1, array.from(1, 2, 3)) // Raises a runtime error because `m` has 2 rows, not 3. 
+
+plot(m.col(0).get(1))

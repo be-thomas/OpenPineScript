@@ -1,0 +1,17 @@
+//@version=5
+indicator("Aligned inputs", "", true)
+
+var GRP1 = "Not aligned"
+ma1SourceInput   = input(close, "MA source",     inline = "11", group = GRP1)
+ma1LengthInput   = input(close, "Length",        inline = "11", group = GRP1)
+long1SourceInput = input(close, "Signal source", inline = "12", group = GRP1)
+long1LengthInput = input(close, "Length",        inline = "12", group = GRP1)
+
+var GRP2 = "Aligned"
+// The three spaces after "MA source" are Unicode EN spaces (U+2002).
+ma2SourceInput   = input(close, "MA source   ",  inline = "21", group = GRP2)
+ma2LengthInput   = input(close, "Length",        inline = "21", group = GRP2)
+long2SourceInput = input(close, "Signal source", inline = "22", group = GRP2)
+long2LengthInput = input(close, "Length",        inline = "22", group = GRP2)
+
+plot(ta.vwma(close, 10))

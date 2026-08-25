@@ -1,0 +1,59 @@
+//@version=5
+indicator("`for...in` loop with arrays demo", "Active high pivots", true, max_lines_count = 500)
+
+//@variable The number of bars required on the left and right to confirm a pivot point. 
+int pivotBarsInput = input.int(5, "Pivot leg length", 1)
+//@variable The number of recent pivot lines to analyze. Controls the size of the `pivotLines` array.
+int maxRecentLines = input.int(20, "Maximum recent lines", 1, 500)
+
+//@variable An array that acts as a queue holding the most recent pivot high lines. 
+var array<line> pivotLines = array.new<line>(maxRecentLines)
+//@variable The pivot high price, or `na` if no pivot is found.
+float highPivotPrice = ta.pivothigh(pivotBarsInput, pivotBarsInput)
+//@variable The average active `highPivotPrice`. 
+float avgHiPivot = ta.sma(highPivotPrice, maxRecentLines)
+
+if not na(highPivotPrice)
+    //@variable The `chart.point` for the start of the line. Does not contain `time` information.
+    firstPoint = chart.point.from_index(bar_index - pivotBarsInput, highPivotPrice)
+    //@variable The `chart.point` for the end of each line. Does not contain `time` information.
+    secondPoint = chart.point.from_index(bar_index, highPivotPrice)
+    //@variable A horizontal line at the new pivot level. 
+    line hiPivotLine = line.new(firstPoint, secondPoint, width = 2, color = color.green) 
+    // Insert the `hiPivotLine` at the beginning of the `pivotLines` array.
+    pivotLines.unshift(hiPivotLine)
+    // Remove the oldest line from the array and delete its ID.
+    line.delete(pivotLines.pop())
+
+//@variable The sum of active pivot prices.
+float activePivotSum = 0.0
+//@variable The number of active pivot high levels.
+int numActivePivots = 0
+
+// Loop through the `pivotLines` array, directly accessing each `pivotLine` element. 
+for pivotLine in pivotLines
+    //@variable The `x2` coordinate of the `pivotline`.
+    int lineEnd = pivotLine.get_x2()
+    // Move to the next `pivotline` in the array if the current line is inactive.
+    if pivotLine.get_x2() < bar_index - 1
+        continue
+    //@variable The price value of the `pivotLine`.
+    float pivotPrice = pivotLine.get_price(bar_index)
+    // Change the style of the `pivotLine` and stop extending its display if the `high` is above the `pivotPrice`.
+    if high > pivotPrice
+        pivotLine.set_color(color.maroon)
+        pivotLine.set_style(line.style_dotted)
+        pivotLine.set_width(1)
+        continue
+    // Extend the `pivotLine` and add the `pivotPrice` to the `activePivotSum` when the loop allows a full iteration.
+    pivotLine.set_x2(bar_index)
+    activePivotSum  += pivotPrice
+    numActivePivots += 1
+
+//@variable The average active pivot high value.
+float avgActivePivot = activePivotSum / numActivePivots
+
+// Plot crosses at the `highPivotPrice`, offset backward by the `pivotBarsInput`.
+plot(highPivotPrice, "High pivot marker", color.green, 3, plot.style_cross, offset = -pivotBarsInput)
+// Plot the `avgActivePivot` as a line with breaks.
+plot(avgActivePivot, "Avg. active pivot", color.orange, 3, plot.style_linebr)

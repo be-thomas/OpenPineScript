@@ -1,0 +1,4 @@
+//@version=2
+study("Fibonacci numbers")
+fib = na(fib[1]) or na(fib[2]) ? 1 : fib[1] + fib[2]
+plot(fib)

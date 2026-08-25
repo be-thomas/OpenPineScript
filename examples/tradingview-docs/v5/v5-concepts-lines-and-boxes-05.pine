@@ -1,0 +1,36 @@
+//@version=5
+
+//@variable The maximum number of lines allowed on the chart.
+const int MAX_LINES_COUNT = 500
+
+indicator("Deleting lines demo", "RSI cross levels", max_lines_count = MAX_LINES_COUNT)
+
+//@variable The length of the RSI.
+int rsiLength = input.int(14, "RSI length", 2)
+//@variable The length of the RSI's EMA.
+int emaLength = input.int(28, "RSI average length", 2)
+//@variable The maximum number of lines to keep on the chart.
+int numberOfLines = input.int(20, "Lines on the chart", 0, MAX_LINES_COUNT)
+
+//@variable An array containing the IDs of lines on the chart.
+var array<line> lines = array.new<line>()
+
+//@variable An `rsiLength` RSI of `close`.
+float rsi = ta.rsi(close, rsiLength)
+//@variable A `maLength` EMA of the `rsi`.
+float rsiMA = ta.ema(rsi, emaLength)
+
+if ta.cross(rsi, rsiMA)
+    //@variable The color of the horizontal line.
+    color lineColor = rsi > rsiMA ? color.green : color.red
+    // Draw a new horizontal line. Uses the default `xloc.bar_index`.
+    newLine = line.new(bar_index, rsiMA, bar_index + 1, rsiMA, extend = extend.right, color = lineColor, width = 2)
+    // Push the `newLine` into the `lines` array.
+    lines.push(newLine)
+    // Delete the oldest line when the size of the array exceeds the specified `numberOfLines`.
+    if array.size(lines) > numberOfLines
+        line.delete(lines.shift())
+
+// Plot the `rsi` and `rsiMA`.
+plot(rsi, "RSI", color.new(color.blue, 40))
+plot(rsiMA, "EMA of RSI", color.new(color.gray, 30))

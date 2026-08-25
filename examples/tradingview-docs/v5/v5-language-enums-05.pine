@@ -1,0 +1,31 @@
+//@version=5
+indicator("Incompatible enums demo")
+
+//@enum An enumeration of oscillator choices.
+enum OscType
+    rsi = "Relative Strength Index"
+    mfi = "Money Flow Index"
+    cci = "Commodity Channel Index"
+
+//@enum An enumeration of oscillator choices. Its fields DO NOT represent the same values those in the `OscType` enum.
+enum OscType2
+    rsi = "Relative Strength Index"
+    mfi = "Money Flow Index"
+    cci = "Commodity Channel Index"
+
+//@variable An enumerator (member) of the `OscType2` enum.
+OscType2 oscInput = input.enum(OscType2.rsi, "Oscillator type")
+
+//@function         Calculates one of three oscillators based on a specified `selection`.
+//@param source     The series of values to process.
+//@param length     The number of bars in the calculation.
+//@param selection  Determines which oscillator to calculate.
+calcOscillator(float source, simple int length, OscType selection) =>
+    result = switch selection
+        OscType.rsi => ta.rsi(source, length)
+        OscType.mfi => ta.mfi(source, length)
+        OscType.cci => ta.cci(source, length)
+
+// Plot the value of a `calcOscillator()` call with `oscInput` as the `selection`.
+// Raises a compilation error because only members of `OscType` are allowed. 
+plot(calcOscillator(close, 20, oscInput))

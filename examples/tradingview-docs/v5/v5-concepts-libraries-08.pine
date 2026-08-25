@@ -1,0 +1,4 @@
+//@version=5  
+indicator("") 
+import TradingView/PivotLabels/1 as dpl   
+dpl.drawPivots(20, 10, 10)

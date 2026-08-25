@@ -1,0 +1,25 @@
+//@version=5
+indicator("`time` and `time_close` demo", overlay = true, max_labels_count = 500)
+
+//@variable A "string" representing the hour, minute, and second of the bar's opening time in the exchange time zone. 
+string openTimeString = str.format_time(time, "HH:mm:ss")
+//@variable A "string" representing the hour, minute, and second of the bar's closing time in the exchange time zone.
+string closeTimeString = str.format_time(time_close, "HH:mm:ss")
+
+//@variable Is `label.style_label_down` when the `open` is higher than `close`, `label.style_label_up` otherwise.
+string openLabelStyle  = open > close ? label.style_label_down : label.style_label_up
+//@variable Is `label.style_label_down` when the `close` is higher than `open`, `label.style_label_up` otherwise.
+string closeLabelStyle = close > open ? label.style_label_down : label.style_label_up
+
+// Draw labels anchored to the bar's `time` to display the `openTimeString` and `closeTimeString`.
+label.new(time, open,  openTimeString,  xloc.bar_time, yloc.price, color.orange, openLabelStyle,  color.white)
+label.new(time, close, closeTimeString, xloc.bar_time, yloc.price, color.blue,   closeLabelStyle, color.white)
+ 
+if barstate.islast
+    //@variable A `table` displaying the last bar's *unformatted* UNIX timestamps. 
+    var table t = table.new(position.bottom_right, 2, 2, bgcolor = #ffe70d)
+    // Populate the `t` table with "string" representations of the the "int" `time` and `time_close` values. 
+    t.cell(0, 0, "`time`")
+    t.cell(1, 0, str.tostring(time))
+    t.cell(0, 1, "`time_close`")
+    t.cell(1, 1, str.tostring(time_close))

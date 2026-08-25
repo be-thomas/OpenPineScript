@@ -1,0 +1,4 @@
+//@version=5
+indicator("", "", true)
+color lineColorInput  = input(#1848CC, "Line color")
+plot(close, color = lineColorInput)

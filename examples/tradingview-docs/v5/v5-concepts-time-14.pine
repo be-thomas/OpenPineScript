@@ -1,0 +1,8 @@
+//@version=5
+indicator("Testing for session bars demo", overlay = true)
+
+//@variable Checks if the bar opens between 11:00 and 13:00. Is `true` if the `time()` function does not return `na`. 
+bool inSession = not na(time(timeframe.period, "1100-1300"))
+
+// Highlight the background of the bars that are in the session "11:00-13:00". 
+bgcolor(inSession ? color.rgb(155, 39, 176, 80) : na)

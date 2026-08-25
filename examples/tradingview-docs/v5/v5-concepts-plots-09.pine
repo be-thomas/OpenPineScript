@@ -1,0 +1,5 @@
+//@version=5
+indicator("Pivot plots", "", true)
+pivotHigh = fixnan(ta.pivothigh(3,3))
+plot(pivotHigh, "High pivot", ta.change(pivotHigh) ? na : color.olive, 3)
+plotchar(ta.change(pivotHigh), "ta.change(pivotHigh)", "•", location.top, size = size.small)

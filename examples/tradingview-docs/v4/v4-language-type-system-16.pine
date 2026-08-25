@@ -1,0 +1,5 @@
+//@version=4
+study("My Script")
+len = 10.0
+s = sma(close, int(len))
+plot(s)

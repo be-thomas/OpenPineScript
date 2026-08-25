@@ -1,0 +1,11 @@
+//@version=5
+indicator("Invalid sum dimensions demo") 
+
+//@variable A 2x3 matrix. 
+matrix<float> m1 = matrix.new<float>(2, 3, 1)
+//@variable A 3x4 matrix.
+matrix<float> m2 = matrix.new<float>(3, 4, 2)
+
+mSum = matrix.sum(m1, m2) // Raises an error. `m1` and `m2` don't have matching dimensions.
+
+plot(mSum.get(0, 0))

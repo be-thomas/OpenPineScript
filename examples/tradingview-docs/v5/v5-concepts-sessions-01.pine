@@ -1,0 +1,4 @@
+//@version=5
+indicator("Example 1: Regular Session Data")
+regularSessionData = request.security("NASDAQ:AAPL", timeframe.period, close, barmerge.gaps_on)
+plot(regularSessionData, style = plot.style_linebr)

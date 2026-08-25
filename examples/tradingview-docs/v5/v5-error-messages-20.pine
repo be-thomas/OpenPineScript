@@ -1,0 +1,42 @@
+//@version=5
+indicator("Monthly BOP array", "Memory limit demo")
+
+// Returns the calculated `bop`, and a copy of the `dataArray` on a month's first trading day only, or `na` otherwise.
+dataFunction() => 
+    //@variable Persistent array containing the "balance of power" (BOP) values for all higher timeframe bars.
+    var array<float> dataArray = array.new_float(0)
+
+    // When a new month starts, return monthly data array to calculate average BOP for completed month.
+    //@variable Array is `na` except on first trading day of each month, when it contains completed month's BOP values. 
+    array<float> returnArray = na
+    //@variable Is `true` on the first bar of each month, `false` otherwise.
+    bool isNewMonth = timeframe.change("1M")
+    if isNewMonth
+        returnArray := dataArray
+    //Clear persistent array to start storing new month's data.
+    if isNewMonth[1]
+        dataArray.clear()
+
+    //@variable The "balance of power" percentage calculated for the current higher timeframe bar.
+    float bop = (close - open) / (high - low) * 100
+    dataArray.push(bop)
+
+    //Return the calculated result and the `returnArray`.
+    [bop, returnArray]
+
+// Request BOP data from the higher timeframe. (Returns calculated BOP and array of BOP values if new month starts)
+[reqValue, reqData] = request.security(syminfo.tickerid, "1D", dataFunction())
+
+// Calculate the average BOP for the most-recent completed month.
+//@variable Persistent array that holds the BOP values for the most-recent completed month.
+var array<float> completedMonthBOPs = array.new_float(0)
+// If new month starts (i.e., `reqData` is not returned as `na`), then `completedMonthBOPs` is updated with new values.
+// Otherwise, it persists the last valid values for the rest of the month to adjust for `na` gaps.
+completedMonthBOPs := na(reqData) ? completedMonthBOPs : reqData
+//@variable The average BOP for the most-recent completed month.
+float avgBOP = completedMonthBOPs.avg()
+
+// Plot the BOP value and average line.
+color plotColor = reqValue >= 0 ? color.aqua : color.orange
+plot(reqValue, "BOP", plotColor, style = plot.style_columns)
+plot(avgBOP, "Avg", color.purple, linewidth = 3)

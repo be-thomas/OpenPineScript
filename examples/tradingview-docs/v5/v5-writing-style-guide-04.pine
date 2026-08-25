@@ -1,0 +1,23 @@
+//@version=5
+indicator("<function_declarations>", "", true)
+
+string SIZE_LARGE  = "Large"
+string SIZE_NORMAL = "Normal"
+string SIZE_SMALL  = "Small"
+
+string sizeInput = input.string(SIZE_NORMAL, "Size", options = [SIZE_LARGE, SIZE_NORMAL, SIZE_SMALL])
+
+// @function        Used to produce an argument for the `size` parameter in built-in functions.
+// @param userSize  (simple string) User-selected size.
+// @returns         One of the `size.*` built-in constants.
+// Dependencies     SIZE_LARGE, SIZE_NORMAL, SIZE_SMALL
+getSize(simple string userSize) =>
+    result = 
+      switch userSize
+        SIZE_LARGE  => size.large
+        SIZE_NORMAL => size.normal
+        SIZE_SMALL  => size.small
+        => size.auto
+
+if ta.rising(close, 3)
+    label.new(bar_index, na, yloc = yloc.abovebar, style = label.style_arrowup, size = getSize(sizeInput))

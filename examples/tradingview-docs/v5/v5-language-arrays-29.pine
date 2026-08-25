@@ -1,0 +1,6 @@
+//@version=5
+indicator("Out of bounds index")
+a = array.new<float>(3)
+for i = 1 to 3
+    array.set(a, i, i)
+plot(array.pop(a))

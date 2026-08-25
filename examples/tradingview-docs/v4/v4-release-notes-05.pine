@@ -1,0 +1,3 @@
+//@version=4
+study("My Script")
+plot(hour(1591012800000, "GMT+1"))

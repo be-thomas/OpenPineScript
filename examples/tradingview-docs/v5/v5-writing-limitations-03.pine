@@ -1,0 +1,22 @@
+//@version=5
+
+// Approximate maximum number of label drawings
+MAX_LABELS = 10
+
+indicator("conditional labels", overlay = false, max_labels_count = MAX_LABELS)
+
+// Add background color for the last MAX_LABELS bars.
+bgcolor(bar_index > last_bar_index - MAX_LABELS ? color.new(color.green, 80) : na)
+
+longCondition =  bar_index % 2 != 0
+shortCondition = bar_index % 2 == 0
+
+// Add a "Buy" label when `longCondition` is true.
+if longCondition
+    label.new(bar_index,  0, text = "Buy", color = color.new(color.green, 0), style = label.style_label_up)
+// Add a "Sell" label when `shortCondition` is true.
+if shortCondition
+    label.new(bar_index, 0, text = "Sell", color = color.new(color.red, 0), style = label.style_label_down)
+
+plot(longCondition  ? 1 : 0)
+plot(shortCondition ? 1 : 0)

@@ -1,0 +1,16 @@
+//@version=5
+indicator("`array.sort()`")
+a = array.new<float>(0)
+b = array.new<float>(0)
+array.push(a, 2)
+array.push(a, 0)
+array.push(a, 1)
+array.push(b, 4)
+array.push(b, 3)
+array.push(b, 5)
+if barstate.islast
+    barUp = close > open
+    array.sort(barUp ? a : b, barUp ? order.ascending : order.descending)
+    label.new(bar_index, 0, 
+      "a " + (barUp ? "is sorted ▲: "   : "is not sorted: ") + str.tostring(a) + "\n\n" +
+      "b " + (barUp ? "is not sorted: " : "is sorted ▼: ")   + str.tostring(b), size = size.large)

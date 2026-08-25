@@ -1,0 +1,11 @@
+//@version=5
+indicator("TSI")
+myTSI = 100 * ta.tsi(close, 25, 13)
+
+hline( 50, "+50",  color.lime)
+hline( 25, "+25",  color.green)
+hline(  0, "Zero", color.gray, linestyle = hline.style_dotted)
+hline(-25, "-25",  color.maroon)
+hline(-50, "-50",  color.red)
+
+plot(myTSI)

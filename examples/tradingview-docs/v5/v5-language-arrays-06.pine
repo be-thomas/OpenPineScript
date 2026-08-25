@@ -1,0 +1,24 @@
+//@version=5
+indicator("Distance from high", "", true)
+lookbackInput = input.int(100)
+FILL_COLOR = color.green
+// Declare array and set its values on the first bar only.
+var fillColors = array.new<color>(5)
+if barstate.isfirst
+    // Initialize the array elements with progressively lighter shades of the fill color.
+    fillColors.set(0, color.new(FILL_COLOR, 70))
+    fillColors.set(1, color.new(FILL_COLOR, 75))
+    fillColors.set(2, color.new(FILL_COLOR, 80))
+    fillColors.set(3, color.new(FILL_COLOR, 85))
+    fillColors.set(4, color.new(FILL_COLOR, 90))
+
+// Find the offset to highest high. Change its sign because the function returns a negative value.
+lastHiBar = - ta.highestbars(high, lookbackInput)
+// Convert the offset to an array index, capping it to 4 to avoid a runtime error.
+// The index used by `array.get()` will be the equivalent of `floor(fillNo)`.
+fillNo = math.min(lastHiBar / (lookbackInput / 5), 4)
+// Set background to a progressively lighter fill with increasing distance from location of highest high.
+bgcolor(array.get(fillColors, fillNo))
+// Plot key values to the Data Window for debugging.
+plotchar(lastHiBar, "lastHiBar", "", location.top, size = size.tiny)
+plotchar(fillNo, "fillNo", "", location.top, size = size.tiny)

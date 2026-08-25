@@ -1,0 +1,21 @@
+//@version=5
+indicator("Chart points demo", overlay = true)
+
+//@variable A new `chart.point` at the previous `bar_index` and `high`.
+firstPoint = chart.point.from_index(bar_index - 1, high[1])
+//@variable A new `chart.point` at the current bar's `low`.
+secondPoint = chart.point.now(low)
+
+// Draw a new line connecting coordinates from the `firstPoint` and `secondPoint`.
+// This line uses the `index` fields from the points as x-coordinates.
+line.new(firstPoint, secondPoint, color = color.purple, width = 3)
+// Draw a label at the `firstPoint`. Uses the point's `index` field as its x-coordinate.
+label.new(
+     firstPoint, str.tostring(firstPoint.price), color = color.green, 
+     style = label.style_label_down, textcolor = color.white
+ )
+// Draw a label at the `secondPoint`. Uses the point's `index` field as its x-coordinate.
+label.new(
+     secondPoint, str.tostring(secondPoint.price), color = color.red, 
+     style = label.style_label_up, textcolor = color.white
+ )

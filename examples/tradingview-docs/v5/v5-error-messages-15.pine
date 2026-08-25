@@ -1,0 +1,9 @@
+//@version=5
+indicator("My Script")
+f(off) =>
+    t = 0.0
+    s = close
+    if bar_index > 242
+        t := s[off]
+    t
+plot(f(301))

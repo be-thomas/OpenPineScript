@@ -1,0 +1,5 @@
+//@version=5
+indicator("", "", true)
+kagiBreakTicker = ticker.linebreak(syminfo.tickerid, 3)
+kagiBreakClose = request.security(kagiBreakTicker, timeframe.period, close)
+plot(kagiBreakClose)

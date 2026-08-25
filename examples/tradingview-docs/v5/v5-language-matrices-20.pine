@@ -1,0 +1,36 @@
+//@version=5
+indicator("Deep copy demo")
+
+//@function Returns a deep copy of a label matrix.
+method deepCopy(matrix<label> this) =>
+    //@variable A deep copy of `this` matrix.
+    matrix<label> that = this.copy()
+    for row = 0 to that.rows() - 1
+        for column = 0 to that.columns() - 1
+            // Assign the element at each `row` and `column` of `that` matrix to a copy of the retrieved label.
+            that.set(row, column, that.get(row, column).copy())
+    that
+
+//@variable Initial value of the original matrix.
+var label newLabel = label.new(
+     bar_index, 2, "Original", color = color.blue, textcolor = color.white, size = size.huge
+ )
+
+//@variable A 1x1 matrix containing a new `label` instance.
+var matrix<label> myMatrix = matrix.new<label>(1, 1, newLabel)
+//@variable A deep copy of `myMatrix`.
+var matrix<label> myCopy = myMatrix.deepCopy()
+
+//@variable The first label from the `myCopy` matrix.
+label testLabel = myCopy.get(0, 0)
+
+// Change the `text`, `style`, and `x` values of `testLabel`. Does not affect the `newLabel`.
+testLabel.set_text("Copy")
+testLabel.set_style(label.style_label_up)
+testLabel.set_x(bar_index)
+
+// Change the `x` value of `newLabel`.
+newLabel.set_x(bar_index)
+
+// Plot the total number of labels.
+plot(label.all.size(), linewidth = 3)

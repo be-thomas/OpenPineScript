@@ -1,0 +1,14 @@
+//@version=5
+indicator("Creating lines demo", overlay = true)
+
+//@variable The `chart.point` for the start of the line. Contains `index` and `time` information.
+firstPoint = chart.point.now(open)
+//@variable The `chart.point` for the end of the line. Contains `index` and `time` information.
+secondPoint = chart.point.now(close)
+
+// Draw a basic line with a `width` of 5 connecting the `firstPoint` to the `secondPoint`.
+// This line uses the `index` field from each point for its x-coordinates.
+line.new(firstPoint, secondPoint, width = 5)
+
+// Color the background on the unconfirmed bar.
+bgcolor(barstate.isconfirmed ? na : color.new(color.orange, 70), title = "Unconfirmed bar highlight")

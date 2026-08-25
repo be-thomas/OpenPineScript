@@ -1,0 +1,26 @@
+//@version=5
+indicator("Putting and getting demo")
+
+//@variable The length of the `ta.rising()` and `ta.falling()` calculation.
+int length = input.int(2, "Length")
+
+//@variable A map associating `string` keys with `int` values.
+var data = map.new<string, int>()
+
+// Put a new ("Rising", `bar_index`) pair into the `data` map when `close` is rising.
+if ta.rising(close, length)
+    data.put("Rising", bar_index)
+// Put a new ("Falling", `bar_index`) pair into the `data` map when `close` is falling.
+if ta.falling(close, length)
+    data.put("Falling", bar_index)
+
+// Put the "Difference" between current "Rising" and "Falling" values into the `data` map.
+data.put("Difference", data.get("Rising") - data.get("Falling"))
+
+//@variable The difference between the last "Rising" and "Falling" `bar_index`.
+int index = data.get("Difference")
+
+//@variable Returns `color.green` when `index` is positive, `color.red` when negative, and `color.gray` otherwise.
+color indexColor = index > 0 ? color.green : index < 0 ? color.red : color.gray
+
+plot(index, color = indexColor, style = plot.style_columns)

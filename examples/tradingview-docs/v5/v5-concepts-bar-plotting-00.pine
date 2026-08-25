@@ -1,0 +1,3 @@
+//@version=5
+indicator("Single-color candles")
+plotcandle(open, high, low, close)

@@ -1,0 +1,13 @@
+//@version=5
+indicator("", "", true)
+lbl = label.new(bar_index, na)
+if close >= open
+    label.set_text( lbl, "green")
+    label.set_color(lbl, color.green)
+    label.set_yloc( lbl, yloc.belowbar)
+    label.set_style(lbl, label.style_label_up)
+else
+    label.set_text( lbl, "red")
+    label.set_color(lbl, color.red)
+    label.set_yloc( lbl, yloc.abovebar)
+    label.set_style(lbl, label.style_label_down)

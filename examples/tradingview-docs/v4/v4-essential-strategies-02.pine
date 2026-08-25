@@ -1,0 +1,6 @@
+//@version=4
+strategy("revers demo")
+if bar_index  < 100
+    strategy.entry("buy", strategy.long, 4, when=strategy.position_size <= 0)
+    strategy.entry("sell", strategy.short, 6, when=strategy.position_size > 0)
+plot(strategy.equity)

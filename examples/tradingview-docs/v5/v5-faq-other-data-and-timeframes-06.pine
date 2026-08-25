@@ -1,0 +1,19 @@
+//@version=5
+indicator("Multiple of current TF", overlay = false)
+
+// Provide an input to specify the multiple to apply to the chart's timeframe.
+float tfMult = input.float(4, minval = 1)
+
+// Get multiple of current timeframe.
+string targetTfString = timeframe.from_seconds(int(timeframe.in_seconds() * tfMult))
+// Create RSI from the current timeframe.
+float myRsi = ta.rsi(close, 14)
+plot(myRsi, "Current TF RSI", color = color.silver)
+// Non-repainting HTF RSI.
+float myRsiHtf = request.security(syminfo.tickerid, targetTfString, myRsi[1], lookahead = barmerge.lookahead_on)
+plot(myRsiHtf, "Non-repainting HTF RSI", color = color.green)
+
+// Display the calculated timeframe at the top right of the main chart pane. 
+if barstate.islastconfirmedhistory
+    var table displayTable = table.new(position.top_right, 1, 1, color.new(color.yellow, 70), color.gray, 1, color.gray, 1, force_overlay = true)
+    table.cell(displayTable, 0, 0, str.format("Target TF (string): {0}", targetTfString), text_color = chart.fg_color)

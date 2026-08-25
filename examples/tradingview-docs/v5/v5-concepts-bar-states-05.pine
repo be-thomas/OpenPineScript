@@ -1,0 +1,22 @@
+//@version=5
+indicator("Bar States", overlay = true, max_labels_count = 500)
+
+stateText() =>
+    string txt = ""
+    txt += barstate.isfirst     ? "isfirst\n"     : ""
+    txt += barstate.islast      ? "islast\n"      : ""
+    txt += barstate.ishistory   ? "ishistory\n"   : ""
+    txt += barstate.isrealtime  ? "isrealtime\n"  : ""
+    txt += barstate.isnew       ? "isnew\n"       : ""
+    txt += barstate.isconfirmed ? "isconfirmed\n" : ""
+    txt += barstate.islastconfirmedhistory ? "islastconfirmedhistory\n" : ""
+
+labelColor = switch
+    barstate.isfirst                => color.fuchsia
+    barstate.islastconfirmedhistory => color.gray
+    barstate.ishistory              => color.silver
+    barstate.isconfirmed            => color.orange
+    barstate.isnew                  => color.red
+    => color.yellow
+
+label.new(bar_index, na, stateText(), yloc = yloc.abovebar, color = labelColor)

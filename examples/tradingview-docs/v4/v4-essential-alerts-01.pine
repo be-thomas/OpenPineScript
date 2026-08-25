@@ -1,0 +1,17 @@
+//@version=4
+study("All `alert()` calls")
+r = rsi(close, 20)
+
+// Detect crosses.
+xUp = crossover( r, 50)
+xDn = crossunder(r, 50)
+// Trigger an alert on crosses.
+if xUp
+    alert("Go long (RSI is " + tostring(r, "#.00)"))
+else if xDn
+    alert("Go short (RSI is " + tostring(r, "#.00)"))
+
+plotchar(xUp, "Go Long",  "▲", location.bottom, color.lime, size = size.tiny)
+plotchar(xDn, "Go Short", "▼", location.top,    color.red,  size = size.tiny)
+hline(50)
+plot(r)

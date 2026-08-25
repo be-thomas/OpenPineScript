@@ -1,0 +1,17 @@
+//@version=5
+strategy("Strategy using `alert_message`")
+r = ta.rsi(close, 20)
+
+// Detect crosses.
+xUp = ta.crossover( r, 50)
+xDn = ta.crossunder(r, 50)
+// Place order on crosses using a custom alert message for each.
+if xUp
+    strategy.entry("Long", strategy.long, stop = high, alert_message = "Stop-buy executed (stop was " + str.tostring(high) + ")")
+else if xDn
+    strategy.entry("Short", strategy.short, stop = low, alert_message = "Stop-sell executed (stop was " + str.tostring(low) + ")")
+
+plotchar(xUp, "Go Long",  "▲", location.bottom, color.lime, size = size.tiny)
+plotchar(xDn, "Go Short", "▼", location.top,    color.red,  size = size.tiny)
+hline(50)
+plot(r)

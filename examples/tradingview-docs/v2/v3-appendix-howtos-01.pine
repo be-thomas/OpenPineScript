@@ -1,0 +1,5 @@
+//@version=2
+study("Real OHLC", overlay=true)
+t = tickerid(syminfo.prefix, ticker)
+realC = security(t, period, close)
+plot(realC)

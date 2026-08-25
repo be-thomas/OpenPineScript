@@ -1,0 +1,7 @@
+//@version=5
+indicator("Slice out of bounds")
+a = array.new<float>(5, 0)
+b = array.slice(a, 3, 5)
+array.remove(a, 0)
+c = array.indexof(b, 2)
+plot(c)

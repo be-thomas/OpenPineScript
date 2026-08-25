@@ -1,0 +1,14 @@
+//@version=5
+indicator("Historical buffer demo", overlay = true)
+
+//@variable A `chart.point` at the `bar_index` from 300 bars ago and current `close.
+firstPoint = chart.point.from_index(bar_index[300], close)
+//@variable The current bar's `chart.point` containing the current `close`.
+secondPoint = chart.point.now(close)
+
+// Explicitly set the historical buffer of the `time` series to 300 bars.
+max_bars_back(time, 300)
+
+// Draw a new line on realtime bars.
+if barstate.isrealtime
+    line.new(firstPoint, secondPoint)

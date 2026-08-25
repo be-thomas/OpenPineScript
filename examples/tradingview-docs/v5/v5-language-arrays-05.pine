@@ -1,0 +1,11 @@
+//@version=5
+indicator("Using `var`")
+//@variable An array that expands its size by 1 on each bar.
+var a = array.new<float>(0)
+array.push(a, close)
+
+if barstate.islast
+    //@variable A string containing the size of `a` and the current `bar_index` value.
+    string labelText = "Array size: " + str.tostring(a.size()) + "\nbar_index: " + str.tostring(bar_index)
+    // Display the `labelText`.
+    label.new(bar_index, 0, labelText, size = size.large)

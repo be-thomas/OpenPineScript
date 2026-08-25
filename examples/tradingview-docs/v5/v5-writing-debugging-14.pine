@@ -1,0 +1,18 @@
+//@version=5
+indicator("Conditional shapes demo", "RSI cross under 30", true)
+
+//@variable The length of the RSI.
+int lengthInput = input.int(14, "Length", 1)
+
+//@variable The calculated RSI value.
+float rsi = ta.rsi(close, lengthInput)
+
+//@variable Is `true` when the `rsi` crosses below 30, `false` otherwise.
+bool crossBelow = ta.crossunder(rsi, 30.0)
+//@variable Returns `rsi - 30.0` when `crossBelow` is `true`, `na` otherwise.
+float debugNumber = crossBelow ? rsi - 30.0 : na
+
+// Plot the `rsi`.
+plot(rsi, "RSI", color.rgb(136, 76, 146), display = display.data_window)
+// Plot circles at the `debugNumber`.
+plotarrow(debugNumber, "RSI cross below 30 distnce")

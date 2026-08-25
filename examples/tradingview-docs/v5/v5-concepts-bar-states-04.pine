@@ -1,0 +1,4 @@
+//@version=5
+indicator("")
+myRSI = ta.rsi(close, 20)
+plot(barstate.isconfirmed ? myRSI : na)

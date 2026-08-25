@@ -1,0 +1,17 @@
+//@version=5
+indicator("Quandl demo", "BTC hash rate")
+
+//@variable The estimated hash rate for the Bitcoin network.
+float hashRate = request.quandl("BCHAIN/HRATE", barmerge.gaps_off, 0)
+//@variable The percentage threshold from the all-time highest `hashRate`.
+float dropThreshold = input.int(40, "Drop threshold", 0, 100)
+
+//@variable The all-time highest `hashRate`.
+float maxHashRate = ta.max(hashRate)
+//@variable The value `dropThreshold` percent below the `maxHashRate`.
+float minHashRate = maxHashRate * (100 - dropThreshold) / 100
+//@variable The color of the plot based on the `minHashRate` and `maxHashRate`.
+color plotColor = color.from_gradient(hashRate, minHashRate, maxHashRate, color.orange, color.blue)
+
+// Plot the `hashRate`.
+plot(hashRate, "Hash Rate Estimate", plotColor, style = plot.style_area)

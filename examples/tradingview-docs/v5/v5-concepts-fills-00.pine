@@ -1,0 +1,21 @@
+//@version=5
+indicator("Example 1")
+
+// Assign "plot" IDs to the `p1`, `p2`, and `p3` variables.
+p1 = plot(math.sin(high), "Sine of `high`")
+p2 = plot(math.cos(low), "Cosine of `low`")
+p3 = plot(math.sin(close), "Sine of `close`")
+// Fill the space between `p1` and `p2` with 90% transparent red.
+fill(p1, p3, color.new(color.red, 90), "`p1`-`p3` fill")
+// Fill the space between `p2` and `p3` with 90% transparent blue.
+fill(p2, p3, color.new(color.blue, 90), "`p2`-`p3` fill")
+
+// Assign "hline" IDs to the `h1`, `h2`, and `h3` variables.
+h1 = hline(0, "First level")
+h2 = hline(1.0, "Second level")
+h3 = hline(0.5, "Third level")
+h4 = hline(1.5, "Fourth level")
+// Fill the space between `h1` and `h2` with 90% transparent yellow.
+fill(h1, h2, color.new(color.yellow, 90), "`h1`-`h2` fill")
+// Fill the space between `h3` and `h4` with 90% transparent lime.
+fill(h3, h4, color.new(color.lime, 90), "`h3`-`h4` fill")

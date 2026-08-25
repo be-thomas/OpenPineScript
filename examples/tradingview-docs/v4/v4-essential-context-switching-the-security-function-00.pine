@@ -1,0 +1,4 @@
+//@version=4
+study("Example security 1", overlay=true)
+ibm_15 = security("NYSE:IBM", "15", close)
+plot(ibm_15)

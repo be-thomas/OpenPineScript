@@ -75,17 +75,35 @@ describe("Pine Script v2 Legacy Math & Environment Variables", () => {
             assert.strictEqual(getVarValue(ctx, "res_sub"), 1);
         });
 
-        it("should coerce 'na' to 0 during arithmetic to prevent series poisoning", () => {
+        /**
+         * `na` PROPAGATES through arithmetic. It is not coerced to zero.
+         *
+         * This test previously asserted the opposite — that `na + 5` is 5 —
+         * and had failed since it was written. The v3 migration guide does
+         * document an implicit conversion in v2, but a BOOLEAN one ("in Pine
+         * Script v2 there were rules of implicit conversion of booleans into
+         * numeric types"), which is what the neighbouring counting test below
+         * covers. Nothing in TradingView's documentation extends that to `na`,
+         * and `nz()` exists precisely because arithmetic does not do it for
+         * you: if `na + 5` were 5, `nz()` would have nothing to do.
+         *
+         * Pinning propagation rather than deleting the case, because it is the
+         * behaviour a wrong "fix" would break — coercing here would silently
+         * turn every unwarmed indicator into a real number.
+         */
+        it("should propagate 'na' through arithmetic rather than coercing it to 0", () => {
             const pine = [
-                'out_of_bounds = close[10]',    // Yields na (NaN) because history doesn't exist on bar 0
-                'res_add = out_of_bounds + 5',  // na + 5 -> 0 + 5 = 5
-                'res_sub = 10 - out_of_bounds'  // 10 - na -> 10 - 0 = 10
+                'out_of_bounds = close[10]',    // na — no history on bar 0
+                'res_add = out_of_bounds + 5',  // na + 5 -> na
+                'res_sub = 10 - out_of_bounds', // 10 - na -> na
+                'res_nz  = nz(out_of_bounds) + 5' // nz() is how you ask for 0
             ].join('\n');
-            
+
             const ctx = executePine(pine, 1);
-            
-            assert.strictEqual(getVarValue(ctx, "res_add"), 5);
-            assert.strictEqual(getVarValue(ctx, "res_sub"), 10);
+
+            assert.ok(Number.isNaN(getVarValue(ctx, "res_add")), "na + 5 must stay na");
+            assert.ok(Number.isNaN(getVarValue(ctx, "res_sub")), "10 - na must stay na");
+            assert.strictEqual(getVarValue(ctx, "res_nz"), 5);
         });
 
         it("should cleanly evaluate legacy logical counting equations", () => {

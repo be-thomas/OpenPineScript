@@ -1,0 +1,12 @@
+//@version=5
+indicator("My script")
+
+var e = 0
+if barstate.islast
+    a = 1
+    b = 2
+    c = 3
+    d = 4
+    e := a + b + c + d
+
+plot(e)

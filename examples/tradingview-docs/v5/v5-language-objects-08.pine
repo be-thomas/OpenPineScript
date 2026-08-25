@@ -1,0 +1,17 @@
+//@version=5
+indicator("Objects using `var` demo")
+
+//@type A custom type to hold index, price, and volume information.
+type BarInfo
+    int   index = bar_index
+    float price = close
+    float vol   = volume
+
+//@variable A `BarInfo` instance whose fields persist through all iterations, starting from the first bar.
+var BarInfo firstBar = BarInfo.new()
+//@variable A `BarInfo` instance declared on every bar.
+BarInfo currentBar = BarInfo.new()
+
+// Plot the `index` fields of both instances to compare the difference. 
+plot(firstBar.index)
+plot(currentBar.index)

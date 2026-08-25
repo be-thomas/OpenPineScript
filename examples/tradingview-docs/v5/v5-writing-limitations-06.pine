@@ -1,0 +1,20 @@
+//@version=5
+indicator("Tuple element limit")
+
+s1 = close
+s2 = close * 2
+...
+s128 = close * 128
+
+// Causes an error. 
+[v1, v2, v3, ..., v128] = request.security(syminfo.tickerid, "1D", [s1, s2, s3, ..., s128])
+
+// Works fine:
+type myType
+    float v1
+    float v2
+    float v3
+    ...
+    float v128
+
+myObj = request.security(syminfo.tickerid, "1D", myType.new(s1, s2, s3, ..., s128))

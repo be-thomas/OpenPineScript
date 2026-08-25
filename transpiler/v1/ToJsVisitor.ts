@@ -76,7 +76,8 @@ import {
   IdContext,
 } from "../../parser/v1/generated/PineV1Parser";
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
-import { BASE_REGISTRY, REGISTRY } from "../../runtime/v1/stdlib";
+import { BASE_REGISTRY, REGISTRY, UNIMPLEMENTED_BUILTINS } from "../../runtime/v1/stdlib";
+import { ScopeInfo, analyseScopes } from "../passes/ScopeAnalysis";
 
 /**
  * Anything carrying a source position. Structural rather than
@@ -101,6 +102,24 @@ interface SourceLocated {
  * overridden rules first, so the same rule has a different index per version.
  * The class NAME is the one identifier ANTLR keeps stable across the hierarchy.
  */
+/**
+ * Names the RUNTIME binds into the sandbox directly, outside the registry.
+ *
+ * initializeSandbox() installs the OHLCV series and both spellings of the bar
+ * counter as Series objects. They have no registry entry because they are DATA
+ * rather than functions, so any check asking "does this name exist?" has to
+ * know about them separately or it rejects `close`.
+ *
+ * `n` and `bar_index` are both here on purpose. Exactly one of them is
+ * spellable at any version, and the one that is not is a poison pill installed
+ * by the profile — which throws its own, better message on read. Rejecting it
+ * here instead would replace "renamed in v4" with "undeclared identifier".
+ */
+export const RUNTIME_GLOBALS: ReadonlySet<string> = new Set([
+  "open", "high", "low", "close", "volume", "n", "bar_index",
+]);
+
+
 export function isRule(node: unknown, ruleContextName: string): boolean {
   return (node as any)?.constructor?.name === ruleContextName;
 }
@@ -178,6 +197,19 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    * v3 rejects forward references outright, so this set is empty there.
    */
   protected hoisted: ReadonlySet<string> = new Set();
+
+  /**
+   * Whole-script scope facts, filled by visitPine_script.
+   *
+   * Lives at v1 rather than v2 because `Undeclared identifier` must behave the
+   * same at both — see conformance/v1_equals_v2.test.ts. v2 additionally uses
+   * it for ':=' , which is why the analysis pass was originally introduced
+   * there.
+   */
+  protected scopes: ScopeInfo = {
+    declared: new Map(), mutated: new Set(), booleans: new Set(),
+    functions: new Set(), bound: new Set(), functionScoped: new Set(),
+  };
 
   /** Prefix every diagnostic with the version that rejected the code. */
   protected err(ctx: SourceLocated, message: string): Error {
@@ -322,6 +354,11 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // definition. See funcName().
     this.userFunctions = this.collectFunctionNames(ctx);
     this.hoisted = this.collectForwardReferenced(ctx);
+    // Whole-script scope facts. v1 has no ':=' to check, but it does need to
+    // know what the script binds before rejecting a read of something it does
+    // not — and `Undeclared identifier` has to fire identically at v1 and v2,
+    // which TradingView states are the same language.
+    this.scopes = analyseScopes(ctx as any);
 
     const stmts = ctx.stmt().map((s) => this.visit(s)).filter(Boolean);
     const body = stmts.join("\n");
@@ -1068,8 +1105,21 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (idxExpr) {
       const index = this.visit(idxExpr);
       
-      // 1. Check if the base is a simple identifier (e.g. 'close', 'myVar')
-      const isSimpleId = ctx.atom().id() != null;
+      // 1. Is the EMITTED base a bare JavaScript identifier?
+      //
+      // The parse tree is not enough to answer this. `hl2` is an `id` atom, but
+      // it is a registry getter, so it emits `ctx.call("hl2@L5:C3", opsv2_hl2)`
+      // — a call, not a name. Deciding on `ctx.atom().id() != null` sent those
+      // down the by-name branch, which interpolated the call into a string
+      // literal WITHOUT escaping it:
+      //
+      //   ctx.get(ctx.call("hl2@L5:C3", opsv2_hl2), 1, "ctx.call("hl2@L5:C3", …)")
+      //                                                             ^ closes early
+      //
+      // — syntactically invalid JavaScript, and the wrong key even if escaped,
+      // since no series is registered under that name. `hl2[1]`, `hlc3[1]` and
+      // `barstate.islast[1]` are ordinary Pine, so this reached real scripts.
+      const isSimpleId = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(base);
 
       if (isSimpleId) {
         // Standard variable history lookup: close[1]
@@ -1313,6 +1363,61 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return this.namespaceRootCache;
   }
 
+  /**
+   * Is this identifier the NAME of a keyword argument rather than a read?
+   *
+   * `plot(close, title = "x")` reaches visitId twice: once for `close`, which
+   * is a variable read, and once for `title`, which is the callee's parameter
+   * name. Any check hooked on visitId sees both and must not treat the second
+   * as a variable — no script declares `title`.
+   */
+  protected isKeywordArgumentName(ctx: IdContext): boolean {
+    const parent = (ctx as any).parent;
+    return isRule(parent, "Kw_argContext") && parent.id?.() === ctx;
+  }
+
+  /**
+   * Reject a read of a name that nothing declares — the extension point.
+   *
+   * Lives at v1 so that v1 and v2 — which TradingView states are the same
+   * language, and which conformance/v1_equals_v2.test.ts asserts over the whole
+   * corpus — reject the same scripts. `bound` rather than `declared` is the
+   * right question: v1 and v2 both permit forward references.
+   *
+   * ── Why this exists ─────────────────────────────────────────────────────
+   *
+   * visitId's fallback emits `opsv2_<name>` for anything it does not
+   * recognise. Through `with(sandbox)` an unrecognised name is not a Pine
+   * diagnostic but a JavaScript ReferenceError on the first bar:
+   *
+   *     opsv2_last_bar_index is not defined
+   *
+   * which reads as an engine crash. TradingView answers `Undeclared identifier`
+   * at compile time. Dotted names already had a guard here ("'chart' is not a
+   * namespace"); bare ones had none, so every unimplemented built-in surfaced
+   * as a crash. Running TradingView's own documentation corpus turned up 45
+   * scripts failing that way.
+   */
+  protected checkUndeclaredRead(name: string, ctx: IdContext): void {
+    if (this.registry[name]) return;
+    if (RUNTIME_GLOBALS.has(name)) return;
+    if (UNIMPLEMENTED_BUILTINS.has(name)) return;   // bound as a poison pill
+    if (this.scopes.bound.has(name) || this.scopes.declared.has(name)) return;
+    if (this.namespaceRoots.has(name)) return;
+
+    // In the union registry but not this version's view: a MIGRATION error, not
+    // a typo. Reporting it as undeclared would bury the actual problem.
+    if (name in REGISTRY) {
+      throw this.err(
+        ctx,
+        `'${name}' is not available in Pine Script v${this.version}. ` +
+        `It was added in a later version.`,
+      );
+    }
+
+    throw this.err(ctx, `Undeclared identifier '${name}'.`);
+  }
+
   visitId(ctx: IdContext): string {
     const text = ctx.getText();
 
@@ -1348,6 +1453,10 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // strategy.* namespace (getters/constants too) requires strategy() context.
     if (text.startsWith("strategy.")) {
       this.enforceStrategyContext(text, ctx);
+    }
+
+    if (!text.includes(".") && !this.isKeywordArgumentName(ctx)) {
+      this.checkUndeclaredRead(text, ctx);
     }
 
     // 1. Handle Transpilation (Prefixing)

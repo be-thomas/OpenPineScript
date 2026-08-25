@@ -1,0 +1,46 @@
+//@version=5
+indicator("Custom Sample BB", overlay = true)
+
+float sourceInput  = input.source(close, "Source")
+int   samplesInput = input.int(20, "Samples")
+int   n            = input.int(10, "Bars")
+float multiplier   = input.float(2.0, "StdDev")
+
+var array<float> sourceArray = array.new<float>(samplesInput)
+
+// @function         Maintains a queue of the size of `srcArray`. 
+//                   It appends a `value` to the array and removes its oldest element at position zero.
+// @param srcArray   (array<float>) The array where the queue is maintained.
+// @param value      (float) The new value to be added to the queue. 
+//                   The queue's oldest value is also removed, so its size is constant.
+// @param takeSample (bool) A new `value` is only pushed into the queue if this is true.
+// @returns          (array<float>) `srcArray` object.
+method maintainQueue(array<float> srcArray, float value, bool takeSample = true) =>
+    if takeSample
+        srcArray.push(value)
+        srcArray.shift()
+    srcArray
+
+// @function         Computes Bollinger Band values from an array of data.
+// @param srcArray   (array<float>) The array where the queue is maintained.
+// @param multiplier (float) Standard deviaiton multiplier.
+// @param calcuate   (bool) The method will only calculate new values when this is true.
+// @returns          A tuple containing the basis, upper band, and lower band respectively.
+method calcBB(array<float> srcArray, float mult, bool calculate = true) =>
+    var float mean = na
+    var float dev  = na
+    if calculate
+        // Compute the mean and standard deviation of the array.
+        mean := srcArray.avg()
+        dev  := srcArray.stdev() * mult
+    [mean, mean + dev, mean - dev]
+
+// Identify if `n` bars have passed.
+bool newSample = bar_index % n == 0
+
+// Update the queue and compute new BB values on each new sample.
+[sampleMean, highBand, lowBand] = sourceArray.maintainQueue(sourceInput, newSample).calcBB(multiplier, newSample)
+
+plot(sampleMean, "Basis", color.orange)
+plot(highBand, "Upper", color.lime)
+plot(lowBand, "Lower", color.red)

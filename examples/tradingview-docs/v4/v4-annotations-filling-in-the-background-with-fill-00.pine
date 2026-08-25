@@ -1,0 +1,13 @@
+//@version=4
+study("fill Example")
+p1 = plot(sin(high))
+p2 = plot(cos(low))
+p3 = plot(sin(close))
+fill(p1, p3, color=color.red)
+fill(p2, p3, color=color.blue)
+h1 = hline(0)
+h2 = hline(1.0)
+h3 = hline(0.5)
+h4 = hline(1.5)
+fill(h1, h2, color=color.yellow)
+fill(h3, h4, color=color.lime)

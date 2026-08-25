@@ -1,0 +1,15 @@
+//@version=5
+strategy("OCA Cancel Demo", overlay=true)
+
+float ma1 = ta.sma(close, 5)
+float ma2 = ta.sma(close, 9)
+
+if ta.cross(ma1, ma2)
+    if strategy.position_size == 0
+        strategy.order("Long",  strategy.long, stop = high)
+        strategy.order("Short", strategy.short, stop = low)
+    else
+        strategy.close_all()
+
+plot(ma1, "Fast MA", color.aqua)
+plot(ma2, "Slow MA", color.orange)

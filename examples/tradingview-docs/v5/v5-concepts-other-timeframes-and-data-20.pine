@@ -1,0 +1,20 @@
+//@version=5
+indicator("Requesting calculated variables demo", "Price return correlation")
+
+//@variable The symbol to compare to the chart symbol.
+string symbol = input.symbol("SPY", "Symbol to compare")
+//@variable The number of bars in the calculation window.
+int length = input.int(60, "Length", 1)
+
+//@variable The close-to-close price return.
+float priceReturn = (close - close[1]) / close[1]
+//@variable The close-to-close price return calculated on another `symbol`.
+float requestedReturn = request.security(symbol, timeframe.period, priceReturn)
+
+//@variable The correlation between the `priceReturn` and `requestedReturn` over `length` bars.
+float correlation = ta.correlation(priceReturn, requestedReturn, length)
+//@variable The color of the correlation plot.
+color plotColor = color.from_gradient(correlation, -1, 1, color.purple, color.orange)
+
+// Plot the correlation value.
+plot(correlation, "Correlation", plotColor, style = plot.style_area)

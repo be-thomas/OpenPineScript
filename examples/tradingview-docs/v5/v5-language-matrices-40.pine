@@ -1,0 +1,9 @@
+//@version=5
+indicator("Invalid from_row, to_row demo") 
+
+//@variable A 4x4 matrix filled with a random value. 
+matrix<float> m = matrix.new<float>(4, 4, math.random())
+
+matrix<float> mSub = m.submatrix(from_row = 2, to_row = 2) // Raises an error. `from_row` can't equal `to_row`.
+
+plot(mSub.get(0, 0))

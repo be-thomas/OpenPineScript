@@ -1,0 +1,15 @@
+//@version=4
+study("Debugging from inside functions", "", true)
+// Create an array containing only one float element.
+instantVal = array.new_float(1)
+f_hlca() =>
+    var float _avg = na
+    _instantVal = avg(high, low, close, nz(_avg, close))
+    // Set the array's only element to the current value of `_instantVal`.
+    array.set(instantVal, 0, _instantVal)
+    _avg := sma(_instantVal, 20)
+
+hlca = f_hlca()
+plot(hlca, "hlca")
+// Retrieve the value of the array's only element which was set from inside the function.
+plot(array.get(instantVal, 0), "instantVal", color.black)

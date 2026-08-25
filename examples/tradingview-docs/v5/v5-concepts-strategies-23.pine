@@ -1,0 +1,8 @@
+//@version=5
+strategy("Close multiple ID demo", "test", overlay = true, pyramiding = 3)
+
+switch strategy.opentrades
+    0 => strategy.entry("A", strategy.long)
+    1 => strategy.entry("B", strategy.long)
+    2 => strategy.entry("C", strategy.long)
+    3 => strategy.close_all()

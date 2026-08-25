@@ -1,0 +1,4 @@
+//@version=5
+indicator("", "", true)
+longSignal = ta.rising(close, 2) and ta.rising(high, 2) and (na(volume) or ta.rising(volume, 2))
+plot(longSignal ? low - ta.tr : na, "Long", color.blue, 2, plot.style_circles)

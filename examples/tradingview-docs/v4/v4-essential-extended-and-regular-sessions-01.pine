@@ -1,0 +1,5 @@
+//@version=4
+study("Example 3: Regular Session Data (using tickerid)")
+t = tickerid("BATS", "AAPL", session.regular)
+cc = security("BATS:AAPL", timeframe.period, close, true)
+plot(cc, style=plot.style_linebr)

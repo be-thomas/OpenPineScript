@@ -1,0 +1,5 @@
+//@version=4
+study("Plot RSI and `bar_index`")
+r = rsi(close, 20)
+plot(r, "RSI", color.black)
+plotchar(bar_index, "Bar index", "", location.top)

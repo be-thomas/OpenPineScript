@@ -1,0 +1,49 @@
+//@version=5
+indicator("Calculating financial metrics demo", overlay = true, max_labels_count = 500)
+
+//@function Calculates the market capitalization (market cap) for the chart's symbol.
+marketCap() =>
+    //@variable The most recent number of outstanding shares reported for the symbol.
+    float totalSharesOutstanding = request.financial(syminfo.tickerid, "TOTAL_SHARES_OUTSTANDING", "FQ")
+    // Return the market cap value.
+    totalSharesOutstanding * close
+
+//@function Calculates the Earnings Yield for the chart's symbol.
+earningsYield() =>
+    //@variable The most recent 12-month earnings per share reported for the symbol.
+    float eps = request.financial(syminfo.tickerid, "EARNINGS_PER_SHARE", "TTM")
+    //Return the Earnings Yield percentage.
+    100.0 * eps / close
+
+//@function Calculates the Price-to-Book (P/B) ratio for the chart's symbol.
+priceBookRatio() =>
+    //@variable The most recent Book Value Per Share (BVPS) reported for the symbol.
+    float bookValuePerShare = request.financial(syminfo.tickerid, "BOOK_VALUE_PER_SHARE", "FQ")
+    // Return the P/B ratio.
+    close / bookValuePerShare
+
+//@function Calculates the Price-to-Earnings (P/E) ratio for the chart's symbol.
+priceEarningsRatio() =>
+    //@variable The most recent 12-month earnings per share reported for the symbol.
+    float eps = request.financial(syminfo.tickerid, "EARNINGS_PER_SHARE", "TTM")
+    // Return the P/E ratio.
+    close / eps
+
+//@function Calculates the Price-to-Sales (P/S) ratio for the chart's symbol.
+priceSalesRatio() =>
+    //@variable The most recent number of outstanding shares reported for the symbol.
+    float totalSharesOutstanding = request.financial(syminfo.tickerid, "TOTAL_SHARES_OUTSTANDING", "FQ")
+    //@variable The most recent 12-month total revenue reported for the symbol.
+    float totalRevenue = request.financial(syminfo.tickerid, "TOTAL_REVENUE", "TTM")
+    // Return the P/S ratio.
+    totalSharesOutstanding * close / totalRevenue
+
+//@variable The text to display in label tooltips.
+string tooltipText = str.format(
+     "Market Cap: {0} {1}\nEarnings Yield: {2}%\nP/B Ratio: {3}\nP/E Ratio: {4}\nP/S Ratio: {5}",
+     str.tostring(marketCap(), format.volume), syminfo.currency, earningsYield(), priceBookRatio(),
+     priceEarningsRatio(), priceSalesRatio()
+ )
+
+//@variable Displays a blank label with a tooltip containing the `tooltipText`.
+label info = label.new(chart.point.now(high), tooltip = tooltipText)

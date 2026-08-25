@@ -1,0 +1,6 @@
+//@version=4
+study("My Script")
+price = close
+if hl2 > price
+    price := hl2
+plot(price)

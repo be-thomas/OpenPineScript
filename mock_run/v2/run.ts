@@ -463,6 +463,10 @@ async function main() {
         ctx.userInputs[key] = isNaN(numVal) ? rawVal : numVal;
     }
 
+    // `last_bar_index` / `last_bar_time` must be answerable on bar 1, and the
+    // CSV is the only thing that knows how far the run goes.
+    ctx.provideDatasetExtent(bars.length, bars[bars.length - 1].time);
+
     const sandbox = { ctx };
     const executeBar = compile(jsCode, ctx, sandbox);
 

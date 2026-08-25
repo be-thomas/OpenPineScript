@@ -1,0 +1,7 @@
+//@version=5
+indicator("Realtime behavior demo", overlay = true)
+
+//@variable Is orange when the `line` is subject to rollback and gray after the `line` is committed.
+color lineColor = barstate.isconfirmed ? color.gray : color.orange
+
+line.new(bar_index, hl2, bar_index + 1, hl2, color = lineColor, width = 4)

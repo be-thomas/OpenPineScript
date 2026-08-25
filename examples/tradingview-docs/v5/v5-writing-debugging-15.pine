@@ -1,0 +1,27 @@
+//@version=5
+indicator("Conditional colors demo", "Price change colors")
+
+//@variable The number of bars in the price change calculation.
+int lengthInput = input.int(10, "Length", 1)
+
+//@variable The change in `close` prices over `lengthInput` bars.
+float priceChange = ta.change(close, lengthInput)
+
+//@variable Is `true` when the `priceChange` is a positive value, `false` otherwise.
+bool isPositive = priceChange > 0
+//@variable Is `true` when the `priceChange` is a negative value, `false` otherwise.
+bool isNegative = priceChange < 0
+
+//@variable Returns a color for the `priceChange` plot to show when `isPositive`, `isNegative`, or neither occurs.
+color plotColor = isPositive ? color.teal : isNegative ? color.maroon : chart.fg_color
+//@variable Returns an 80% transparent color for the background when `isPositive` or `isNegative`, `na` otherwise.
+color bgColor = isPositive ? color.new(color.aqua, 80) : isNegative ? color.new(color.fuchsia, 80) : na
+//@variable Returns a color to emphasize chart bars when `isPositive` occurs. Otherwise, returns the `chart.bg_color`.
+color barColor = isPositive ? color.orange : chart.bg_color
+
+// Plot the `priceChange` and color it with the `plotColor`.
+plot(priceChange, "Price change", plotColor, style = plot.style_area)
+// Highlight the pane's background with the `bgColor`.
+bgcolor(bgColor, title = "Background highlight")
+// Emphasize the chart bars with positive price change using the `barColor`.
+barcolor(barColor, title = "Positive change bars")

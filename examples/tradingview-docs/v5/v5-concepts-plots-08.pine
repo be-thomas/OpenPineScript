@@ -1,0 +1,4 @@
+//@version=5
+indicator("", "", true)
+plotColor = close >= open ? color.lime : color.red
+plot(close, color = plotColor)

@@ -1,0 +1,14 @@
+//@version=5
+strategy("Commission Demo", overlay=true, default_qty_value = 2, default_qty_type = strategy.percent_of_equity)
+
+length = input.int(10, "Length")
+
+float highest = ta.highest(close, length)
+float lowest  = ta.lowest(close, length)
+
+switch close
+    highest => strategy.entry("Long", strategy.long)
+    lowest  => strategy.close("Long")
+
+plot(highest, color = color.new(color.lime, 50))
+plot(lowest, color = color.new(color.red, 50))

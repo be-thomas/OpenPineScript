@@ -1,0 +1,39 @@
+//@version=5
+indicator("Incorrectly formatting time difference demo", overlay = true)
+
+//@variable A table that displays monthly close countdown information.
+var table displayTable = table.new(position.top_right, 1, 4, color.rgb(0, 188, 212, 60))
+
+if barstate.islast
+    //@variable A UNIX timestamp representing the current time as of the script's latest execution. 
+    int currentTime = timenow
+    //@variable A UNIX timestamp representing the expected closing time of the current "1M" bar. 
+    int monthCloseTime = time_close("1M")
+
+    //@variable The number of milliseconds between the `currentTime` and the `monthCloseTime`. 
+    //          This value is NOT intended as a UNIX timestamp.
+    int timeLeft = monthCloseTime - currentTime
+    //@variable A "string" representing the `timeLeft` as a date and time in the exchange time zone, in ISO 8601 format.
+    //          This format is INCORRECT for the `timeLeft` value because it's supposed to represent the time between 
+    //          two nonzero UNIX timestamps, NOT a specific point in time.
+    string incorrectTimeFormat = str.format_time(timeLeft)
+
+    // Initialize `displayTable` cells to initialize the `currentTime` and `monthCloseTime`.
+    displayTable.cell(
+         0, 0, "Current time: " + str.format_time(currentTime, "HH:mm:ss.S dd/MM/yy (z)"), 
+         text_size = size.large, text_halign = text.align_right
+     )
+    displayTable.cell(
+         0, 1, "`1M` Bar closing time: " + str.format_time(monthCloseTime, "HH:mm:ss.SS dd/MM/yy (z)"), 
+         text_size = size.large, text_halign = text.align_right
+     )
+    // Initialize a cell to display the `timeLeft` millisecond difference.
+    displayTable.cell(
+         0, 2, "`timeLeft` value: " + str.tostring(timeLeft), 
+         text_size = size.large, bgcolor = color.yellow
+     )
+    // Initialize a cell to display the `incorrectTimeFormat` representation.
+    displayTable.cell(
+         0, 3, "Time left (incorrect format): " + incorrectTimeFormat, 
+         text_size = size.large, bgcolor = color.maroon, text_color = color.white
+     )

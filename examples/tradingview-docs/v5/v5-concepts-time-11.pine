@@ -1,0 +1,32 @@
+//@version=5
+indicator("`last_bar_time` demo", overlay = true)
+
+if barstate.isfirst
+    //@variable A single-cell `table`, created only on the *first* bar, showing the *last* available bar's opening time.
+    table displayTable = table.new(position.bottom_right, 1, 1, color.aqua)
+    //@variable A "string" containing the `last_bar_time` UNIX timestamp and a custom date and time representation. 
+    string lastBarTimeText = "`last_bar_time`: "              + str.tostring(last_bar_time) 
+                             + "\nDate and time (exchange): " + str.format_time(last_bar_time, "dd/MM/yy HH:mm:ss")
+    // Initialize the `displayTable` cell with the `lastBarTimeText`.
+    displayTable.cell(
+         0, 0, lastBarTimeText, 
+         text_color = color.white, text_size = size.large, text_halign = text.align_left
+     )
+
+//@variable Is `true` only on the first occurrence of `barstate.islast`, `false` otherwise.
+//          This condition occurs on the bar whose `time` the `last_bar_time` variable refers to on historical bars.
+bool isInitialLastBar = barstate.islast and not barstate.islast[1]
+
+if isInitialLastBar
+    //@variable A "string" containing the last available bar's `time` value and a custom date and time representation.
+    //          Matches the `lastBarTimeText` from the first bar because `last_bar_time` equals this bar's `time`.
+    string openTimeText = "`time`: "                       + str.tostring(time)
+                          + "\nDate and time (exchange): " + str.format_time(time, "dd/MM/yy HH:mm:ss") 
+    // Draw a label anchored to the bar's `time` to display the `openTimeText`. 
+    label.new(
+         time, high, openTimeText, xloc.bar_time,
+         color = color.purple, textcolor = color.white, size = size.large, textalign = text.align_left
+     )
+
+// Highlight the background when `isInitialLastBar` is `true` for visual reference. 
+bgcolor(barstate.islast ? color.rgb(155, 39, 176, 80) : na, title = "Initial last bar highlight")

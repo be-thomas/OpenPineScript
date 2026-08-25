@@ -1,0 +1,27 @@
+//@version=5
+indicator("Loop is too long", max_bars_back = 101)
+bar_back_at(t) =>
+    i = 0
+    step = 51
+    for j = 1 to 100
+        if i < 0
+            i := 0
+            break
+        if step == 0
+            break
+        if time[i] >= t
+            i := i + step
+            i
+        else
+            i := i - step
+            i
+        step := step / 2
+        step
+    i
+
+s = 0
+for i = 1 to 1e3  // to make it longer
+    s := s - bar_back_at(timestamp(2017, 02, 23, 23, 59)) +
+         bar_back_at(timestamp(2017, 02, 23, 00, 00))
+    s
+plot(s)

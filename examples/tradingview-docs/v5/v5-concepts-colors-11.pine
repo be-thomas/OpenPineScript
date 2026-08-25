@@ -1,0 +1,10 @@
+//@version=5
+indicator("")
+plot(high, "", color.new(color.orange, 80), 8)
+plot(high, "", color.new(color.orange, 60), 4)
+plot(high, "", color.new(color.orange, 00), 1)
+
+plot(hl2, "", color.new(color.orange, 60), 4)
+plot(hl2, "", color.new(color.orange, 00), 1)
+
+plot(low, "", color.new(color.orange, 0), 1)

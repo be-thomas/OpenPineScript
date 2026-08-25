@@ -1,0 +1,30 @@
+//@version=5
+strategy("Exits for entries with the same ID demo", overlay = true, pyramiding = 2)
+
+//@variable Take-profit price for exit commands.
+var float takeProfit = na
+//@variable Stop-loss price for exit commands.
+var float stopLoss   = na
+
+//@variable Is `true` on two consecutive bars in 100-bar cycles. 
+bool buyCondition = math.min(bar_index % 100, math.max(bar_index - 1, 0) % 100) == 0
+
+if buyCondition
+    // Place a "buy" market order to enter a trade. 
+    strategy.entry("buy", strategy.long)
+    // Calculate exits on the second order.
+    if strategy.opentrades == 1
+        // Update the `takeProfit` and `stopLoss`.
+        takeProfit := close * 1.01
+        stopLoss   := close * 0.99
+        // Place exit orders for both "buy" entries.
+        strategy.exit("exit", "buy", limit = takeProfit, stop = stopLoss)
+
+// Set `takeProfit` and `stopLoss` to `na` when both trades close.
+if ta.change(strategy.closedtrades) == 2
+    takeProfit := na
+    stopLoss   := na
+
+// Plot the `takeProfit` and `stopLoss` values.
+plot(takeProfit, "TP", color.green, style = plot.style_circles)
+plot(stopLoss, "SL", color.red, style = plot.style_circles)

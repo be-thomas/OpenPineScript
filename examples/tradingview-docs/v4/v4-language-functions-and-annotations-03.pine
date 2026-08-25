@@ -1,0 +1,13 @@
+//@version=4
+study("My Script", overlay=true)
+
+// Returns the value of "a" the last time the function was called 2 bars ago.
+f(a) => a[1]
+// Returns the value of last bar's "close", as expected.
+f2() => close[1]
+
+oneBarInTwo = bar_index % 2 == 0
+plot(oneBarInTwo ? f(close) : na, color=color.maroon, linewidth=6, style=plot.style_cross)
+plot(oneBarInTwo ? f2() : na, color=color.lime, linewidth=6, style=plot.style_circles)
+plot(close[2], color=color.maroon)
+plot(close[1], color=color.lime)

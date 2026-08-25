@@ -1,0 +1,8 @@
+//@version=4
+study("For loop")
+my_sma(price, length) =>
+    sum = price
+    for i = 1 to length-1
+        sum := sum + price[i]
+    sum / length
+plot(my_sma(close,14))

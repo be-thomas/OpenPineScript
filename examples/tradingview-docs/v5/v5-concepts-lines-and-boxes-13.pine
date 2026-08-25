@@ -1,0 +1,28 @@
+//@version=5
+indicator("Curved drawings demo", "Smooth oscillating polyline")
+
+//@variable The number of bars between each point in the drawing.
+int length = input.int(20, "Length between points", 2)
+
+//@variable An array of `chart.point` objects to sequentially connect with a polyline.
+var points = array.new<chart.point>()
+
+//@variable The y-coordinate of each point in the `points`. Alternates between 1 and -1 on each `newPoint`.
+var int yValue = 1
+
+//@variable Is `true` once every `length` bars, `false` otherwise.
+bool newPoint = bar_index % length == 0
+
+if newPoint
+    // Push a new `chart.point` into the `points`. The new point contains `time` and `index` info.
+    points.push(chart.point.now(yValue))
+    // Change the sign of the `yValue`.
+    yValue *= -1
+
+// Draw a new curved `polyline` on the last confirmed historical chart bar.
+// The polyline uses the `time` field from each `chart.point` in the `points` array as x-coordinates.
+if barstate.islastconfirmedhistory
+    polyline.new(points, curved = true, xloc = xloc.bar_time, line_color = #9151A6, line_width = 3)
+
+// Highlight the chart background on every `newPoint` condition.
+bgcolor(newPoint ? color.new(color.gray, 70) : na, title = "New point highlight")

@@ -1,0 +1,20 @@
+//@version=5
+strategy("Stop order demo", overlay = true, margin_long = 100, margin_short = 100)
+
+//@function Displays text passed to `txt` when called and shows the `price` level on the chart.
+debugLabel(price, txt) =>
+    label.new(
+         bar_index, high, text = txt, color = color.teal, textcolor = color.white, 
+         style = label.style_label_lower_right, size = size.large
+     )
+    line.new(bar_index, high, bar_index, price, style = line.style_dotted, color = color.teal)
+    line.new(
+         bar_index, price, bar_index + 1, price, color = color.teal, extend = extend.right, 
+         style = line.style_dashed
+     )
+
+// Generate a long stop order with a label and lines 100 bars before the last bar.
+if last_bar_index - bar_index == 100
+    stopPrice = close + syminfo.mintick * 800
+    debugLabel(stopPrice, "Long Stop order created")
+    strategy.entry("Long", strategy.long, stop = stopPrice)

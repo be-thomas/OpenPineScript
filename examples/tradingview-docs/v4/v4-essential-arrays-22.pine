@@ -1,0 +1,7 @@
+//@version=4
+study("Protected array size")
+i_size = input(10, "Array size", minval = 1, maxval = 100000)
+a = array.new_float(i_size)
+for _i = 0 to i_size - 1
+    array.set(a, _i, _i)
+plot(array.size(a))

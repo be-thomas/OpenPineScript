@@ -1,0 +1,6 @@
+//@version=5
+indicator("HA Close", "", true)
+regularSessionTicker = ticker.new(syminfo.prefix, syminfo.ticker, session.regular)
+haTicker = ticker.heikinashi(regularSessionTicker)
+haClose = request.security(haTicker, timeframe.period, close, gaps = barmerge.gaps_on)
+plot(haClose, "HA Close", color.black, 3, plot.style_linebr)

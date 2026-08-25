@@ -1,0 +1,21 @@
+//@version=5
+indicator("UNIX timestamps demo")
+
+//@variable A UNIX time value representing the specific point 1,723,472,500,000 ms after the UNIX Epoch. 
+int unixTimestamp = 1723472500000
+
+// These are a few different ways to express the `unixTimestamp` in a relative, human-readable format.
+// Despite their format and time zone differences, all the calculated strings represent the SAME distinct point: 
+string isoExchange  = str.format_time(unixTimestamp)
+string utcDateTime  = str.format_time(unixTimestamp, "MM/dd/yyyy HH:mm:ss.S", "UTC+0")
+string utc4TimeDate = str.format_time(unixTimestamp, "hh:mm:ss a, MMMM dd, yyyy z", "UTC+4")
+
+// Log the `unixTimestamp` and the custom "string" representations on the first bar.
+if barstate.isfirst
+    log.info(
+         "\nUNIX time (ms): {0, number, #}\n
+         ISO 8601 representation (Exchange time zone): {1}\n
+         Custom date and time representation (UTC+0 time zone): {2}\n
+         Custom time and date representation (UTC+4 time zone): {3}",
+         unixTimestamp, isoExchange, utcDateTime, utc4TimeDate
+     )

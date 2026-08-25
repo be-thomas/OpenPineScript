@@ -1,0 +1,15 @@
+//@version=5
+strategy("Multiple close demo", "test", overlay = true, pyramiding = 3)
+
+//@variable Is `true` on every 100th bar.
+sellCond = bar_index % 100 == 0
+//@variable Is `true` on every 25th bar except for those that are divisible by 100.
+buyCond = bar_index % 25 == 0 and not sellCond
+
+if buyCond
+    strategy.entry("buy", strategy.long)
+if sellCond
+    strategy.close("buy")
+
+bgcolor(buyCond  ? color.new(color.blue, 90) : na)
+bgcolor(sellCond ? color.new(color.red, 90) : na)

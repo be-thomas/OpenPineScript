@@ -1,0 +1,15 @@
+//@version=5
+strategy("Cancel market demo", "test", overlay = true)
+
+//@variable Is `color.green` when the strategy places the "buy" order, `color.orange` when it tries to cancel the order.
+color bgColor = na
+
+if last_bar_index - bar_index == 100
+    strategy.entry("buy", strategy.long)
+    bgColor := color.new(color.green, 50)
+
+if last_bar_index - bar_index == 99
+    strategy.cancel_all()
+    bgColor := color.new(color.orange, 50)
+
+bgcolor(bgColor)

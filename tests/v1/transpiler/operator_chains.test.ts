@@ -18,11 +18,17 @@
 import { describe, it, expect } from "vitest";
 import { transpile } from "../../../transpiler";
 import { compileScript } from "../../../transpiler";
+
+/** Declarations for the operand names the chains below use. */
+const DECLS = "a = 3.0\nb = 5.0\nc = 7.0\n";
 import { compile, Context } from "../../../runtime/v1";
 
 /** Evaluates a v1 expression over one bar. */
 function evaluate(expr: string): number {
-  const { js, profile } = compileScript(`x = ${expr}\n`);
+  // The operands are DECLARED, not conjured. A bare `a * b / c` names nothing,
+  // which `Undeclared identifier` now rejects before the operators are reached
+  // — the point of this test is the operator positions, not the scope rule.
+  const { js, profile } = compileScript(`a = 3.0\nb = 5.0\nc = 7.0\nd = 11.0\nx = ${expr}\n`);
   const ctx = new Context(profile);
   const exec = compile(js.replace(/\blet\b/g, "var "), ctx, Object.create(null));
   ctx.setBar(0, 10, 12, 9, 11, 100);
@@ -49,19 +55,19 @@ describe("mixed multiplicative chains", () => {
   });
 
   it("the emitted operator matches the written one, position by position", () => {
-    expect(transpile("x = a * b / c\n")).toContain("(opsv2_a * opsv2_b) / opsv2_c");
-    expect(transpile("x = a / b * c\n")).toContain("(opsv2_a / opsv2_b) * opsv2_c");
+    expect(transpile(DECLS + "x = a * b / c\n")).toContain("(opsv2_a * opsv2_b) / opsv2_c");
+    expect(transpile(DECLS + "x = a / b * c\n")).toContain("(opsv2_a / opsv2_b) * opsv2_c");
   });
 });
 
 describe("mixed comparison chains", () => {
   // Rare in real scripts, but broken the same way and for the same reason.
   it("a > b < c keeps each operator", () => {
-    expect(transpile("x = a > b < c\n")).toContain("(opsv2_a > opsv2_b) < opsv2_c");
+    expect(transpile(DECLS + "x = a > b < c\n")).toContain("(opsv2_a > opsv2_b) < opsv2_c");
   });
 
   it("a != b == c keeps each operator", () => {
-    expect(transpile("x = a != b == c\n")).toContain("(opsv2_a != opsv2_b) == opsv2_c");
+    expect(transpile(DECLS + "x = a != b == c\n")).toContain("(opsv2_a != opsv2_b) == opsv2_c");
   });
 });
 

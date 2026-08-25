@@ -1,0 +1,7 @@
+//@version=5
+indicator("Protected array size")
+sizeInput = input.int(10, "Array size", minval = 1, maxval = 100000)
+a = array.new<float>(sizeInput)
+for i = 0 to sizeInput - 1
+    array.set(a, i, i)
+plot(array.size(a))

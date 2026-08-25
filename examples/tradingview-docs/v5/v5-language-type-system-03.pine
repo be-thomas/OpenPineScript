@@ -1,0 +1,6 @@
+//@version=5
+indicator("Constant reference to 'series' ID demo")
+
+//@variable A `label` variable declared as `const`, preventing reassignment.
+//          Although the reference is constant, the ID of the `label` is a "series" value.
+const label myVar = label.new(bar_index, close)

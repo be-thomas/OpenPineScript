@@ -1,0 +1,25 @@
+//@version=5
+strategy(
+     "Custom contexts demo 3", "Renko strategy", true, default_qty_type = strategy.percent_of_equity,
+     default_qty_value = 2, initial_capital = 50000, slippage = 1,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 1, margin_long = 100,
+     margin_short = 100
+ )
+
+//@variable A Renko ticker ID.
+string renkoTickerID = ticker.renko(syminfo.tickerid, "ATR", 14)
+// Request the `open` and `close` prices using the `renkoTickerID`.
+[renkoOpen, renkoClose] = request.security(renkoTickerID, timeframe.period, [open, close])
+
+//@variable When `true`, the strategy places a long market order.
+bool longEntry = ta.crossover(renkoClose, renkoOpen)
+//@variable When `true`, the strategy places a short market order.
+bool shortEntry = ta.crossunder(renkoClose, renkoOpen)
+
+if longEntry
+    strategy.entry("Long Entry", strategy.long)
+if shortEntry
+    strategy.entry("Short Entry", strategy.short)
+
+plot(renkoOpen)
+plot(renkoClose)

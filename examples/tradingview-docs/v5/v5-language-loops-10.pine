@@ -1,0 +1,21 @@
+//@version=5
+indicator("`while` loop with a counter condition demo")
+
+if barstate.islastconfirmedhistory
+    // A `for` loop that creates blue labels displaying each `i` value.
+    for i = 0 to 10
+        label.new(
+             bar_index + i, 0, str.tostring(i), color = color.blue, textcolor = color.white, 
+             size = size.large, style = label.style_label_down
+         )
+
+    //@variable An "int" to use as a counter within a `while` loop.
+    int j = 0
+    // A `while` loop that creates orange labels displaying each `j` value.
+    while j <= 10
+        label.new(
+             bar_index + j, 0, str.tostring(j), color = color.orange, textcolor = color.white, 
+             size = size.large, style = label.style_label_up
+         )
+        // Update the `j` counter within the local block.
+        j += 1

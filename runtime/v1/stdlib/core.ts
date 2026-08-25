@@ -187,3 +187,54 @@ export const fuchsia = "#E040FB";
 export const olive = "#808000";
 export const maroon = "#800000";
 export const silver = "#C0C0C0";
+
+/**
+ * `int(x)` — explicit cast from float to int.
+ *
+ * Pine v4 added "functions for explicit type casting" (June 2019) because it
+ * has no implicit float → integer conversion. The v4 manual's own example is
+ * the reason this matters:
+ *
+ *     len = 10.0
+ *     s = sma(close, int(len))
+ *
+ * without which `sma` rejects `const float` where it wants `integer`.
+ *
+ * Truncates toward zero rather than rounding — `int(-1.7)` is `-1`, not `-2` —
+ * and propagates `na`, since a cast cannot invent a value.
+ *
+ * Source: https://www.tradingview.com/pine-script-docs/v4/language/type-system/
+ *
+ * @returns {series int} `x` truncated toward zero, or na.
+ */
+export function int(x: any): number {
+    const n = Number(x != null && typeof x.valueOf === "function" ? x.valueOf() : x);
+    return Number.isFinite(n) ? Math.trunc(n) : NaN;
+}
+
+/**
+ * `max_bars_back(var, num)` — request a deeper history buffer for one series.
+ *
+ * ── Deliberately a no-op ────────────────────────────────────────────────────
+ *
+ * On TradingView this raises the internal lookback buffer for `var`, and exists
+ * because that buffer is capped: a script that indexes further back than the
+ * engine guessed fails with "Pine cannot determine the referencing length of
+ * series".
+ *
+ * This engine has no such cap. Lookback depth is bounded by available memory,
+ * which is one of the limits skipped on purpose — see the "Deliberate
+ * deviations" section of the README and dev-docs/04-skipped-restrictions.md.
+ * Every buffer is therefore already at least as large as any `max_bars_back`
+ * call could ask for, and honouring the request would mean SHRINKING history
+ * to match a restriction that is not being modelled.
+ *
+ * Accepting and ignoring it is what keeps scripts that call it runnable. The
+ * alternative — leaving the name unbound — is what made four of TradingView's
+ * own documentation examples die with a ReferenceError.
+ *
+ * @returns {void}
+ */
+export function max_bars_back(_series: any, _num: any): void {
+    /* no cap to raise — see above */
+}

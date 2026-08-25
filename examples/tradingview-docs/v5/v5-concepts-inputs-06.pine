@@ -1,0 +1,11 @@
+//@version=5
+indicator("MA", "", true)
+maLengthInput = input.int(10, minval = 1)
+bbFactorInput = input.float(1.5, minval = 0, step = 0.5)
+ma      = ta.sma(close, maLengthInput)
+bbWidth = ta.stdev(ma, maLengthInput) * bbFactorInput
+bbHi    = ma + bbWidth
+bbLo    = ma - bbWidth
+plot(ma)
+plot(bbHi, "BB Hi", color.gray)
+plot(bbLo, "BB Lo", color.gray)

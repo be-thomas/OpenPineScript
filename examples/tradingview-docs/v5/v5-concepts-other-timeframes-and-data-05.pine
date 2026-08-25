@@ -1,0 +1,19 @@
+//@version=5
+indicator("'series' arguments demo", dynamic_requests = true)
+ 
+//@variable A "series" that cycles through four different symbol strings. Its value changes every five bars.  
+string symbolSeries = switch int(bar_index / 5) % 4
+    1 => "NASDAQ:MSFT"
+    2 => "NASDAQ:AMD"
+    3 => "NASDAQ:INTC"
+    =>   "AMEX:SPY"
+
+//@variable The requested `close` value from one of the four `symbolSeries` values on the chart's timeframe.
+float requestedClose = request.security(symbolSeries, timeframe.period, close)
+
+// Plot the `requestedClose`.
+plot(requestedClose, "Requested close", color.purple, 3)
+
+// Draw a label displaying the requested symbol each time the `symbolSeries` changes.
+if symbolSeries != symbolSeries[1]
+    label.new(bar_index, requestedClose, symbolSeries, textcolor = color.white)

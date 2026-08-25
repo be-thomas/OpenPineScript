@@ -1,0 +1,10 @@
+//@version=4
+study("Debugging from inside `for` loops")
+i_lookBack = input(20, minval = 0)
+
+float trBalance = 0
+for _i = 1 to i_lookBack
+    trBalance := trBalance + sign(tr - tr[_i])
+
+hline(0)
+plot(trBalance)

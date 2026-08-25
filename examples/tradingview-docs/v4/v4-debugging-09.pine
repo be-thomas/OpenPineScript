@@ -1,0 +1,12 @@
+//@version=4
+study("Debugging from inside functions", "", true)
+f_hlca() =>
+    var float _avg = na
+    _instantVal = avg(high, low, close, nz(_avg, close))
+    _avg := sma(_instantVal, 20)
+    // Return two values instead of one.
+    [_avg, _instantVal]
+
+[hlca, instantVal] = f_hlca()
+plot(hlca, "hlca")
+plot(instantVal, "instantVal", color.black)

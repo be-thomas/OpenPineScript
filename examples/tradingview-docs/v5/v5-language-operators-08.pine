@@ -1,0 +1,7 @@
+//@version=5
+indicator("", "", true)
+// Declare `pHi` and initilize it on the first bar only.
+var float pHi = na
+// Reassign a value to `pHi`
+pHi := nz(ta.pivothigh(5, 5), pHi)
+plot(pHi)
