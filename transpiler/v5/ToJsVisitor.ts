@@ -43,7 +43,7 @@
  * its own, so they are rejected by NAME instead — see UNSUPPORTED below. Either
  * way the script is refused rather than compiled into something it does not say.
  */
-import type { PineVersion } from "../version";
+import type { PineVersion } from "../common/version";
 import { V4ToJsVisitor } from "../v4/ToJsVisitor";
 import { isRule } from "../v1/ToJsVisitor";
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";

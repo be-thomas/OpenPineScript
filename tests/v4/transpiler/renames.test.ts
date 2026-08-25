@@ -10,7 +10,7 @@
  * script written half in each would compile here and fail on TradingView.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v4";
 import { V4_RENAMES } from "../../../runtime/v1/stdlib/renames";
 

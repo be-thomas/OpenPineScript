@@ -8,7 +8,7 @@
  * silent, and it made the whole v4 suite pass under the wrong profile once
  * already.
  */
-import { compileScript } from "../../transpiler";
+import { compileScript } from "../../transpiler/common";
 import { compile, Context } from "../../runtime/v5";
 
 export const HEAD = '//@version=5\nindicator("t")\n';

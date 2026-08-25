@@ -24,7 +24,7 @@
  * unimplemented here. Collapsing them would trade a crash for a wrong message.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
 
 const v = (n: number, body: string) => `//@version=${n}\n${body}`;
@@ -91,7 +91,7 @@ describe("undeclared identifiers are rejected at compile time", () => {
 
 describe("built-ins that are Pine but deliberately unimplemented", () => {
   it("compiles rather than rejecting — the read may never happen", () => {
-    // conformance/corpus/v3/cci_commodity_channel_index.pine mentions `accdist`
+    // conformance/v3/corpus/cci_commodity_channel_index.pine mentions `accdist`
     // in one branch of an input-selected chain; every other branch still works.
     expect(() => compileScript(v(3,
       'study("t")\nsrc = close\nif close > open\n    src := accdist\nplot(src)\n',

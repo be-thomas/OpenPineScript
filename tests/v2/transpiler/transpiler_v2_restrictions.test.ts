@@ -11,7 +11,7 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { parse } from "../../../parser/v2";
 import { V2ToJsVisitor } from "../../../transpiler/v2/ToJsVisitor";
 

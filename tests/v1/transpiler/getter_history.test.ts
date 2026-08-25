@@ -29,7 +29,7 @@
  * failure was a syntax error rather than a wrong value.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
 
 /** Parses the emitted JavaScript without running it. */

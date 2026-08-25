@@ -13,9 +13,9 @@
  * The render model is derived from `ctx` (plots/fills/scriptMeta/trades), so the
  * typed PlotData union maps straight onto chart structures.
  */
-import { compileScript } from "../../transpiler";
-import type { PineVersion } from "../../transpiler/version";
-import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/profiles";
+import { compileScript } from "../../transpiler/common";
+import type { PineVersion } from "../../transpiler/common/version";
+import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 import { compile, Context } from "./index";
 import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle } from "./context";
 

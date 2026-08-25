@@ -15,7 +15,7 @@
  *                  using `ta.hma` could not run at all.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v5";
 import { matrix } from "../../../runtime/v1/stdlib/matrix";
 import { HEAD, build, value } from "../helpers";

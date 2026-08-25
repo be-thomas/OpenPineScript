@@ -2,7 +2,7 @@ import { PREFIX, removePrefix, extractFunctionName } from "../../utils/v2/common
 import { Series, SeriesSnapshot } from "./Series";
 import { REGISTRY } from "./stdlib";
 import { MATRIX_TAG } from "./stdlib/matrix";
-import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/profiles";
+import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 
 // Define Trade Types
 export interface Trade {
@@ -298,7 +298,7 @@ export class Context {
      * Lines emitted by `log.info` / `log.warning` / `log.error` (v5).
      *
      * Kept on the Context rather than written to the console because they are
-     * OUTPUT: scripts/make-log-harness.ts generates harnesses whose entire
+     * OUTPUT: scripts/common/make-log-harness.ts generates harnesses whose entire
      * result is a log line per bar, and a host has to be able to read them back
      * to reproduce locally what TradingView's Pine Logs pane shows.
      */

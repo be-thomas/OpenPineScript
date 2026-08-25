@@ -6,7 +6,7 @@ import { describe, it } from "vitest";
 import assert from "node:assert";
 import * as vm from "node:vm";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { Context } from "../../../runtime/v1";
 
 /**

@@ -7,8 +7,8 @@
  * without a PRO+ subscription. "Export chart data…" is a paid feature; Pine
  * Logs are not, they run on HISTORICAL bars (unlike `alert()`, which only ever
  * fires on realtime bars), and they retain the last 10,000 messages. Every
- * harness in conformance/golden/v5 ends by writing one CSV row per bar through
- * `log.info`, and scripts/make-log-harness.ts generates them.
+ * harness in conformance/v5/golden ends by writing one CSV row per bar through
+ * `log.info`, and scripts/common/make-log-harness.ts generates them.
  *
  * So the engine must be able to RUN those harnesses, not merely compile them —
  * otherwise the one artefact that proves the harness itself is well-formed

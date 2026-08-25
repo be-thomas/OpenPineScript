@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
 import { processPendingOrders, oca, direction } from "../../../runtime/v1/stdlib/strategy";
 

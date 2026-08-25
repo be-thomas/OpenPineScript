@@ -101,7 +101,7 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         // report each correctly. Throwing on READ rather than at compile time
         // is what keeps a script runnable when it only mentions one in a branch
         // the user's inputs never select — which is exactly what
-        // conformance/corpus/v3/cci_commodity_channel_index.pine does.
+        // conformance/v3/corpus/cci_commodity_channel_index.pine does.
         for (const name of UNIMPLEMENTED_BUILTINS) {
             Object.defineProperty(sandbox, `${PREFIX}${name}`, {
                 get() {

@@ -216,7 +216,7 @@ function parseSession(spec: string): { ranges: Array<[number, number]>; days: Se
  * calendar the timezone note above is missing, and Mon-Fri broke a published
  * script in the corpus outright: sunday.pine marks Sunday opens by testing
  * `dayofweek(time('D'))`, and a weekday mask makes that `na` on every bar it
- * exists to find. See the note in transpiler/profiles/index.ts.
+ * exists to find. See the note in transpiler/common/profiles/index.ts.
  *
  * @returns {series float} The bar's UNIX time in ms, or na.
  */

@@ -6,7 +6,7 @@
  * change silently and so the claim in the code stays checkable.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../transpiler";
+import { compileScript } from "../../transpiler/common";
 import { compile, Context } from "../../runtime/v4";
 
 function build(src: string) {

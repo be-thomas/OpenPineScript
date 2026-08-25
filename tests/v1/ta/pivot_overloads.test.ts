@@ -15,7 +15,7 @@
  * simply plotted nothing, which is the worst way for a function to be wrong.
  *
  * Found by running TradingView's own documentation examples
- * (examples/tradingview-docs/v5/v5-language-operators-08.pine) against the
+ * (examples/v5/tradingview-docs/v5-language-operators-08.pine) against the
  * engine: 0 of 506 bars finite where the three-argument form gave 28.
  *
  * The assertion is that the two forms AGREE. That is the actual contract, and

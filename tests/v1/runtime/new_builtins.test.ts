@@ -4,7 +4,7 @@
  * ── How these were found ────────────────────────────────────────────────────
  *
  * By running TradingView's own documentation examples
- * (examples/tradingview-docs/) through the engine. 45 of them died with a
+ * (examples/<version>/tradingview-docs/) through the engine. 45 of them died with a
  * JavaScript ReferenceError — "opsv2_last_bar_index is not defined" — because
  * visitId emitted a bare prefixed identifier for any name it did not recognise
  * and `with(sandbox)` then failed to resolve it at run time.
@@ -23,7 +23,7 @@
  * at the assertion.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
 
 /** Compiles and runs `src` over `n` synthetic daily bars. */

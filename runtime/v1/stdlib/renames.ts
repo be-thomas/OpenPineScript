@@ -214,7 +214,7 @@ export const V4_REMOVED: readonly string[] = (() => {
  * `Undeclared identifier` would be a lie; it also cannot be allowed to compile
  * into a silent `undefined`. runtime/v1/index.ts binds each one as a poison pill that
  * throws only when READ, which is what lets
- * conformance/corpus/v3/cci_commodity_channel_index.pine keep running: it
+ * conformance/v3/corpus/cci_commodity_channel_index.pine keep running: it
  * mentions `accdist` in a branch selected by an input, and every other branch
  * still works.
  */

@@ -12,7 +12,7 @@
  *     `var` is the only one with emit consequences; the type prefix is checked
  *     and discarded, and the qualifiers are discarded outright.
  *
- *   NAMES (transpiler/profiles/index.ts + runtime)
+ *   NAMES (transpiler/common/profiles/index.ts + runtime)
  *     The 3a rename table — `n` → `bar_index`, `red` → `color.red`,
  *     `period` → `timeframe.period`, and the rest. Those are lookups, not emit
  *     rules, so they do not belong here.
@@ -21,7 +21,7 @@
  * `switch`. Both are v5. v4 adds no statement keyword at all, which is why this
  * file overrides declarations and nothing else.
  */
-import type { PineVersion } from "../version";
+import type { PineVersion } from "../common/version";
 import { V3ToJsVisitor } from "../v3/ToJsVisitor";
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
 import { V4_VIEW } from "../../runtime/v1/stdlib";

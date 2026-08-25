@@ -7,7 +7,7 @@
  * from v4's grammar rather than merely guarded in its emitter.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { HEAD, build, series, value } from "../helpers";
 
 describe("while", () => {

@@ -25,7 +25,7 @@
  * enumeration, and both are moved here anyway. The rule the guide states is
  * that the technical-analysis library moved to `ta.` — the enumeration is the
  * list of members, not a set of exceptions to it — and `ta.fixnan` is used by
- * conformance/golden/v5/harness_state.pine, which was generated from the v3
+ * conformance/v5/golden/harness_state.pine, which was generated from the v3
  * harness against that same rule. Leaving them flat would make v5 the only
  * version where part of the TA library has no namespace.
  *

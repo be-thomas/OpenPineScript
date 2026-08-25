@@ -43,7 +43,7 @@ npm install
 [`grammar/`](grammar/). Then run a script against a CSV of bars:
 
 ```bash
-npm run opsv2 -- examples/sma_crossover.pine --data mock_data/AAPL_mock.csv
+npm run opsv2 -- examples/v1/sma_crossover.pine --data mock_data/common/AAPL_mock.csv
 ```
 
 ```
@@ -61,8 +61,8 @@ A strategy reports performance instead. This is one of TradingView's own
 documentation examples, unedited:
 
 ```bash
-npm run opsv2 -- examples/tradingview-docs/v4/v4-essential-strategies-00.pine \
-  --data mock_data/AAPL_mock.csv
+npm run opsv2 -- examples/v4/tradingview-docs/v4-essential-strategies-00.pine \
+  --data mock_data/common/AAPL_mock.csv
 ```
 
 ```
@@ -85,7 +85,7 @@ Performance:
 npm run replv2
 ```
 
-![OpenPineScript REPL evaluating Pine Script expressions in a terminal session](https://raw.githubusercontent.com/be-thomas/OpenPineScript/main/images/repl-1.png)
+![OpenPineScript REPL evaluating Pine Script expressions in a terminal session](https://raw.githubusercontent.com/be-thomas/OpenPineScript/main/images/common/repl-1.png)
 
 ## Supported Pine Script versions
 
@@ -119,7 +119,7 @@ still missing, and why each item is refused rather than approximated.
 
 ## Parity: 763 real scripts from TradingView's docs
 
-[`examples/tradingview-docs/`](examples/tradingview-docs/) holds 763 complete
+[`examples/<version>/tradingview-docs/`](examples/common/tradingview-docs/README.md) holds 763 complete
 Pine Script programs taken verbatim from TradingView's own documentation —
 v2 through v5, byte-for-byte identical to their sources, never edited.
 
@@ -136,12 +136,12 @@ logs.
 | **Total** | **763** | **495 (65%)** |
 
 Byte-identity is checked rather than promised —
-[`scripts/fetch-doc-examples.mjs`](scripts/fetch-doc-examples.mjs) re-downloads
+[`scripts/common/fetch-doc-examples.mjs`](scripts/common/fetch-doc-examples.mjs) re-downloads
 every page and compares SHA-256 digests against
-[`MANIFEST.json`](examples/tradingview-docs/MANIFEST.json):
+[`MANIFEST.json`](examples/common/tradingview-docs/MANIFEST.json):
 
 ```bash
-node scripts/fetch-doc-examples.mjs verify
+node scripts/common/fetch-doc-examples.mjs verify
 ```
 
 All 495 that compile also RUN — not one produces a JavaScript error. An
@@ -151,7 +151,7 @@ time, the way TradingView reports it, rather than crashing on the first bar.
 The 268 that do not compile are a map of what is missing — compound assignment
 (`+=`), `for … in`, `else if`, the `chart.*` and `format.*` namespaces, tuple
 destructuring. Every one is broken down by cause in the
-[corpus README](examples/tradingview-docs/README.md), along with the defects
+[corpus README](examples/common/tradingview-docs/README.md), along with the defects
 running it has already fixed. The files are © TradingView and are not covered by
 this repository's licence.
 
@@ -181,8 +181,8 @@ Every flag — `--out-chart`, `--out-trades`, `--compare-chart`, `--tolerance`,
 ## Transpile Pine Script to JavaScript
 
 ```bash
-npm run opsv2 -- examples/sma_crossover.pine \
-  --data mock_data/AAPL_mock.csv --show-transpiled
+npm run opsv2 -- examples/v1/sma_crossover.pine \
+  --data mock_data/common/AAPL_mock.csv --show-transpiled
 ```
 
 ```js
@@ -239,6 +239,13 @@ Two patterns carry most of the weight:
 
 ## Repository layout
 
+Every top-level folder partitions its contents the same way: child folders are
+named `v1`–`v5` for version-specific code and `common` for anything shared. The
+grammars are the one place this costs something — ANTLR resolves composite
+`import` chains through a single `--lib` directory, so
+[`scripts/common/build-grammars.mjs`](scripts/common/build-grammars.mjs) stages
+every `.g4` into one temporary folder at build time and deletes it afterwards.
+
 | Path | Contents |
 |------|----------|
 | [`grammar/`](grammar/) | ANTLR lexer and parser grammars (`.g4`), one pair per version |
@@ -284,7 +291,7 @@ TradingView.
 Yes — including `while`, `switch`, user-defined types, methods, libraries,
 matrices, maps and Pine Logs. See
 [Supported Pine Script versions](#supported-pine-script-versions), and the
-[parity corpus](examples/tradingview-docs/README.md) for what is still missing.
+[parity corpus](examples/common/tradingview-docs/README.md) for what is still missing.
 
 ### Does it support Pine Script v6?
 
@@ -312,7 +319,7 @@ JavaScript.
 ### How do I convert Pine Script to JavaScript?
 
 Use `--show-transpiled`, or call `compileScript()` from
-[`transpiler/index.ts`](transpiler/index.ts) directly.
+[`transpiler/common/index.ts`](transpiler/common/index.ts) directly.
 
 ## Contributing
 
@@ -332,7 +339,7 @@ GNU GPL-3.0. See [LICENSE](LICENSE).
 
 The Pine Script language and TradingView are trademarks of TradingView, Inc.
 This project is not affiliated with or endorsed by TradingView. The examples in
-[`examples/tradingview-docs/`](examples/tradingview-docs/) are © TradingView,
+[`examples/<version>/tradingview-docs/`](examples/common/tradingview-docs/README.md) are © TradingView,
 reproduced verbatim for interoperability testing and not covered by the licence
 above.
 

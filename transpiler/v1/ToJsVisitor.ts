@@ -28,7 +28,7 @@
 import { ParseTreeVisitor } from "antlr4ng";
 import type { TerminalNode, ParserRuleContext, ParseTree } from "antlr4ng";
 import * as common from "../../utils/v2/common";
-import type { PineVersion } from "../version";
+import type { PineVersion } from "../common/version";
 import {
   Pine_scriptContext,
   StmtContext,
@@ -77,7 +77,7 @@ import {
 } from "../../parser/v1/generated/PineV1Parser";
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
 import { BASE_REGISTRY, REGISTRY, UNIMPLEMENTED_BUILTINS } from "../../runtime/v1/stdlib";
-import { ScopeInfo, analyseScopes } from "../passes/ScopeAnalysis";
+import { ScopeInfo, analyseScopes } from "../common/passes/ScopeAnalysis";
 
 /**
  * Anything carrying a source position. Structural rather than
@@ -682,7 +682,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // Pine allows '_' as a repeated throwaway: `[macdLine, _, _] = macd(...)`.
     // JavaScript does not — `let [a, _, _] = ...` is
     // "SyntaxError: Identifier '_' has already been declared", which took out
-    // the published strategy validation/breakout_crossover_4H_1D.pine.
+    // the published strategy validation/v2/breakout_crossover_4H_1D.pine.
     //
     // Every throwaway gets a script-unique name. The counter is per-visitor
     // rather than per-statement because that file collides ACROSS statements:

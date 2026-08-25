@@ -8,7 +8,7 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
 
 function build(pine: string) {

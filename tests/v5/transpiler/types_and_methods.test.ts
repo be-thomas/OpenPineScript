@@ -15,7 +15,7 @@
  * script that looks like it accumulates state and does not.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { HEAD, build, series, value } from "../helpers";
 
 const POINT = [

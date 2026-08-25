@@ -9,7 +9,7 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
 import { parse } from "../../../parser/v2";
 import { V2ToJsVisitor } from "../../../transpiler/v2/ToJsVisitor";

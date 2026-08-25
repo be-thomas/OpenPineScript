@@ -26,10 +26,10 @@
  * rejects it as a syntax error because PineV1Lexer.g4 has no such token.
  */
 import type { ParseTree, ParserRuleContext } from "antlr4ng";
-import type { PineVersion } from "../version";
+import type { PineVersion } from "../common/version";
 import { V2ToJsVisitor } from "../v2/ToJsVisitor";
 import { isRule } from "../v1/ToJsVisitor";
-import { isStaticallyBool } from "../passes/ScopeAnalysis";
+import { isStaticallyBool } from "../common/passes/ScopeAnalysis";
 import {
   Var_defContext,
   Add_exprContext,

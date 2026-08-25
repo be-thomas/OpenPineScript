@@ -12,7 +12,7 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
 import type { LinePlot, OHLCPlot, MarkerPlot, ColorDirective, PlotData, FillData } from "../../../runtime/v1/context";
 

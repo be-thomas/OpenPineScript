@@ -12,7 +12,7 @@
  * name produced, and the v4 name must be REFUSED at v5.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v5";
 import { V5_RENAMES, V5_REMOVED } from "../../../runtime/v1/stdlib/renames5";
 import { V4_VIEW, V5_VIEW } from "../../../runtime/v1/stdlib";

@@ -9,7 +9,7 @@
  * quietly not what the author asked for.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { HEAD, build, value } from "../helpers";
 
 describe("the directive", () => {

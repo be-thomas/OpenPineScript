@@ -13,7 +13,7 @@
  * caught real defects; each says which.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v5";
 
 const LIB = [

@@ -16,8 +16,8 @@
  * — produced a modulo.
  */
 import { describe, it, expect } from "vitest";
-import { transpile } from "../../../transpiler";
-import { compileScript } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
+import { compileScript } from "../../../transpiler/common";
 
 /** Declarations for the operand names the chains below use. */
 const DECLS = "a = 3.0\nb = 5.0\nc = 7.0\n";

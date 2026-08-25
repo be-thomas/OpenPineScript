@@ -36,10 +36,10 @@
  *
  * v3 inherits this guard unchanged. ':=' scope was never a v1→v2→v3 delta.
  *
- * ⚠ See the sourcing note in grammar/PineV2Lexer.g4 on why ':=' is placed at v2
+ * ⚠ See the sourcing note in grammar/v2/PineV2Lexer.g4 on why ':=' is placed at v2
  * rather than v1. If that turns out to be wrong, this class moves to v1 wholesale.
  */
-import type { PineVersion } from "../version";
+import type { PineVersion } from "../common/version";
 import { V1ToJsVisitor } from "../v1/ToJsVisitor";
 import {
   Var_assignContext,

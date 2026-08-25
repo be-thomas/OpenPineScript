@@ -14,7 +14,7 @@
  * ── The number FORMAT is the load-bearing part ──────────────────────────────
  *
  * `str.tostring(value, format)` is how the golden-data harnesses get numbers
- * out of TradingView (see scripts/make-log-harness.ts): every column is emitted
+ * out of TradingView (see scripts/common/make-log-harness.ts): every column is emitted
  * as `str.tostring(v, "#.##########")`. If this formatter disagrees with
  * TradingView's, every golden comparison is measuring the formatter rather than
  * the indicator — so the digit rules below are implemented literally from

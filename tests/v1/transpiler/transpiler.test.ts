@@ -7,7 +7,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as vm from "node:vm";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
 import { getGeneratedRegistry } from "../../../runtime/v1/stdlib/metadata";
 
