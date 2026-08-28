@@ -236,8 +236,17 @@ for_in_expr : FOR_STMT ( ids_array | id ) IN ternary_expr stmts_block ;
  * No ambiguity with a dotted callee. `id` is greedy, so `a.b(1)` still parses
  * as one id `a.b` followed by an argument list; this rule can only start after
  * a closing parenthesis.
+ *
+ * The parentheses are OPTIONAL, because a suffix may be a FIELD rather than a
+ * method. From the manual's matrices page:
+ *
+ *     plot(m.get(0, 0).value, linewidth = 3)
+ *
+ * `matrix.get()` hands back "a reference to an object rather than a copy", so
+ * `.value` reads a field off that reference. Same rule for a UDT returned by
+ * any call. The emitter tells the two apart by whether LPAR is present.
  */
-call_suffix : DOT id type_args? LPAR ( fun_actual_args )? RPAR ;
+call_suffix : DOT id ( type_args? LPAR ( fun_actual_args )? RPAR )? ;
 
 fun_call : id type_args? LPAR ( fun_actual_args )? RPAR call_suffix* ;
 

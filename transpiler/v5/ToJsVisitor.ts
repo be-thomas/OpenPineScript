@@ -802,12 +802,28 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     return js;
   }
 
-  /** One `.method(args)` applied to an already-emitted receiver. */
+  /** One `.method(args)` — or `.field` — applied to an already-emitted receiver. */
   protected emitChainedMethod(receiver: string, ctx: Call_suffixContext): string {
     // `getText()`, not `visit`: this is a METHOD NAME, and visiting it as an
     // identifier would run it through the undeclared-identifier guard and the
     // rename table, neither of which is about a method.
-    const method = ctx.id().getText();
+    // A suffix's name may be DOTTED, because `id` is greedy inside this rule
+    // too: `.inner.x` and `.xs.size()` both arrive as one id. Every part but
+    // the last is a FIELD read, folded left to right exactly as
+    // `emitFieldChain` folds a named receiver's.
+    //
+    // No parentheses means the last part is a field as well:
+    //
+    //     plot(m.get(0, 0).value, linewidth = 3)
+    //
+    // "matrix.get() returns a reference to an object rather than a copy", so
+    // `.value` reads through the same accessor.
+    const parts = ctx.id().getText().split(".");
+    const method = ctx.LPAR() ? parts.pop()! : "";
+    const field = (js: string, part: string) => `ctx.field(${js}, ${JSON.stringify(part)})`;
+    receiver = parts.reduce(field, receiver);
+    if (!method) return receiver;
+
     const args = this.withCallee(
       method,
       () => (ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : ""),
