@@ -140,3 +140,43 @@ describe("plot.style_cross exists at v4 even though v3's `cross` is the TA funct
       .not.toThrow();
   });
 });
+
+describe("a keyword argument's NAME is not a read of that word", () => {
+  /**
+   * `plot(close, title = "x")` reaches visitId twice, and the second time the
+   * identifier is the CALLEE's parameter name. The rename table describes what
+   * a SCRIPT may spell, so it does not apply there.
+   *
+   * Two of v4's renamed words are also parameter names of v4 built-ins, and
+   * both were rejected as reads of the word they replaced. Four of
+   * TradingView's own published v5 scripts hit it — the `for`-loop and time
+   * pages, which build a table, and the FAQ page that spells out every
+   * `request.security` argument.
+   */
+  const CASES: Array<[string, string, string]> = [
+    ["columns", "plot.style_columns",
+     'table.new(position.top_right, columns = 5, rows = 4)'],
+    ["symbol", "input.symbol",
+     'security(symbol = syminfo.tickerid, resolution = "D", expression = close)'],
+    ["resolution", "input.resolution",
+     'input(title = "t", defval = "D", type = input.resolution)'],
+  ];
+
+  for (const [word, renamedTo, call] of CASES) {
+    it(`'${word} = ...' is an argument, not the renamed '${renamedTo}'`, () => {
+      expect(() => compileScript(`//@version=4\nstudy("t")\nx = ${call}\n`)).not.toThrow();
+    });
+
+    it(`...while a bare read of '${word}' is still the migration error`, () => {
+      expect(() => compileScript(`//@version=4\nstudy("t")\nx = ${word}\n`))
+        .toThrow(new RegExp(`'${word}' was renamed to '${renamedTo.replace(".", "\\.")}'`));
+    });
+  }
+
+  it("the same holds at v5, which inherits the guard", () => {
+    expect(() => compileScript(
+      '//@version=5\nindicator("t")\n' +
+      'x = table.new(position.top_right, columns = 5, rows = 4)\n',
+    )).not.toThrow();
+  });
+});

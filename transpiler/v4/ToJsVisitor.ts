@@ -157,7 +157,19 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
 
   override visitId(ctx: IdContext): string {
     const text = ctx.getText();
-    if (!text.includes(".")) this.enforceRenamedInV4(text, ctx);
+    // A keyword argument's key is the CALLEE's parameter name, not a name this
+    // script is reading, so the rename table does not apply to it. Two of
+    // v4's renamed words are also parameter names of v4 built-ins —
+    //
+    //     table.new(position.top_right, columns = 5, rows = 4, ...)
+    //     request.security(symbol = syminfo.tickerid, timeframe = "1D", ...)
+    //
+    // — and both were rejected as reads of the v3 plot-style `columns` and the
+    // v3 input-type `symbol`. Four of TradingView's own v5 scripts hit it. v5's
+    // own guard already skips these; v4's did not.
+    if (!text.includes(".") && !this.isKeywordArgumentName(ctx as any)) {
+      this.enforceRenamedInV4(text, ctx);
+    }
     return super.visitId(ctx as any);
   }
 
