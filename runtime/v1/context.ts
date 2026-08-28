@@ -1,6 +1,6 @@
 import { PREFIX, removePrefix, extractFunctionName } from "../../utils/v2/common";
 import { Series, SeriesSnapshot } from "./Series";
-import { REGISTRY } from "./stdlib";
+import { REGISTRY, viewFor } from "./stdlib";
 import { MATRIX_TAG } from "./stdlib/matrix";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 
@@ -603,7 +603,7 @@ export class Context {
         }
 
         const key = `${namespace}.${name}`;
-        const entry = REGISTRY[key];
+        const entry = this.entryFor(key);
         if (!entry || entry.is_value) {
             throw new Error(`'${namespace}' has no method '${name}'.`);
         }
@@ -905,7 +905,7 @@ export class Context {
         
         try {
             const fname = removePrefix(extractFunctionName(id)); 
-            const entry = REGISTRY[fname];
+            const entry = this.entryFor(fname);
 
             // 1. Check if the entry exists. If not, we default to standard call (fail-safe)
             if (!entry) {
@@ -990,8 +990,29 @@ export class Context {
      * the call inside its own initialiser saw the variable (undefined) instead
      * of the function. The transpiler routes shadowed built-in callees here.
      */
+    /**
+     * The stdlib entry for `name` AT THIS SCRIPT'S VERSION.
+     *
+     * `REGISTRY` is deliberately the union of every version's view, so a few
+     * names carry two meanings in it and the union's last writer decides which
+     * one survives. `float`, `bool` and `string` are the v1–v3 `input()` type
+     * CONSTANTS and v4's casting FUNCTIONS; `session` is a v1–v3 constant and a
+     * v5 namespace. Reading the union directly handed a v4 script the string
+     * "float" where it had called `float(na)` — "[Context.call] ... The
+     * provided reference is not a function".
+     *
+     * This is the preference `createStdlib` already applies to the sandbox,
+     * applied to the CALL path as well. Falling back to the union keeps a name
+     * the view does not carry resolvable: the transpiler has already decided
+     * what a script may spell, and the runtime is not the place to refuse a
+     * second time.
+     */
+    private entryFor(name: string) {
+        return viewFor(this.profile.version)[name] ?? REGISTRY[name];
+    }
+
     public builtin(name: string): any {
-        return REGISTRY[name]?.ref;
+        return this.entryFor(name)?.ref;
     }
 
     public getPersistentState<T>(initFn: () => T): T {

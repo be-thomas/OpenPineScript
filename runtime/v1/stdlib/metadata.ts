@@ -3,6 +3,7 @@ import * as alerts from "./alerts";
 import * as arrays from "./arrays";
 import * as barmerge from "./barmerge";
 import * as barstate from "./barstate";
+import * as cast from "./cast";
 import * as chart from "./chart";
 import * as color from "./color";
 import * as core from "./core";
@@ -478,6 +479,30 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: barstate.isfirst
+      },
+      "cast.float": {
+          uses_context: false,
+          args: ["x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"float} `x` as a float, or na."},
+          is_value: false,
+          ref: cast.float
+      },
+      "cast.bool": {
+          uses_context: false,
+          args: ["x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"bool} `x` as a boolean, or na."},
+          is_value: false,
+          ref: cast.bool
+      },
+      "cast.string": {
+          uses_context: false,
+          args: ["x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"string} `x` as a string, or na."},
+          is_value: false,
+          ref: cast.string
       },
       "period": {
           uses_context: true,

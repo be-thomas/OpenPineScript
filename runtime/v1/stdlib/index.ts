@@ -179,10 +179,36 @@ export const V4_REGISTRY: Record<string, StdlibEntry> =
  * derived from it without importing an emitter: a registry view is data about
  * the LANGUAGE, and the emitter is one of its consumers rather than its owner.
  */
+/**
+ * v4's explicit type CASTS, under the flat names a script actually writes.
+ *
+ * `float`, `bool` and `string` are two different things at two different
+ * versions — the v1–v3 `input()` type CONSTANTS, and v4's casting FUNCTIONS —
+ * and one flat registry key cannot hold both. They are generated under `cast.*`
+ * (see the header of ./cast.ts) and re-keyed here, so the constant survives in
+ * BASE_REGISTRY and the function exists only from v4.
+ *
+ * Spread AFTER the removal, deliberately: `without(BASE_REGISTRY, V4_REMOVED)`
+ * has just deleted the three constants, which is correct, and this puts the
+ * three functions back under the same names. `cast.*` itself is dropped, so
+ * `cast.float(x)` is not a spelling in any version.
+ */
+const V4_CASTS: Record<string, StdlibEntry> = Object.fromEntries(
+    ["float", "bool", "string"].map(name => {
+        const entry = V4_NAMESPACE_REGISTRY[`cast.${name}`];
+        if (!entry) throw new Error(`stdlib: cast.${name} is missing from the registry`);
+        return [name, entry];
+    }),
+);
+
+/** Everything under `cast.` — present so it can be excluded, never spelled. */
+const CAST_KEYS = Object.keys(V4_NAMESPACE_REGISTRY).filter(k => k.startsWith("cast."));
+
 export const V4_VIEW: Record<string, StdlibEntry> = {
     ...without(BASE_REGISTRY, V4_REMOVED),
-    ...V4_NAMESPACE_REGISTRY,
+    ...without(V4_NAMESPACE_REGISTRY, CAST_KEYS),
     ...V4_REGISTRY,
+    ...V4_CASTS,
 };
 
 export const V5_REGISTRY: Record<string, StdlibEntry> =

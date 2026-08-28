@@ -139,6 +139,12 @@ export const V4_ONLY_NAMESPACES: readonly string[] = [
   // The flat v1–v3 `session` input-type constant is untouched: the gate skips a
   // key equal to its own root.
   "session",
+
+  // Not a namespace a script can spell — see the header of ./cast.ts. `cast.*`
+  // is listed here so the three casting functions land in v4's namespace
+  // registry, which is where index.ts picks them up and re-keys them onto the
+  // flat names `float`, `bool` and `string`.
+  "cast",
 ];
 
 /**
