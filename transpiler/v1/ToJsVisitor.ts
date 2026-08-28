@@ -1542,11 +1542,40 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    * as a crash. Running TradingView's own documentation corpus turned up 45
    * scripts failing that way.
    */
+  /**
+   * Is a binding of `name` in scope at the point it is READ?
+   *
+   * "The global scope is all of the script that is not inside a function, if
+   *  statement, or other conditional structure ... Only code that is in the
+   *  same local scope can access a local variable."
+   *
+   * Answered by token span rather than by nesting depth, because the question
+   * is about two POSITIONS: a name bound inside one `if` is invisible inside
+   * the `if` beside it, and those are at the same depth. See `scopesOf`.
+   *
+   * A name the analysis pass records no scope for is treated as visible. That
+   * is the safe direction — a binding form the pass does not model yet makes
+   * this check silent rather than making it reject working code.
+   */
+  protected visibleAt(name: string, ctx: IdContext): boolean {
+    const scopes = this.scopes.scopesOf?.get(name);
+    if (!scopes?.length) return true;
+    const at = (ctx as any).start?.tokenIndex;
+    if (typeof at !== "number") return true;
+    return scopes.some(s => s === null || (at >= s.start && at <= s.stop));
+  }
+
   protected checkUndeclaredRead(name: string, ctx: IdContext): void {
     if (this.registry[name]) return;
     if (RUNTIME_GLOBALS.has(name)) return;
     if (UNIMPLEMENTED_BUILTINS.has(name)) return;   // bound as a poison pill
-    if (this.scopes.bound.has(name) || this.scopes.declared.has(name)) return;
+    if (this.scopes.bound.has(name) || this.scopes.declared.has(name)) {
+      if (this.visibleAt(name, ctx)) return;
+      // Bound, but not HERE — a local read from outside its block. The name is
+      // known, so none of the branches below apply; TradingView reports the
+      // same error it reports for a name that was never written at all.
+      throw this.err(ctx, `Undeclared identifier '${name}'.`);
+    }
     if (this.namespaceRoots.has(name)) return;
 
     // In the union registry but not this version's view: a MIGRATION error, not

@@ -64,6 +64,39 @@ export interface ScopeInfo {
    * valid published code (v3/cci_commodity_channel_index.pine).
    */
   functionScoped: ReadonlySet<string>;
+  /**
+   * name → the LOCAL SCOPE of each of its bindings, `null` for a binding at
+   * script scope.
+   *
+   * From the manual's programming FAQ: "The global scope is all of the script
+   * that is not inside a function, if statement, or other conditional
+   * structure", and "only code that is in the same local scope can access a
+   * local variable."
+   *
+   * `bound` and `declared` are flat sets, so a name bound only inside an `if`
+   * block looked declared everywhere. TradingView's own "Scope demo" —
+   *
+   *     if barstate.isconfirmed
+   *         int localValue = close > open ? 1 : -1
+   *     plot(localValue, ...)
+   *
+   * — exists to show that this is an error, and the page names it: "gives an
+   * 'Undeclared identifier' error when we try to access a local variable from
+   * the global scope". Here it emitted `opsv2_localValue`, which `with(sandbox)`
+   * turned into a ReferenceError on the first bar. It was the last such crash
+   * in the whole documentation corpus.
+   *
+   * A SPAN rather than a depth, because visibility is a question about two
+   * positions and not about nesting: a name bound in one block is invisible in
+   * its SIBLING, which is at the same depth.
+   */
+  scopesOf: ReadonlyMap<string, ReadonlyArray<Span | null>>;
+}
+
+/** Half-open in neither direction: both token indices are inside the scope. */
+export interface Span {
+  start: number;
+  stop: number;
 }
 
 /** Duck-typed node access — the generated contexts do not share a usable base type. */
@@ -80,6 +113,26 @@ function ruleName(node: any): string {
 
 function textOf(node: any): string {
   return typeof node?.getText === "function" ? node.getText() : "";
+}
+
+/**
+ * The rules that INTRODUCE a local scope.
+ *
+ * `local_stmts_multiline` is the body of every indented block — v1's grammar
+ * routes an `if`, `for` and function body alike through
+ * `stmts_block : fun_body_multiline : local_stmts_multiline` — so one entry
+ * covers all of them, in every version. `local_stmt_singleline` is the other
+ * body form: a single-line function, and a v5 switch arm.
+ */
+const SCOPE_RULES = new Set([
+  "Local_stmts_multilineContext",
+  "Local_stmt_singlelineContext",
+]);
+
+function spanOf(node: any): Span | null {
+  const start = node?.start?.tokenIndex;
+  const stop = node?.stop?.tokenIndex;
+  return typeof start === "number" && typeof stop === "number" ? { start, stop } : null;
 }
 
 function positionOf(node: any): Declaration {
@@ -138,16 +191,44 @@ class Collector {
   readonly functions = new Set<string>();
   readonly bound = new Set<string>();
   readonly functionScoped = new Set<string>();
+  readonly scopesOf = new Map<string, Array<Span | null>>();
+
+  /** The local scopes currently open, innermost last. */
+  private scopeStack: Array<Span | null> = [];
+
+  /** Records that `name` is bound in whatever scope is open here. */
+  private record(name: string): void {
+    const scope = this.scopeStack.length ? this.scopeStack[this.scopeStack.length - 1] : null;
+    const list = this.scopesOf.get(name);
+    if (list) list.push(scope);
+    else this.scopesOf.set(name, [scope]);
+  }
 
   walk(node: any): void {
     if (!node) return;
     const kind = ruleName(node);
 
+    if (SCOPE_RULES.has(kind)) {
+      this.scopeStack.push(spanOf(node));
+      for (const child of children(node)) this.walk(child);
+      this.scopeStack.pop();
+      return;
+    }
+
     switch (kind) {
       case "Fun_def_singlelineContext":
       case "Fun_def_multilineContext": {
         const name = textOf(node.id?.());
-        if (name) { this.functions.add(name); this.bound.add(name); }
+        if (name) { this.functions.add(name); this.bound.add(name); this.record(name); }
+
+        // Parameters belong to the FUNCTION, not to the scope its declaration
+        // sits in: without a scope of their own they would read as visible
+        // script-wide. The span is the whole `fun_def` rather than just the
+        // body, because `fun_head` is lexically OUTSIDE the body and the
+        // parameter list is itself a read of every parameter — scoping them to
+        // the body alone rejected the declaration site of 129 published
+        // scripts, the first parameter of the first function in each.
+        this.scopeStack.push(spanOf(node));
         // Parameters are bound inside the body; record them so a reference to a
         // parameter is never mistaken for a forward reference to a global.
         //
@@ -166,6 +247,7 @@ class Collector {
           if (!name) continue;
           this.bound.add(name);
           this.functionScoped.add(name);
+          this.record(name);
         }
 
         // Walk the body with fnDepth raised so its LOCAL declarations are not
@@ -175,6 +257,7 @@ class Collector {
         this.fnDepth++;
         for (const child of children(node)) this.walk(child);
         this.fnDepth--;
+        this.scopeStack.pop();
         return;
       }
 
@@ -182,6 +265,7 @@ class Collector {
         const name = textOf(node.id?.());
         if (name) {
           this.bound.add(name);
+          this.record(name);
           // Only script-scope declarations participate in forward-reference
           // checks; a function-local binding is invisible outside its body.
           if (this.fnDepth === 0 && !this.declared.has(name)) {
@@ -202,6 +286,7 @@ class Collector {
           const name = textOf(id);
           if (!name) continue;
           this.bound.add(name);
+          this.record(name);
           if (this.fnDepth === 0 && !this.declared.has(name)) {
             this.declared.set(name, positionOf(node));
           }
@@ -225,6 +310,7 @@ class Collector {
           if (!name) continue;
           this.bound.add(name);
           this.functionScoped.add(name);
+          this.record(name);
         }
         break;
       }
@@ -261,5 +347,6 @@ export function analyseScopes(tree: ParseTree | ParserRuleContext): ScopeInfo {
     functions: c.functions,
     bound: c.bound,
     functionScoped: c.functionScoped,
+    scopesOf: c.scopesOf,
   };
 }

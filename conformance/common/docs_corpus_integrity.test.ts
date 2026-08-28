@@ -179,6 +179,49 @@ describe("blocks that are documentation rather than script", () => {
   }
 });
 
+/**
+ * Scripts that DO NOT COMPILE ON PURPOSE.
+ *
+ * Four vendored files are not evidence of a gap here, because refusing them is
+ * the correct answer. Three are scope demonstrations whose pages exist to show
+ * the error — `v5-language-loops-04` says so in a comment in its own source:
+ * "This code causes a compilation error because these variables are not
+ * accessible in this location." The fourth is a published typo: the script
+ * declares `holidayColor` and then plots `c_holiday`, which is nowhere in the
+ * file.
+ *
+ * Pinned here so they stay in the failure column with a reason attached. That
+ * the ENGINE gives TradingView's own diagnostic for each of the three scope
+ * demos is asserted where that rule lives — tests/v1/transpiler/local_scope.ts.
+ */
+const REFUSED_ON_PURPOSE: readonly string[] = [
+  "v5/v5-concepts-colors-04.pine",   // plots `c_holiday`; the variable is `holidayColor`
+  "v5/v5-faq-programming-00.pine",   // reads an `if`-local from global scope
+  "v5/v5-faq-programming-02.pine",   // reads a nested block's local from its parent
+  "v5/v5-language-loops-04.pine",    // reads a `for`-local after the loop
+];
+
+describe("scripts that do not compile on purpose", () => {
+  for (const file of REFUSED_ON_PURPOSE) {
+    it(`${file} still exists — a pin that names nothing is not a pin`, () => {
+      expect(fs.existsSync(
+        path.join(EXAMPLES, file.split("/")[0], "tradingview-docs", file.split("/")[1]),
+      )).toBe(true);
+    });
+  }
+
+  it("the loops demo says so in its own source", () => {
+    expect(read("v5/v5-language-loops-04.pine"))
+      .toMatch(/This code causes a compilation error/);
+  });
+
+  it("the colors demo really does plot a name it never declares", () => {
+    const src = read("v5/v5-concepts-colors-04.pine");
+    expect(src).toMatch(/c_holiday/);
+    expect(src).not.toMatch(/c_holiday\s*=/);
+  });
+});
+
 describe("the corpus is there at all", () => {
   it("has the files this suite is about (guards every case below)", () => {
     expect(corpusFiles().length).toBeGreaterThan(700);
