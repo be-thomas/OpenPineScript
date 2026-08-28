@@ -215,13 +215,12 @@ describe("`session` is a CONSTANT at v1–v3 and a NAMESPACE at v5", () => {
   });
 });
 
-describe("all five are v5-only", () => {
+describe("four of the five are v5-only", () => {
   const CASES: Array<[string, string]> = [
     ["chart", "x = chart.fg_color"],
     ["format", "x = format.price"],
     ["display", "x = display.all"],
     ["font", "x = font.family_default"],
-    ["session", "x = session.regular"],
   ];
 
   for (const [name, body] of CASES) {
@@ -230,4 +229,23 @@ describe("all five are v5-only", () => {
         .toThrow(new RegExp(`'${name}' is not a namespace in Pine Script v4`));
     });
   }
+
+  /**
+   * `session` is the exception, and it is a v4 namespace that GREW at v5.
+   *
+   * From the v4 release notes, April 2021: "session.ismarket - returns true if
+   * the current bar is a part of the regular trading hours ...
+   * session.ispremarket ... session.ispostmarket". `session.regular` appears in
+   * the v4 manual's own extended-session examples. The four bar-position
+   * members appear in no v4 release note and in none of the 148 v4 examples.
+   */
+  it("session.* is available at v4 — the namespace is v4, not v5", () => {
+    expect(() => transpile('//@version=4\nstudy("t")\nx = session.regular\n')).not.toThrow();
+    expect(() => transpile('//@version=4\nstudy("t")\nx = session.ismarket\n')).not.toThrow();
+  });
+
+  it("...and refused at v3", () => {
+    expect(() => transpile('//@version=3\nstudy("t")\nx = session.regular\n'))
+      .toThrow(/'session' is not a namespace in Pine Script v3/);
+  });
 });

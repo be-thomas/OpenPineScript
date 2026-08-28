@@ -25,6 +25,7 @@ import * as session from "./session";
 import * as sources from "./sources";
 import * as str from "./str";
 import * as strategy from "./strategy";
+import * as syminfo from "./syminfo";
 import * as ta from "./ta";
 import * as time from "./time";
 import * as ui from "./ui";
@@ -3262,6 +3263,102 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: strategy.short
       },
+      "syminfo.ticker": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["ticker"]
+      },
+      "syminfo.tickerid": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["tickerid"]
+      },
+      "syminfo.basecurrency": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["basecurrency"]
+      },
+      "syminfo.currency": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["currency"]
+      },
+      "syminfo.description": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["description"]
+      },
+      "syminfo.mintick": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["mintick"]
+      },
+      "syminfo.pointvalue": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["pointvalue"]
+      },
+      "syminfo.prefix": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["prefix"]
+      },
+      "syminfo.root": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["root"]
+      },
+      "syminfo.session": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["session"]
+      },
+      "syminfo.timezone": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["timezone"]
+      },
+      "syminfo.type": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: syminfo.syminfo["type"]
+      },
       "sma": {
           uses_context: true,
           args: ["source","length"],
@@ -3912,7 +4009,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "tickerid": {
           uses_context: false,
-          args: ["prefix","ticker"],
+          args: ["prefix","ticker","session","adjustment"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,

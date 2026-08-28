@@ -219,6 +219,21 @@ call_suffix : DOT id type_args? LPAR ( fun_actual_args )? RPAR ;
 
 fun_call : id type_args? LPAR ( fun_actual_args )? RPAR call_suffix* ;
 
+/**
+ * A dotted name may END in one of v5's declaration keywords.
+ *
+ * `syminfo.type` is the case that matters — it is a live built-in, used in six
+ * of TradingView's own v5 examples — and PineV5Lexer.g4 records the trade that
+ * made it unparseable: `type` had to become a token so `type Point` could be
+ * told from two identifiers, which stopped `type` from lexing as an ID.
+ *
+ * Admitting these words only AFTER a dot recovers the built-in without undoing
+ * the trade. The FIRST part of a name is still an ordinary `id_part`, so
+ * `type Point` cannot be read as a name, and `type = 5` stays the error it
+ * should be: v5 reserves the word.
+ */
+id : id_part ( DOT ( id_part | TYPE | METHOD | IMPORT | EXPORT ) )* ;
+
 // A statement may now also DECLARE a type, a method, a library export, or a
 // library import. The two inherited alternatives are kept, in the same order.
 stmt

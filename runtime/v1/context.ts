@@ -253,6 +253,57 @@ export class Context {
     public mintick: number = 0.01;
 
     /**
+     * The rest of what a script can ask about its instrument — the `syminfo.*`
+     * family added at v4.
+     *
+     * ── Why these are host-declared, with stated defaults ───────────────────
+     *
+     * None of it is derivable from OHLCV bars. A CSV of prices does not say
+     * which exchange listed them, what currency they are quoted in, or which
+     * time zone the session runs in. So each is a field the host sets, and each
+     * default below is a CHOICE that a script can act on:
+     *
+     *   `syminfo.type == "crypto"` selects a different pivot window in a large
+     *   share of published indicators, and `syminfo.currency` appears directly
+     *   in position-sizing arithmetic.
+     *
+     * Left unset, a script gets the defaults — a US equity quoted in USD on a
+     * one-cent tick — which is exactly what this repo's sample dataset is. That
+     * is a starting point, not a claim about whatever data a host supplies.
+     *
+     * Two are DERIVED rather than stored, because Pine defines them in terms of
+     * the ticker id: `syminfo.prefix` and `syminfo.ticker` are the two halves
+     * of `EXCHANGE:SYMBOL`. Storing them separately would let them drift out of
+     * step with the symbol they describe.
+     */
+    public currency: string = "USD";
+    public basecurrency: string = "";
+    public description: string = "";
+    public symbolType: string = "stock";
+    public symbolRoot: string = "";
+    public timezone: string = "UTC";
+    public pointvalue: number = 1;
+    public sessionSpec: string = "regular";
+
+    /** Declares the instrument's metadata. Every field is optional. */
+    public provideSymbolInfo(info: {
+        symbol?: string; mintick?: number; currency?: string; basecurrency?: string;
+        description?: string; type?: string; root?: string; timezone?: string;
+        pointvalue?: number; session?: string;
+    }): void {
+        if (info.symbol !== undefined) this.symbol = String(info.symbol);
+        if (info.mintick !== undefined) this.mintick = Number(info.mintick);
+        if (info.currency !== undefined) this.currency = String(info.currency);
+        if (info.basecurrency !== undefined) this.basecurrency = String(info.basecurrency);
+        if (info.description !== undefined) this.description = String(info.description);
+        if (info.type !== undefined) this.symbolType = String(info.type);
+        if (info.root !== undefined) this.symbolRoot = String(info.root);
+        if (info.timezone !== undefined) this.timezone = String(info.timezone);
+        if (info.pointvalue !== undefined) this.pointvalue = Number(info.pointvalue);
+        if (info.session !== undefined) this.sessionSpec = String(info.session);
+    }
+
+    /**
      * How many bars the host is going to feed, and when the last one opens.
      *
      * ── Why the host has to say ─────────────────────────────────────────────

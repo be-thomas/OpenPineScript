@@ -93,16 +93,14 @@ const REQUEST: RenameSpec[] = [{ to: "request.security", from: "security" }];
 /**
  * Chart-type ticker constructors, plus `tickerid()` → `ticker.new()`.
  *
- * `ticker.new` inherits `syminfo.tickerid`, which is v4's spelling of the same
- * registry entry. That conflation predates v5: TradingView keeps the ticker-id
- * STRING (`syminfo.tickerid`) apart from the FUNCTION that builds one
- * (`tickerid()` / `ticker.new()`), and this engine has always had one entry
- * doing both jobs. Carried forward rather than fixed here, because fixing it is
- * a change to v4's behaviour and belongs in its own change.
+ * `ticker.new` inherits the v1–v4 FUNCTION `tickerid(prefix, ticker, session)`,
+ * which is the thing v5 renamed. The ticker-id STRING is a different built-in
+ * and is `syminfo.tickerid` from v4 on — see runtime/v1/stdlib/syminfo.ts for
+ * why the two were one entry here until now, and what that cost.
  */
 const TICKER: RenameSpec[] = [
     { to: "ticker.heikinashi", from: "heikinashi" },
-    { to: "ticker.new", from: "syminfo.tickerid" },
+    { to: "ticker.new", from: "tickerid" },
     // The non-standard chart types. All four are documented on the v3 page as
     // well as the v4 one, so they are v1–v4 flat names that v5 namespaced —
     // the same shape as heikinashi. Their implementations refuse rather than
@@ -143,13 +141,16 @@ export const V5_ONLY_NAMESPACES: readonly string[] = [
     //   format   the price-axis and Data Window formats
     //   display  where a plot's values appear
     //   font     the two label/table typefaces
-    //   session  session.regular/extended and the per-bar session booleans
+    //
+    // `session` is NOT here: it is a v4 namespace (see V4_ONLY_NAMESPACES).
+    // Only its four bar-position members are v5, and those are gated by name
+    // in V5_ONLY_NAMES below.
     //
     // `chart` gates only the DOTTED keys. The flat v1–v3 names in
     // runtime/v1/stdlib/chart.ts — `period`, `interval`, `isdaily` — are a
     // different set of built-ins that happen to live in the same file, and
     // `isV5Only` skips a key equal to its own root, so they survive the cut.
-    "chart", "format", "display", "font", "session",
+    "chart", "format", "display", "font",
 ];
 
 /**
@@ -172,6 +173,14 @@ export const V5_ONLY_NAMES: readonly string[] = [
     // calculation." Flat names rather than a namespace, so they are listed
     // here rather than in V5_ONLY_NAMESPACES. See ./dataset.ts.
     "last_bar_index", "last_bar_time", "hlcc4",
+
+    // The `session` NAMESPACE is v4 (April 2021 for its three market-state
+    // booleans; `session.regular` is in the v4 manual). These four are not:
+    // they appear in no v4 release note and in none of the 148 v4 examples
+    // vendored from the manual, so they are gated by exact key rather than by
+    // root. See ./session.ts.
+    "session.isfirstbar", "session.isfirstbar_regular",
+    "session.islastbar", "session.islastbar_regular",
 ];
 
 export const V5_RENAMES: readonly RenameSpec[] = [

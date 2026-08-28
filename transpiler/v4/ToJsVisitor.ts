@@ -96,10 +96,34 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
     // the migration error.
     if (this.scopes.declared.has(name) || this.scopes.bound.has(name)) return;
 
+    // The word may also survive as a FUNCTION while only the VARIABLE moved.
+    // `tickerid` is that case, and the migration guide is explicit: "The
+    // `ticker` and `tickerid` VARIABLES are renamed to `syminfo.ticker` and
+    // `syminfo.tickerid` respectively." `tickerid(prefix, ticker, session)` is
+    // still v4 — it appears in three of TradingView's own v4 examples — and
+    // rejecting the call would refuse valid code in the name of a rename that
+    // did not touch it.
+    //
+    // Gated on being a CALLEE, not on the entry existing: `x = tickerid` is a
+    // read of the moved variable and must still be refused.
+    if (this.isCalleeOf(ctx) && this.registry[name]) return;
+
     throw this.err(
       ctx,
       `'${name}' was renamed to '${replacement}' in Pine Script v4.`,
     );
+  }
+
+  /**
+   * Is this identifier the CALLEE of a function call, rather than a read?
+   *
+   * Structural rather than `instanceof` — every version generates its own
+   * context classes, so `instanceof` is false across the hierarchy (see the
+   * note on `isRule` in the v1 base).
+   */
+  protected isCalleeOf(ctx: SourceLocated): boolean {
+    const parent = (ctx as any).parent;
+    return parent?.constructor?.name === "Fun_callContext" && parent.id?.() === ctx;
   }
 
   override visitId(ctx: IdContext): string {

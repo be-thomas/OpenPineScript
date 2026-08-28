@@ -45,6 +45,13 @@ const rootOf = (key: string): string => key.split(".")[0];
 
 /** True when `key` belongs to v4+ and must not appear in the v1–v3 view. */
 function isV4Only(key: string): boolean {
+    // A NAMESPACE can arrive at v4 and grow at v5. `session` is that case: its
+    // three market-state booleans are April 2021 (v4), and the four
+    // bar-position ones are v5. An exact v5 name therefore wins over its v4
+    // root, or `session.isfirstbar` would join v4's view along with the rest of
+    // the namespace and be spellable a version early.
+    if (v5OnlyNames.has(key)) return false;
+
     // A flat name that v4 introduced — bb, wpr, mfi.
     if (v4OnlyNames.has(key)) return true;
     const root = rootOf(key);
@@ -163,7 +170,7 @@ function without(view: Record<string, StdlibEntry>, removed: readonly string[]) 
 }
 
 export const V4_REGISTRY: Record<string, StdlibEntry> =
-    aliasesFrom(V4_RENAMES, BASE_REGISTRY, 4);
+    aliasesFrom(V4_RENAMES, BASE_REGISTRY, 4, V4_NAMESPACE_REGISTRY);
 
 /**
  * What a v4 script may spell.

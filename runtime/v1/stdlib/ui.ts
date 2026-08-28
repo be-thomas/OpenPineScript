@@ -244,8 +244,25 @@ export function color(col: any, transp?: any): string {
     return hex + alpha.toString(16).padStart(2, "0");
 }
 
-/** tickerid(prefix, ticker) — exchange-qualified symbol string. */
-export function tickerid(prefix: any, ticker: any): string {
+/**
+ * `tickerid(prefix, ticker, session, adjustment)` — builds a ticker id string.
+ *
+ * The FUNCTION, not the variable: `syminfo.tickerid` is the current chart's id
+ * and lives in ./syminfo.ts. Pine keeps functions and variables in separate
+ * namespaces, so v1–v4 spell both of them `tickerid`; v5 renames this one to
+ * `ticker.new` and leaves the variable alone.
+ *
+ * `session` and `adjustment` are accepted and IGNORED. Both select a different
+ * data feed on TradingView — extended hours, dividend adjustment — and this
+ * engine has one feed, the bars it was handed. Accepting them keeps
+ * `tickerid("BATS", "AAPL", session.regular)` (a v4 documentation example)
+ * running against the chart's own data, which is what it would produce anyway
+ * for a regular-session request; asking for `session.extended` gets the same
+ * bars, which is a divergence rather than a refusal because the ticker id is
+ * usually handed straight to `security()`, where an unknown symbol already
+ * reports itself.
+ */
+export function tickerid(prefix: any, ticker: any, _session?: any, _adjustment?: any): string {
     const p = String(prefix && typeof prefix.valueOf === "function" ? prefix.valueOf() : prefix ?? "");
     const t = String(ticker && typeof ticker.valueOf === "function" ? ticker.valueOf() : ticker ?? "");
     return p ? `${p}:${t}` : t;

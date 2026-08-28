@@ -122,6 +122,23 @@ const SYMINFO: RenameSpec[] = [
 export const V4_ONLY_NAMESPACES: readonly string[] = [
   "array", "line", "label", "box", "table",
   "xloc", "yloc", "extend", "position", "text", "order",
+  // `syminfo` gets here two ways and both are v4. `syminfo.ticker` and
+  // `syminfo.tickerid` are v1–v3 flat names the table below renames; the other
+  // ten members have no earlier spelling at all and live in ./syminfo.ts. The
+  // root is listed so neither kind resolves at v1–v3.
+  "syminfo",
+  // `session` is v4, not v5. From the v4 release notes, April 2021:
+  //
+  //   "session.ismarket - returns true if the current bar is a part of the
+  //    regular trading hours ... session.ispremarket ... session.ispostmarket"
+  //
+  // and `session.regular` appears in the v4 manual's own extended-session
+  // examples. The four `is*bar*` members ARE v5 and are gated by name in
+  // renames5.ts — a namespace can arrive in one version and grow in another.
+  //
+  // The flat v1–v3 `session` input-type constant is untouched: the gate skips a
+  // key equal to its own root.
+  "session",
 ];
 
 /**
@@ -208,6 +225,14 @@ export const V4_REMOVED: readonly string[] = (() => {
   // `line` as a drawing type, `area` only ever as a style. Keeping `line`
   // spellable matters; `area` is genuinely gone.
   removed.delete("line");
+
+  // `tickerid` is the same shape, and the migration guide says so in as many
+  // words: "The `ticker` and `tickerid` VARIABLES are renamed to
+  // `syminfo.ticker` and `syminfo.tickerid` respectively." Only the variables.
+  // The FUNCTION `tickerid(prefix, ticker, session)` is still v4 — it appears
+  // in three of TradingView's own v4 examples — and does not become
+  // `ticker.new` until v5.
+  removed.delete("tickerid");
   return [...removed];
 })();
 

@@ -65,20 +65,43 @@ describe("generated v5 log harnesses", () => {
     describe(file, () => {
       const source = fs.readFileSync(path.join(DIR, file), "utf8");
 
-      it("is annotated v5, so it routes to the v5 pipeline", () => {
-        expect(compileScript(source).version).toBe(5);
-      });
+      /**
+       * Compiled ONCE and shared by every case below.
+       *
+       * Not a micro-optimisation. A v5 script of this size costs the better
+       * part of a second to parse — ALL(*) prediction over v5's grammar is far
+       * slower than v3's, ~900ms against ~20ms for the same harness — and this
+       * block used to call `compileScript` five times per file. Across the
+       * generated harnesses that was tens of seconds of pure repetition, and
+       * under the full suite's parallel load one case crossed vitest's 30s
+       * timeout and failed on wall-clock alone.
+       *
+       * Lazy rather than hoisted to the describe body: a compile error must
+       * fail the "compiles" CASE, not collection, or one bad harness takes the
+       * whole file's report with it.
+       */
+      let compiled: ReturnType<typeof compileScript> | null = null;
+      const build = () => (compiled ??= compileScript(source));
 
-      it("compiles", () => {
-        expect(() => compileScript(source)).not.toThrow();
-      });
-
-      it("runs to completion and logs one row per bar", () => {
-        const { js, profile } = compileScript(source);
+      /** A fresh Context and executor over the shared compile. */
+      const run = () => {
+        const { js, profile } = build();
         const ctx = new Context(profile);
         const exec = compile(js, ctx, Object.create(null));
         feed(ctx, exec);
+        return ctx;
+      };
 
+      it("is annotated v5, so it routes to the v5 pipeline", () => {
+        expect(build().version).toBe(5);
+      });
+
+      it("compiles", () => {
+        expect(() => build()).not.toThrow();
+      });
+
+      it("runs to completion and logs one row per bar", () => {
+        const ctx = run();
         const rows = ctx.logs.filter(l => l.message.startsWith("OPS|"));
         expect(rows.length).toBe(BARS);
       });
@@ -87,10 +110,7 @@ describe("generated v5 log harnesses", () => {
         // A row whose width drifts from the header is the failure that makes a
         // golden CSV silently misaligned — column N of the data compared
         // against column N of a different indicator.
-        const { js, profile } = compileScript(source);
-        const ctx = new Context(profile);
-        const exec = compile(js, ctx, Object.create(null));
-        feed(ctx, exec);
+        const ctx = run();
 
         const headers = ctx.logs.filter(l => l.message.startsWith("OPSHEAD|"));
         expect(headers.length, "the header is gated on barstate.isfirst").toBe(1);
@@ -106,10 +126,7 @@ describe("generated v5 log harnesses", () => {
       it("logs numbers, not the string 'NaN' for the whole row", () => {
         // The row is built with `+`, which used to coerce both sides through
         // Number() and collapse every harness to a single "NaN".
-        const { js, profile } = compileScript(source);
-        const ctx = new Context(profile);
-        const exec = compile(js, ctx, Object.create(null));
-        feed(ctx, exec);
+        const ctx = run();
 
         const last = ctx.logs.filter(l => l.message.startsWith("OPS|")).pop()!;
         const cells = last.message.replace("OPS|", "").split(",");

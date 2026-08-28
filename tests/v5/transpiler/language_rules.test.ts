@@ -261,12 +261,19 @@ describe("the v5 declaration keywords are keywords now", () => {
       .toThrow(/no source was supplied for the library 'someuser\/somelib\/1'/);
   });
 
-  it("the cost of making them keywords: `type` can no longer be a name part", () => {
-    // `syminfo.type` is the only real casualty, and it is not in this engine's
-    // registry at any version — so it was already unusable, and a parse error
-    // is a clearer outcome than a mis-parsed type declaration.
-    expect(() => compileScript(`${HEAD}x = syminfo.type\n`))
-      .toThrow(/parsing failed/);
+  it("a keyword may still END a dotted name — `syminfo.type` parses", () => {
+    // The cost of tokenising these words was that `syminfo.type` stopped
+    // parsing, and it is a live built-in used in six of TradingView's own v5
+    // examples. `id` therefore admits them AFTER a dot, which recovers the
+    // name without un-reserving the word.
+    expect(() => compileScript(`${HEAD}x = syminfo.type\n`)).not.toThrow();
+  });
+
+  it("...but a keyword still cannot BEGIN one", () => {
+    // Which is what keeps `type Point` a type declaration rather than two
+    // identifiers. `id` requires an ordinary `id_part` first.
+    expect(() => compileScript(`${HEAD}x = type.foo\n`)).toThrow();
+    expect(() => compileScript(`${HEAD}type = 5\n`)).toThrow(/parsing failed/);
   });
 });
 
