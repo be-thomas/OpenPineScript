@@ -2423,6 +2423,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: inputs.input["text_area"]
       },
+      "input.enum": {
+          uses_context: true,
+          args: ["defval","title","rest"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: inputs.input["enum"]
+      },
       "log.info": {
           uses_context: true,
           args: ["message","args"],

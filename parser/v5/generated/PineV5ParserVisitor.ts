@@ -11,6 +11,9 @@ import { Type_def_stmtContext } from "./PineV5Parser.js";
 import { Type_bodyContext } from "./PineV5Parser.js";
 import { Type_fieldContext } from "./PineV5Parser.js";
 import { Method_def_stmtContext } from "./PineV5Parser.js";
+import { Enum_def_stmtContext } from "./PineV5Parser.js";
+import { Enum_bodyContext } from "./PineV5Parser.js";
+import { Enum_fieldContext } from "./PineV5Parser.js";
 import { Export_stmtContext } from "./PineV5Parser.js";
 import { Import_stmtContext } from "./PineV5Parser.js";
 import { Import_pathContext } from "./PineV5Parser.js";
@@ -134,6 +137,24 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitMethod_def_stmt?: (ctx: Method_def_stmtContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV5Parser.enum_def_stmt`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitEnum_def_stmt?: (ctx: Enum_def_stmtContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV5Parser.enum_body`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitEnum_body?: (ctx: Enum_bodyContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV5Parser.enum_field`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitEnum_field?: (ctx: Enum_fieldContext) => Result;
     /**
      * Visit a parse tree produced by `PineV5Parser.export_stmt`.
      * @param ctx the parse tree

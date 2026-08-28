@@ -177,6 +177,9 @@ export const V5_ONLY_NAMES: readonly string[] = [
     "input.int", "input.float", "input.bool", "input.string", "input.color",
     "input.timeframe", "input.session", "input.symbol", "input.source",
     "input.time", "input.price", "input.text_area",
+    // June 2024, with enums: they "enable convenient dropdown input creation
+    // with the new input.enum() function".
+    "input.enum",
 
     // Added December 2021, per the v5 release notes: "Added new built-in
     // variables that return the bar_index and time values of the last bar in

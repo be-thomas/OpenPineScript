@@ -625,6 +625,57 @@ export class Context {
 
     /** Looks a drawing up, or throws — a stale id is a bug, not a no-op. */
     /**
+     * Titles of every `enum` member this script declares, keyed by the member's
+     * own value — `"OscType.rsi"` → `"Relative Strength Index"`.
+     *
+     * ── Why a member is a STRING and not an object ──────────────────────────
+     *
+     * Because `==` has to work, and the emitter emits JavaScript `==`. A script
+     * variable holds a Series, so `x == OscType.rsi` compares a Series to the
+     * member; JavaScript coerces an object against a PRIMITIVE via `valueOf`
+     * and compares two OBJECTS by reference, so a member object would have made
+     * every such comparison false — silently, on every bar.
+     *
+     * A string carries the enum name as a prefix, which keeps the rule the
+     * manual states: "Scripts cannot compare members of different enums ... even
+     * if the fields have identical names and titles." `A.up` and `B.up` are
+     * different strings.
+     *
+     * The TITLE cannot live in the member for the same reason, so it lives here
+     * — read back by `str.tostring`, which the manual calls "the only way to
+     * retrieve its title".
+     */
+    public enumTitles: Map<string, string> = new Map();
+
+    /** Members of each enum, in declaration order — what a dropdown lists. */
+    public enumMembers: Map<string, string[]> = new Map();
+
+    /**
+     * Records an enum declaration and returns its member table.
+     *
+     * Called once per bar from the emitted script, and idempotent: re-recording
+     * the same titles is a no-op, and the table it returns holds the same
+     * STRINGS every time, which is what makes `==` work across bars.
+     */
+    public declareEnum(name: string, titles: Record<string, string>): Record<string, string> {
+        const table: Record<string, string> = {};
+        const members: string[] = [];
+        for (const [field, title] of Object.entries(titles)) {
+            const member = `${name}.${field}`;
+            table[field] = member;
+            members.push(member);
+            this.enumTitles.set(member, title);
+        }
+        this.enumMembers.set(name, members);
+        return table;
+    }
+
+    /** The title of an enum member, or undefined when the value is not one. */
+    public enumTitle(value: any): string | undefined {
+        return typeof value === "string" ? this.enumTitles.get(value) : undefined;
+    }
+
+    /**
      * Every live drawing of one kind, oldest first — `polyline.all`,
      * `linefill.all`, `label.all`.
      *

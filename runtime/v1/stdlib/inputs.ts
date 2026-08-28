@@ -79,6 +79,22 @@ export const input = {
     price: (ctx: Context, defval: any, title?: any) => register(ctx, defval, title, "float"),
 
     text_area: (ctx: Context, defval: any, title?: any) => register(ctx, defval, title, "string"),
+
+    /**
+     * `input.enum(defaultValue, title, options, …)` — a dropdown of enum members.
+     *
+     * June 2024, with enums themselves: they "enable convenient dropdown input
+     * creation with the new input.enum() function", and "the input displays all
+     * enum field titles in its dropdown menu".
+     *
+     * The declared type is `enum` rather than `string` so a host rendering the
+     * inputs can list the right choices: `Context.enumMembers` holds every
+     * member of the enum the default belongs to, and `Context.enumTitles` turns
+     * each into the text the dropdown should show. A plain `string` input would
+     * offer a free-text box for a value that must be one of a fixed set.
+     */
+    enum: (ctx: Context, defval: any, title?: any, ..._rest: any[]) =>
+        register(ctx, defval, title, "enum"),
 };
 
 // NOTE FOR ANYONE EDITING THIS FILE: every member above must be written as an

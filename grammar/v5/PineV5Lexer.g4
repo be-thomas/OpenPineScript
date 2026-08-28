@@ -70,6 +70,12 @@ METHOD : 'method' ;
 IMPORT : 'import' ;
 EXPORT : 'export' ;
 
+// `enum`, June 2024: "Enums, also known as enumerations, enumerated types, or
+// enum types, are unique data types with all possible values declared by the
+// programmer." Same trade as TYPE above — a keyword, so `enum Signal` is not
+// read as two identifiers, and therefore not an `id_part`.
+ENUM   : 'enum'   ;
+
 // `as` IS admitted to `id_part`. It appears only in `import … as alias`, where
 // nothing else can follow the path, and excluding it would stop a script
 // binding a variable called `as` — which v1–v4 allow and v5 does not reserve.

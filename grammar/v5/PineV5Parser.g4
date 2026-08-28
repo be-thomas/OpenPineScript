@@ -115,11 +115,33 @@ type_field : type_qual? field_type id ( DEFINE arith_expr )? ;
 method_def_stmt : METHOD fun_def_stmt ;
 
 /**
+ * `enum Name` + an indented list of fields.
+ *
+ * Quoted, from the manual's Enums page:
+ *
+ *   [export ]enum <enumName>
+ *       <field_1>[ = <title_1>]
+ *       <field_2>[ = <title_2>]
+ *       ...
+ *
+ * The title is optional — "If the programmer does not specify a field's title,
+ * its title is the 'string' representation of its name" — which is why the
+ * `DEFINE arith_expr` is.
+ *
+ * The same shape as `type_def_stmt`, deliberately: an enum is a list of named
+ * things under a header, and reusing the shape means reusing the indentation
+ * handling that already works for one.
+ */
+enum_def_stmt : ENUM id enum_body ;
+enum_body : BEGIN ( enum_field | LEND )+ END ;
+enum_field : id ( DEFINE arith_expr )? ;
+
+/**
  * `export` marks a declaration as a library's public surface. It attaches to a
  * function, a method or a type, and changes nothing about how any of them is
  * written.
  */
-export_stmt : EXPORT ( type_def_stmt | method_def_stmt | fun_def_stmt ) ;
+export_stmt : EXPORT ( type_def_stmt | enum_def_stmt | method_def_stmt | fun_def_stmt ) ;
 
 /**
  * `import user/library/version as alias`.
@@ -232,12 +254,12 @@ fun_call : id type_args? LPAR ( fun_actual_args )? RPAR call_suffix* ;
  * `type Point` cannot be read as a name, and `type = 5` stays the error it
  * should be: v5 reserves the word.
  */
-id : id_part ( DOT ( id_part | TYPE | METHOD | IMPORT | EXPORT ) )* ;
+id : id_part ( DOT ( id_part | TYPE | METHOD | IMPORT | EXPORT | ENUM ) )* ;
 
 // A statement may now also DECLARE a type, a method, a library export, or a
 // library import. The two inherited alternatives are kept, in the same order.
 stmt
-  : import_stmt | export_stmt | type_def_stmt | method_def_stmt
+  : import_stmt | export_stmt | type_def_stmt | enum_def_stmt | method_def_stmt
   | fun_def_stmt | global_stmt
   ;
 

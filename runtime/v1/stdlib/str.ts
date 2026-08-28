@@ -149,6 +149,19 @@ export const str = {
      */
     tostring: (ctx: Context, value: any, format?: any): string => {
         const v = val(value);
+
+        // An ENUM MEMBER renders as its TITLE, and the manual is emphatic that
+        // this is the only way to get one: "Calling the str.tostring() function
+        // on an enum field is the ONLY way to retrieve its title for additional
+        // calculations."
+        //
+        // Checked before everything else because a member IS a string —
+        // `"OscType.rsi"` — so every path below would happily return the
+        // internal spelling instead. See `Context.declareEnum` for why members
+        // are strings.
+        const title = ctx?.enumTitle?.(v);
+        if (title !== undefined) return title;
+
         if (Array.isArray(v)) return `[${v.map(defaultString).join(", ")}]`;
         if (format === undefined || format === null) return defaultString(v);
         if (typeof v !== "number") return defaultString(v);

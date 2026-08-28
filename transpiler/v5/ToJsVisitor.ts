@@ -65,6 +65,7 @@ import {
   IdContext,
   StmtContext,
   Type_def_stmtContext,
+  Enum_def_stmtContext,
   Method_def_stmtContext,
   Export_stmtContext,
   Import_stmtContext,
@@ -96,6 +97,18 @@ interface TypeField {
   readonly name: string;
   /** Its `= …` initialiser, or null — an undeclared default is `na`. */
   readonly defaultExpr: any | null;
+}
+
+/** One member of an `enum` declaration. */
+interface EnumField {
+  readonly name: string;
+  /**
+   * Its `= "title"` expression, or null.
+   *
+   * "If the programmer does not specify a field's title, its title is the
+   * 'string' representation of its name."
+   */
+  readonly titleExpr: any | null;
 }
 
 /**
@@ -292,6 +305,15 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   protected userTypes: Map<string, TypeField[]> = new Map();
 
   /**
+   * `enum Name` declarations, name → its fields in declaration order.
+   *
+   * Collected in the same pre-pass as `userTypes`, and for the same reason: a
+   * member may be READ above the line that declares its enum, inside any
+   * function body, and a single-pass emitter cannot know that yet.
+   */
+  protected userEnums: Map<string, EnumField[]> = new Map();
+
+  /**
    * Names declared with `method`.
    *
    * Kept apart from `userFunctions` — which already contains them, since a
@@ -434,6 +456,9 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       if (isRule(n, "Type_def_stmtContext")) {
         this.userTypes.set(n.id().getText(), this.fieldsOf(n));
       }
+      if (isRule(n, "Enum_def_stmtContext")) {
+        this.userEnums.set(n.id().getText(), this.enumFieldsOf(n));
+      }
       if (isRule(n, "Method_def_stmtContext")) {
         const def = n.fun_def_stmt();
         const inner = def.fun_def_singleline() ?? def.fun_def_multiline();
@@ -574,6 +599,25 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     if (dot <= 0) return null;
 
     const root = text.slice(0, dot);
+
+    // `OscType.rsi` — an ENUM MEMBER, resolved before anything else.
+    //
+    // Before receivers, because an enum name is not a variable this script
+    // binds and `isReceiverName` would refuse it; before namespaces, because a
+    // script may legally name an enum after one (TradingView's own example
+    // declares `enum syminfo`), and its own declaration wins.
+    if (this.userEnums.has(root)) {
+      const field = text.slice(dot + 1);
+      const declared = this.userEnums.get(root)!;
+      if (!declared.some(f => f.name === field)) {
+        throw new Error(
+          `'${root}' has no member '${field}'. It declares: ` +
+          `${declared.map(f => f.name).join(", ")}.`,
+        );
+      }
+      return `${this.enumFactory(root)}[${JSON.stringify(field)}]`;
+    }
+
     if (this.namespaceRoots.has(root)) return null;
     if (this.importAliases.has(root)) return null;
     if (!this.isReceiverName(root)) return null;
@@ -1055,6 +1099,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     if (ctx.import_stmt()) return this.visit(ctx.import_stmt()!);
     if (ctx.export_stmt()) return this.visit(ctx.export_stmt()!);
     if (ctx.type_def_stmt()) return this.visit(ctx.type_def_stmt()!);
+    if (ctx.enum_def_stmt()) return this.visit(ctx.enum_def_stmt()!);
     if (ctx.method_def_stmt()) return this.visit(ctx.method_def_stmt()!);
     return super.visitStmt(ctx as any);
   }
@@ -1107,6 +1152,67 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       `  return _o;`,
       `}`,
     ].join("\n");
+  }
+
+  /**
+   * `enum Name` + fields → one frozen object of MEMBER objects.
+   *
+   *     enum OscType
+   *         rsi = "Relative Strength Index"
+   *         mfi = "Money Flow Index"
+   *
+   * becomes
+   *
+   *     const opsv2_$enum_OscType = ctx.declareEnum("OscType", {
+   *       "rsi": "Relative Strength Index", "mfi": "Money Flow Index",
+   *     });
+   *
+   * whose members are the STRINGS `"OscType.rsi"` and `"OscType.mfi"`. See
+   * `Context.declareEnum` for why a member is a string rather than an object —
+   * in one line, because `x == OscType.rsi` compares a Series to the member,
+   * and JavaScript compares two objects by reference while it coerces an object
+   * against a primitive.
+   *
+   * The enum NAME is part of every member, which keeps the rule the manual
+   * states: "Scripts cannot compare members of different enums ... even if the
+   * fields have identical names and titles."
+   *
+   * ── The title default ──────────────────────────────────────────────────
+   *
+   * "If the programmer does not specify a field's title, its title is the
+   * 'string' representation of its name."
+   */
+  visitEnum_def_stmt(ctx: Enum_def_stmtContext): string {
+    const enumName = ctx.id().getText();
+    const fields = this.userEnums.get(enumName) ?? this.enumFieldsOf(ctx);
+
+    const seen = new Set<string>();
+    const titles = fields.map(f => {
+      if (seen.has(f.name)) {
+        throw this.err(ctx, `enum '${enumName}' declares the field '${f.name}' twice.`);
+      }
+      seen.add(f.name);
+      const title = f.titleExpr ? this.visit(f.titleExpr) : JSON.stringify(f.name);
+      return `${JSON.stringify(f.name)}: ${title}`;
+    });
+
+    return `const ${this.enumFactory(enumName)} = ` +
+           `ctx.declareEnum(${JSON.stringify(enumName)}, {${titles.join(", ")}});`;
+  }
+
+  /** An enum declaration's fields, in declaration order. */
+  protected enumFieldsOf(ctx: Enum_def_stmtContext): EnumField[] {
+    return ctx.enum_body().enum_field().map(f => ({
+      // Read raw, exactly as a type's field is: a member lives in its own
+      // namespace, so it is neither a reserved word nor a renamed built-in.
+      name: f.id().getText(),
+      titleExpr: f.arith_expr() ?? null,
+    }));
+  }
+
+  /** The emitted name of an enum's member table. */
+  protected enumFactory(enumName: string): string {
+    return `${this.PREFIX}${this.nameScope}$enum_${enumName}`;
   }
 
   /** The emitted name of a type's factory. */
@@ -1167,11 +1273,14 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * indicator is a script that thinks it is something it is not.
    */
   visitExport_stmt(ctx: Export_stmtContext): string {
-    const inner = ctx.type_def_stmt() ?? ctx.method_def_stmt() ?? ctx.fun_def_stmt();
+    const inner = ctx.type_def_stmt() ?? ctx.enum_def_stmt()
+      ?? ctx.method_def_stmt() ?? ctx.fun_def_stmt();
 
     const named = ctx.type_def_stmt()
       ? ctx.type_def_stmt()!.id().getText()
-      : this.definitionName(ctx.method_def_stmt()?.fun_def_stmt() ?? ctx.fun_def_stmt()!);
+      : ctx.enum_def_stmt()
+        ? ctx.enum_def_stmt()!.id().getText()
+        : this.definitionName(ctx.method_def_stmt()?.fun_def_stmt() ?? ctx.fun_def_stmt()!);
 
     if (!this.declaresLibrary) {
       throw this.err(
