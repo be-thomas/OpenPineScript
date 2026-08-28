@@ -858,13 +858,49 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     try {
       const thenBlock = this.visit(ctx.stmts_block(0));
       let result = `if (ctx.truthy(${cond})) ${thenBlock}`;
-      if (ctx.IF_COND_ELSE()) {
-        result += ` else ${this.visit(ctx.stmts_block(1))}`;
-      }
-      return plain ? result : `(() => { ${result} })()`;
+      const alternative = this.emitElseBranch(ctx);
+      if (alternative !== null) result += ` else ${alternative}`;
+
+      // "The value assigned to the variable is the return value of the
+      // <local_block>, or `na` if no local block is executed."
+      //   — Conditional structures, the Pine Script manual
+      //
+      // Without the trailing return, an `if` whose condition is false and which
+      // has no `else` evaluated to JavaScript `undefined`. That reads as NaN in
+      // arithmetic, so it looked right on a chart — but `na(x)` was false for
+      // it, and it is not what the language says the value is.
+      //
+      // Unreachable whenever the chain ends in an `else`, which is most of them.
+      //
+      // KNOWN GAP: the manual carves out one exception — "if the structure
+      // returns 'bool' values ... `false` is returned instead". Honouring it
+      // needs the branch TYPE, which this emitter does not infer, so a
+      // bool-valued `if` with no `else` yields `na` here and `false` on
+      // TradingView.
+      return plain ? result : `(() => { ${result} return NaN; })()`;
     } finally {
       this.suppressBlockReturn = saved;
     }
+  }
+
+  /**
+   * The `else` branch, already emitted, or null when the `if` has none.
+   *
+   * A seam, not a behaviour: v1 has exactly one shape of else — a block — and
+   * this returns it. v4 adds `else if`, and overrides here rather than
+   * re-implementing `visitIf_expr`, because everything the chain needs is
+   * decided by the code ABOVE this call:
+   *
+   *   - the IIFE wrapper. One `if/else if/else` is ONE expression, so it gets
+   *     one wrapper. A nested `if` visited normally would build its own, and in
+   *     expression position its value would be computed and then dropped.
+   *   - `suppressBlockReturn`. Every block in the chain is at the same depth
+   *     and must make the same return-or-not decision.
+   *
+   * Both are already set when this runs, so an override inherits them for free.
+   */
+  protected emitElseBranch(ctx: If_exprContext): string | null {
+    return ctx.IF_COND_ELSE() ? this.visit(ctx.stmts_block(1)) : null;
   }
 
   visitFor_expr(ctx: For_exprContext): string {

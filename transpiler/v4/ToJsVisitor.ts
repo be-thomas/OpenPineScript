@@ -15,6 +15,8 @@
  *     The five compound assignment operators, `+= -= *= /= %=` (March 2021).
  *     Sourced from the v4 release notes; see PineV4Lexer.g4 for the quote.
  *
+ *     `else if` (May 2020). Grammar in PineV4Parser.g4, emit below.
+ *
  *   NAMES (transpiler/common/profiles/index.ts + runtime)
  *     The 3a rename table — `n` → `bar_index`, `red` → `color.red`,
  *     `period` → `timeframe.period`, and the rest. Those are lookups, not emit
@@ -33,6 +35,7 @@ import {
   Var_defContext,
   Var_defsContext,
   Var_assignContext,
+  If_exprContext,
   IdContext,
 } from "../../parser/v4/generated/PineV4Parser";
 
@@ -206,5 +209,47 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
     const name = this.visit(ctx.id());
     const value = this.visit(ctx.arith_expr());
     return `${name} = ctx.new_var("${name}", ${this.compoundValue(op, name, value)})`;
+  }
+
+  // ── `else if` ─────────────────────────────────────────────────────────────
+
+  /**
+   * `else if cond` — the else branch is another `if` rather than a block.
+   *
+   * Emitted INLINE, as one more `else if` on the JavaScript side, instead of
+   * by visiting the nested `if` normally. That distinction is the whole of the
+   * work here, and it is not a matter of taste:
+   *
+   *     x = if a
+   *             1
+   *         else if b
+   *             2
+   *         else
+   *             3
+   *
+   * A normal visit would give the nested `if` its own IIFE, producing
+   * `(() => { if (a) { return 1; } else (() => { … })(); })()` — the inner
+   * function computes 2 or 3 and the outer one throws the result away, so `x`
+   * is `undefined` on every bar that takes the `else`. No error; just an `na`
+   * where a number belongs.
+   *
+   * Recursing HERE keeps the whole chain inside the single wrapper
+   * `visitIf_expr` already opened, and inside the one `suppressBlockReturn`
+   * level it already set — so every arm of the chain returns, or does not,
+   * together.
+   */
+  protected override emitElseBranch(ctx: If_exprContext): string | null {
+    if (!ctx.IF_COND_ELSE()) return null;
+
+    // `( if_expr | stmts_block )`: when the else is a plain block, v1's
+    // implementation is still exactly right.
+    const nested = ctx.if_expr();
+    if (!nested) return super.emitElseBranch(ctx as any);
+
+    const cond = this.visit(nested.ternary_expr());
+    let out = `if (ctx.truthy(${cond})) ${this.visit(nested.stmts_block(0))}`;
+    const alternative = this.emitElseBranch(nested);
+    if (alternative !== null) out += ` else ${alternative}`;
+    return out;
   }
 }

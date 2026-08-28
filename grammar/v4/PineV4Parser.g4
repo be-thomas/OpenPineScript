@@ -94,3 +94,32 @@ var_defs : decl_mod? type_qual? type_name? ids_array DEFINE arith_expr ;
 compound_assign_op : PLUS_ASSIGN | MINUS_ASSIGN | MUL_ASSIGN | DIV_ASSIGN | MOD_ASSIGN ;
 
 var_assign : id ( ASSIGN | compound_assign_op ) arith_expr ;
+
+/**
+ * `else if`.
+ *
+ * Quoted, from the TradingView v4 release notes, May 2020:
+ *
+ *   "`else if` statement was added"
+ *
+ * and from the manual's Conditional structures page, which gives the shape:
+ *
+ *   "if <expression> <local_block> {else if <expression> <local_block>}
+ *    [else <local_block>]"
+ *
+ * Written RECURSIVELY — the else branch is either a block or another `if` —
+ * rather than as the `{...}` repetition the manual draws, because that is what
+ * `else if` is: `else` followed by an `if`. The two forms accept exactly the
+ * same language, and the recursive one hands the emitter a tree whose shape is
+ * already the JavaScript it has to produce.
+ *
+ * Nothing new is needed in the lexer: `else` and `if` are both v1 tokens, and
+ * v1 rejects the pair only because its `if_expr` demands a block after `else`.
+ *
+ * The `LEND*` is the same one v1 needs before a plain `else`, for the same
+ * reason: dedenting out of the `then` block emits LEND END LEND, and the
+ * trailing LEND is the separator for the level being returned to.
+ */
+if_expr
+  : IF_COND ternary_expr stmts_block ( LEND* IF_COND_ELSE ( if_expr | stmts_block ) )?
+  ;

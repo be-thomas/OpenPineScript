@@ -32,6 +32,7 @@ import { Type_nameContext } from "./PineV5Parser.js";
 import { IdContext } from "./PineV5Parser.js";
 import { Compound_assign_opContext } from "./PineV5Parser.js";
 import { Var_assignContext } from "./PineV5Parser.js";
+import { If_exprContext } from "./PineV5Parser.js";
 import { Pine_scriptContext } from "./PineV5Parser.js";
 import { Global_stmtContext } from "./PineV5Parser.js";
 import { Fun_def_stmtContext } from "./PineV5Parser.js";
@@ -47,7 +48,6 @@ import { Local_stmts_listContext } from "./PineV5Parser.js";
 import { Local_stmt_multilineContext } from "./PineV5Parser.js";
 import { Ids_arrayContext } from "./PineV5Parser.js";
 import { Arith_exprsContext } from "./PineV5Parser.js";
-import { If_exprContext } from "./PineV5Parser.js";
 import { For_exprContext } from "./PineV5Parser.js";
 import { Stmts_blockContext } from "./PineV5Parser.js";
 import { Ternary_exprContext } from "./PineV5Parser.js";
@@ -258,6 +258,12 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      */
     visitVar_assign?: (ctx: Var_assignContext) => Result;
     /**
+     * Visit a parse tree produced by `PineV5Parser.if_expr`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitIf_expr?: (ctx: If_exprContext) => Result;
+    /**
      * Visit a parse tree produced by `PineV5Parser.pine_script`.
      * @param ctx the parse tree
      * @return the visitor result
@@ -347,12 +353,6 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitArith_exprs?: (ctx: Arith_exprsContext) => Result;
-    /**
-     * Visit a parse tree produced by `PineV5Parser.if_expr`.
-     * @param ctx the parse tree
-     * @return the visitor result
-     */
-    visitIf_expr?: (ctx: If_exprContext) => Result;
     /**
      * Visit a parse tree produced by `PineV5Parser.for_expr`.
      * @param ctx the parse tree
