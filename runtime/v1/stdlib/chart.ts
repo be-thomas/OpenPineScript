@@ -206,3 +206,95 @@ export function pointfigure(
 ): string {
   return refuseChartType("pointfigure", "Point & Figure columns");
 }
+
+// ── v5's `chart.*` namespace ────────────────────────────────────────────────
+//
+// NOT the v1–v3 spellings above. Those are `period`, `interval`, `isdaily` —
+// flat names that v4 moved into `timeframe.*`. This object is a different set
+// of built-ins entirely, added at v5, that ask about the CHART rather than the
+// timeframe: its colours, its type, and which bars the user can see.
+//
+// It lives in this file because the subject is the same, and no `__IS_NAMESPACE__`
+// flag is set — the object's own name supplies the `chart.` prefix, exactly as
+// `color` does in ./color.ts. Setting the flag would produce `chart.chart.*`.
+
+/**
+ * Is the chart a standard candlestick/bar chart?
+ *
+ * Always true here, and that is a fact rather than a default: this engine is
+ * fed OHLCV bars, and every non-standard type it could be asked about REFUSES
+ * rather than approximating (see `renko` and friends above). There is no run in
+ * which a script gets here on Renko candles.
+ */
+const IS_STANDARD = true;
+
+/**
+ * Relative luminance of a #RRGGBB[AA] colour, on the WCAG scale.
+ *
+ * Used only to decide which of black or white contrasts better with the chart
+ * background, which is the whole of what `chart.fg_color` promises.
+ */
+function luminance(hex: string): number {
+  const h = hex.replace("#", "");
+  if (h.length < 6) return 1;
+  const channel = (i: number): number => {
+    const c = parseInt(h.substring(i * 2, i * 2 + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(0) + 0.7152 * channel(1) + 0.0722 * channel(2);
+}
+
+export const chart = {
+  /**
+   * The chart's background colour.
+   *
+   * "chart.bg_color returns the color of the chart's background from the
+   *  'Chart settings/Appearance/Background' field."
+   *
+   * Host-supplied via `Context.provideChartBackground`; see the note there for
+   * the default and why it is a choice rather than a fact.
+   * @getter
+   */
+  bg_color: (ctx: Context): string => ctx.chartBgColor,
+
+  /**
+   * A colour that contrasts well with the background.
+   *
+   * "chart.fg_color returns a color providing optimal contrast with
+   *  chart.bg_color."
+   *
+   * Black on a light background, white on a dark one, chosen by relative
+   * luminance. TradingView does not publish the exact rule, so this is the
+   * standard one rather than a reproduction of theirs — the two agree on which
+   * END of the scale to pick, which is what the promise is about, and may
+   * differ on a mid-grey background.
+   * @getter
+   */
+  fg_color: (ctx: Context): string =>
+    luminance(String(ctx.chartBgColor)) > 0.179 ? "#000000ff" : "#ffffffff",
+
+  /**
+   * Is the chart type standard?
+   * @getter
+   */
+  is_standard: (_ctx: Context): boolean => IS_STANDARD,
+
+  /**
+   * Opening time of the leftmost VISIBLE bar.
+   *
+   * "chart.left_visible_bar_time returns the time of the leftmost bar
+   *  currently visible on the chart."
+   *
+   * There is no viewport here, so this is the first bar of the run unless the
+   * host declares one — see `Context.provideVisibleRange`, which also explains
+   * why that is a divergence worth stating.
+   * @getter
+   */
+  left_visible_bar_time: (ctx: Context): number => ctx.leftVisibleBarTime,
+
+  /**
+   * Opening time of the rightmost VISIBLE bar. See `left_visible_bar_time`.
+   * @getter
+   */
+  right_visible_bar_time: (ctx: Context): number => ctx.rightVisibleBarTime,
+};

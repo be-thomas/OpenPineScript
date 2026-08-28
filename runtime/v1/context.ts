@@ -295,6 +295,67 @@ export class Context {
     }
 
     /**
+     * The chart's background colour — what `chart.bg_color` returns.
+     *
+     * "chart.bg_color returns the color of the chart's background from the
+     *  'Chart settings/Appearance/Background' field."
+     *
+     * There is no chart here, so the host declares it. The default is
+     * TradingView's own light-theme background, `#ffffff`, which is a CHOICE
+     * and not a fact about the run — a script that draws its own dark
+     * dashboard will get black text out of `chart.fg_color` unless the host
+     * says otherwise. That is why the setter exists.
+     */
+    public chartBgColor: string = "#ffffff";
+
+    /** Declares the chart's background colour, for `chart.bg_color`. */
+    public provideChartBackground(color: string): void {
+        this.chartBgColor = String(color);
+    }
+
+    /**
+     * The first and last VISIBLE bar times — `chart.left_visible_bar_time` and
+     * `chart.right_visible_bar_time`.
+     *
+     * "chart.left_visible_bar_time returns the time of the leftmost bar
+     *  currently visible on the chart."
+     *
+     * Visibility is a property of a viewport, and this engine has none: it runs
+     * every bar it is given. So the visible range defaults to the WHOLE
+     * dataset, which is what a script scanning "the bars on screen" would see
+     * if the user had zoomed all the way out.
+     *
+     * Stated rather than hidden, because it changes results: a script that
+     * counts bars between the two, or anchors a VWAP to the left edge, gets the
+     * full history here and a window on TradingView. A host that knows the
+     * viewport should declare it.
+     */
+    public visibleRange: { left: number; right: number } | null = null;
+
+    /** Declares the visible bar range, in milliseconds. */
+    public provideVisibleRange(leftTime: number, rightTime: number): void {
+        this.visibleRange = { left: Number(leftTime), right: Number(rightTime) };
+    }
+
+    /** Opening time of the leftmost visible bar. */
+    public get leftVisibleBarTime(): number {
+        return this.visibleRange ? this.visibleRange.left : this.firstBarTime;
+    }
+
+    /** Opening time of the rightmost visible bar. */
+    public get rightVisibleBarTime(): number {
+        return this.visibleRange ? this.visibleRange.right : this.lastBarTime;
+    }
+
+    /**
+     * Opening time of the FIRST bar seen, or 0 before any bar.
+     *
+     * Recorded on the first `setBar` rather than derived, because the Context
+     * is fed one bar at a time and nothing else remembers where the run began.
+     */
+    public firstBarTime: number = 0;
+
+    /**
      * Lines emitted by `log.info` / `log.warning` / `log.error` (v5).
      *
      * Kept on the Context rather than written to the console because they are
@@ -1050,6 +1111,7 @@ export class Context {
     }
 
     public setBar(time: number, open: number, high: number, low: number, close: number, volume: number) {
+        if (this.currentBarIndex === 0) this.firstBarTime = time;
         // 1. Update Public Props
         this.time = time;
         this.open = open;

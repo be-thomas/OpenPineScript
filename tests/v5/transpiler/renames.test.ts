@@ -33,13 +33,40 @@ describe("every rename resolves at v5 to what its v4 spelling meant", () => {
   // source is a FUNCTION is compared by identity of the resolved reference
   // rather than by calling it — calling would need per-function arguments, and
   // the thing under test is the aliasing, not the maths.
+  /**
+   * `tostring` → `str.tostring` is a rename in the DIAGNOSTIC sense only.
+   *
+   * v5's `str.tostring(value, format)` takes a second argument that v4's
+   * `tostring(x)` does not, and runtime/v1/stdlib/str.ts implements it. So the
+   * two references are deliberately different, and ./index.ts is careful not to
+   * let the table overwrite the real implementation with v4's — which it did,
+   * and which silently dropped the format argument from every call.
+   *
+   * The table entry still has to exist: it is what produces
+   * "'tostring' was renamed to 'str.tostring' in Pine Script v5", asserted
+   * below like every other entry.
+   */
+  const IMPLEMENTED_NOT_ALIASED = new Set(["str.tostring"]);
+
   for (const { to, from } of V5_RENAMES) {
     if (from === undefined) continue;
     it(`${from} → ${to}`, () => {
       expect(V5_VIEW[to], `${to} is missing from the v5 view`).toBeDefined();
+      if (IMPLEMENTED_NOT_ALIASED.has(to)) {
+        expect(V5_VIEW[to].ref).not.toBe(V4_VIEW[from].ref);
+        return;
+      }
       expect(V5_VIEW[to].ref).toBe(V4_VIEW[from].ref);
     });
   }
+
+  it("str.tostring keeps its own two-argument implementation", () => {
+    // The regression this guards: with the alias in place, `args` was `["x"]`
+    // and `uses_context` false, so `ctx.call` passed the format nowhere and
+    // every golden-harness column was captured unformatted.
+    expect(V5_VIEW["str.tostring"].args).toEqual(["value", "format"]);
+    expect(V5_VIEW["str.tostring"].uses_context).toBe(true);
+  });
 });
 
 describe("the v4 spelling is refused at v5", () => {

@@ -29,6 +29,8 @@
  */
 
 import { val } from "../../../utils/v2/common";
+import { Context } from "../context";
+import { FORMAT_PREFIX, format as formatConstants } from "./format";
 
 /** Pine renders every flavour of "no value" as the string `NaN`. */
 function isNa(v: any): boolean {
@@ -127,16 +129,39 @@ export const str = {
     /**
      * `str.tostring(value, format)` — v5's spelling of v1–v4's `tostring(x)`.
      *
-     * The second argument is new in this spelling; without it the behaviour is
-     * the inherited one, which is why the v1–v4 `tostring` entry is aliased to
-     * this rather than kept as a separate implementation.
+     * The second argument is new in this spelling. The v1–v4 flat `tostring`
+     * keeps its own one-argument implementation in ./core.ts — `str.tostring`
+     * is a rename for DIAGNOSTIC purposes only, and ./index.ts is careful not
+     * to let the rename table overwrite this entry with it.
+     *
+     * ── The format is EITHER a format string or a `format.*` constant ────────
+     *
+     * "use str.tostring(myValue, format.mintick) to first round the number to
+     *  tick precision and then return its string representation."
+     *
+     * `format.mintick` needs the instrument's tick size, which is why this is
+     * the one `str.*` member that takes a Context. The other `format.*`
+     * constants describe how a value appears on the PRICE AXIS and in the Data
+     * Window — neither of which exists here — so they are recognised and then
+     * render the value plainly, rather than being fed to the number-format
+     * parser, where "format.volume" would be read as a mask with no digit
+     * placeholders and produce an empty string.
      */
-    tostring: (value: any, format?: any): string => {
+    tostring: (ctx: Context, value: any, format?: any): string => {
         const v = val(value);
         if (Array.isArray(v)) return `[${v.map(defaultString).join(", ")}]`;
         if (format === undefined || format === null) return defaultString(v);
         if (typeof v !== "number") return defaultString(v);
-        return formatNumber(v, String(val(format)));
+
+        const spec = String(val(format));
+        if (spec.startsWith(FORMAT_PREFIX)) {
+            if (spec !== formatConstants.mintick) return defaultString(v);
+            const tick = Number(ctx.mintick);
+            if (!Number.isFinite(tick) || tick <= 0) return defaultString(v);
+            return defaultString(Math.round(v / tick) * tick);
+        }
+
+        return formatNumber(v, spec);
     },
 
     /** `str.tonumber(string)` — na (NaN) when the string is not a number. */

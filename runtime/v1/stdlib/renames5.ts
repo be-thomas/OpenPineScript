@@ -137,6 +137,19 @@ const STR: RenameSpec[] = [{ to: "str.tostring", from: "tostring" }];
  */
 export const V5_ONLY_NAMESPACES: readonly string[] = [
     "str", "math", "matrix", "map", "log", "runtime", "ta", "request", "ticker",
+    // Presentation and chart-state namespaces, all v5:
+    //   chart    chart.bg_color / fg_color (blog announcement, 2022),
+    //            chart.is_standard, chart.left/right_visible_bar_time
+    //   format   the price-axis and Data Window formats
+    //   display  where a plot's values appear
+    //   font     the two label/table typefaces
+    //   session  session.regular/extended and the per-bar session booleans
+    //
+    // `chart` gates only the DOTTED keys. The flat v1–v3 names in
+    // runtime/v1/stdlib/chart.ts — `period`, `interval`, `isdaily` — are a
+    // different set of built-ins that happen to live in the same file, and
+    // `isV5Only` skips a key equal to its own root, so they survive the cut.
+    "chart", "format", "display", "font", "session",
 ];
 
 /**

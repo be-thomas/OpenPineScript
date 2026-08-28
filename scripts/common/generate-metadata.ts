@@ -144,6 +144,26 @@ function generateConfig(stdlibPath: string) {
                             const params = initializer.getParameters().map(p => p.getName());
                             isContextAware = params[0] === "ctx";
                             args = (isContextAware ? params.slice(1) : params).map(pineParamName);
+
+                            // `@getter` on a property, exactly as on an exported
+                            // function. Some namespace members are VARIABLES that
+                            // still need the Context to answer — `chart.fg_color`
+                            // is a colour the host supplies, `session.ismarket` is
+                            // a per-bar boolean — so they must be written as
+                            // functions and READ as values.
+                            //
+                            // Without this, the emitter treats them as callables:
+                            // `chart.fg_color` emits the function object itself,
+                            // which is truthy, is not a colour, and produces no
+                            // error anywhere.
+                            //
+                            // Read from the leading COMMENT rather than
+                            // `getJsDocs()`: ts-morph does not type a
+                            // PropertyAssignment as JSDocable, so the typed
+                            // accessor is unavailable here even though the
+                            // comment is a perfectly ordinary JSDoc block.
+                            isGetter = prop.getLeadingCommentRanges()
+                                .some(range => /@getter\b/.test(range.getText()));
                         }
 
                         // Determine return type logic

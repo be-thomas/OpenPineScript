@@ -7,8 +7,11 @@ import * as chart from "./chart";
 import * as color from "./color";
 import * as core from "./core";
 import * as dataset from "./dataset";
+import * as display from "./display";
 import * as drawings from "./drawings";
 import * as errors from "./errors";
+import * as font from "./font";
+import * as format from "./format";
 import * as input from "./input";
 import * as inputs from "./inputs";
 import * as logging from "./logging";
@@ -18,6 +21,7 @@ import * as matrix from "./matrix";
 import * as mtf from "./mtf";
 import * as request from "./request";
 import * as scale from "./scale";
+import * as session from "./session";
 import * as sources from "./sources";
 import * as str from "./str";
 import * as strategy from "./strategy";
@@ -578,6 +582,46 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: chart.pointfigure
       },
+      "chart.bg_color": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["bg_color"]
+      },
+      "chart.fg_color": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["fg_color"]
+      },
+      "chart.is_standard": {
+          uses_context: false,
+          args: ["ctx"],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["is_standard"]
+      },
+      "chart.left_visible_bar_time": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["left_visible_bar_time"]
+      },
+      "chart.right_visible_bar_time": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["right_visible_bar_time"]
+      },
       "sunday": {
           uses_context: false,
           args: [],
@@ -1065,6 +1109,54 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"The last bar's opening time, known from the first bar."},
           is_value: false,
           ref: dataset.last_bar_time
+      },
+      "display.none": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: display.display["none"]
+      },
+      "display.data_window": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: display.display["data_window"]
+      },
+      "display.pane": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: display.display["pane"]
+      },
+      "display.price_scale": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: display.display["price_scale"]
+      },
+      "display.status_line": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: display.display["status_line"]
+      },
+      "display.all": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: display.display["all"]
       },
       "line.new": {
           uses_context: true,
@@ -1986,6 +2078,70 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: errors.runtime["error"]
       },
+      "font.family_default": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: font.font["family_default"]
+      },
+      "font.family_monospace": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: font.font["family_monospace"]
+      },
+      "format.inherit": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: format.format["inherit"]
+      },
+      "format.mintick": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: format.format["mintick"]
+      },
+      "format.percent": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: format.format["percent"]
+      },
+      "format.price": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: format.format["price"]
+      },
+      "format.volume": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: format.format["volume"]
+      },
+      "FORMAT_PREFIX": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: format.FORMAT_PREFIX
+      },
       "input": {
           uses_context: true,
           args: ["defval","title","type"],
@@ -2666,6 +2822,78 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: scale.none
       },
+      "session.regular": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: session.session["regular"]
+      },
+      "session.extended": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: session.session["extended"]
+      },
+      "session.ismarket": {
+          uses_context: false,
+          args: ["ctx"],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: session.session["ismarket"]
+      },
+      "session.ispremarket": {
+          uses_context: false,
+          args: ["ctx"],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: session.session["ispremarket"]
+      },
+      "session.ispostmarket": {
+          uses_context: false,
+          args: ["ctx"],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: session.session["ispostmarket"]
+      },
+      "session.isfirstbar": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: session.session["isfirstbar"]
+      },
+      "session.isfirstbar_regular": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: session.session["isfirstbar_regular"]
+      },
+      "session.islastbar": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: session.session["islastbar"]
+      },
+      "session.islastbar_regular": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: session.session["islastbar_regular"]
+      },
       "hl2": {
           uses_context: true,
           args: [],
@@ -2699,7 +2927,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           ref: sources.hlcc4
       },
       "str.tostring": {
-          uses_context: false,
+          uses_context: true,
           args: ["value","format"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},

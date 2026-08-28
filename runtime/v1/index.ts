@@ -23,6 +23,17 @@ function injectStdlib(target: any, lib: any, prefix: string) {
             const namespaceObj: any = {};
             // 3. RECURSE: Dig deeper into the object to prefix its children
             injectStdlib(namespaceObj, val, prefix);
+
+            // 3b. A namespace root may ALSO be a value. `session` is v1–v3's
+            // input-type constant and v5's `session.*` namespace at the same
+            // time, so createStdlib gives it a non-enumerable `valueOf`. The
+            // fresh object built at (2) would drop it, and `input(1, type =
+            // session)` would then record `[object Object]` as the input type.
+            for (const key of ["valueOf", "toString"]) {
+                const own = Object.getOwnPropertyDescriptor(val, key);
+                if (own) Object.defineProperty(namespaceObj, key, own);
+            }
+
             target[prefixedKey] = namespaceObj;
         } else {
             // 4. It's a function or primitive, just assign it

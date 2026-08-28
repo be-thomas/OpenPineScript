@@ -107,10 +107,28 @@ function aliasesFrom(
     renames: readonly RenameSpec[],
     source: Record<string, StdlibEntry>,
     version: number,
+    /**
+     * The namespace entries THIS version adds.
+     *
+     * A rename whose new spelling already has a real implementation is not an
+     * alias, and must not become one. `tostring` → `str.tostring` is the case:
+     * ./str.ts implements the v5 two-argument form, and inheriting v4's
+     * one-argument `tostring` on top of it silently dropped the FORMAT
+     * argument — so `str.tostring(x, "#.##")` returned every digit of `x`, and
+     * every golden-data harness column (scripts/common/make-log-harness.ts)
+     * was captured with default formatting instead of the mask it asked for.
+     *
+     * The rename entry still has to EXIST, because it is also what tells the
+     * emitter that flat `tostring` was renamed at v5 and produces the migration
+     * error. Only its registry inheritance is wrong here.
+     */
+    implemented: Record<string, StdlibEntry> = {},
 ): Record<string, StdlibEntry> {
     const out: Record<string, StdlibEntry> = {};
 
     for (const { to, from, value } of renames) {
+        if (implemented[to]) continue;
+
         if (from !== undefined) {
             const entry = source[from];
             if (!entry) {
@@ -161,7 +179,7 @@ export const V4_VIEW: Record<string, StdlibEntry> = {
 };
 
 export const V5_REGISTRY: Record<string, StdlibEntry> =
-    aliasesFrom(V5_RENAMES, V4_VIEW, 5);
+    aliasesFrom(V5_RENAMES, V4_VIEW, 5, V5_NAMESPACE_REGISTRY);
 
 /** What a v5 script may spell. */
 export const V5_VIEW: Record<string, StdlibEntry> = {
@@ -206,6 +224,22 @@ export function viewFor(version: number): Record<string, StdlibEntry> {
     return BASE_REGISTRY;
 }
 
+/**
+ * An empty namespace object that still reads as `value`.
+ *
+ * For a name that is a CONSTANT at one version and a NAMESPACE at another —
+ * `session` is the only one today — so that `input(1, type = session)` at v1–v3
+ * and `session.regular` at v5 both work off one sandbox binding.
+ */
+function valueBearingNamespace(value: unknown): Record<string, any> {
+    const holder: Record<string, any> = {};
+    Object.defineProperty(holder, "valueOf", { value: () => value, enumerable: false });
+    Object.defineProperty(holder, "toString", {
+        value: () => String(value), enumerable: false,
+    });
+    return holder;
+}
+
 export function createStdlib(ctx: Context) {
     const sandboxStdlib: Record<string, any> = {};
 
@@ -223,7 +257,37 @@ export function createStdlib(ctx: Context) {
     // to emit it and the runtime is not the place to refuse a second time.
     const view = viewFor(ctx.profile.version);
 
+    // A handful of ROOTS are a flat VALUE at one version and a NAMESPACE at
+    // another, and one sandbox slot cannot hold both readings:
+    //
+    //   session   v1–v3  the input-type constant, `input(s, type = session)`
+    //             v5     the `session.*` namespace
+    //   line      v1–v3  the plot-style constant, `plot(x, style = line)`
+    //             v4+    the `line.*` drawing namespace
+    //
+    // Where THIS version can spell only one of the two, install only that one.
+    // Installing both let the union's last writer decide, and at v1–v3
+    // `x = session` came out as the namespace object rather than the string
+    // "session" — an input whose declared type was `[object Object]`.
+    //
+    // Where a version can spell BOTH (v4 keeps a flat `line` alongside
+    // `line.new`), nothing is skipped and the merge below settles it.
+    const spellable = (key: string): boolean => view[key] !== undefined;
+    const skip = (key: string): boolean => {
+        const dot = key.indexOf(".");
+        if (dot > 0) {
+            // A namespace member whose ROOT is a flat value here, and which
+            // this version cannot spell anyway.
+            const root = key.slice(0, dot);
+            return !spellable(key) && view[root]?.is_value === true;
+        }
+        // A flat value this version cannot spell, whose namespace it can.
+        if (spellable(key)) return false;
+        return Object.keys(view).some(k => k.startsWith(key + "."));
+    };
+
     for (const [key, unscoped] of Object.entries(REGISTRY)) {
+        if (skip(key)) continue;
         const entry = view[key] ?? unscoped;
         const parts = key.split('.');
         let current = sandboxStdlib;
@@ -255,8 +319,30 @@ export function createStdlib(ctx: Context) {
                 // for color/input/hline/dayofweek/log/ticker. Attaching members
                 // to the function object is legal, and injectStdlib knows to
                 // prefix them there.
-                if (!current[part]) {
+                //
+                // It may also already be a PRIMITIVE. `session` is a v1–v3
+                // input-type constant whose value is the string "session", and
+                // it is also v5's `session.*` namespace — and this registry is
+                // deliberately the union of every version's view, so both
+                // arrive. A string cannot carry properties, so assigning
+                // `session.regular` onto it threw
+                //
+                //     Cannot create property 'regular' on string 'session'
+                //
+                // at sandbox construction, which broke EVERY script rather than
+                // just the ones naming `session`.
+                //
+                // The replacement is a plain object with a non-enumerable
+                // `valueOf`, which is the same device ./inputs.ts uses to let
+                // `input.float` be v4's constant and v5's function at once:
+                // every read of a value in this engine goes through `val()`,
+                // which calls `valueOf()`. Non-enumerable so that injectStdlib
+                // does not mistake it for a namespace member and prefix it.
+                const here = current[part];
+                if (here === undefined || here === null) {
                     current[part] = {};
+                } else if (typeof here !== "object" && typeof here !== "function") {
+                    current[part] = valueBearingNamespace(here);
                 }
                 current = current[part];
             }

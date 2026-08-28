@@ -11,53 +11,62 @@
 import { describe, it, expect } from "vitest";
 import { HEAD, build, value } from "../helpers";
 import { str } from "../../../runtime/v1/stdlib/str";
+import { Context } from "../../../runtime/v5";
+
+/**
+ * `str.tostring` takes a Context, because `format.mintick` needs the
+ * instrument's tick size. These tests exercise the FORMAT-STRING path, which
+ * does not read it, so a default Context is enough — but it has to be passed.
+ */
+const CTX = new Context();
+const tostring = (value: any, format?: any) => str.tostring(CTX, value, format);
 
 describe("str.tostring formatting", () => {
   it("trims optional digits — '#' is an OPTIONAL digit", () => {
-    expect(str.tostring(1.5, "#.##")).toBe("1.5");
-    expect(str.tostring(1.5, "#.##########")).toBe("1.5");
-    expect(str.tostring(2, "#.##")).toBe("2");
+    expect(tostring(1.5, "#.##")).toBe("1.5");
+    expect(tostring(1.5, "#.##########")).toBe("1.5");
+    expect(tostring(2, "#.##")).toBe("2");
   });
 
   it("keeps required digits — '0' is a REQUIRED digit", () => {
-    expect(str.tostring(1.5, "0.00")).toBe("1.50");
-    expect(str.tostring(2, "0.00")).toBe("2.00");
+    expect(tostring(1.5, "0.00")).toBe("1.50");
+    expect(tostring(2, "0.00")).toBe("2.00");
   });
 
   it("'#' alone is an integer, which is how timestamps are logged", () => {
-    expect(str.tostring(1420156800000, "#")).toBe("1420156800000");
-    expect(str.tostring(1.7, "#")).toBe("2");
+    expect(tostring(1420156800000, "#")).toBe("1420156800000");
+    expect(tostring(1.7, "#")).toBe("2");
   });
 
   it("pads the integer side to its required width", () => {
-    expect(str.tostring(7, "00")).toBe("07");
+    expect(tostring(7, "00")).toBe("07");
   });
 
   it("rounds rather than truncating", () => {
     // 1.005 is deliberately avoided: it has no exact binary representation, so
     // every language rounds it down and a test on it measures IEEE-754 rather
     // than this formatter.
-    expect(str.tostring(1.006, "#.##")).toBe("1.01");
-    expect(str.tostring(1.004, "#.##")).toBe("1");
+    expect(tostring(1.006, "#.##")).toBe("1.01");
+    expect(tostring(1.004, "#.##")).toBe("1");
   });
 
   it("keeps the sign", () => {
-    expect(str.tostring(-1.5, "#.##")).toBe("-1.5");
+    expect(tostring(-1.5, "#.##")).toBe("-1.5");
   });
 
   it("renders na as NaN, which is what the golden loader parses", () => {
-    expect(str.tostring(NaN, "#.##")).toBe("NaN");
-    expect(str.tostring(NaN)).toBe("NaN");
+    expect(tostring(NaN, "#.##")).toBe("NaN");
+    expect(tostring(NaN)).toBe("NaN");
   });
 
   it("without a format it is the inherited v1–v4 tostring behaviour", () => {
-    expect(str.tostring(1.5)).toBe("1.5");
-    expect(str.tostring(true)).toBe("true");
-    expect(str.tostring("x")).toBe("x");
+    expect(tostring(1.5)).toBe("1.5");
+    expect(tostring(true)).toBe("true");
+    expect(tostring("x")).toBe("x");
   });
 
   it("renders an array", () => {
-    expect(str.tostring([1, 2, 3])).toBe("[1, 2, 3]");
+    expect(tostring([1, 2, 3])).toBe("[1, 2, 3]");
   });
 });
 
