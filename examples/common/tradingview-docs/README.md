@@ -10,7 +10,7 @@ this engine nor its author wrote.
 | `//@version=3` | 18 | 17 (94%) |
 | `//@version=4` | 148 | 129 (87%) |
 | `//@version=5` | 571 | 326 (57%) |
-| **Total** | **763** | **495 (65%)** |
+| **Total** | **763** | **496 (65%)** |
 
 ## These files are not edited. Ever.
 
@@ -99,14 +99,14 @@ engine rejects is a gap whatever the reason.
 
 ## Compiling is not the same as running
 
-Of the 495 that compile, running each one over the 506-bar `mock_data/common/AAPL_mock.csv`:
+Of the 496 that compile, running each one over the 506-bar `mock_data/common/AAPL_mock.csv`:
 
 | Result | Count | Meaning |
 |---|---|---|
-| ran, produced output | 251 | plots, trades or logs came out |
+| ran, produced output | 258 | plots, trades or logs came out |
 | no output | 105 | most have no plotting call at all — drawings and tables only. The rest need data this run does not have (a strategy gated on `n > 4000` over 506 bars) |
-| all-`na` output | 71 | mostly expected: the output is a colour, or the script wants `request.`/symbol data |
-| runtime error | 68 | every one is now a NAMED diagnostic — see below |
+| all-`na` output | 73 | mostly expected: the output is a colour, or the script wants `request.`/symbol data |
+| runtime error | 60 | every one is now a NAMED diagnostic — see below |
 
 **No script in this corpus can raise a `ReferenceError` any more.** That used to
 be the largest failure class: 99 runtime errors, 45 of them a bare
@@ -115,7 +115,7 @@ JavaScript crash is always an engine bug, so both halves were fixed — the
 missing built-ins were implemented, and the emitter no longer emits a name that
 nothing binds.
 
-The 68 that remain are explicit refusals (`renko` cannot be rebuilt from OHLCV,
+The 60 that remain are explicit refusals (`renko` cannot be rebuilt from OHLCV,
 `accdist` is not implemented), bounds errors in matrix and array demos, and two
 `color.from_gradient` registry entries that resolve to a non-function.
 
@@ -133,6 +133,7 @@ TradingView's own release notes before being changed:
 | `int()`, `max_bars_back()`, `time_close`, `time_tradingday` implemented (v4) | 16 files |
 | `random`, `todegrees`, `toradians`, `round_to_mintick` re-gated from v5-only to v4, aliased to `math.*` at v5 | 1 file, and the v4 release notes |
 | `renko`, `linebreak`, `kagi`, `pointfigure` refuse explicitly instead of crashing | 4 files |
+| `color.from_gradient` and `alert()` + `alert.freq_*` implemented (v4) | 3 files, and the v4 release notes |
 
 The last one is the shape most of these take. TradingView's v4 release notes say
 `random(min, max, seed)` is a v4 function; this engine had it gated as v5-only

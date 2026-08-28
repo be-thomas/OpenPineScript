@@ -2,5 +2,9 @@
 node_modules/
 .DS_Store
 
+# CLI output. `--out-dir ./results` writes here; it is a run artefact, not
+# source, and it was committed by accident.
+/results/
+
 *.dev.md
 feed.sh

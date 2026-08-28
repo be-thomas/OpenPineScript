@@ -25,6 +25,7 @@
 import { describe, it, expect } from "vitest";
 import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
+import color from "../../../runtime/v1/stdlib/color";
 
 /** Compiles and runs `src` over `n` synthetic daily bars. */
 function run(src: string, n = 30) {
@@ -36,6 +37,10 @@ function run(src: string, n = 30) {
   for (let i = 0; i < n; i++) {
     ctx.is_new = true;
     ctx.is_last = i === n - 1;
+    // alert() only fires on realtime bars, so the harness has to model the
+    // history/realtime split rather than leaving both flags at their defaults.
+    ctx.is_realtime = ctx.is_last;
+    ctx.is_history = !ctx.is_last;
     ctx.setBar(i * 86400000, 10 + i, 12 + i, 9 + i, 11 + i, 100);
     exec();
     ctx.finalizeBar();
@@ -171,4 +176,62 @@ describe("unsupported things are refused, not approximated", () => {
       .toThrow(/cannot build Renko bricks/);
   });
 
+});
+
+describe("the two silent namespace gaps", () => {
+  /**
+   * `color.from_gradient` and `alert()` failed differently from the names
+   * above, and worse: both roots (`color`, `alert`) resolve, so a missing
+   * MEMBER read as `undefined` instead of raising anything. The script ran to
+   * completion and only died where the result was called — "The provided
+   * reference is not a function", which names neither the missing built-in nor
+   * the line that wanted it.
+   */
+  it("color.from_gradient interpolates, clamps, and defaults alpha to opaque", () => {
+    const at = (v: number) =>
+      plotted(run(`//@version=4\nstudy("t")\nplot(1)\nbgcolor(color.from_gradient(${v}, 0, 10, #000000, #ffffff))`, 2));
+    // Values come back through the plot pipeline as colours, so assert on the
+    // stdlib directly for the arithmetic and on compilation for the wiring.
+    expect(color.from_gradient(0, 0, 10, "#000000ff", "#ffffffff")).toBe("#000000ff");
+    expect(color.from_gradient(5, 0, 10, "#000000ff", "#ffffffff")).toBe("#808080ff");
+    expect(color.from_gradient(10, 0, 10, "#000000ff", "#ffffffff")).toBe("#ffffffff");
+    // Outside the range Pine returns the endpoint rather than extrapolating.
+    expect(color.from_gradient(-99, 0, 10, "#000000ff", "#ffffffff")).toBe("#000000ff");
+    expect(color.from_gradient(99, 0, 10, "#000000ff", "#ffffffff")).toBe("#ffffffff");
+    // #RRGGBB carries no alpha; the result must still be opaque, not transparent.
+    expect(color.from_gradient(5, 0, 10, "#ff0000", "#0000ff")).toBe("#800080ff");
+    expect(() => at(5)).not.toThrow();
+  });
+
+  it("a degenerate range does not divide by zero", () => {
+    expect(color.from_gradient(5, 7, 7, "#000000ff", "#ffffffff")).toBe("#ffffffff");
+  });
+
+  it("alert() fires on realtime bars only", () => {
+    // The v4 manual is explicit that alert() triggers on realtime bars — that
+    // is what separates it from Pine Logs. Firing on history would report
+    // thousands of alerts TradingView never sent.
+    const ctx = run('//@version=4\nstudy("t")\nalert("fired", alert.freq_all)\nplot(1)', 5);
+    const alerts = (ctx as any).alerts ?? [];
+    expect(alerts.length).toBe(1);
+    expect(alerts[0].bar).toBe(4);
+    expect(alerts[0].message).toBe("fired");
+    expect(alerts[0].freq).toBe("freq_all");
+  });
+
+  it("alert is a function AND a namespace, like input and color", () => {
+    expect(() => compileScript('//@version=4\nstudy("t")\nalert("x")\nplot(1)')).not.toThrow();
+    expect(() => compileScript('//@version=4\nstudy("t")\nalert("x", alert.freq_once_per_bar_close)\nplot(1)'))
+      .not.toThrow();
+  });
+
+  it("both are v4+, matching TradingView", () => {
+    // v3 has alertcondition() only — there is no `alert(` anywhere in the v3
+    // documentation — and color.from_gradient arrived with color.rgb in the
+    // May 2021 batch.
+    expect(() => compileScript('//@version=3\nstudy("t")\nalert("x")\nplot(1)'))
+      .toThrow(/not available in Pine Script v3/);
+    expect(() => compileScript('//@version=3\nstudy("t")\nplot(1)\nbgcolor(color.from_gradient(5, 0, 10, #000000, #ffffff))'))
+      .toThrow(/not available in Pine Script v3/);
+  });
 });

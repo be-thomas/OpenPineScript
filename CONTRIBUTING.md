@@ -7,7 +7,7 @@ transpiler, and runtime are tightly coupled — a change to the emitted JavaScri
 usually needs a matching change in the runtime contract — and keeping that in
 one head is currently faster than reviewing it across many.
 
-This may change once the v1–v5 work in [dev-docs/](dev-docs/) is done. Issues
+This may change once the v1–v5 work in `dev-docs/` is done. Issues
 and discussions are open and genuinely shape the roadmap.
 
 ## Reporting a bug
@@ -34,11 +34,11 @@ Open a GitHub Issue with what the engine should do and the use case behind it.
 
 If it is a missing Pine Script built-in, name the function and the version it
 belongs to — check
-[dev-docs/01-version-delta-spec.md](dev-docs/01-version-delta-spec.md) first, as
+`dev-docs/01-version-delta-spec.md` first, as
 it may already be scheduled.
 
 If it is something the engine deliberately does not do, check
-[dev-docs/04-skipped-restrictions.md](dev-docs/04-skipped-restrictions.md).
+`dev-docs/04-skipped-restrictions.md`.
 TradingView's execution limits are skipped on purpose, and each entry explains
 what would change if that decision were reversed.
 
@@ -111,11 +111,12 @@ Never flatten `grammar/` back to satisfy ANTLR. Stage at build time instead.
 
 ## Working on the code
 
-If you are reading the source, start with:
+If you are reading the source, start with (the `dev-docs/` notes are kept
+local and are not published to the repository):
 
-- [dev-docs/00-architecture-assessment.md](dev-docs/00-architecture-assessment.md) — the pipeline and its extension points
-- [dev-docs/03-tdd-workflow.md](dev-docs/03-tdd-workflow.md) — how changes are tested
-- [vibe.dev.md](vibe.dev.md) — the short list of things that break subtly
+- `dev-docs/00-architecture-assessment.md` — the pipeline and its extension points
+- `dev-docs/03-tdd-workflow.md` — how changes are tested
+- `vibe.dev.md` — the short list of things that break subtly
 
 Run the suite with `npm test`.
 

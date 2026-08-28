@@ -3,7 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org)
 [![Pine Script](https://img.shields.io/badge/Pine%20Script-v1%20%E2%80%93%20v5-orange.svg)](#supported-pine-script-versions)
-[![Tests](https://img.shields.io/badge/tests-1303%20passing-success.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1326%20passing-success.svg)](#testing)
 
 **OpenPineScript is an open-source Pine Script engine.** It compiles TradingView
 Pine Script source (`.pine`) to JavaScript and executes it against your own OHLCV
@@ -132,8 +132,8 @@ logs.
 | `//@version=2` | 26 | 23 (88%) |
 | `//@version=3` | 18 | 17 (94%) |
 | `//@version=4` | 148 | 129 (87%) |
-| `//@version=5` | 571 | 326 (57%) |
-| **Total** | **763** | **495 (65%)** |
+| `//@version=5` | 571 | 327 (57%) |
+| **Total** | **763** | **496 (65%)** |
 
 Byte-identity is checked rather than promised —
 [`scripts/common/fetch-doc-examples.mjs`](scripts/common/fetch-doc-examples.mjs) re-downloads
@@ -144,11 +144,11 @@ every page and compares SHA-256 digests against
 node scripts/common/fetch-doc-examples.mjs verify
 ```
 
-All 495 that compile also RUN — not one produces a JavaScript error. An
+All 496 that compile also RUN — not one produces a JavaScript error. An
 unimplemented built-in is now reported as `Undeclared identifier` at compile
 time, the way TradingView reports it, rather than crashing on the first bar.
 
-The 268 that do not compile are a map of what is missing — compound assignment
+The 267 that do not compile are a map of what is missing — compound assignment
 (`+=`), `for … in`, `else if`, the `chart.*` and `format.*` namespaces, tuple
 destructuring. Every one is broken down by cause in the
 [corpus README](examples/common/tradingview-docs/README.md), along with the defects
@@ -225,7 +225,7 @@ Report written: ./results/comparison_report.json
 npm test
 ```
 
-1,303 tests pass across 50 files. None fail.
+1,326 tests pass across 50 files. None fail.
 
 Two patterns carry most of the weight:
 

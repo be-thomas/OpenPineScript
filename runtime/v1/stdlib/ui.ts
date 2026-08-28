@@ -273,6 +273,47 @@ export function alertcondition(ctx: Context, condition: any, title?: any, messag
 }
 
 /**
+ * `alert(message, freq)` — the v4 script-alert call.
+ *
+ * ── How it differs from alertcondition() above ─────────────────────────────
+ *
+ * `alertcondition()` DECLARES an alert a user can then configure from the
+ * chart UI; `alert()` FIRES one at the moment it is called, with a message that
+ * may be computed on the bar. Both land in `ctx.alerts` here, because there is
+ * no delivery system to integrate with locally — recording keeps them
+ * inspectable, which is what a backtest can actually use.
+ *
+ * ── Realtime only, deliberately ────────────────────────────────────────────
+ *
+ * The v4 manual is explicit that an `alert()` call only triggers on realtime
+ * bars — it is the property that separates it from Pine Logs, which run on
+ * history too. Firing on every historical bar would make a backtest report
+ * thousands of alerts TradingView would never have sent, so `is_realtime`
+ * gates it.
+ *
+ * `freq` is recorded rather than enforced (the constants live in
+ * ./alerts.ts — see the note there on why they cannot sit in this file): the three frequencies differ in how
+ * many times a single realtime bar may re-fire as it updates, and that depends
+ * on a tick feed the host supplies rather than on anything decidable here.
+ *
+ * Source: https://www.tradingview.com/pine-script-docs/v4/essential/alerts/
+ *
+ * @returns {void}
+ */
+export function alert(ctx: Context, message: any, freq?: any): void {
+    if (!ctx.is_realtime) return;
+    (ctx as any).alerts ??= [];
+    (ctx as any).alerts.push({
+        bar: ctx.currentBarIndex,
+        time: ctx.time,
+        title: "",
+        message: String(message != null && typeof message.valueOf === "function"
+            ? message.valueOf() : message ?? ""),
+        freq: String(freq ?? "freq_once_per_bar"),
+    });
+}
+
+/**
  * currency.* — the account currency the strategy reports in. Host-provided;
  * NONE means "same as the symbol". See R-15.
  */

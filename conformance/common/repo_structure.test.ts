@@ -9,6 +9,8 @@
  *     later search for "where does transpiling happen".
  *  2. Test files that are never run, because the runner was given a
  *     hand-maintained file list instead of a glob.
+ *  3. A folder that drifts out of the version layout, which is how a "small
+ *     shared helper" starts quietly coupling two language versions together.
  */
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
@@ -154,4 +156,51 @@ describe("test discovery", () => {
       expect(walk(dir).some(f => f.endsWith(".test.ts")), `tests/${v} has no suite`).toBe(true);
     }
   });
+});
+
+/**
+ * ── The version layout ──────────────────────────────────────────────────────
+ *
+ * Every top-level folder holds ONLY `v1`–`v5` and `common`, and no loose files.
+ * The rule and its rationale are in CONTRIBUTING.md; this is the part that
+ * fails the build, because a convention nothing checks is a convention that
+ * rots.
+ *
+ * Why it matters: adding a version must never mean editing an earlier one. A
+ * helper dropped at a folder root is shared by every version the moment a
+ * second one imports it, and from then on changing v5 can change v2's numbers.
+ * The layout makes that visible where it happens.
+ *
+ * `dev-docs` is exempt — it is excluded from git (.git/info/exclude) and is
+ * notes rather than source. `results` is exempt because the CLI creates it:
+ * `--out-dir ./results` drops loose CSVs there, and a run of the tool must not
+ * be able to fail the test suite. `node_modules` is not ours.
+ */
+describe("every top-level folder follows the version layout", () => {
+  const ALLOWED = new Set(["v1", "v2", "v3", "v4", "v5", "common"]);
+  const EXEMPT = new Set(["node_modules", "dev-docs", "results"]);
+
+  const topLevel = fs.readdirSync(ROOT, { withFileTypes: true })
+    .filter(e => e.isDirectory() && !e.name.startsWith(".") && !EXEMPT.has(e.name))
+    .map(e => e.name)
+    .sort();
+
+  it("finds the folders to check", () => {
+    // A glob that matches nothing passes vacuously; this is the guard on the guard.
+    expect(topLevel.length).toBeGreaterThan(5);
+  });
+
+  for (const dir of topLevel) {
+    it(`${dir}/ contains only version folders`, () => {
+      const entries = fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })
+        .filter(e => !e.name.startsWith("."));
+
+      const badDirs = entries.filter(e => e.isDirectory() && !ALLOWED.has(e.name)).map(e => e.name);
+      const looseFiles = entries.filter(e => e.isFile()).map(e => e.name);
+
+      expect(badDirs, `${dir}/ may only contain ${[...ALLOWED].join(", ")}`).toEqual([]);
+      expect(looseFiles, `${dir}/ must not hold loose files — move them into a version folder or common/`).toEqual([]);
+      expect(entries.length, `${dir}/ is empty`).toBeGreaterThan(0);
+    });
+  }
 });

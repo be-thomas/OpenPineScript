@@ -1,4 +1,5 @@
 // This file is AUTO-GENERATED. Do not edit manually.
+import * as alerts from "./alerts";
 import * as arrays from "./arrays";
 import * as barmerge from "./barmerge";
 import * as barstate from "./barstate";
@@ -41,6 +42,30 @@ export interface StdlibEntry {
 
 export function getGeneratedRegistry(): Record<string, StdlibEntry> {
     return {
+      "alert.freq_once_per_bar": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: alerts.alert["freq_once_per_bar"]
+      },
+      "alert.freq_once_per_bar_close": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: alerts.alert["freq_once_per_bar_close"]
+      },
+      "alert.freq_all": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: alerts.alert["freq_all"]
+      },
       "array.new_float": {
           uses_context: false,
           args: ["size","initial_value"],
@@ -632,6 +657,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"color"},
           is_value: false,
           ref: (color.default || color)["rgb"]
+      },
+      "color.from_gradient": {
+          uses_context: false,
+          args: ["value","bottomValue","topValue","bottomColor","topColor"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"color"},
+          is_value: false,
+          ref: (color.default || color)["from_gradient"]
       },
       "color.r": {
           uses_context: false,
@@ -3664,6 +3697,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: ui.alertcondition
+      },
+      "alert": {
+          uses_context: true,
+          args: ["message","freq"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: ui.alert
       },
       "location.abovebar": {
           uses_context: false,

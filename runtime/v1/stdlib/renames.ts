@@ -167,6 +167,16 @@ export const V4_ONLY_NAMES: readonly string[] = [
     //    buffer sizes" and "functions for explicit type casting" (June 2019)
     "random", "todegrees", "toradians", "round_to_mintick",
     "time_close", "time_tradingday", "max_bars_back", "int",
+
+    // The May-2021 colour batch. Every other member of it — color.rgb,
+    // color.r/g/b/t — was already implemented and gated; from_gradient was
+    // missed, and a missing MEMBER of a real namespace fails silently.
+    "color.from_gradient",
+
+    // `alert()` and its frequency constants. v3 has `alertcondition()` only —
+    // the v3 documentation has no `alert(` anywhere — so this is v4+.
+    "alert", "alert.freq_once_per_bar", "alert.freq_once_per_bar_close",
+    "alert.freq_all",
 ];
 
 export const V4_RENAMES: readonly RenameSpec[] = [
