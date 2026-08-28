@@ -144,21 +144,60 @@ const SCOPE_RULES = new Set([
   "Local_stmt_singlelineContext",
 ]);
 
+/** The contents of the LAST statement line of an indented block. */
+function lastContents(node: any): any[] | null {
+  const multi = node?.local_stmts_multiline?.()
+    ?? node?.fun_body_multiline?.()?.local_stmts_multiline?.();
+  const lines = multi?.local_stmts_list?.()?.local_stmt_multiline?.();
+  return lines?.[lines.length - 1]?.local_stmt_content?.() ?? null;
+}
+
 /**
- * The number of elements in the `[ ... ]` list a function body ENDS with, or
- * null when it ends with anything else.
+ * The number of elements in the `[ ... ]` list a body ENDS with, or null when
+ * it ends with anything else.
  *
- * Duck-typed down both body shapes — `f() => [a, b]` and an indented block
- * whose last line is `[a, b]` — because the two share no rule.
+ * Duck-typed down every body shape — `f() => [a, b]`, an indented block whose
+ * last line is `[a, b]`, and an `if` whose BRANCHES each end in one — because
+ * they share no rule. The third is not an exotic case: TradingView's own v4
+ * drawings page ends `pivots()` with
+ *
+ *     if isFound and length * 2 <= bar_index
+ *         [bar_index[length], p]
+ *     else
+ *         [int(na), float(na)]
+ *
+ * and an `if` in value position evaluates to whichever branch runs, so its
+ * arity is the branches'. The first branch that answers decides — Pine requires
+ * them to agree, and disagreeing is the callee's error rather than this pass's.
  */
-function tupleArityOfBody(node: any): number | null {
-  const contents =
-    node.fun_body_singleline?.()?.local_stmt_singleline?.()?.local_stmt_content?.()
-    ?? node.fun_body_multiline?.()?.local_stmts_multiline?.()?.local_stmts_list?.()
-         ?.local_stmt_multiline?.()?.slice(-1)[0]?.local_stmt_content?.();
+function tupleArityOfContents(contents: any[] | null): number | null {
   const last = contents?.[contents.length - 1];
-  const list = last?.arith_exprs?.();
-  return list ? (list.arith_expr?.()?.length ?? null) : null;
+  if (!last) return null;
+
+  const list = last.arith_exprs?.();
+  if (list) return list.arith_expr?.().length ?? null;
+
+  // `local_stmt_content` reaches if_expr through the transparent `arith_expr`
+  // wrapper; `global_stmt_content` names it directly.
+  const conditional = last.if_expr?.() ?? last.arith_expr?.()?.if_expr?.();
+  return conditional ? tupleArityOfIf(conditional) : null;
+}
+
+function tupleArityOfIf(node: any): number | null {
+  for (const block of node.stmts_block?.() ?? []) {
+    const arity = tupleArityOfContents(lastContents(block));
+    if (arity !== null) return arity;
+  }
+  // v4's `else if` puts another if_expr where the else block would be.
+  const chained = node.if_expr?.();
+  return chained ? tupleArityOfIf(chained) : null;
+}
+
+function tupleArityOfBody(node: any): number | null {
+  const single =
+    node.fun_body_singleline?.()?.local_stmt_singleline?.()?.local_stmt_content?.();
+  if (single) return tupleArityOfContents(single);
+  return tupleArityOfContents(lastContents(node.fun_body_multiline?.()));
 }
 
 function spanOf(node: any): Span | null {

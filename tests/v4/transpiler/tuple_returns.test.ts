@@ -106,6 +106,54 @@ describe("arity is checked against the definition", () => {
   });
 });
 
+describe("a body that ends in an `if`", () => {
+  /**
+   * An `if` in value position evaluates to whichever branch runs, so a function
+   * ending in one returns a tuple when its branches do. TradingView's own v4
+   * drawings page is built on this:
+   *
+   *     if isFound and length * 2 <= bar_index
+   *         [bar_index[length], p]
+   *     else
+   *         [int(na), float(na)]
+   */
+  const PIVOT =
+    "f(up) =>\n" +
+    "    if up\n" +
+    "        [1.0, 2.0]\n" +
+    "    else\n" +
+    "        [3.0, 4.0]\n";
+
+  it("takes the taken branch's values", () => {
+    expect(read(head(5) + PIVOT + "[a, b] = f(true)\n", "a")).toBe(1);
+    expect(read(head(5) + PIVOT + "[a, b] = f(false)\n", "a")).toBe(3);
+  });
+
+  it("...and its arity is the branches'", () => {
+    expect(() => transpile(head(5) + PIVOT + "[a, b, c] = f(true)\n"))
+      .toThrow(/'f' returns 2 values, but you provided 3/);
+  });
+
+  it("an `else if` chain is followed too", () => {
+    const src = head(5) +
+      "f(n) =>\n" +
+      "    if n > 2\n" +
+      "        [1.0, 2.0]\n" +
+      "    else if n > 1\n" +
+      "        [3.0, 4.0]\n" +
+      "    else\n" +
+      "        [5.0, 6.0]\n" +
+      "[a, b] = f(2.0)\n";
+    expect(read(src, "a")).toBe(3);
+  });
+
+  it("an `if` whose branches are NOT tuples is still not a tuple", () => {
+    const src = head(5) +
+      "f(up) =>\n    if up\n        1.0\n    else\n        2.0\n[a, b] = f(true)\n";
+    expect(() => transpile(src)).toThrow(/does not return a tuple/);
+  });
+});
+
 describe("as request.security's expression", () => {
   it("a user function returning a tuple gives the request a tuple", () => {
     // The shape on TradingView's error-messages page: the width is a fact about
