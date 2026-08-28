@@ -271,53 +271,6 @@ interface ChartPoint {
 // `Context.newObject`), so `p.price` reads through the same field accessor.
 
 
-const point = {
-  /**
-   * `chart.point.new(index, time, price)` — every field given.
-   */
-  new: (index: any, time: any, price: any): ChartPoint => ({
-    index: Number(val(index)),
-    time: Number(val(time)),
-    price: Number(val(price)),
-  }),
-
-  /**
-   * `chart.point.now(price)` — the CURRENT bar's index and time.
-   *
-   * The only constructor that needs the Context, and the reason is the whole
-   * point of it: "now" is a fact about the run, not about the arguments.
-   */
-  now: (ctx: Context, price: any): ChartPoint => ({
-    index: ctx.currentBarIndex,
-    time: ctx.time,
-    price: Number(val(price)),
-  }),
-
-  /**
-   * `chart.point.from_index(index, price)` — time left `na`.
-   */
-  from_index: (index: any, price: any): ChartPoint => ({
-    index: Number(val(index)),
-    time: NaN,
-    price: Number(val(price)),
-  }),
-
-  /**
-   * `chart.point.from_time(time, price)` — index left `na`.
-   */
-  from_time: (time: any, price: any): ChartPoint => ({
-    index: NaN,
-    time: Number(val(time)),
-    price: Number(val(price)),
-  }),
-
-  /** `chart.point.copy(point)` — a new point with the same three fields. */
-  copy: (p: any): ChartPoint => {
-    const src = val(p) ?? {};
-    return { index: src.index, time: src.time, price: src.price };
-  },
-};
-
 export const chart = {
   /**
    * `chart.point` — v5's coordinate object.
@@ -368,14 +321,6 @@ export const chart = {
       return { index: src.index, time: src.time, price: src.price };
     },
   },
-
-  /**
-   * `chart.point` — v5's coordinate object. Declared below this literal and
-   * referenced here, because the registry generator reads the object it is
-   * nested INSIDE: `chart.point.new` is a key only if `point` is a property of
-   * `chart`.
-   */
-  point,
 
   /**
    * The chart's background colour.

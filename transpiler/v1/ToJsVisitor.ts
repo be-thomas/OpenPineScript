@@ -532,9 +532,9 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
 
     this.fnDepth++;
     let body: string;
-    try { body = this.visit(ctx.fun_body_singleline()); }
+    try { body = this.singleLineBody(ctx.fun_body_singleline().local_stmt_singleline()); }
     finally { this.fnDepth--; }   // a guard deeper in the body throws
-    return `function ${name}${params} {\n  return ${body};\n}`;
+    return `function ${name}${params} {\n  ${body};\n}`;
   }
 
   visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
@@ -567,9 +567,42 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return this.visit(ctx.local_stmt_singleline());
   }
 
+  /**
+   * A single-line body — `f(x) => a = 1, b = 2, a + b` — as the INSIDE of a
+   * JavaScript block that hands back the body's value.
+   *
+   * SOURCING. From the manual's user-defined functions page: "The body of the
+   * function must separate all individual statements in its body with commas",
+   * and what a call returns is "the final expression, variable, or tuple in the
+   * function's body".
+   *
+   * So a comma list is a list of STATEMENTS. Joining it with `,` into a
+   * JavaScript comma expression works only while every one of them happens to
+   * BE an expression, and Pine's do not have to be. TradingView's own
+   *
+   *     printTable(txt) => var table t = table.new(...), table.cell(t, 0, 0, txt)
+   *
+   * emitted `return let opsv2_t = ...`, which is not JavaScript — so the script
+   * passed compilation and then threw a SyntaxError the moment it was run.
+   */
+  protected singleLineBody(ctx: Local_stmt_singlelineContext): string {
+    const contents = ctx.local_stmt_content();
+    return contents
+      .map((content, i) => {
+        const js = this.visit(content);
+        return i === contents.length - 1 ? this.returnLastStatement(content, js) : js;
+      })
+      .join(";\n");
+  }
+
+  /**
+   * Retained for generic visits only — `singleLineBody` is what the two call
+   * sites for this rule (a single-line function body, and a v5 switch arm) use,
+   * because they need the trailing statement's VALUE and this does not produce
+   * it.
+   */
   visitLocal_stmt_singleline(ctx: Local_stmt_singlelineContext): string {
-    const contents = ctx.local_stmt_content().map((c) => this.visit(c));
-    return contents.join(", "); 
+    return ctx.local_stmt_content().map((c) => this.visit(c)).join(";\n");
   }
 
   visitLocal_stmt_content(ctx: Local_stmt_contentContext): string {
@@ -609,52 +642,67 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return def ? this.visit(def.id()) : null;
   }
 
+  /**
+   * `js`, the emitted form of a block's LAST statement, turned into whatever
+   * hands that statement's value back to the caller.
+   *
+   * Shared with `singleLineBody`, because the rule is the same one either way:
+   * a body evaluates to its final statement.
+   */
+  protected returnLastStatement(content: Local_stmt_contentContext, js: string): string {
+    // A statement-position `if` inside a loop is emitted as a plain `if` block,
+    // not an IIFE, so that break/continue are legal. It is a STATEMENT —
+    // `return <that>` (or the `_res = <that>` that visitFor_expr rewrites it
+    // into) is a syntax error.
+    if (this.loopDepth > 0 && this.statementIf(content)) return js;
+
+    const isExpression =
+      content.arith_expr() ||
+      content.arith_exprs() ||
+      (content as any).fun_call?.() ||
+      (content as any).if_expr?.() ||
+      (content as any).for_expr?.();
+
+    if (isExpression) return "return " + js;
+
+    // A trailing BINDING is still the function's return value.
+    //
+    // Without this the function fell off the end and returned undefined, so
+    // every caller plotted NaN. It is the reason the published v3 indicator
+    // mcginley_dynamic.pine — whose body is `md = 0.0` then `md := ...` —
+    // produced an all-NaN series.
+    const bound = this.trailingValueName(content);
+    if (bound) return `${js};\nreturn ${bound}`;
+
+    // `break` / `continue`, which have no value and must not be returned.
+    return js;
+  }
+
   visitLocal_stmts_list(ctx: Local_stmts_listContext): string {
-    const stmts = ctx.local_stmt_multiline();
+    // FLATTENED, because a comma-separated line is several statements and not
+    // one — the same rule `singleLineBody` quotes. The block's value is its
+    // last CONTENT, which is not the same node as its last LINE:
+    //
+    //     float q1 = ta.percentile(...), map.put(debugData, "q1", q1)
+    //
+    // is two statements, and reading only the first of them emitted
+    // `let opsv2_q1 = ..., ctx.call(...)` — a `let` list whose second binding
+    // is a call, so the SyntaxError landed on the `.` of `ctx.call`.
+    const contents = ctx.local_stmt_multiline().flatMap(stmt => stmt.local_stmt_content());
 
-    const lines = stmts.map((stmt, index) => {
-        let js = this.visit(stmt);
-
-        // Return logic for last statement
-        if (index === stmts.length - 1 && this.suppressBlockReturn === 0) {
-             const content = stmt.local_stmt_content(0);
-
-             // A statement-position `if` inside a loop is emitted as a plain
-             // `if` block, not an IIFE, so that break/continue are legal. It is
-             // a STATEMENT — `return <that>` (or the `_res = <that>` that
-             // visitFor_expr rewrites it into) is a syntax error.
-             if (content && this.loopDepth > 0 && this.statementIf(content)) return js;
-
-             if (content) {
-                 const isExpression =
-                    content.arith_expr() ||
-                    content.arith_exprs() ||
-                    (content as any).fun_call?.() ||
-                    (content as any).if_expr?.() ||
-                    (content as any).for_expr?.();
-
-                 if (isExpression) {
-                     return "return " + js;
-                 }
-
-                 // A trailing BINDING is still the function's return value.
-                 //
-                 // Without this the function fell off the end and returned
-                 // undefined, so every caller plotted NaN. It is the reason the
-                 // published v3 indicator mcginley_dynamic.pine — whose body is
-                 // `md = 0.0` then `md := ...` — produced an all-NaN series.
-                 const bound = this.trailingValueName(content);
-                 if (bound) return `${js};\nreturn ${bound}`;
-             }
-        }
-        return js;
+    const lines = contents.map((content, index) => {
+      const js = this.visit(content);
+      if (index === contents.length - 1 && this.suppressBlockReturn === 0) {
+        return this.returnLastStatement(content, js);
+      }
+      return js;
     });
     return lines.join(";\n") + ";";
   }
 
+  /** @see visitLocal_stmts_list — the flattening there is what this rule needs. */
   visitLocal_stmt_multiline(ctx: Local_stmt_multilineContext): string {
-    const parts = ctx.local_stmt_content().map((c) => this.visit(c));
-    return parts.join(", ");
+    return ctx.local_stmt_content().map((c) => this.visit(c)).join(";\n");
   }
 
   // --- Variables (Series Architecture) ---

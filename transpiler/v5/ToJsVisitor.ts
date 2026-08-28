@@ -1747,20 +1747,11 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * body does not, and cannot simply be wrapped in one either: `1 => x = 2`
    * emits a declaration, and `return let x = …` is a syntax error. A trailing
    * binding evaluates to the bound name, which is the same rule a function body
-   * follows.
+   * follows — so this is exactly `singleLineBody`.
    */
   protected caseBody(arm: Switch_caseContext): string {
     const block = arm.stmts_block();
     if (block) return this.visit(block);
-
-    const single = arm.local_stmt_singleline()!;
-    const js = this.visit(single);
-
-    const contents = single.local_stmt_content();
-    if (contents.length === 1) {
-      const bound = this.trailingValueName(contents[0] as any);
-      if (bound) return `{ ${js};\nreturn ${bound}; }`;
-    }
-    return `{ return ${js}; }`;
+    return `{ ${this.singleLineBody(arm.local_stmt_singleline()! as any)}; }`;
   }
 }
