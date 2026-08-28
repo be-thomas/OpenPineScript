@@ -294,6 +294,18 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     }
   }
 
+  /**
+   * The arity of the tuple this call returns BECAUSE ITS ARGUMENT IS ONE, or
+   * null when nothing about the call says it returns a tuple.
+   *
+   * Always null here: tuple expressions are a v4 addition ("the `expression`
+   * parameter can be series or tuple", v4 release notes, May 2020), and before
+   * that a bracketed list is not admitted as an argument at all.
+   */
+  protected tupleArityFromArgument(_call: Fun_callContext): number | null {
+    return null;
+  }
+
   /** User-defined functions cannot return tuples. */
   protected enforceNoTupleReturn(ctx: SourceLocated, detail = ""): void {
     throw this.err(ctx, `User-defined functions cannot return tuples.${detail}`);
@@ -723,8 +735,25 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
         const funcName = funCall.id().getText();
         const entry = this.registry[funcName];
 
+        // A call can return a tuple because its ARGUMENT is one:
+        //
+        //     [o, h, l, c] = security(sym, "D", [open, high, low, close])
+        //
+        // The arity is the literal's, not the function's, so no registry entry
+        // could state it — `security` returns one value or four depending on
+        // what it was handed. Null before v4, which has no tuple expressions.
+        const argumentArity = this.tupleArityFromArgument(funCall);
+        if (argumentArity !== null) {
+            if (argumentArity !== ids.length) {
+                throw this.err(
+                    ctx,
+                    `'${funcName}' was given a ${argumentArity}-element tuple, but you ` +
+                    `provided ${ids.length} variables.`,
+                );
+            }
+        }
         // If it's a built-in, check the registry for tuple return
-        if (entry) {
+        else if (entry) {
             if (entry.returns.kind !== "tuple") {
                 throw this.err(ctx, `'${funcName}' does not return a tuple. Multi-variable assignment is only allowed for specific built-in functions.`);
             }
@@ -1314,7 +1343,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     const aa = ctx.fun_actual_args();
 
     const pos = aa?.pos_args();
-    const exprs = pos ? pos.arith_expr() : [];
+    const exprs = pos ? this.positionalArgs(pos) : [];
     const parts = exprs.map((e, i) => {
       const js = this.visit(e);
       return i === 2 ? `() => (${js})` : js; // positional `expression`
@@ -1360,8 +1389,22 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return "";
   }
 
+  /**
+   * The positional arguments of a call, in order.
+   *
+   * A seam, not a behaviour. v1's `pos_args` is a list of `arith_expr`, and v4
+   * widens it so a BRACKETED LIST can be one — `security(sym, tf,
+   * [close, open])` and `input.string("FQ", "Period", ["FQ", "FH"])`. The
+   * generated context therefore exposes `pos_arg()` at v4 and `arith_expr()`
+   * before it, and every place that walks the argument list has to ask the
+   * same question.
+   */
+  protected positionalArgs(ctx: Pos_argsContext): any[] {
+    return ctx.arith_expr();
+  }
+
   visitPos_args(ctx: Pos_argsContext): string {
-    return ctx.arith_expr().map((e) => this.visit(e)).join(", ");
+    return this.positionalArgs(ctx).map((e) => this.visit(e)).join(", ");
   }
 
   visitKw_args(ctx: Kw_argsContext): string {

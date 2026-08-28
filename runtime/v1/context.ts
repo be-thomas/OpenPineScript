@@ -1008,9 +1008,25 @@ export class Context {
         const vals = Array.isArray(values) ? values : [values];
 
         return names.map((name, index) => {
-            const val = (index < vals.length) ? vals[index] : NaN;
-            // Unwrap potential Series object to raw number
-            const numVal = Number(val); 
+            if (index >= vals.length) return this.new_var(name, NaN);
+
+            const raw = vals[index];
+            const unwrapped = (raw !== null && raw !== undefined && typeof raw.valueOf === "function")
+                ? raw.valueOf() : raw;
+
+            // NON-NUMERIC ELEMENTS SURVIVE. `Number()` was applied to every
+            // element, which is right for `[m, s, h] = macd(...)` and wrong for
+            // a v4 tuple expression:
+            //
+            //     [price, currency] = security(sym, "D", [close, syminfo.currency])
+            //
+            // where the second element is a string and came out `na`.
+            if (typeof unwrapped === "string" || typeof unwrapped === "boolean"
+                || Array.isArray(unwrapped)) {
+                return this.new_var(name, unwrapped);
+            }
+
+            const numVal = Number(unwrapped);
             return this.new_var(name, isNaN(numVal) ? NaN : numVal);
         });
     }
@@ -1393,7 +1409,7 @@ export class Context {
      * sub-context, by rebinding the VM's global series (open/high/.../close) and
      * `ctx` to the sub-context for the duration of the thunk. Restores on exit.
      */
-    public evalSecurityBar(sub: Context, bar: SecurityCandle, thunk: () => any): number {
+    public evalSecurityBar(sub: Context, bar: SecurityCandle, thunk: () => any): any {
         const sb = this.__sandbox;
         if (!sb) return NaN;
         const P = "opsv2_";
@@ -1412,8 +1428,17 @@ export class Context {
         try {
             sub.setBar(bar.time, bar.open, bar.high, bar.low, bar.close, bar.volume);
             const r = thunk();
-            const num = (r !== null && r !== undefined && typeof (r as any).valueOf === "function") ? (r as any).valueOf() : r;
+            const unwrap = (x: any) =>
+                (x !== null && x !== undefined && typeof x.valueOf === "function") ? x.valueOf() : x;
+            const num = unwrap(r);
             sub.finalizeBar();
+
+            // A TUPLE expression — `security(sym, "D", [close, open])`, v4,
+            // May 2020 — comes back as an array, and a STRING expression
+            // (`syminfo.currency`) as a string. `Number()` turned both into
+            // NaN, so the tuple form silently produced `na` for every element.
+            if (Array.isArray(num)) return num.map(unwrap);
+            if (typeof num === "string") return num;
             return Number(num);
         } finally {
             sb.ctx = saved.ctx;

@@ -37,6 +37,9 @@ import {
   Var_assignContext,
   If_exprContext,
   IdContext,
+  Pos_argsContext,
+  Pos_argContext,
+  Fun_callContext,
 } from "../../parser/v4/generated/PineV4Parser";
 
 /** Anything carrying a source position (see the v1 base for why it is structural). */
@@ -251,5 +254,51 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
     const alternative = this.emitElseBranch(nested);
     if (alternative !== null) out += ` else ${alternative}`;
     return out;
+  }
+
+  // ── Bracketed lists as positional arguments ───────────────────────────────
+
+  /**
+   * v4's `pos_args` is a list of `pos_arg`, not of `arith_expr`. Overriding the
+   * SEAM rather than `visitPos_args` means `emitSecurity` — which walks the
+   * same list to defer its third argument into a thunk — picks the change up
+   * without knowing about it.
+   */
+  protected override positionalArgs(ctx: Pos_argsContext): any[] {
+    return (ctx as any).pos_arg?.() ?? super.positionalArgs(ctx as any);
+  }
+
+  /** `arith_expr | arith_exprs` — a transparent wrapper either way. */
+  visitPos_arg(ctx: Pos_argContext): string {
+    const list = ctx.arith_exprs();
+    return list ? this.visit(list) : this.visit(ctx.arith_expr()!);
+  }
+
+  /**
+   * `[o, h, l, c] = security(sym, "D", [open, high, low, close])`.
+   *
+   * The tuple is the ARGUMENT's, so its width is read off the bracketed list
+   * rather than out of the registry — `security` returns one value or four
+   * depending on what it was handed, and no single registry entry can say that.
+   *
+   * Both spellings are read, positional and keyword, because both appear in
+   * TradingView's own examples.
+   */
+  protected override tupleArityFromArgument(call: Fun_callContext): number | null {
+    const args = call.fun_actual_args();
+    if (!args) return null;
+
+    // `expression` is the third positional parameter of every function in the
+    // security family, which is the only place a tuple argument is documented.
+    const positional = args.pos_args()?.pos_arg() ?? [];
+    const third = positional[2]?.arith_exprs();
+    if (third) return third.arith_expr().length;
+
+    for (const kw of args.kw_args()?.kw_arg() ?? []) {
+      if (kw.id().getText() !== "expression") continue;
+      const list = kw.arith_exprs();
+      if (list) return list.arith_expr().length;
+    }
+    return null;
   }
 }

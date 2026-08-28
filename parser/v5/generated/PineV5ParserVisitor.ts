@@ -34,6 +34,8 @@ import { IdContext } from "./PineV5Parser.js";
 import { Compound_assign_opContext } from "./PineV5Parser.js";
 import { Var_assignContext } from "./PineV5Parser.js";
 import { If_exprContext } from "./PineV5Parser.js";
+import { Pos_argContext } from "./PineV5Parser.js";
+import { Pos_argsContext } from "./PineV5Parser.js";
 import { Pine_scriptContext } from "./PineV5Parser.js";
 import { Global_stmtContext } from "./PineV5Parser.js";
 import { Fun_def_stmtContext } from "./PineV5Parser.js";
@@ -62,7 +64,6 @@ import { Unary_exprContext } from "./PineV5Parser.js";
 import { Sqbr_exprContext } from "./PineV5Parser.js";
 import { AtomContext } from "./PineV5Parser.js";
 import { Fun_actual_argsContext } from "./PineV5Parser.js";
-import { Pos_argsContext } from "./PineV5Parser.js";
 import { Kw_argsContext } from "./PineV5Parser.js";
 import { Kw_argContext } from "./PineV5Parser.js";
 import { LiteralContext } from "./PineV5Parser.js";
@@ -271,6 +272,18 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      */
     visitIf_expr?: (ctx: If_exprContext) => Result;
     /**
+     * Visit a parse tree produced by `PineV5Parser.pos_arg`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitPos_arg?: (ctx: Pos_argContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV5Parser.pos_args`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitPos_args?: (ctx: Pos_argsContext) => Result;
+    /**
      * Visit a parse tree produced by `PineV5Parser.pine_script`.
      * @param ctx the parse tree
      * @return the visitor result
@@ -438,12 +451,6 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitFun_actual_args?: (ctx: Fun_actual_argsContext) => Result;
-    /**
-     * Visit a parse tree produced by `PineV5Parser.pos_args`.
-     * @param ctx the parse tree
-     * @return the visitor result
-     */
-    visitPos_args?: (ctx: Pos_argsContext) => Result;
     /**
      * Visit a parse tree produced by `PineV5Parser.kw_args`.
      * @param ctx the parse tree

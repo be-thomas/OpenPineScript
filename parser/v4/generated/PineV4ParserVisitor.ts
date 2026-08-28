@@ -12,6 +12,8 @@ import { Var_defsContext } from "./PineV4Parser.js";
 import { Compound_assign_opContext } from "./PineV4Parser.js";
 import { Var_assignContext } from "./PineV4Parser.js";
 import { If_exprContext } from "./PineV4Parser.js";
+import { Pos_argContext } from "./PineV4Parser.js";
+import { Pos_argsContext } from "./PineV4Parser.js";
 import { Global_stmt_contentContext } from "./PineV4Parser.js";
 import { Local_stmt_contentContext } from "./PineV4Parser.js";
 import { Pine_scriptContext } from "./PineV4Parser.js";
@@ -46,7 +48,6 @@ import { Sqbr_exprContext } from "./PineV4Parser.js";
 import { AtomContext } from "./PineV4Parser.js";
 import { Fun_callContext } from "./PineV4Parser.js";
 import { Fun_actual_argsContext } from "./PineV4Parser.js";
-import { Pos_argsContext } from "./PineV4Parser.js";
 import { Kw_argsContext } from "./PineV4Parser.js";
 import { Kw_argContext } from "./PineV4Parser.js";
 import { LiteralContext } from "./PineV4Parser.js";
@@ -122,6 +123,18 @@ export class PineV4ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitIf_expr?: (ctx: If_exprContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV4Parser.pos_arg`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitPos_arg?: (ctx: Pos_argContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV4Parser.pos_args`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitPos_args?: (ctx: Pos_argsContext) => Result;
     /**
      * Visit a parse tree produced by `PineV4Parser.global_stmt_content`.
      * @param ctx the parse tree
@@ -326,12 +339,6 @@ export class PineV4ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitFun_actual_args?: (ctx: Fun_actual_argsContext) => Result;
-    /**
-     * Visit a parse tree produced by `PineV4Parser.pos_args`.
-     * @param ctx the parse tree
-     * @return the visitor result
-     */
-    visitPos_args?: (ctx: Pos_argsContext) => Result;
     /**
      * Visit a parse tree produced by `PineV4Parser.kw_args`.
      * @param ctx the parse tree

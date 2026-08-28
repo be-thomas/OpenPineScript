@@ -765,7 +765,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   /** `Point.new(…)` and `Point.copy(p)` — the two calls a TYPE answers. */
   protected emitTypeCall(typeName: string, member: string, ctx: Fun_callContext): string | null {
     if (member === "copy") {
-      const target = ctx.fun_actual_args()?.pos_args()?.arith_expr(0);
+      const pos = ctx.fun_actual_args()?.pos_args();
+      const target = pos ? this.positionalArgs(pos)[0] : undefined;
       if (!target) throw this.err(ctx, `'${typeName}.copy' needs the object to copy.`);
       return `ctx.copyObject(${this.visit(target)})`;
     }
@@ -799,7 +800,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     const args = ctx.fun_actual_args();
     const assigned = new Map<string, string>();
 
-    const positional = args?.pos_args()?.arith_expr() ?? [];
+    const posArgs = args?.pos_args();
+    const positional = posArgs ? this.positionalArgs(posArgs) : [];
     if (positional.length > fields.length) {
       throw this.err(
         ctx,
@@ -883,7 +885,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    */
   protected enforceExitCondition(ctx: Fun_callContext): void {
     const args = ctx.fun_actual_args();
-    const positional = args?.pos_args()?.arith_expr().length ?? 0;
+    const posArgs = args?.pos_args();
+    const positional = posArgs ? this.positionalArgs(posArgs).length : 0;
     if (positional >= 5) return;
 
     const keywords = args?.kw_args()?.kw_arg().map(a => a.id().getText()) ?? [];
@@ -1361,7 +1364,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     }
 
     if (member === "copy") {
-      const target = ctx.fun_actual_args()?.pos_args()?.arith_expr(0);
+      const pos = ctx.fun_actual_args()?.pos_args();
+      const target = pos ? this.positionalArgs(pos)[0] : undefined;
       if (!target) throw this.err(ctx, `'${alias}.${typeName}.copy' needs the object to copy.`);
       return `ctx.copyObject(${this.visit(target)})`;
     }

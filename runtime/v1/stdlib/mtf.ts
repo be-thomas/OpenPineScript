@@ -44,7 +44,7 @@ export function security(
     expression: () => any,
     _gaps?: any,
     lookaheadInput?: any
-): number {
+): any {
     if (typeof expression !== "function") return NaN; // malformed call
 
     // Explicit argument wins; otherwise the version's default. v1/v2 default to

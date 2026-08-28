@@ -123,3 +123,26 @@ var_assign : id ( ASSIGN | compound_assign_op ) arith_expr ;
 if_expr
   : IF_COND ternary_expr stmts_block ( LEND* IF_COND_ELSE ( if_expr | stmts_block ) )?
   ;
+
+/**
+ * A bracketed list as a POSITIONAL argument.
+ *
+ * Quoted, from the TradingView v4 release notes, May 2020:
+ *
+ *   "The behavior of `security` function has changed: the `expression`
+ *    parameter can be series or tuple."
+ *
+ * so `security(sym, timeframe.period, [close, open])` is v4 syntax, and the
+ * same shape covers an `options` list written positionally —
+ * `input.string("FQ", "Period", ["FQ", "FH", "FY"])`.
+ *
+ * v1 already admits `arith_exprs` as a keyword-argument VALUE, and its header
+ * explains why it stops there: a bracketed list is NOT a general expression in
+ * Pine, so admitting it to `atom` would make `x = [1, 2]` legal. This widens
+ * exactly one more position — an argument — and leaves that reasoning intact.
+ *
+ * No ambiguity with history access. `a[1]` is a `sqbr_expr`, which requires an
+ * atom BEFORE the bracket; an argument that opens with '[' can only be a list.
+ */
+pos_arg  : arith_expr | arith_exprs ;
+pos_args : pos_arg ( COMMA pos_arg )* ;
