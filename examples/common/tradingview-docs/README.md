@@ -8,9 +8,9 @@ this engine nor its author wrote.
 |---|---|---|
 | `//@version=2` | 26 | 23 (88%) |
 | `//@version=3` | 18 | 17 (94%) |
-| `//@version=4` | 148 | 129 (87%) |
-| `//@version=5` | 571 | 326 (57%) |
-| **Total** | **763** | **496 (65%)** |
+| `//@version=4` | 148 | 146 (99%) |
+| `//@version=5` | 571 | 537 (94%) |
+| **Total** | **763** | **723 (95%)** |
 
 ## These files are not edited. Ever.
 
@@ -68,56 +68,92 @@ came from.
   two-line snippets illustrating a point; those would add files without adding
   anything to run.
 - **The compilation-error pages.** Those examples are deliberately broken — they
-  exist to show you an error message. The fetch script skips them by name.
+  exist to show you an error message. The fetch script skips them by name, and
+  the five it misses are pinned instead (see below): a script published to show
+  an error looks exactly like a script with an error, so nothing structural
+  separates them.
 
-## Why 35% do not compile
+## What the 40 remaining failures are
 
-Every failure is a real gap, and the corpus was added precisely so they stop
-being invisible. Grouped by cause, largest first:
+Twenty-two of them are not evidence of a gap here, because refusing them is the
+right answer, and they are PINNED in
+[`conformance/common/docs_corpus_integrity.test.ts`](../../../conformance/common/docs_corpus_integrity.test.ts)
+so the denominator stays honest — adding one requires saying why.
 
-| Count | Cause |
-|---|---|
-| 49 | compound assignment — `+=`, `-=`, `*=`, `/=`, `%=` |
-| 36 | `for … in` over arrays and maps, including `for [i, value] in` |
-| 34 | the `chart.*` namespace — `chart.point`, `chart.left_visible_bar_time` |
-| 26 | `else if` chains |
-| 24 | a standard-library name that is missing, or one this engine correctly rejects |
-| 16 | the `display.*`, `session.*`, `syminfo.*` and `font.*` namespaces |
-| 16 | the `format.*` namespace |
-| 10 | `str.format` pattern literals the lexer rejects |
-| 9 | `enum` |
-| 7 | tuple destructuring — `[a, b] = f()` |
-| 7 | **by design** — an `import` whose library source the caller did not supply |
-| 3 | upstream artefacts: three release-note blocks contain reStructuredText, not Pine |
-| 30 | a long tail, mostly multi-line call arguments and `syminfo.type` |
+| Count | Cause | Ours? |
+|---|---|---|
+| 10 | TradingView publishes it BROKEN — a `str.format` mask with a real newline inside the quotes, which is not a Pine literal | no |
+| 9 | **by design** — an `import` whose library source the caller did not supply | no |
+| 5 | published to DEMONSTRATE a compilation error — three scope demos, a script that plots a name it never declares, and one whose own comment reads "Causes compilation error" | no |
+| 5 | the block is DOCUMENTATION, not a script: a reStructuredText directive, an elided body, prose left in the same code block | no |
+| 4 | a v5 page carrying a v4 spelling — bare `fixnan` where v5 has `ta.fixnan`, and one `transp =` argument v5 removed | no |
+| 3 | a v2 page carrying v4 code — `syminfo.mintick` in a `//@version=2` script | no |
+| 2 | an indent that dedents to a level it never opened. One is deliberate — the page is about that message — and one is not | no |
+| 1 | method OVERLOADING — two `getType` methods distinguished by receiver type. This engine dispatches by name, and says so | yes |
+| 1 | a method CHAIN destructured into a tuple: `arr.maintainQueue(…).calcBB(…)` returns one, and the arity of a chain's last method is not resolved | yes |
 
-The v5 rate is the lowest because TradingView's v5 archive is served from the
-current documentation set and carries examples using features added after v5
-shipped — `chart.point` and `enum` among them. Those are counted as failures
-here rather than excused, because a script that TradingView accepts and this
-engine rejects is a gap whatever the reason.
+The last two are the only ones that describe this engine rather than the
+corpus. Both are named refusals with a line number, not silent wrong answers.
+
+### What closed the gap
+
+Each of these was implemented from a quoted TradingView doc or release note,
+with a dedicated test file, after the corpus made the absence visible:
+
+| Feature | Version | Scripts |
+|---|---|---|
+| `+=` `-=` `*=` `/=` `%=` | v4 | 32 |
+| `else if` chains | v4 | 22 |
+| `for … in` over arrays and maps | v5 | 25 |
+| `chart.*`, `format.*`, `display.*`, `font.*`, `session.*` | v5 | 71 |
+| tuple expressions as arguments | v4 | 12 |
+| method chaining — `a.f().g()` | v5 | 9 |
+| `syminfo.*`, and splitting the `tickerid` variable from the function | v4 | 7 |
+| `chart.point`, `polyline.*`, `linefill.*` | v5 | 15 |
+| `enum` and `input.enum` | v5 | 9 |
+| user functions returning tuples | v4 | 7 |
+| `float()`, `bool()`, `string()` casts | v4 | 8 |
+| a keyword argument's name is not a renamed word | v4 | 4 |
+| `str.replace_all` re-gated from v5 to v4 | v4 | 3 |
+| a tuple-returning body may end in an `if` | v4 | 3 |
+| the `float[]` array type suffix | v4 | 1 |
+| a call suffix may be a field — `m.get(0, 0).value` | v5 | 1 |
+| `varip` on a UDT field | v5 | 1 |
+
+Two more changed no count and mattered more than any row above. Emitting a
+comma-separated body as STATEMENTS rather than as a JavaScript comma expression
+fixed three scripts that compiled and then threw a `SyntaxError` on the first
+bar; scoping a block's locals to their block turned a first-bar `ReferenceError`
+into `Undeclared identifier`, which cost three scripts in the table — every one
+of them published by TradingView to show that exact error.
 
 ## Compiling is not the same as running
 
-Of the 496 that compile, running each one over the 506-bar `mock_data/common/AAPL_mock.csv`:
+Of the 723 that compile, running each one over the 506-bar
+`mock_data/common/AAPL_mock.csv`:
 
 | Result | Count | Meaning |
 |---|---|---|
-| ran, produced output | 258 | plots, trades or logs came out |
-| no output | 105 | most have no plotting call at all — drawings and tables only. The rest need data this run does not have (a strategy gated on `n > 4000` over 506 bars) |
-| all-`na` output | 73 | mostly expected: the output is a colour, or the script wants `request.`/symbol data |
-| runtime error | 60 | every one is now a NAMED diagnostic — see below |
+| ran, produced output | 330 | plots, trades or logs came out |
+| no output | 159 | most have no plotting call at all — drawings and tables only. The rest need data this run does not have (a strategy gated on `n > 4000` over 506 bars) |
+| all-`na` output | 110 | mostly expected: the script is gated on `barstate.islastconfirmedhistory`, on an intraday session, or on a symbol this dataset is not |
+| runtime error | 124 | every one is a NAMED diagnostic — see below |
 
-**No script in this corpus can raise a `ReferenceError` any more.** That used to
-be the largest failure class: 99 runtime errors, 45 of them a bare
-`opsv2_<name> is not defined` on the first bar. A valid Pine script producing a
-JavaScript crash is always an engine bug, so both halves were fixed — the
-missing built-ins were implemented, and the emitter no longer emits a name that
-nothing binds.
+**No script in this corpus raises a `ReferenceError`, and every one of the 723
+emits JavaScript that parses.** Both used to be false. `ReferenceError` was once
+the largest failure class — 45 files dying with a bare `opsv2_<name> is not
+defined` on the first bar — and three scripts compiled to JavaScript that
+`new Function` rejected outright, because a Pine comma list was emitted as a
+JavaScript comma expression and a declaration is not one. A valid Pine script
+producing a JavaScript crash is always an engine bug, so both halves were fixed:
+the missing built-ins were implemented, the emitter no longer emits a name that
+nothing binds, and a name that is bound in a block it is not read from is now
+`Undeclared identifier` at compile time — which is what TradingView calls it.
 
-The 60 that remain are explicit refusals (`renko` cannot be rebuilt from OHLCV,
-`accdist` is not implemented), bounds errors in matrix and array demos, and two
-`color.from_gradient` registry entries that resolve to a non-function.
+The 124 that remain are explicit refusals (`renko`, `linebreak` and
+`pointfigure` cannot be rebuilt from OHLCV bars; `accdist` is not implemented),
+bounds errors in matrix and array demos, and a tail of missing members on
+namespaces that do exist.
 
 ## What running the corpus fixed
 
@@ -134,6 +170,10 @@ TradingView's own release notes before being changed:
 | `random`, `todegrees`, `toradians`, `round_to_mintick` re-gated from v5-only to v4, aliased to `math.*` at v5 | 1 file, and the v4 release notes |
 | `renko`, `linebreak`, `kagi`, `pointfigure` refuse explicitly instead of crashing | 4 files |
 | `color.from_gradient` and `alert()` + `alert.freq_*` implemented (v4) | 3 files, and the v4 release notes |
+| A comma-separated body emitted `return let x = …` — JavaScript that does not parse | 3 files failing `new Function(js)` |
+| `str.tostring`'s format argument was silently dropped, so every golden column had been captured unformatted | the v5 rename table overwriting a real implementation |
+| `syminfo.tickerid` read as the `tickerid()` FUNCTION object, because one registry key served both | 89 uses across the corpus |
+| A block's local was visible from global scope, emitting a name nothing binds | 3 files, all of them TradingView's own scope demos |
 
 The last one is the shape most of these take. TradingView's v4 release notes say
 `random(min, max, seed)` is a v4 function; this engine had it gated as v5-only

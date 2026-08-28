@@ -146,6 +146,12 @@ function isDocumentationRatherThanScript(source: string): boolean {
 const NOT_DETECTABLE_BY_SHAPE: readonly string[] = [
   "v3/v5-release-notes-19.pine",
   "v5/v5-error-messages-06.pine",
+  // Indentation the published source gets wrong by accident rather than on
+  // purpose: `highest()`'s `for` body opens at column 12 and its next line
+  // dedents to 8, which is not an open level. A stray indent is a stray indent
+  // however it got there, so nothing structural separates this from the case
+  // above — or from a real bug.
+  "v5/v5-release-notes-07.pine",
 ];
 
 describe("blocks that are documentation rather than script", () => {
@@ -199,6 +205,12 @@ const REFUSED_ON_PURPOSE: readonly string[] = [
   "v5/v5-faq-programming-00.pine",   // reads an `if`-local from global scope
   "v5/v5-faq-programming-02.pine",   // reads a nested block's local from its parent
   "v5/v5-language-loops-04.pine",    // reads a `for`-local after the loop
+  // A different rule, the same intent. TradingView's comment on the offending
+  // line is "Causes compilation error since the scope count is now 602"; the
+  // engine refuses it one rule earlier, because `x` is mutable and mutable
+  // variables cannot be passed to `request.security`. Both are real Pine rules
+  // and the script compiles under neither.
+  "v5/v5-writing-limitations-10.pine",
 ];
 
 describe("scripts that do not compile on purpose", () => {
@@ -209,6 +221,11 @@ describe("scripts that do not compile on purpose", () => {
       )).toBe(true);
     });
   }
+
+  it("the limitations demo says so in its own source too", () => {
+    expect(read("v5/v5-writing-limitations-10.pine"))
+      .toMatch(/Causes compilation error/);
+  });
 
   it("the loops demo says so in its own source", () => {
     expect(read("v5/v5-language-loops-04.pine"))
