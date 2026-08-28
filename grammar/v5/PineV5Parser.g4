@@ -194,7 +194,30 @@ for_in_expr : FOR_STMT ( ids_array | id ) IN ternary_expr stmts_block ;
 
 // --- Overrides -------------------------------------------------------------
 
-fun_call : id type_args? LPAR ( fun_actual_args )? RPAR ;
+/**
+ * A method call CHAINED onto the result of another call.
+ *
+ * Quoted, from the manual's Methods page:
+ *
+ *   "We are able to call `copy()`, `fill()`, and `avg()` successively on the
+ *    same line of code because the first two methods return an `array<float>`
+ *    instance."
+ *
+ *     srcArray.copy().fill(1.0, 0.0, min, val).avg()
+ *     m.get(0, 0).set_x(bar_index)
+ *
+ * A separate rule rather than a wider `id`, because the receiver here is a
+ * VALUE — the previous call's result — and not a name. The emitter needs that
+ * distinction: `m.get(0, 0)` is a method call whose receiver is `m`, and
+ * `.set_x(...)` is a method call whose receiver is whatever that returned.
+ *
+ * No ambiguity with a dotted callee. `id` is greedy, so `a.b(1)` still parses
+ * as one id `a.b` followed by an argument list; this rule can only start after
+ * a closing parenthesis.
+ */
+call_suffix : DOT id type_args? LPAR ( fun_actual_args )? RPAR ;
+
+fun_call : id type_args? LPAR ( fun_actual_args )? RPAR call_suffix* ;
 
 // A statement may now also DECLARE a type, a method, a library export, or a
 // library import. The two inherited alternatives are kept, in the same order.

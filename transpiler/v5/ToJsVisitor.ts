@@ -55,6 +55,7 @@ import { parse as parseV5 } from "../../parser/v5";
 import {
   While_exprContext,
   For_in_exprContext,
+  Call_suffixContext,
   Switch_exprContext,
   Switch_caseContext,
   Fun_callContext,
@@ -695,6 +696,11 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   // ── Calls ─────────────────────────────────────────────────────────────────
 
   override visitFun_call(ctx: Fun_callContext): string {
+    return this.emitCallChain(this.emitBaseCall(ctx), ctx);
+  }
+
+  /** The call itself, before any `.method()` chained onto its result. */
+  protected emitBaseCall(ctx: Fun_callContext): string {
     const name = ctx.id().getText();
 
     // The directive is intercepted before anything else, exactly as the base
@@ -730,6 +736,52 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     if (dotted !== null) return dotted;
 
     return this.withCallee(name, () => super.visitFun_call(ctx as any));
+  }
+
+  /**
+   * `a.f().g()` — the chained method calls hanging off a call's result.
+   *
+   * Folded here rather than inside each emit path, because every one of them
+   * returns a VALUE and the chain applies to the value, whatever produced it:
+   * a built-in call, a method call, a UDT constructor, a library function.
+   *
+   * The receiver of a chained call is an expression, so it cannot go through
+   * `emitMethodCall`, which resolves a receiver NAME to a local. Dispatch is
+   * otherwise identical, and `Context.builtinMethod` was already receiving a
+   * value rather than a name.
+   */
+  protected emitCallChain(base: string, ctx: Fun_callContext): string {
+    let js = base;
+    for (const suffix of (ctx as any).call_suffix?.() ?? []) {
+      js = this.emitChainedMethod(js, suffix as Call_suffixContext);
+    }
+    return js;
+  }
+
+  /** One `.method(args)` applied to an already-emitted receiver. */
+  protected emitChainedMethod(receiver: string, ctx: Call_suffixContext): string {
+    // `getText()`, not `visit`: this is a METHOD NAME, and visiting it as an
+    // identifier would run it through the undeclared-identifier guard and the
+    // rename table, neither of which is about a method.
+    const method = ctx.id().getText();
+    const args = this.withCallee(
+      method,
+      () => (ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : ""),
+    );
+    const tail = args ? `, ${args}` : "";
+    const at = this.getLocId(ctx as SourceLocated);
+
+    if (this.userMethods.has(method)) {
+      return `ctx.call("${method}${at}", ${this.funcName(method)}, ${receiver}${tail})`;
+    }
+
+    const owner = this.libraryMethods.get(method);
+    if (owner !== undefined) {
+      const fn = `${this.libraryNamespace(owner)}[${JSON.stringify(method)}]`;
+      return `ctx.call("${method}${at}", ${fn}, ${receiver}${tail})`;
+    }
+
+    return `ctx.builtinMethod("${at}", ${receiver}, ${JSON.stringify(method)}${tail})`;
   }
 
   /**

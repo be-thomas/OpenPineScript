@@ -109,12 +109,31 @@ export const array = {
         return a.splice(bounds(a, index, "remove"), 1)[0];
     },
     clear: (id: any) => { arr(id, "clear").length = 0; },
+    /**
+     * Fills a contiguous range, and RETURNS THE ARRAY.
+     *
+     * The reference gives `array.fill(id, value, index_from, index_to) → void`,
+     * and the manual's Methods page gives this example
+     *
+     *     srcArray.copy().fill(1.0, 0.0, min, val).avg()
+     *
+     * with the explanation: "We are able to call `copy()`, `fill()`, and
+     * `avg()` successively on the same line of code because the first two
+     * methods return an `array<float>` instance."
+     *
+     * The two statements disagree. The example is the one a script can depend
+     * on — it is TradingView's own published code, and returning the receiver
+     * is a strict superset of returning nothing: a caller that ignores the
+     * result cannot tell the difference. So the receiver is returned, and the
+     * conflict is recorded here rather than resolved silently.
+     */
     fill: (id: any, value: any, index_from: any = 0, index_to: any = undefined) => {
         const a = arr(id, "fill");
         const from = Number(val(index_from)) || 0;
         const to = index_to === undefined || val(index_to) === undefined
             ? a.length : Number(val(index_to));
         a.fill(val(value), from, to);
+        return a;
     },
 
     // --- Whole-array operations -------------------------------------------
