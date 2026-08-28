@@ -102,7 +102,22 @@ field_type : ( type_name | id ) type_args? ;
  */
 type_def_stmt : TYPE id type_body ;
 type_body : BEGIN ( type_field | LEND )+ END ;
-type_field : type_qual? field_type id ( DEFINE arith_expr )? ;
+/**
+ * One field. The manual states the shape as
+ *
+ *     [export ]type <UDT_identifier>
+ *         [varip ][field_type ]<field_name>[ = <value>]
+ *
+ * so `varip` precedes the type, and the type itself is optional.
+ *
+ * `varip` is PARSED AND IGNORED here, which is honest rather than lazy: on
+ * TradingView it exempts the field from the intra-bar rollback, and an object
+ * in this engine is a plain JavaScript object that is not rolled back at all.
+ * Every field already behaves the way a `varip` one does, so accepting the
+ * word changes no result — and rejecting it took the whole script with it. The
+ * same reasoning `type_qual` carries.
+ */
+type_field : VARIP? type_qual? field_type? id ( DEFINE arith_expr )? ;
 
 /**
  * `method name(Receiver self, …) => …`.

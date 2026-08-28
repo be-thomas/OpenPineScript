@@ -302,3 +302,47 @@ describe("typed declarations and parameters", () => {
       .toThrow(/parsing failed/);
   });
 });
+
+describe("a `varip` field", () => {
+  /**
+   * SOURCING. The manual gives a UDT's shape as
+   *
+   *     [export ]type <UDT_identifier>
+   *         [varip ][field_type ]<field_name>[ = <value>]
+   *
+   * so `varip` precedes the field's type, and the type is itself optional.
+   * TradingView's "Objects using `varip` fields demo" is the example.
+   *
+   * ── What it does here, and what it does not ─────────────────────────────
+   *
+   * On TradingView `varip` exempts the field from the intra-bar rollback. An
+   * object in this engine is a plain JavaScript object, held by reference and
+   * not rolled back at all, so every field already behaves the way a `varip`
+   * one does and the qualifier changes no result. It is parsed because
+   * rejecting it took the whole script with it — a script that uses the word
+   * once would not compile, and nothing about it was reported as a field.
+   */
+  it("is accepted on a field", () => {
+    expect(() => compileScript(HEAD + "type Counter\n    int bars = 0\n    varip int ticks = 0\n" +
+                           "var Counter c = Counter.new()\nx = c.ticks\n")).not.toThrow();
+  });
+
+  it("the field still carries its default", () => {
+    const src = HEAD + "type Counter\n    varip int ticks = 7\n" +
+                "c = Counter.new()\nv = c.ticks\n";
+    expect(value(src, "v")).toBe(7);
+  });
+
+  it("...and is still assignable", () => {
+    const src = HEAD + "type Counter\n    varip int ticks = 0\n" +
+                "c = Counter.new()\nc.ticks += 3\nv = c.ticks\n";
+    expect(value(src, "v")).toBe(3);
+  });
+
+  it("a field may omit its type entirely", () => {
+    // "[varip ][field_type ]<field_name>" — the type is optional in the
+    // manual's own shape, with or without `varip`.
+    expect(() => compileScript(HEAD + "type T\n    a = 1\n    varip b = 2\n" +
+                           "t = T.new()\nx = t.a\n")).not.toThrow();
+  });
+});
