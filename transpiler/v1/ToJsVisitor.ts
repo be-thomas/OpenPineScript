@@ -833,6 +833,23 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
                 ctx,
                 ` Multi-variable assignment is only allowed for specific built-in functions.`,
             );
+
+            // Past the guard, so this version DOES admit a tuple-returning
+            // user function. The arity is the definition's; see `tupleArity`.
+            const arity = this.scopes.tupleArity?.get(funcName);
+            if (arity === undefined) {
+                throw this.err(
+                    ctx,
+                    `'${funcName}' does not return a tuple — its last statement is not a ` +
+                    `'[ ... ]' list, so there is nothing to unpack into ${ids.length} variables.`,
+                );
+            }
+            if (arity !== ids.length) {
+                throw this.err(
+                    ctx,
+                    `'${funcName}' returns ${arity} values, but you provided ${ids.length} variables.`,
+                );
+            }
         }
     } else {
         throw this.err(ctx, `Multi-variable assignment must originate directly from a supported built-in function call.`);

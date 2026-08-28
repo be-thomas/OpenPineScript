@@ -91,6 +91,21 @@ export interface ScopeInfo {
    * its SIBLING, which is at the same depth.
    */
   scopesOf: ReadonlyMap<string, ReadonlyArray<Span | null>>;
+  /**
+   * user function name → how many values its tuple body returns.
+   *
+   * "Programmers can write functions that return multiple values or references
+   *  by using a tuple as the FINAL STATEMENT in the function's body" — so the
+   * arity is a property of the definition and nothing else can supply it. The
+   * destructuring site needs it to check `[a, b] = f()` against `f`, and Pine
+   * permits forward references, so it cannot be read off the emitter's own
+   * left-to-right walk.
+   *
+   * Absent for a function whose last statement is not a `[ ... ]` list, which
+   * is how the destructuring site tells "returns a tuple of the wrong size"
+   * from "does not return a tuple at all".
+   */
+  tupleArity: ReadonlyMap<string, number>;
 }
 
 /** Half-open in neither direction: both token indices are inside the scope. */
@@ -128,6 +143,23 @@ const SCOPE_RULES = new Set([
   "Local_stmts_multilineContext",
   "Local_stmt_singlelineContext",
 ]);
+
+/**
+ * The number of elements in the `[ ... ]` list a function body ENDS with, or
+ * null when it ends with anything else.
+ *
+ * Duck-typed down both body shapes — `f() => [a, b]` and an indented block
+ * whose last line is `[a, b]` — because the two share no rule.
+ */
+function tupleArityOfBody(node: any): number | null {
+  const contents =
+    node.fun_body_singleline?.()?.local_stmt_singleline?.()?.local_stmt_content?.()
+    ?? node.fun_body_multiline?.()?.local_stmts_multiline?.()?.local_stmts_list?.()
+         ?.local_stmt_multiline?.()?.slice(-1)[0]?.local_stmt_content?.();
+  const last = contents?.[contents.length - 1];
+  const list = last?.arith_exprs?.();
+  return list ? (list.arith_expr?.()?.length ?? null) : null;
+}
 
 function spanOf(node: any): Span | null {
   const start = node?.start?.tokenIndex;
@@ -192,6 +224,7 @@ class Collector {
   readonly bound = new Set<string>();
   readonly functionScoped = new Set<string>();
   readonly scopesOf = new Map<string, Array<Span | null>>();
+  readonly tupleArity = new Map<string, number>();
 
   /** The local scopes currently open, innermost last. */
   private scopeStack: Array<Span | null> = [];
@@ -219,7 +252,13 @@ class Collector {
       case "Fun_def_singlelineContext":
       case "Fun_def_multilineContext": {
         const name = textOf(node.id?.());
-        if (name) { this.functions.add(name); this.bound.add(name); this.record(name); }
+        if (name) {
+          this.functions.add(name);
+          this.bound.add(name);
+          this.record(name);
+          const arity = tupleArityOfBody(node);
+          if (arity !== null) this.tupleArity.set(name, arity);
+        }
 
         // Parameters belong to the FUNCTION, not to the scope its declaration
         // sits in: without a scope of their own they would read as visible
@@ -348,5 +387,6 @@ export function analyseScopes(tree: ParseTree | ParserRuleContext): ScopeInfo {
     bound: c.bound,
     functionScoped: c.functionScoped,
     scopesOf: c.scopesOf,
+    tupleArity: c.tupleArity,
   };
 }

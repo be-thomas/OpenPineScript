@@ -79,6 +79,35 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
   }
 
   /**
+   * From v4, a user-defined function MAY return a tuple.
+   *
+   * SOURCING. From the manual's user-defined functions page: "Programmers can
+   * write functions that return multiple values or references by using a tuple
+   * as the final statement in the function's body", with
+   *
+   *     sumDiff(float val1, float val2) =>
+   *         [val1 + val2, val1 - val2]
+   *
+   *     [sum, diff] = sumDiff(math.random(), math.random())
+   *
+   * and the rule for reading one back: "the script must use a tuple declaration
+   * containing one NEW variable for each returned item. It is not possible to
+   * reassign existing tuples or to use previously declared variables within
+   * them."
+   *
+   * v1–v3 keep the refusal — `conformance/common/guards_by_version.test.ts` has
+   * always declared the guard for those three and left v4 and v5 unstated, and
+   * this is the override that was missing. Eight of TradingView's own published
+   * scripts were rejected by it, including the one on its own error-messages
+   * page about tuples.
+   *
+   * Lifting the guard is the WHOLE change: `[a, b]` already emits a JavaScript
+   * array through `visitArith_exprs`, a body's last statement is already what a
+   * function returns, and `ctx.new_vars` already unpacks a built-in's tuple.
+   */
+  protected override enforceNoTupleReturn(): void {}
+
+  /**
    * Rejects a v1–v3 spelling with the name that replaced it.
    *
    * Hooked on `visitId` rather than driven off the registry, because a missing
@@ -315,14 +344,49 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
     // `expression` is the third positional parameter of every function in the
     // security family, which is the only place a tuple argument is documented.
     const positional = args.pos_args()?.pos_arg() ?? [];
-    const third = positional[2]?.arith_exprs();
-    if (third) return third.arith_expr().length;
+    const third = this.expressionArity(positional[2]);
+    if (third !== null) return third;
 
     for (const kw of args.kw_args()?.kw_arg() ?? []) {
       if (kw.id().getText() !== "expression") continue;
-      const list = kw.arith_exprs();
-      if (list) return list.arith_expr().length;
+      const arity = this.expressionArity(kw);
+      if (arity !== null) return arity;
     }
     return null;
+  }
+
+  /**
+   * How many values this `expression` argument yields, when that is knowable.
+   *
+   * Two shapes, and the second is why this is not just `.arith_exprs()`:
+   *
+   *     [o, h, l, c] = request.security(sym, "D", [open, high, low, close])
+   *     [bop, avg]   = request.security(sym, "1D", dataFunction())
+   *
+   * The manual's own error-messages page uses the second — a call to a
+   * user-defined function whose body ends in a tuple. Its width is a fact about
+   * that DEFINITION, which `ScopeInfo.tupleArity` collected for exactly this.
+   */
+  protected expressionArity(node: any): number | null {
+    if (!node) return null;
+    const list = node.arith_exprs?.();
+    if (list) return list.arith_expr().length;
+
+    const call = this.soleCall(node.arith_expr?.());
+    if (!call) return null;
+    return this.scopes.tupleArity?.get(call.id().getText()) ?? null;
+  }
+
+  /**
+   * The call this expression consists of ENTIRELY, or null.
+   *
+   * Only a single-child spine is followed, so `f() + 1` is not `f()`: the
+   * arithmetic makes it one value however many `f` returns.
+   */
+  protected soleCall(node: any): any | null {
+    if (!node) return null;
+    if (node.constructor?.name === "Fun_callContext") return node;
+    const kids = (node.children ?? []).filter((c: any) => typeof c?.getChildCount === "function");
+    return kids.length === 1 ? this.soleCall(kids[0]) : null;
   }
 }
