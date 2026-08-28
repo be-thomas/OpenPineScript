@@ -55,7 +55,13 @@ describe("the directive", () => {
 });
 
 describe("reserved words", () => {
-  const RESERVED = ["catch", "class", "do", "ellipse", "in", "is", "polygon",
+  /**
+   * The words v5 reserves but does NOT lex — they are ordinary identifiers to
+   * the parser, and a guard in the emitter refuses to BIND one. That split is
+   * deliberate: `text` is a live namespace, so the rule has to be about
+   * declaring a name rather than about reading one.
+   */
+  const RESERVED = ["catch", "class", "do", "ellipse", "is", "polygon",
                     "range", "return", "struct", "text", "throw", "try"];
 
   for (const word of RESERVED) {
@@ -64,6 +70,18 @@ describe("reserved words", () => {
         .toThrow(new RegExp(`'${word}' is a reserved word in Pine Script v5`));
     });
   }
+
+  it("`in` is rejected too, but as a KEYWORD rather than by the guard", () => {
+    // `in` is the one reserved word that carries syntax — `for item in xs`
+    // cannot be told from two identifiers without it — so v5 lexes it. That
+    // puts it in the same class as `if` and `for`: binding it is a parse error,
+    // which is what TradingView reports for a keyword too.
+    expect(() => compileScript(`${HEAD}in = 5\n`)).toThrow(/parsing failed/);
+  });
+
+  it("v4 still accepts `in` as a name, since the token is v5's", () => {
+    expect(() => compileScript('//@version=4\nstudy("t")\nin = 5\nplot(in)\n')).not.toThrow();
+  });
 
   it("but v4 still accepts them, since the list is a v5 addition", () => {
     expect(() => compileScript('//@version=4\nstudy("t")\nrange = 5\nplot(range)\n')).not.toThrow();

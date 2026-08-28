@@ -20,10 +20,12 @@
 // dev-docs/01-version-delta-spec.md. Neither appears in the v4 release notes or
 // the v4 manual; both are documented v5 additions. See §3b of that document.
 //
+// It also adds `for … in`, which needs one keyword of its own — see IN below.
+//
 // WHAT IT DOES NOT ADD, AND WHY
 //
-// v5's RESERVED WORDS — catch, class, do, ellipse, in, is, polygon, range,
-// return, struct, text, throw, try — are deliberately NOT tokens.
+// v5's remaining RESERVED WORDS — catch, class, do, ellipse, is, polygon,
+// range, return, struct, text, throw, try — are deliberately NOT tokens.
 //
 // Making them tokens would break the language rather than restrict it. `text`
 // is a live namespace in v4 and v5 (`text.align_left` parameterises every
@@ -72,3 +74,18 @@ EXPORT : 'export' ;
 // nothing else can follow the path, and excluding it would stop a script
 // binding a variable called `as` — which v1–v4 allow and v5 does not reserve.
 AS : 'as' ;
+
+// --- `for … in` ------------------------------------------------------------
+//
+// `in` IS a token, unlike v5's other reserved words, because it is the only one
+// that carries syntax: `for item in collection` cannot be told from the two
+// identifiers `item` and `collection` without it.
+//
+// Tokenising it is safe precisely BECAUSE v5 reserves it. A v5 script may not
+// name anything `in`, so nothing that used to lex as an ID stops doing so — and
+// v1–v4, where `in` is an ordinary name, are untouched: this rule lives here,
+// and an importing grammar's rules never reach the versions it imports.
+//
+// It is therefore NOT admitted to `id_part`, for the same reason VAR is not:
+// admitting a reserved word as a name fragment un-reserves it.
+IN : 'in' ;

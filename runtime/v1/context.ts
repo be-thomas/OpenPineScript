@@ -955,6 +955,80 @@ export class Context {
     }
 
     /**
+     * `for … in` — one iteration handle over an array, matrix or map.
+     *
+     * Yields `[key, value]` pairs. What those mean is the collection's business,
+     * and the manual states each one:
+     *
+     *   array   "item ... holds sequential values or references from the
+     *            specified collection_id" and index is "the index ... of the
+     *            retrieved item"
+     *   matrix  the item is a ROW array, and the index is "the row's position
+     *            within the matrix"
+     *   map     "the index contains the key, and item contains the associated
+     *            value from each key-value pair"
+     *
+     * A matrix is represented as an array of row arrays, so it needs no branch
+     * of its own here: iterating an array of rows already yields rows.
+     *
+     * ── The size rule is different for maps, so the code is too ──────────────
+     *
+     * "Scripts can modify the sizes of arrays and matrices directly within a
+     *  for…in loop's local scope. When a for…in loop changes the size of a
+     *  collection during an iteration, the loop's header uses the UPDATED size
+     *  to control subsequent iterations."
+     *
+     * That is why the array branch re-reads `.length` every step instead of
+     * capturing it once. A snapshot would run past the end of a shrunk array
+     * and stop short of a grown one.
+     *
+     * "Attempting to add or remove a map's key-value pairs while looping
+     *  through it with this structure typically causes a runtime error."
+     *
+     * So the map branch does the opposite: it takes the keys once and then
+     * REFUSES a size change, rather than silently iterating a stale key list.
+     * `arity` is how many loop variables the script wrote, which is what makes
+     * the single-variable form on a map reportable — the manual's second form
+     * is the only one maps accept.
+     */
+    public *forIn(collection: any, arity: number, at: string): Generator<[any, any]> {
+        const c = collection && typeof collection.valueOf === "function"
+            ? collection.valueOf()
+            : collection;
+
+        if (c instanceof Map) {
+            if (arity !== 2) {
+                throw new Error(
+                    `for … in at ${at}: iterating a map needs two loop variables — ` +
+                    `write 'for [key, value] in ...'.`,
+                );
+            }
+            const size = c.size;
+            for (const key of [...c.keys()]) {
+                if (c.size !== size) {
+                    throw new Error(
+                        `for … in at ${at}: the map changed size during iteration. ` +
+                        `Pine does not allow adding or removing key-value pairs inside ` +
+                        `a for … in over the same map.`,
+                    );
+                }
+                yield [key, c.get(key)];
+            }
+            return;
+        }
+
+        if (!Array.isArray(c)) {
+            throw new Error(
+                `for … in at ${at}: expected an array, matrix or map, got ` +
+                `${c === undefined || c === null ? "na" : typeof c}.`,
+            );
+        }
+
+        // `.length` re-read each step, deliberately — see above.
+        for (let i = 0; i < c.length; i++) yield [i, c[i]];
+    }
+
+    /**
      * Universal History Accessor (Called by transpiled code: [])
      */
     public get(target: any, offset: number, id: string): number {

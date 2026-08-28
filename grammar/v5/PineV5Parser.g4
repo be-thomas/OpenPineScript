@@ -165,6 +165,33 @@ type_args : LT type_arg ( COMMA type_arg )* GT ;
 /** A built-in type word, or a user-defined type's name. */
 type_arg : type_name | id ;
 
+/**
+ * `for … in` — iterate a collection rather than a numeric range.
+ *
+ * Quoted, from the manual's Loops page:
+ *
+ *   "[variables = | :=] for item in collection_id
+ *        statements | continue | break
+ *        return_expression"
+ *
+ *   "[variables = | :=] for [index, item] in collection_id"
+ *
+ * The two forms differ only in the loop variable, so one rule covers both:
+ * `id` is the single-variable form and `ids_array` is the `[index, item]` one,
+ * and `ids_array` is v1's own rule — the `[a, b]` of a tuple declaration has
+ * exactly this shape.
+ *
+ * The leading `[variables = | :=]` of the quoted syntax is not written here.
+ * It is not part of the loop: it is the ordinary `var_def` / `var_assign` that
+ * surrounds any expression, and admitting `for_in_expr` to `arith_expr` below
+ * is what makes it reachable there.
+ *
+ * The collection is a `ternary_expr`, matching v1's `for_expr` bounds rather
+ * than the wider `arith_expr` — a nested `if` or `for` in the collection slot
+ * is not something a script can mean.
+ */
+for_in_expr : FOR_STMT ( ids_array | id ) IN ternary_expr stmts_block ;
+
 // --- Overrides -------------------------------------------------------------
 
 fun_call : id type_args? LPAR ( fun_actual_args )? RPAR ;
@@ -200,7 +227,7 @@ id_part
 
 global_stmt_content
   : var_def | var_defs | fun_call | if_expr | var_assign
-  | for_expr | while_expr | switch_expr
+  | for_expr | for_in_expr | while_expr | switch_expr
   | loop_break | loop_continue | arith_expr
   ;
 
@@ -210,6 +237,9 @@ local_stmt_content
   | loop_break | loop_continue
   ;
 
-// `switch` joins `if` and `for` as a construct that is both a statement and an
-// expression; `while` deliberately does not.
-arith_expr : ternary_expr | if_expr | for_expr | switch_expr ;
+// `switch` and `for … in` join `if` and `for` as constructs that are both a
+// statement and an expression; `while` deliberately does not.
+//
+// `local_stmt_content` needs no `for_in_expr` alternative of its own: it
+// reaches one through `arith_expr`, exactly as it already reaches `for_expr`.
+arith_expr : ternary_expr | if_expr | for_expr | for_in_expr | switch_expr ;

@@ -98,15 +98,18 @@ describe("fields", () => {
     expect(value(src, "v")).toBe(7);
   });
 
+  // The field is `inner`, not `in`: `in` is on v5's reserved-word list, so no
+  // real script could name a field that, and it became a keyword outright when
+  // `for … in` landed.
   it("nest", () => {
     const src = HEAD + [
       "type Inner",
       "    float v",
       "type Outer",
-      "    Inner in",
+      "    Inner inner",
       "",
       "o = Outer.new(Inner.new(4.0))",
-      "r = o.in.v",
+      "r = o.inner.v",
     ].join("\n") + "\n";
     expect(value(src, "r")).toBe(4);
   });
@@ -116,11 +119,11 @@ describe("fields", () => {
       "type Inner",
       "    float v",
       "type Outer",
-      "    Inner in",
+      "    Inner inner",
       "",
       "o = Outer.new(Inner.new(4.0))",
-      "o.in.v := 11.0",
-      "r = o.in.v",
+      "o.inner.v := 11.0",
+      "r = o.inner.v",
     ].join("\n") + "\n";
     expect(value(src, "r")).toBe(11);
   });

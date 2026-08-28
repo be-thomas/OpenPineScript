@@ -14,12 +14,13 @@
  *     driven from a data table, not emit rules.
  *
  *   SYNTAX (this file)
- *     `while` and `switch`. Neither is a v4 construct — an early draft of the
- *     delta spec said otherwise and was wrong — so v4 emits nothing for them
- *     and v5 emits both here.
+ *     `while`, `switch`, and `for … in`. None is a v4 construct — an early
+ *     draft of the delta spec said otherwise about the first two and was wrong
+ *     — so v4 emits nothing for them and v5 emits all three here.
  *
  *   RESERVED WORDS (this file)
- *     Thirteen words v5 will not let a script NAME anything. Enforced on the
+ *     Twelve of the thirteen words v5 will not let a script NAME anything (the
+ *     thirteenth, `in`, is a lexer keyword — see RESERVED below). Enforced on the
  *     identifier rather than in the lexer, because `text` is simultaneously a
  *     live namespace (`text.align_left`) and a forbidden variable name — a
  *     distinction a token cannot draw.
@@ -53,6 +54,7 @@ import type { ParseTree } from "antlr4ng";
 import { parse as parseV5 } from "../../parser/v5";
 import {
   While_exprContext,
+  For_in_exprContext,
   Switch_exprContext,
   Switch_caseContext,
   Fun_callContext,
@@ -181,9 +183,14 @@ const UNSUPPORTED = new Map<string, string>([]);
  * `text` is on the list and is also a live namespace root, which is why the
  * check below only ever fires on an UNDOTTED identifier that is not a keyword
  * argument's name.
+ *
+ * `in` is the fourteenth reserved word and is deliberately NOT here. It is the
+ * only one that carries syntax — `for item in xs` is unreadable without it — so
+ * PineV5Lexer.g4 tokenises it, and `in = 5` is a parse error before this check
+ * could run. Listing it anyway would be dead code that reads like the rule.
  */
 const RESERVED = new Set([
-  "catch", "class", "do", "ellipse", "in", "is", "polygon", "range", "return",
+  "catch", "class", "do", "ellipse", "is", "polygon", "range", "return",
   "struct", "text", "throw", "try",
 ]);
 
@@ -1382,13 +1389,75 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   protected override visitContent(ctx: any): string {
     if (ctx.while_expr?.()) return this.visit(ctx.while_expr()!);
     if (ctx.switch_expr?.()) return this.visit(ctx.switch_expr()!);
+    if (ctx.for_in_expr?.()) return this.visit(ctx.for_in_expr()!);
     return super.visitContent(ctx);
   }
 
-  /** `arith_expr` gained a `switch_expr` alternative; the base knows three. */
+  /** `arith_expr` gained `switch_expr` and `for_in_expr`; the base knows three. */
   override visitArith_expr(ctx: any): string {
     if (ctx.switch_expr?.()) return this.visit(ctx.switch_expr()!);
+    if (ctx.for_in_expr?.()) return this.visit(ctx.for_in_expr()!);
     return super.visitArith_expr(ctx);
+  }
+
+  // ── `for … in` ────────────────────────────────────────────────────────────
+
+  /**
+   * `for item in xs` and `for [index, item] in xs`.
+   *
+   * Emitted as a real JavaScript `for … of` over `Context.forIn`, for the same
+   * reason `while` is emitted as a real `while`: `break` and `continue` cannot
+   * cross a function boundary, and Pine allows both here.
+   *
+   * The whole thing still sits inside an IIFE, because — unlike `while` — a
+   * `for … in` is an EXPRESSION. The manual's syntax block opens with
+   * `[variables = | :=]`, and its body ends with a `return_expression`, so the
+   * loop has a value: the last one its body produced. `captureLoopResult`
+   * rewrites the block's trailing `return` into an assignment to `_res`, which
+   * is exactly what `visitFor_expr` does for the numeric form — the two loops
+   * differ in how they step, not in what they evaluate to.
+   *
+   * ── Why the pair comes from the runtime rather than the emitter ───────────
+   *
+   * `item` means something different per collection — an element of an array, a
+   * ROW of a matrix, the VALUE half of a map entry — and the emitter cannot
+   * know which it has: `xs` is an expression, and this engine does not track
+   * element types. `Context.forIn` decides at runtime, where the value is,
+   * and hands back a uniform `[key, value]`. It also owns the two size rules,
+   * which differ between maps and the rest.
+   */
+  visitFor_in_expr(ctx: For_in_exprContext): string {
+    const tuple = ctx.ids_array();
+    const names = tuple
+      ? tuple.id().map(id => this.visit(id))
+      : [this.visit(ctx.id()!)];
+
+    const collection = this.visit(ctx.ternary_expr());
+
+    this.loopDepth++;
+    let rawBody: string;
+    try { rawBody = this.visit(ctx.stmts_block()); }
+    finally { this.loopDepth--; }
+
+    this.anonCounter = this.anonCounter || 0;
+    const id = this.anonCounter++;
+    const res = `_res${id}`;
+    const pair = `_it${id}`;
+    const safeBody = this.captureLoopResult(rawBody, res);
+
+    // One variable binds the VALUE, not the key: `for item in xs` is
+    // element-wise, and the index is what the two-variable form adds.
+    const bindings = names.length === 2
+      ? `let ${names[0]} = ${pair}[0], ${names[1]} = ${pair}[1];`
+      : `let ${names[0]} = ${pair}[1];`;
+
+    const at = JSON.stringify(this.getLocId(ctx as SourceLocated));
+    const step = `ctx.forIn(${collection}, ${names.length}, ${at})`;
+
+    // `= NaN` for the same reason `visitFor_expr` initialises its own: an empty
+    // collection produces no `return_expression`, and that value is `na`.
+    return `(() => {\n  let ${res} = NaN;\n  for (const ${pair} of ${step}) {\n` +
+           `    ${bindings}\n    ${safeBody}\n  }\n  return ${res};\n})()`;
   }
 
   // ── `while` ───────────────────────────────────────────────────────────────

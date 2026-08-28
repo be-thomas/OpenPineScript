@@ -209,6 +209,26 @@ class Collector {
         break;
       }
 
+      case "For_in_exprContext": {
+        // `for item in xs` and `for [i, item] in xs` bind their loop variables
+        // for the body's lifetime. Without this they look undeclared, and v1's
+        // `checkUndeclaredRead` rejects the loop body outright — the variable
+        // that the loop exists to produce being the one name it cannot read.
+        //
+        // v5-only: no earlier grammar has this rule, so the case never fires
+        // there. Recorded as function-scoped for the same reason a parameter
+        // is — the binding is local to the block, so it must not be mistaken
+        // for a script-scope declaration of the same name.
+        const ids = node.ids_array?.()?.id?.() ?? [node.id?.()];
+        for (const id of ids) {
+          const name = textOf(id);
+          if (!name) continue;
+          this.bound.add(name);
+          this.functionScoped.add(name);
+        }
+        break;
+      }
+
       case "Var_assignContext": {
         const name = textOf(node.id?.());
         if (name) {

@@ -17,6 +17,7 @@ import { Import_pathContext } from "./PineV5Parser.js";
 import { Fun_paramContext } from "./PineV5Parser.js";
 import { Type_argsContext } from "./PineV5Parser.js";
 import { Type_argContext } from "./PineV5Parser.js";
+import { For_in_exprContext } from "./PineV5Parser.js";
 import { Fun_callContext } from "./PineV5Parser.js";
 import { StmtContext } from "./PineV5Parser.js";
 import { Fun_headContext } from "./PineV5Parser.js";
@@ -167,6 +168,12 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitType_arg?: (ctx: Type_argContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV5Parser.for_in_expr`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitFor_in_expr?: (ctx: For_in_exprContext) => Result;
     /**
      * Visit a parse tree produced by `PineV5Parser.fun_call`.
      * @param ctx the parse tree

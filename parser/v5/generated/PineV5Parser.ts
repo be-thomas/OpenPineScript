@@ -20,67 +20,68 @@ export class PineV5Parser extends antlr.Parser {
     public static readonly IMPORT = 8;
     public static readonly EXPORT = 9;
     public static readonly AS = 10;
-    public static readonly VAR = 11;
-    public static readonly VARIP = 12;
-    public static readonly SERIES = 13;
-    public static readonly SIMPLE = 14;
-    public static readonly CONST = 15;
-    public static readonly INT_TYPE = 16;
-    public static readonly FLOAT_TYPE = 17;
-    public static readonly BOOL_TYPE = 18;
-    public static readonly STRING_TYPE = 19;
-    public static readonly COLOR_TYPE = 20;
-    public static readonly LINE_TYPE = 21;
-    public static readonly LABEL_TYPE = 22;
-    public static readonly BOX_TYPE = 23;
-    public static readonly TABLE_TYPE = 24;
-    public static readonly PLUS_ASSIGN = 25;
-    public static readonly MINUS_ASSIGN = 26;
-    public static readonly MUL_ASSIGN = 27;
-    public static readonly DIV_ASSIGN = 28;
-    public static readonly MOD_ASSIGN = 29;
-    public static readonly ASSIGN = 30;
-    public static readonly LBEG = 31;
-    public static readonly IF_COND = 32;
-    public static readonly IF_COND_ELSE = 33;
-    public static readonly FOR_STMT = 34;
-    public static readonly FOR_STMT_TO = 35;
-    public static readonly FOR_STMT_BY = 36;
-    public static readonly BREAK = 37;
-    public static readonly CONTINUE = 38;
-    public static readonly OR = 39;
-    public static readonly AND = 40;
-    public static readonly NOT = 41;
-    public static readonly BOOL_LITERAL = 42;
-    public static readonly COND = 43;
-    public static readonly COND_ELSE = 44;
-    public static readonly EQ = 45;
-    public static readonly NEQ = 46;
-    public static readonly GT = 47;
-    public static readonly GE = 48;
-    public static readonly LT = 49;
-    public static readonly LE = 50;
-    public static readonly PLUS = 51;
-    public static readonly MINUS = 52;
-    public static readonly MUL = 53;
-    public static readonly DIV = 54;
-    public static readonly MOD = 55;
-    public static readonly DEFINE = 56;
-    public static readonly ARROW = 57;
-    public static readonly COMMA = 58;
-    public static readonly LPAR = 59;
-    public static readonly RPAR = 60;
-    public static readonly LSQBR = 61;
-    public static readonly RSQBR = 62;
-    public static readonly INT_LITERAL = 63;
-    public static readonly FLOAT_LITERAL = 64;
-    public static readonly STR_LITERAL = 65;
-    public static readonly COLOR_LITERAL = 66;
-    public static readonly ID = 67;
-    public static readonly WS = 68;
-    public static readonly LINE_COMMENT = 69;
-    public static readonly BLOCK_COMMENT = 70;
-    public static readonly DOT = 71;
+    public static readonly IN = 11;
+    public static readonly VAR = 12;
+    public static readonly VARIP = 13;
+    public static readonly SERIES = 14;
+    public static readonly SIMPLE = 15;
+    public static readonly CONST = 16;
+    public static readonly INT_TYPE = 17;
+    public static readonly FLOAT_TYPE = 18;
+    public static readonly BOOL_TYPE = 19;
+    public static readonly STRING_TYPE = 20;
+    public static readonly COLOR_TYPE = 21;
+    public static readonly LINE_TYPE = 22;
+    public static readonly LABEL_TYPE = 23;
+    public static readonly BOX_TYPE = 24;
+    public static readonly TABLE_TYPE = 25;
+    public static readonly PLUS_ASSIGN = 26;
+    public static readonly MINUS_ASSIGN = 27;
+    public static readonly MUL_ASSIGN = 28;
+    public static readonly DIV_ASSIGN = 29;
+    public static readonly MOD_ASSIGN = 30;
+    public static readonly ASSIGN = 31;
+    public static readonly LBEG = 32;
+    public static readonly IF_COND = 33;
+    public static readonly IF_COND_ELSE = 34;
+    public static readonly FOR_STMT = 35;
+    public static readonly FOR_STMT_TO = 36;
+    public static readonly FOR_STMT_BY = 37;
+    public static readonly BREAK = 38;
+    public static readonly CONTINUE = 39;
+    public static readonly OR = 40;
+    public static readonly AND = 41;
+    public static readonly NOT = 42;
+    public static readonly BOOL_LITERAL = 43;
+    public static readonly COND = 44;
+    public static readonly COND_ELSE = 45;
+    public static readonly EQ = 46;
+    public static readonly NEQ = 47;
+    public static readonly GT = 48;
+    public static readonly GE = 49;
+    public static readonly LT = 50;
+    public static readonly LE = 51;
+    public static readonly PLUS = 52;
+    public static readonly MINUS = 53;
+    public static readonly MUL = 54;
+    public static readonly DIV = 55;
+    public static readonly MOD = 56;
+    public static readonly DEFINE = 57;
+    public static readonly ARROW = 58;
+    public static readonly COMMA = 59;
+    public static readonly LPAR = 60;
+    public static readonly RPAR = 61;
+    public static readonly LSQBR = 62;
+    public static readonly RSQBR = 63;
+    public static readonly INT_LITERAL = 64;
+    public static readonly FLOAT_LITERAL = 65;
+    public static readonly STR_LITERAL = 66;
+    public static readonly COLOR_LITERAL = 67;
+    public static readonly ID = 68;
+    public static readonly WS = 69;
+    public static readonly LINE_COMMENT = 70;
+    public static readonly BLOCK_COMMENT = 71;
+    public static readonly DOT = 72;
     public static readonly RULE_while_expr = 0;
     public static readonly RULE_switch_expr = 1;
     public static readonly RULE_switch_body = 2;
@@ -96,60 +97,61 @@ export class PineV5Parser extends antlr.Parser {
     public static readonly RULE_fun_param = 12;
     public static readonly RULE_type_args = 13;
     public static readonly RULE_type_arg = 14;
-    public static readonly RULE_fun_call = 15;
-    public static readonly RULE_stmt = 16;
-    public static readonly RULE_fun_head = 17;
-    public static readonly RULE_var_def = 18;
-    public static readonly RULE_var_defs = 19;
-    public static readonly RULE_id_part = 20;
-    public static readonly RULE_global_stmt_content = 21;
-    public static readonly RULE_local_stmt_content = 22;
-    public static readonly RULE_arith_expr = 23;
-    public static readonly RULE_decl_mod = 24;
-    public static readonly RULE_type_qual = 25;
-    public static readonly RULE_type_name = 26;
-    public static readonly RULE_id = 27;
-    public static readonly RULE_compound_assign_op = 28;
-    public static readonly RULE_var_assign = 29;
-    public static readonly RULE_if_expr = 30;
-    public static readonly RULE_pine_script = 31;
-    public static readonly RULE_global_stmt = 32;
-    public static readonly RULE_fun_def_stmt = 33;
-    public static readonly RULE_fun_def_singleline = 34;
-    public static readonly RULE_fun_def_multiline = 35;
-    public static readonly RULE_fun_body_singleline = 36;
-    public static readonly RULE_local_stmt_singleline = 37;
-    public static readonly RULE_loop_break = 38;
-    public static readonly RULE_loop_continue = 39;
-    public static readonly RULE_fun_body_multiline = 40;
-    public static readonly RULE_local_stmts_multiline = 41;
-    public static readonly RULE_local_stmts_list = 42;
-    public static readonly RULE_local_stmt_multiline = 43;
-    public static readonly RULE_ids_array = 44;
-    public static readonly RULE_arith_exprs = 45;
-    public static readonly RULE_for_expr = 46;
-    public static readonly RULE_stmts_block = 47;
-    public static readonly RULE_ternary_expr = 48;
-    public static readonly RULE_or_expr = 49;
-    public static readonly RULE_and_expr = 50;
-    public static readonly RULE_eq_expr = 51;
-    public static readonly RULE_cmp_expr = 52;
-    public static readonly RULE_add_expr = 53;
-    public static readonly RULE_mult_expr = 54;
-    public static readonly RULE_unary_expr = 55;
-    public static readonly RULE_sqbr_expr = 56;
-    public static readonly RULE_atom = 57;
-    public static readonly RULE_fun_actual_args = 58;
-    public static readonly RULE_pos_args = 59;
-    public static readonly RULE_kw_args = 60;
-    public static readonly RULE_kw_arg = 61;
-    public static readonly RULE_literal = 62;
-    public static readonly RULE_num_literal = 63;
-    public static readonly RULE_other_literal = 64;
+    public static readonly RULE_for_in_expr = 15;
+    public static readonly RULE_fun_call = 16;
+    public static readonly RULE_stmt = 17;
+    public static readonly RULE_fun_head = 18;
+    public static readonly RULE_var_def = 19;
+    public static readonly RULE_var_defs = 20;
+    public static readonly RULE_id_part = 21;
+    public static readonly RULE_global_stmt_content = 22;
+    public static readonly RULE_local_stmt_content = 23;
+    public static readonly RULE_arith_expr = 24;
+    public static readonly RULE_decl_mod = 25;
+    public static readonly RULE_type_qual = 26;
+    public static readonly RULE_type_name = 27;
+    public static readonly RULE_id = 28;
+    public static readonly RULE_compound_assign_op = 29;
+    public static readonly RULE_var_assign = 30;
+    public static readonly RULE_if_expr = 31;
+    public static readonly RULE_pine_script = 32;
+    public static readonly RULE_global_stmt = 33;
+    public static readonly RULE_fun_def_stmt = 34;
+    public static readonly RULE_fun_def_singleline = 35;
+    public static readonly RULE_fun_def_multiline = 36;
+    public static readonly RULE_fun_body_singleline = 37;
+    public static readonly RULE_local_stmt_singleline = 38;
+    public static readonly RULE_loop_break = 39;
+    public static readonly RULE_loop_continue = 40;
+    public static readonly RULE_fun_body_multiline = 41;
+    public static readonly RULE_local_stmts_multiline = 42;
+    public static readonly RULE_local_stmts_list = 43;
+    public static readonly RULE_local_stmt_multiline = 44;
+    public static readonly RULE_ids_array = 45;
+    public static readonly RULE_arith_exprs = 46;
+    public static readonly RULE_for_expr = 47;
+    public static readonly RULE_stmts_block = 48;
+    public static readonly RULE_ternary_expr = 49;
+    public static readonly RULE_or_expr = 50;
+    public static readonly RULE_and_expr = 51;
+    public static readonly RULE_eq_expr = 52;
+    public static readonly RULE_cmp_expr = 53;
+    public static readonly RULE_add_expr = 54;
+    public static readonly RULE_mult_expr = 55;
+    public static readonly RULE_unary_expr = 56;
+    public static readonly RULE_sqbr_expr = 57;
+    public static readonly RULE_atom = 58;
+    public static readonly RULE_fun_actual_args = 59;
+    public static readonly RULE_pos_args = 60;
+    public static readonly RULE_kw_args = 61;
+    public static readonly RULE_kw_arg = 62;
+    public static readonly RULE_literal = 63;
+    public static readonly RULE_num_literal = 64;
+    public static readonly RULE_other_literal = 65;
 
     public static readonly literalNames = [
         null, null, null, null, "'while'", "'switch'", "'type'", "'method'", 
-        "'import'", "'export'", "'as'", "'var'", "'varip'", "'series'", 
+        "'import'", "'export'", "'as'", "'in'", "'var'", "'varip'", "'series'", 
         "'simple'", "'const'", "'int'", "'float'", "'bool'", "'string'", 
         "'color'", "'line'", "'label'", "'box'", "'table'", "'+='", "'-='", 
         "'*='", "'/='", "'%='", "':='", null, "'if'", "'else'", "'for'", 
@@ -162,8 +164,8 @@ export class PineV5Parser extends antlr.Parser {
 
     public static readonly symbolicNames = [
         null, "BEGIN", "END", "LEND", "WHILE", "SWITCH", "TYPE", "METHOD", 
-        "IMPORT", "EXPORT", "AS", "VAR", "VARIP", "SERIES", "SIMPLE", "CONST", 
-        "INT_TYPE", "FLOAT_TYPE", "BOOL_TYPE", "STRING_TYPE", "COLOR_TYPE", 
+        "IMPORT", "EXPORT", "AS", "IN", "VAR", "VARIP", "SERIES", "SIMPLE", 
+        "CONST", "INT_TYPE", "FLOAT_TYPE", "BOOL_TYPE", "STRING_TYPE", "COLOR_TYPE", 
         "LINE_TYPE", "LABEL_TYPE", "BOX_TYPE", "TABLE_TYPE", "PLUS_ASSIGN", 
         "MINUS_ASSIGN", "MUL_ASSIGN", "DIV_ASSIGN", "MOD_ASSIGN", "ASSIGN", 
         "LBEG", "IF_COND", "IF_COND_ELSE", "FOR_STMT", "FOR_STMT_TO", "FOR_STMT_BY", 
@@ -177,17 +179,17 @@ export class PineV5Parser extends antlr.Parser {
         "while_expr", "switch_expr", "switch_body", "switch_case", "field_type", 
         "type_def_stmt", "type_body", "type_field", "method_def_stmt", "export_stmt", 
         "import_stmt", "import_path", "fun_param", "type_args", "type_arg", 
-        "fun_call", "stmt", "fun_head", "var_def", "var_defs", "id_part", 
-        "global_stmt_content", "local_stmt_content", "arith_expr", "decl_mod", 
-        "type_qual", "type_name", "id", "compound_assign_op", "var_assign", 
-        "if_expr", "pine_script", "global_stmt", "fun_def_stmt", "fun_def_singleline", 
-        "fun_def_multiline", "fun_body_singleline", "local_stmt_singleline", 
-        "loop_break", "loop_continue", "fun_body_multiline", "local_stmts_multiline", 
-        "local_stmts_list", "local_stmt_multiline", "ids_array", "arith_exprs", 
-        "for_expr", "stmts_block", "ternary_expr", "or_expr", "and_expr", 
-        "eq_expr", "cmp_expr", "add_expr", "mult_expr", "unary_expr", "sqbr_expr", 
-        "atom", "fun_actual_args", "pos_args", "kw_args", "kw_arg", "literal", 
-        "num_literal", "other_literal",
+        "for_in_expr", "fun_call", "stmt", "fun_head", "var_def", "var_defs", 
+        "id_part", "global_stmt_content", "local_stmt_content", "arith_expr", 
+        "decl_mod", "type_qual", "type_name", "id", "compound_assign_op", 
+        "var_assign", "if_expr", "pine_script", "global_stmt", "fun_def_stmt", 
+        "fun_def_singleline", "fun_def_multiline", "fun_body_singleline", 
+        "local_stmt_singleline", "loop_break", "loop_continue", "fun_body_multiline", 
+        "local_stmts_multiline", "local_stmts_list", "local_stmt_multiline", 
+        "ids_array", "arith_exprs", "for_expr", "stmts_block", "ternary_expr", 
+        "or_expr", "and_expr", "eq_expr", "cmp_expr", "add_expr", "mult_expr", 
+        "unary_expr", "sqbr_expr", "atom", "fun_actual_args", "pos_args", 
+        "kw_args", "kw_arg", "literal", "num_literal", "other_literal",
     ];
 
     public get grammarFileName(): string { return "PineV5Parser.g4"; }
@@ -210,11 +212,11 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 130;
-            this.match(PineV5Parser.WHILE);
-            this.state = 131;
-            this.ternary_expr();
             this.state = 132;
+            this.match(PineV5Parser.WHILE);
+            this.state = 133;
+            this.ternary_expr();
+            this.state = 134;
             this.stmts_block();
             }
         }
@@ -238,19 +240,19 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 134;
-            this.match(PineV5Parser.SWITCH);
             this.state = 136;
+            this.match(PineV5Parser.SWITCH);
+            this.state = 138;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 33547264) !== 0) || ((((_la - 41)) & ~0x1F) === 0 && ((1 << (_la - 41)) & 130288643) !== 0)) {
+            if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 67093504) !== 0) || ((((_la - 42)) & ~0x1F) === 0 && ((1 << (_la - 42)) & 130288643) !== 0)) {
                 {
-                this.state = 135;
+                this.state = 137;
                 this.ternary_expr();
                 }
             }
 
-            this.state = 138;
+            this.state = 140;
             this.switch_body();
             }
         }
@@ -274,14 +276,14 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 140;
+            this.state = 142;
             this.match(PineV5Parser.BEGIN);
-            this.state = 143;
+            this.state = 145;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
             do {
                 {
-                this.state = 143;
+                this.state = 145;
                 this.errorHandler.sync(this);
                 switch (this.tokenStream.LA(1)) {
                 case PineV5Parser.AS:
@@ -309,13 +311,13 @@ export class PineV5Parser extends antlr.Parser {
                 case PineV5Parser.COLOR_LITERAL:
                 case PineV5Parser.ID:
                     {
-                    this.state = 141;
+                    this.state = 143;
                     this.switch_case();
                     }
                     break;
                 case PineV5Parser.LEND:
                     {
-                    this.state = 142;
+                    this.state = 144;
                     this.match(PineV5Parser.LEND);
                     }
                     break;
@@ -323,11 +325,11 @@ export class PineV5Parser extends antlr.Parser {
                     throw new antlr.NoViableAltException(this);
                 }
                 }
-                this.state = 145;
+                this.state = 147;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
-            } while ((((_la) & ~0x1F) === 0 && ((1 << _la) & 33547272) !== 0) || ((((_la - 41)) & ~0x1F) === 0 && ((1 << (_la - 41)) & 130354179) !== 0));
-            this.state = 147;
+            } while ((((_la) & ~0x1F) === 0 && ((1 << _la) & 67093512) !== 0) || ((((_la - 42)) & ~0x1F) === 0 && ((1 << (_la - 42)) & 130354179) !== 0));
+            this.state = 149;
             this.match(PineV5Parser.END);
             }
         }
@@ -351,19 +353,19 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 150;
+            this.state = 152;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 33547264) !== 0) || ((((_la - 41)) & ~0x1F) === 0 && ((1 << (_la - 41)) & 130288643) !== 0)) {
+            if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 67093504) !== 0) || ((((_la - 42)) & ~0x1F) === 0 && ((1 << (_la - 42)) & 130288643) !== 0)) {
                 {
-                this.state = 149;
+                this.state = 151;
                 this.ternary_expr();
                 }
             }
 
-            this.state = 152;
+            this.state = 154;
             this.match(PineV5Parser.ARROW);
-            this.state = 155;
+            this.state = 157;
             this.errorHandler.sync(this);
             switch (this.tokenStream.LA(1)) {
             case PineV5Parser.WHILE:
@@ -399,13 +401,13 @@ export class PineV5Parser extends antlr.Parser {
             case PineV5Parser.COLOR_LITERAL:
             case PineV5Parser.ID:
                 {
-                this.state = 153;
+                this.state = 155;
                 this.local_stmt_singleline();
                 }
                 break;
             case PineV5Parser.BEGIN:
                 {
-                this.state = 154;
+                this.state = 156;
                 this.stmts_block();
                 }
                 break;
@@ -434,28 +436,28 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 159;
+            this.state = 161;
             this.errorHandler.sync(this);
             switch (this.interpreter.adaptivePredict(this.tokenStream, 5, this.context) ) {
             case 1:
                 {
-                this.state = 157;
+                this.state = 159;
                 this.type_name();
                 }
                 break;
             case 2:
                 {
-                this.state = 158;
+                this.state = 160;
                 this.id();
                 }
                 break;
             }
-            this.state = 162;
+            this.state = 164;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (_la === 49) {
+            if (_la === 50) {
                 {
-                this.state = 161;
+                this.state = 163;
                 this.type_args();
                 }
             }
@@ -481,11 +483,11 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 164;
-            this.match(PineV5Parser.TYPE);
-            this.state = 165;
-            this.id();
             this.state = 166;
+            this.match(PineV5Parser.TYPE);
+            this.state = 167;
+            this.id();
+            this.state = 168;
             this.type_body();
             }
         }
@@ -509,14 +511,14 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 168;
+            this.state = 170;
             this.match(PineV5Parser.BEGIN);
-            this.state = 171;
+            this.state = 173;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
             do {
                 {
-                this.state = 171;
+                this.state = 173;
                 this.errorHandler.sync(this);
                 switch (this.tokenStream.LA(1)) {
                 case PineV5Parser.AS:
@@ -534,13 +536,13 @@ export class PineV5Parser extends antlr.Parser {
                 case PineV5Parser.TABLE_TYPE:
                 case PineV5Parser.ID:
                     {
-                    this.state = 169;
+                    this.state = 171;
                     this.type_field();
                     }
                     break;
                 case PineV5Parser.LEND:
                     {
-                    this.state = 170;
+                    this.state = 172;
                     this.match(PineV5Parser.LEND);
                     }
                     break;
@@ -548,11 +550,11 @@ export class PineV5Parser extends antlr.Parser {
                     throw new antlr.NoViableAltException(this);
                 }
                 }
-                this.state = 173;
+                this.state = 175;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
-            } while ((((_la) & ~0x1F) === 0 && ((1 << _la) & 33547272) !== 0) || _la === 67);
-            this.state = 175;
+            } while ((((_la) & ~0x1F) === 0 && ((1 << _la) & 67093512) !== 0) || _la === 68);
+            this.state = 177;
             this.match(PineV5Parser.END);
             }
         }
@@ -576,28 +578,28 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 178;
+            this.state = 180;
             this.errorHandler.sync(this);
             switch (this.interpreter.adaptivePredict(this.tokenStream, 9, this.context) ) {
             case 1:
                 {
-                this.state = 177;
+                this.state = 179;
                 this.type_qual();
                 }
                 break;
             }
-            this.state = 180;
+            this.state = 182;
             this.field_type();
-            this.state = 181;
+            this.state = 183;
             this.id();
-            this.state = 184;
+            this.state = 186;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (_la === 56) {
+            if (_la === 57) {
                 {
-                this.state = 182;
+                this.state = 184;
                 this.match(PineV5Parser.DEFINE);
-                this.state = 183;
+                this.state = 185;
                 this.arith_expr();
                 }
             }
@@ -623,9 +625,9 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 186;
+            this.state = 188;
             this.match(PineV5Parser.METHOD);
-            this.state = 187;
+            this.state = 189;
             this.fun_def_stmt();
             }
         }
@@ -648,20 +650,20 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 189;
+            this.state = 191;
             this.match(PineV5Parser.EXPORT);
-            this.state = 193;
+            this.state = 195;
             this.errorHandler.sync(this);
             switch (this.tokenStream.LA(1)) {
             case PineV5Parser.TYPE:
                 {
-                this.state = 190;
+                this.state = 192;
                 this.type_def_stmt();
                 }
                 break;
             case PineV5Parser.METHOD:
                 {
-                this.state = 191;
+                this.state = 193;
                 this.method_def_stmt();
                 }
                 break;
@@ -680,7 +682,7 @@ export class PineV5Parser extends antlr.Parser {
             case PineV5Parser.TABLE_TYPE:
             case PineV5Parser.ID:
                 {
-                this.state = 192;
+                this.state = 194;
                 this.fun_def_stmt();
                 }
                 break;
@@ -708,18 +710,18 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 195;
+            this.state = 197;
             this.match(PineV5Parser.IMPORT);
-            this.state = 196;
+            this.state = 198;
             this.import_path();
-            this.state = 199;
+            this.state = 201;
             this.errorHandler.sync(this);
             switch (this.interpreter.adaptivePredict(this.tokenStream, 12, this.context) ) {
             case 1:
                 {
-                this.state = 197;
+                this.state = 199;
                 this.match(PineV5Parser.AS);
-                this.state = 198;
+                this.state = 200;
                 this.id();
                 }
                 break;
@@ -746,17 +748,17 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 201;
+            this.state = 203;
             this.id();
-            this.state = 210;
+            this.state = 212;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 54) {
+            while (_la === 55) {
                 {
                 {
-                this.state = 202;
+                this.state = 204;
                 this.match(PineV5Parser.DIV);
-                this.state = 206;
+                this.state = 208;
                 this.errorHandler.sync(this);
                 switch (this.tokenStream.LA(1)) {
                 case PineV5Parser.AS:
@@ -774,19 +776,19 @@ export class PineV5Parser extends antlr.Parser {
                 case PineV5Parser.TABLE_TYPE:
                 case PineV5Parser.ID:
                     {
-                    this.state = 203;
+                    this.state = 205;
                     this.id();
                     }
                     break;
                 case PineV5Parser.INT_LITERAL:
                     {
-                    this.state = 204;
+                    this.state = 206;
                     this.match(PineV5Parser.INT_LITERAL);
                     }
                     break;
                 case PineV5Parser.FLOAT_LITERAL:
                     {
-                    this.state = 205;
+                    this.state = 207;
                     this.match(PineV5Parser.FLOAT_LITERAL);
                     }
                     break;
@@ -795,7 +797,7 @@ export class PineV5Parser extends antlr.Parser {
                 }
                 }
                 }
-                this.state = 212;
+                this.state = 214;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -821,36 +823,36 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 214;
+            this.state = 216;
             this.errorHandler.sync(this);
             switch (this.interpreter.adaptivePredict(this.tokenStream, 15, this.context) ) {
             case 1:
                 {
-                this.state = 213;
+                this.state = 215;
                 this.type_qual();
                 }
                 break;
             }
-            this.state = 217;
+            this.state = 219;
             this.errorHandler.sync(this);
             switch (this.interpreter.adaptivePredict(this.tokenStream, 16, this.context) ) {
             case 1:
                 {
-                this.state = 216;
+                this.state = 218;
                 this.field_type();
                 }
                 break;
             }
-            this.state = 219;
+            this.state = 221;
             this.id();
-            this.state = 222;
+            this.state = 224;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (_la === 56) {
+            if (_la === 57) {
                 {
-                this.state = 220;
+                this.state = 222;
                 this.match(PineV5Parser.DEFINE);
-                this.state = 221;
+                this.state = 223;
                 this.arith_expr();
                 }
             }
@@ -877,27 +879,27 @@ export class PineV5Parser extends antlr.Parser {
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 224;
+            this.state = 226;
             this.match(PineV5Parser.LT);
-            this.state = 225;
+            this.state = 227;
             this.type_arg();
-            this.state = 230;
+            this.state = 232;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 58) {
+            while (_la === 59) {
                 {
                 {
-                this.state = 226;
+                this.state = 228;
                 this.match(PineV5Parser.COMMA);
-                this.state = 227;
+                this.state = 229;
                 this.type_arg();
                 }
                 }
-                this.state = 232;
+                this.state = 234;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
-            this.state = 233;
+            this.state = 235;
             this.match(PineV5Parser.GT);
             }
         }
@@ -918,20 +920,20 @@ export class PineV5Parser extends antlr.Parser {
         let localContext = new Type_argContext(this.context, this.state);
         this.enterRule(localContext, 28, PineV5Parser.RULE_type_arg);
         try {
-            this.state = 237;
+            this.state = 239;
             this.errorHandler.sync(this);
             switch (this.interpreter.adaptivePredict(this.tokenStream, 19, this.context) ) {
             case 1:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 235;
+                this.state = 237;
                 this.type_name();
                 }
                 break;
             case 2:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 236;
+                this.state = 238;
                 this.id();
                 }
                 break;
@@ -950,38 +952,98 @@ export class PineV5Parser extends antlr.Parser {
         }
         return localContext;
     }
+    public for_in_expr(): For_in_exprContext {
+        let localContext = new For_in_exprContext(this.context, this.state);
+        this.enterRule(localContext, 30, PineV5Parser.RULE_for_in_expr);
+        try {
+            this.enterOuterAlt(localContext, 1);
+            {
+            this.state = 241;
+            this.match(PineV5Parser.FOR_STMT);
+            this.state = 244;
+            this.errorHandler.sync(this);
+            switch (this.tokenStream.LA(1)) {
+            case PineV5Parser.LSQBR:
+                {
+                this.state = 242;
+                this.ids_array();
+                }
+                break;
+            case PineV5Parser.AS:
+            case PineV5Parser.SERIES:
+            case PineV5Parser.SIMPLE:
+            case PineV5Parser.CONST:
+            case PineV5Parser.INT_TYPE:
+            case PineV5Parser.FLOAT_TYPE:
+            case PineV5Parser.BOOL_TYPE:
+            case PineV5Parser.STRING_TYPE:
+            case PineV5Parser.COLOR_TYPE:
+            case PineV5Parser.LINE_TYPE:
+            case PineV5Parser.LABEL_TYPE:
+            case PineV5Parser.BOX_TYPE:
+            case PineV5Parser.TABLE_TYPE:
+            case PineV5Parser.ID:
+                {
+                this.state = 243;
+                this.id();
+                }
+                break;
+            default:
+                throw new antlr.NoViableAltException(this);
+            }
+            this.state = 246;
+            this.match(PineV5Parser.IN);
+            this.state = 247;
+            this.ternary_expr();
+            this.state = 248;
+            this.stmts_block();
+            }
+        }
+        catch (re) {
+            if (re instanceof antlr.RecognitionException) {
+                this.errorHandler.reportError(this, re);
+                this.errorHandler.recover(this, re);
+            } else {
+                throw re;
+            }
+        }
+        finally {
+            this.exitRule();
+        }
+        return localContext;
+    }
     public fun_call(): Fun_callContext {
         let localContext = new Fun_callContext(this.context, this.state);
-        this.enterRule(localContext, 30, PineV5Parser.RULE_fun_call);
+        this.enterRule(localContext, 32, PineV5Parser.RULE_fun_call);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 239;
+            this.state = 250;
             this.id();
-            this.state = 241;
+            this.state = 252;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (_la === 49) {
+            if (_la === 50) {
                 {
-                this.state = 240;
+                this.state = 251;
                 this.type_args();
                 }
             }
 
-            this.state = 243;
+            this.state = 254;
             this.match(PineV5Parser.LPAR);
-            this.state = 245;
+            this.state = 256;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (((((_la - 5)) & ~0x1F) === 0 && ((1 << (_la - 5)) & 672136993) !== 0) || ((((_la - 41)) & ~0x1F) === 0 && ((1 << (_la - 41)) & 130288643) !== 0)) {
+            if (((((_la - 5)) & ~0x1F) === 0 && ((1 << (_la - 5)) & 1344273953) !== 0) || ((((_la - 42)) & ~0x1F) === 0 && ((1 << (_la - 42)) & 130288643) !== 0)) {
                 {
-                this.state = 244;
+                this.state = 255;
                 this.fun_actual_args();
                 }
             }
 
-            this.state = 247;
+            this.state = 258;
             this.match(PineV5Parser.RPAR);
             }
         }
@@ -1000,50 +1062,50 @@ export class PineV5Parser extends antlr.Parser {
     }
     public stmt(): StmtContext {
         let localContext = new StmtContext(this.context, this.state);
-        this.enterRule(localContext, 32, PineV5Parser.RULE_stmt);
+        this.enterRule(localContext, 34, PineV5Parser.RULE_stmt);
         try {
-            this.state = 255;
+            this.state = 266;
             this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 22, this.context) ) {
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 23, this.context) ) {
             case 1:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 249;
+                this.state = 260;
                 this.import_stmt();
                 }
                 break;
             case 2:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 250;
+                this.state = 261;
                 this.export_stmt();
                 }
                 break;
             case 3:
                 this.enterOuterAlt(localContext, 3);
                 {
-                this.state = 251;
+                this.state = 262;
                 this.type_def_stmt();
                 }
                 break;
             case 4:
                 this.enterOuterAlt(localContext, 4);
                 {
-                this.state = 252;
+                this.state = 263;
                 this.method_def_stmt();
                 }
                 break;
             case 5:
                 this.enterOuterAlt(localContext, 5);
                 {
-                this.state = 253;
+                this.state = 264;
                 this.fun_def_stmt();
                 }
                 break;
             case 6:
                 this.enterOuterAlt(localContext, 6);
                 {
-                this.state = 254;
+                this.state = 265;
                 this.global_stmt();
                 }
                 break;
@@ -1064,40 +1126,40 @@ export class PineV5Parser extends antlr.Parser {
     }
     public fun_head(): Fun_headContext {
         let localContext = new Fun_headContext(this.context, this.state);
-        this.enterRule(localContext, 34, PineV5Parser.RULE_fun_head);
+        this.enterRule(localContext, 36, PineV5Parser.RULE_fun_head);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 257;
+            this.state = 268;
             this.match(PineV5Parser.LPAR);
-            this.state = 266;
+            this.state = 277;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 33547264) !== 0) || _la === 67) {
+            if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 67093504) !== 0) || _la === 68) {
                 {
-                this.state = 258;
+                this.state = 269;
                 this.fun_param();
-                this.state = 263;
+                this.state = 274;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
-                while (_la === 58) {
+                while (_la === 59) {
                     {
                     {
-                    this.state = 259;
+                    this.state = 270;
                     this.match(PineV5Parser.COMMA);
-                    this.state = 260;
+                    this.state = 271;
                     this.fun_param();
                     }
                     }
-                    this.state = 265;
+                    this.state = 276;
                     this.errorHandler.sync(this);
                     _la = this.tokenStream.LA(1);
                 }
                 }
             }
 
-            this.state = 268;
+            this.state = 279;
             this.match(PineV5Parser.RPAR);
             }
         }
@@ -1116,46 +1178,46 @@ export class PineV5Parser extends antlr.Parser {
     }
     public var_def(): Var_defContext {
         let localContext = new Var_defContext(this.context, this.state);
-        this.enterRule(localContext, 36, PineV5Parser.RULE_var_def);
+        this.enterRule(localContext, 38, PineV5Parser.RULE_var_def);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 271;
+            this.state = 282;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (_la === 11 || _la === 12) {
+            if (_la === 12 || _la === 13) {
                 {
-                this.state = 270;
+                this.state = 281;
                 this.decl_mod();
                 }
             }
 
-            this.state = 274;
-            this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 26, this.context) ) {
-            case 1:
-                {
-                this.state = 273;
-                this.type_qual();
-                }
-                break;
-            }
-            this.state = 277;
+            this.state = 285;
             this.errorHandler.sync(this);
             switch (this.interpreter.adaptivePredict(this.tokenStream, 27, this.context) ) {
             case 1:
                 {
-                this.state = 276;
+                this.state = 284;
+                this.type_qual();
+                }
+                break;
+            }
+            this.state = 288;
+            this.errorHandler.sync(this);
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 28, this.context) ) {
+            case 1:
+                {
+                this.state = 287;
                 this.field_type();
                 }
                 break;
             }
-            this.state = 279;
+            this.state = 290;
             this.id();
-            this.state = 280;
+            this.state = 291;
             this.match(PineV5Parser.DEFINE);
-            this.state = 281;
+            this.state = 292;
             this.arith_expr();
             }
         }
@@ -1174,46 +1236,46 @@ export class PineV5Parser extends antlr.Parser {
     }
     public var_defs(): Var_defsContext {
         let localContext = new Var_defsContext(this.context, this.state);
-        this.enterRule(localContext, 38, PineV5Parser.RULE_var_defs);
+        this.enterRule(localContext, 40, PineV5Parser.RULE_var_defs);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 284;
+            this.state = 295;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (_la === 11 || _la === 12) {
+            if (_la === 12 || _la === 13) {
                 {
-                this.state = 283;
+                this.state = 294;
                 this.decl_mod();
                 }
             }
 
-            this.state = 287;
+            this.state = 298;
             this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 29, this.context) ) {
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 30, this.context) ) {
             case 1:
                 {
-                this.state = 286;
+                this.state = 297;
                 this.type_qual();
                 }
                 break;
             }
-            this.state = 290;
+            this.state = 301;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 33547264) !== 0) || _la === 67) {
+            if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 67093504) !== 0) || _la === 68) {
                 {
-                this.state = 289;
+                this.state = 300;
                 this.field_type();
                 }
             }
 
-            this.state = 292;
+            this.state = 303;
             this.ids_array();
-            this.state = 293;
+            this.state = 304;
             this.match(PineV5Parser.DEFINE);
-            this.state = 294;
+            this.state = 305;
             this.arith_expr();
             }
         }
@@ -1232,14 +1294,14 @@ export class PineV5Parser extends antlr.Parser {
     }
     public id_part(): Id_partContext {
         let localContext = new Id_partContext(this.context, this.state);
-        this.enterRule(localContext, 40, PineV5Parser.RULE_id_part);
+        this.enterRule(localContext, 42, PineV5Parser.RULE_id_part);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 296;
+            this.state = 307;
             _la = this.tokenStream.LA(1);
-            if(!((((_la) & ~0x1F) === 0 && ((1 << _la) & 33547264) !== 0) || _la === 67)) {
+            if(!((((_la) & ~0x1F) === 0 && ((1 << _la) & 67093504) !== 0) || _la === 68)) {
             this.errorHandler.recoverInline(this);
             }
             else {
@@ -1263,85 +1325,92 @@ export class PineV5Parser extends antlr.Parser {
     }
     public global_stmt_content(): Global_stmt_contentContext {
         let localContext = new Global_stmt_contentContext(this.context, this.state);
-        this.enterRule(localContext, 42, PineV5Parser.RULE_global_stmt_content);
+        this.enterRule(localContext, 44, PineV5Parser.RULE_global_stmt_content);
         try {
-            this.state = 309;
+            this.state = 321;
             this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 31, this.context) ) {
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 32, this.context) ) {
             case 1:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 298;
+                this.state = 309;
                 this.var_def();
                 }
                 break;
             case 2:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 299;
+                this.state = 310;
                 this.var_defs();
                 }
                 break;
             case 3:
                 this.enterOuterAlt(localContext, 3);
                 {
-                this.state = 300;
+                this.state = 311;
                 this.fun_call();
                 }
                 break;
             case 4:
                 this.enterOuterAlt(localContext, 4);
                 {
-                this.state = 301;
+                this.state = 312;
                 this.if_expr();
                 }
                 break;
             case 5:
                 this.enterOuterAlt(localContext, 5);
                 {
-                this.state = 302;
+                this.state = 313;
                 this.var_assign();
                 }
                 break;
             case 6:
                 this.enterOuterAlt(localContext, 6);
                 {
-                this.state = 303;
+                this.state = 314;
                 this.for_expr();
                 }
                 break;
             case 7:
                 this.enterOuterAlt(localContext, 7);
                 {
-                this.state = 304;
-                this.while_expr();
+                this.state = 315;
+                this.for_in_expr();
                 }
                 break;
             case 8:
                 this.enterOuterAlt(localContext, 8);
                 {
-                this.state = 305;
-                this.switch_expr();
+                this.state = 316;
+                this.while_expr();
                 }
                 break;
             case 9:
                 this.enterOuterAlt(localContext, 9);
                 {
-                this.state = 306;
-                this.loop_break();
+                this.state = 317;
+                this.switch_expr();
                 }
                 break;
             case 10:
                 this.enterOuterAlt(localContext, 10);
                 {
-                this.state = 307;
-                this.loop_continue();
+                this.state = 318;
+                this.loop_break();
                 }
                 break;
             case 11:
                 this.enterOuterAlt(localContext, 11);
                 {
-                this.state = 308;
+                this.state = 319;
+                this.loop_continue();
+                }
+                break;
+            case 12:
+                this.enterOuterAlt(localContext, 12);
+                {
+                this.state = 320;
                 this.arith_expr();
                 }
                 break;
@@ -1362,64 +1431,64 @@ export class PineV5Parser extends antlr.Parser {
     }
     public local_stmt_content(): Local_stmt_contentContext {
         let localContext = new Local_stmt_contentContext(this.context, this.state);
-        this.enterRule(localContext, 44, PineV5Parser.RULE_local_stmt_content);
+        this.enterRule(localContext, 46, PineV5Parser.RULE_local_stmt_content);
         try {
-            this.state = 319;
+            this.state = 331;
             this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 32, this.context) ) {
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 33, this.context) ) {
             case 1:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 311;
+                this.state = 323;
                 this.var_def();
                 }
                 break;
             case 2:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 312;
+                this.state = 324;
                 this.var_defs();
                 }
                 break;
             case 3:
                 this.enterOuterAlt(localContext, 3);
                 {
-                this.state = 313;
+                this.state = 325;
                 this.arith_expr();
                 }
                 break;
             case 4:
                 this.enterOuterAlt(localContext, 4);
                 {
-                this.state = 314;
+                this.state = 326;
                 this.arith_exprs();
                 }
                 break;
             case 5:
                 this.enterOuterAlt(localContext, 5);
                 {
-                this.state = 315;
+                this.state = 327;
                 this.var_assign();
                 }
                 break;
             case 6:
                 this.enterOuterAlt(localContext, 6);
                 {
-                this.state = 316;
+                this.state = 328;
                 this.while_expr();
                 }
                 break;
             case 7:
                 this.enterOuterAlt(localContext, 7);
                 {
-                this.state = 317;
+                this.state = 329;
                 this.loop_break();
                 }
                 break;
             case 8:
                 this.enterOuterAlt(localContext, 8);
                 {
-                this.state = 318;
+                this.state = 330;
                 this.loop_continue();
                 }
                 break;
@@ -1440,63 +1509,46 @@ export class PineV5Parser extends antlr.Parser {
     }
     public arith_expr(): Arith_exprContext {
         let localContext = new Arith_exprContext(this.context, this.state);
-        this.enterRule(localContext, 46, PineV5Parser.RULE_arith_expr);
+        this.enterRule(localContext, 48, PineV5Parser.RULE_arith_expr);
         try {
-            this.state = 325;
+            this.state = 338;
             this.errorHandler.sync(this);
-            switch (this.tokenStream.LA(1)) {
-            case PineV5Parser.AS:
-            case PineV5Parser.SERIES:
-            case PineV5Parser.SIMPLE:
-            case PineV5Parser.CONST:
-            case PineV5Parser.INT_TYPE:
-            case PineV5Parser.FLOAT_TYPE:
-            case PineV5Parser.BOOL_TYPE:
-            case PineV5Parser.STRING_TYPE:
-            case PineV5Parser.COLOR_TYPE:
-            case PineV5Parser.LINE_TYPE:
-            case PineV5Parser.LABEL_TYPE:
-            case PineV5Parser.BOX_TYPE:
-            case PineV5Parser.TABLE_TYPE:
-            case PineV5Parser.NOT:
-            case PineV5Parser.BOOL_LITERAL:
-            case PineV5Parser.PLUS:
-            case PineV5Parser.MINUS:
-            case PineV5Parser.LPAR:
-            case PineV5Parser.INT_LITERAL:
-            case PineV5Parser.FLOAT_LITERAL:
-            case PineV5Parser.STR_LITERAL:
-            case PineV5Parser.COLOR_LITERAL:
-            case PineV5Parser.ID:
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 34, this.context) ) {
+            case 1:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 321;
+                this.state = 333;
                 this.ternary_expr();
                 }
                 break;
-            case PineV5Parser.IF_COND:
+            case 2:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 322;
+                this.state = 334;
                 this.if_expr();
                 }
                 break;
-            case PineV5Parser.FOR_STMT:
+            case 3:
                 this.enterOuterAlt(localContext, 3);
                 {
-                this.state = 323;
+                this.state = 335;
                 this.for_expr();
                 }
                 break;
-            case PineV5Parser.SWITCH:
+            case 4:
                 this.enterOuterAlt(localContext, 4);
                 {
-                this.state = 324;
+                this.state = 336;
+                this.for_in_expr();
+                }
+                break;
+            case 5:
+                this.enterOuterAlt(localContext, 5);
+                {
+                this.state = 337;
                 this.switch_expr();
                 }
                 break;
-            default:
-                throw new antlr.NoViableAltException(this);
             }
         }
         catch (re) {
@@ -1514,14 +1566,14 @@ export class PineV5Parser extends antlr.Parser {
     }
     public decl_mod(): Decl_modContext {
         let localContext = new Decl_modContext(this.context, this.state);
-        this.enterRule(localContext, 48, PineV5Parser.RULE_decl_mod);
+        this.enterRule(localContext, 50, PineV5Parser.RULE_decl_mod);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 327;
+            this.state = 340;
             _la = this.tokenStream.LA(1);
-            if(!(_la === 11 || _la === 12)) {
+            if(!(_la === 12 || _la === 13)) {
             this.errorHandler.recoverInline(this);
             }
             else {
@@ -1545,14 +1597,14 @@ export class PineV5Parser extends antlr.Parser {
     }
     public type_qual(): Type_qualContext {
         let localContext = new Type_qualContext(this.context, this.state);
-        this.enterRule(localContext, 50, PineV5Parser.RULE_type_qual);
+        this.enterRule(localContext, 52, PineV5Parser.RULE_type_qual);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 329;
+            this.state = 342;
             _la = this.tokenStream.LA(1);
-            if(!((((_la) & ~0x1F) === 0 && ((1 << _la) & 57344) !== 0))) {
+            if(!((((_la) & ~0x1F) === 0 && ((1 << _la) & 114688) !== 0))) {
             this.errorHandler.recoverInline(this);
             }
             else {
@@ -1576,14 +1628,14 @@ export class PineV5Parser extends antlr.Parser {
     }
     public type_name(): Type_nameContext {
         let localContext = new Type_nameContext(this.context, this.state);
-        this.enterRule(localContext, 52, PineV5Parser.RULE_type_name);
+        this.enterRule(localContext, 54, PineV5Parser.RULE_type_name);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 331;
+            this.state = 344;
             _la = this.tokenStream.LA(1);
-            if(!((((_la) & ~0x1F) === 0 && ((1 << _la) & 33488896) !== 0))) {
+            if(!((((_la) & ~0x1F) === 0 && ((1 << _la) & 66977792) !== 0))) {
             this.errorHandler.recoverInline(this);
             }
             else {
@@ -1607,26 +1659,26 @@ export class PineV5Parser extends antlr.Parser {
     }
     public id(): IdContext {
         let localContext = new IdContext(this.context, this.state);
-        this.enterRule(localContext, 54, PineV5Parser.RULE_id);
+        this.enterRule(localContext, 56, PineV5Parser.RULE_id);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 333;
+            this.state = 346;
             this.id_part();
-            this.state = 338;
+            this.state = 351;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 71) {
+            while (_la === 72) {
                 {
                 {
-                this.state = 334;
+                this.state = 347;
                 this.match(PineV5Parser.DOT);
-                this.state = 335;
+                this.state = 348;
                 this.id_part();
                 }
                 }
-                this.state = 340;
+                this.state = 353;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -1647,14 +1699,14 @@ export class PineV5Parser extends antlr.Parser {
     }
     public compound_assign_op(): Compound_assign_opContext {
         let localContext = new Compound_assign_opContext(this.context, this.state);
-        this.enterRule(localContext, 56, PineV5Parser.RULE_compound_assign_op);
+        this.enterRule(localContext, 58, PineV5Parser.RULE_compound_assign_op);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 341;
+            this.state = 354;
             _la = this.tokenStream.LA(1);
-            if(!((((_la) & ~0x1F) === 0 && ((1 << _la) & 1040187392) !== 0))) {
+            if(!((((_la) & ~0x1F) === 0 && ((1 << _la) & 2080374784) !== 0))) {
             this.errorHandler.recoverInline(this);
             }
             else {
@@ -1678,18 +1730,18 @@ export class PineV5Parser extends antlr.Parser {
     }
     public var_assign(): Var_assignContext {
         let localContext = new Var_assignContext(this.context, this.state);
-        this.enterRule(localContext, 58, PineV5Parser.RULE_var_assign);
+        this.enterRule(localContext, 60, PineV5Parser.RULE_var_assign);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 343;
+            this.state = 356;
             this.id();
-            this.state = 346;
+            this.state = 359;
             this.errorHandler.sync(this);
             switch (this.tokenStream.LA(1)) {
             case PineV5Parser.ASSIGN:
                 {
-                this.state = 344;
+                this.state = 357;
                 this.match(PineV5Parser.ASSIGN);
                 }
                 break;
@@ -1699,14 +1751,14 @@ export class PineV5Parser extends antlr.Parser {
             case PineV5Parser.DIV_ASSIGN:
             case PineV5Parser.MOD_ASSIGN:
                 {
-                this.state = 345;
+                this.state = 358;
                 this.compound_assign_op();
                 }
                 break;
             default:
                 throw new antlr.NoViableAltException(this);
             }
-            this.state = 348;
+            this.state = 361;
             this.arith_expr();
             }
         }
@@ -1725,50 +1777,50 @@ export class PineV5Parser extends antlr.Parser {
     }
     public if_expr(): If_exprContext {
         let localContext = new If_exprContext(this.context, this.state);
-        this.enterRule(localContext, 60, PineV5Parser.RULE_if_expr);
+        this.enterRule(localContext, 62, PineV5Parser.RULE_if_expr);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 350;
+            this.state = 363;
             this.match(PineV5Parser.IF_COND);
-            this.state = 351;
-            this.ternary_expr();
-            this.state = 352;
-            this.stmts_block();
             this.state = 364;
+            this.ternary_expr();
+            this.state = 365;
+            this.stmts_block();
+            this.state = 377;
             this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 38, this.context) ) {
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 39, this.context) ) {
             case 1:
                 {
-                this.state = 356;
+                this.state = 369;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
                 while (_la === 3) {
                     {
                     {
-                    this.state = 353;
+                    this.state = 366;
                     this.match(PineV5Parser.LEND);
                     }
                     }
-                    this.state = 358;
+                    this.state = 371;
                     this.errorHandler.sync(this);
                     _la = this.tokenStream.LA(1);
                 }
-                this.state = 359;
+                this.state = 372;
                 this.match(PineV5Parser.IF_COND_ELSE);
-                this.state = 362;
+                this.state = 375;
                 this.errorHandler.sync(this);
                 switch (this.tokenStream.LA(1)) {
                 case PineV5Parser.IF_COND:
                     {
-                    this.state = 360;
+                    this.state = 373;
                     this.if_expr();
                     }
                     break;
                 case PineV5Parser.BEGIN:
                     {
-                    this.state = 361;
+                    this.state = 374;
                     this.stmts_block();
                     }
                     break;
@@ -1795,17 +1847,17 @@ export class PineV5Parser extends antlr.Parser {
     }
     public pine_script(): Pine_scriptContext {
         let localContext = new Pine_scriptContext(this.context, this.state);
-        this.enterRule(localContext, 62, PineV5Parser.RULE_pine_script);
+        this.enterRule(localContext, 64, PineV5Parser.RULE_pine_script);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 370;
+            this.state = 383;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (((((_la - 3)) & ~0x1F) === 0 && ((1 << (_la - 3)) & 2688548863) !== 0) || ((((_la - 37)) & ~0x1F) === 0 && ((1 << (_la - 37)) & 2101395507) !== 0)) {
+            while ((((_la) & ~0x1F) === 0 && ((1 << _la) & 67106808) !== 0) || ((((_la - 33)) & ~0x1F) === 0 && ((1 << (_la - 33)) & 2820146789) !== 0) || ((((_la - 65)) & ~0x1F) === 0 && ((1 << (_la - 65)) & 15) !== 0)) {
                 {
-                this.state = 368;
+                this.state = 381;
                 this.errorHandler.sync(this);
                 switch (this.tokenStream.LA(1)) {
                 case PineV5Parser.WHILE:
@@ -1845,13 +1897,13 @@ export class PineV5Parser extends antlr.Parser {
                 case PineV5Parser.COLOR_LITERAL:
                 case PineV5Parser.ID:
                     {
-                    this.state = 366;
+                    this.state = 379;
                     this.stmt();
                     }
                     break;
                 case PineV5Parser.LEND:
                     {
-                    this.state = 367;
+                    this.state = 380;
                     this.match(PineV5Parser.LEND);
                     }
                     break;
@@ -1859,11 +1911,11 @@ export class PineV5Parser extends antlr.Parser {
                     throw new antlr.NoViableAltException(this);
                 }
                 }
-                this.state = 372;
+                this.state = 385;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
-            this.state = 373;
+            this.state = 386;
             this.match(PineV5Parser.EOF);
             }
         }
@@ -1882,26 +1934,26 @@ export class PineV5Parser extends antlr.Parser {
     }
     public global_stmt(): Global_stmtContext {
         let localContext = new Global_stmtContext(this.context, this.state);
-        this.enterRule(localContext, 64, PineV5Parser.RULE_global_stmt);
+        this.enterRule(localContext, 66, PineV5Parser.RULE_global_stmt);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 375;
+            this.state = 388;
             this.global_stmt_content();
-            this.state = 380;
+            this.state = 393;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 58) {
+            while (_la === 59) {
                 {
                 {
-                this.state = 376;
+                this.state = 389;
                 this.match(PineV5Parser.COMMA);
-                this.state = 377;
+                this.state = 390;
                 this.global_stmt_content();
                 }
                 }
-                this.state = 382;
+                this.state = 395;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -1922,22 +1974,22 @@ export class PineV5Parser extends antlr.Parser {
     }
     public fun_def_stmt(): Fun_def_stmtContext {
         let localContext = new Fun_def_stmtContext(this.context, this.state);
-        this.enterRule(localContext, 66, PineV5Parser.RULE_fun_def_stmt);
+        this.enterRule(localContext, 68, PineV5Parser.RULE_fun_def_stmt);
         try {
-            this.state = 385;
+            this.state = 398;
             this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 42, this.context) ) {
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 43, this.context) ) {
             case 1:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 383;
+                this.state = 396;
                 this.fun_def_singleline();
                 }
                 break;
             case 2:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 384;
+                this.state = 397;
                 this.fun_def_multiline();
                 }
                 break;
@@ -1958,17 +2010,17 @@ export class PineV5Parser extends antlr.Parser {
     }
     public fun_def_singleline(): Fun_def_singlelineContext {
         let localContext = new Fun_def_singlelineContext(this.context, this.state);
-        this.enterRule(localContext, 68, PineV5Parser.RULE_fun_def_singleline);
+        this.enterRule(localContext, 70, PineV5Parser.RULE_fun_def_singleline);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 387;
+            this.state = 400;
             this.id();
-            this.state = 388;
+            this.state = 401;
             this.fun_head();
-            this.state = 389;
+            this.state = 402;
             this.match(PineV5Parser.ARROW);
-            this.state = 390;
+            this.state = 403;
             this.fun_body_singleline();
             }
         }
@@ -1987,17 +2039,17 @@ export class PineV5Parser extends antlr.Parser {
     }
     public fun_def_multiline(): Fun_def_multilineContext {
         let localContext = new Fun_def_multilineContext(this.context, this.state);
-        this.enterRule(localContext, 70, PineV5Parser.RULE_fun_def_multiline);
+        this.enterRule(localContext, 72, PineV5Parser.RULE_fun_def_multiline);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 392;
+            this.state = 405;
             this.id();
-            this.state = 393;
+            this.state = 406;
             this.fun_head();
-            this.state = 394;
+            this.state = 407;
             this.match(PineV5Parser.ARROW);
-            this.state = 395;
+            this.state = 408;
             this.fun_body_multiline();
             }
         }
@@ -2016,11 +2068,11 @@ export class PineV5Parser extends antlr.Parser {
     }
     public fun_body_singleline(): Fun_body_singlelineContext {
         let localContext = new Fun_body_singlelineContext(this.context, this.state);
-        this.enterRule(localContext, 72, PineV5Parser.RULE_fun_body_singleline);
+        this.enterRule(localContext, 74, PineV5Parser.RULE_fun_body_singleline);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 397;
+            this.state = 410;
             this.local_stmt_singleline();
             }
         }
@@ -2039,26 +2091,26 @@ export class PineV5Parser extends antlr.Parser {
     }
     public local_stmt_singleline(): Local_stmt_singlelineContext {
         let localContext = new Local_stmt_singlelineContext(this.context, this.state);
-        this.enterRule(localContext, 74, PineV5Parser.RULE_local_stmt_singleline);
+        this.enterRule(localContext, 76, PineV5Parser.RULE_local_stmt_singleline);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 399;
+            this.state = 412;
             this.local_stmt_content();
-            this.state = 404;
+            this.state = 417;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 58) {
+            while (_la === 59) {
                 {
                 {
-                this.state = 400;
+                this.state = 413;
                 this.match(PineV5Parser.COMMA);
-                this.state = 401;
+                this.state = 414;
                 this.local_stmt_content();
                 }
                 }
-                this.state = 406;
+                this.state = 419;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -2079,11 +2131,11 @@ export class PineV5Parser extends antlr.Parser {
     }
     public loop_break(): Loop_breakContext {
         let localContext = new Loop_breakContext(this.context, this.state);
-        this.enterRule(localContext, 76, PineV5Parser.RULE_loop_break);
+        this.enterRule(localContext, 78, PineV5Parser.RULE_loop_break);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 407;
+            this.state = 420;
             this.match(PineV5Parser.BREAK);
             }
         }
@@ -2102,11 +2154,11 @@ export class PineV5Parser extends antlr.Parser {
     }
     public loop_continue(): Loop_continueContext {
         let localContext = new Loop_continueContext(this.context, this.state);
-        this.enterRule(localContext, 78, PineV5Parser.RULE_loop_continue);
+        this.enterRule(localContext, 80, PineV5Parser.RULE_loop_continue);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 409;
+            this.state = 422;
             this.match(PineV5Parser.CONTINUE);
             }
         }
@@ -2125,11 +2177,11 @@ export class PineV5Parser extends antlr.Parser {
     }
     public fun_body_multiline(): Fun_body_multilineContext {
         let localContext = new Fun_body_multilineContext(this.context, this.state);
-        this.enterRule(localContext, 80, PineV5Parser.RULE_fun_body_multiline);
+        this.enterRule(localContext, 82, PineV5Parser.RULE_fun_body_multiline);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 411;
+            this.state = 424;
             this.local_stmts_multiline();
             }
         }
@@ -2148,15 +2200,15 @@ export class PineV5Parser extends antlr.Parser {
     }
     public local_stmts_multiline(): Local_stmts_multilineContext {
         let localContext = new Local_stmts_multilineContext(this.context, this.state);
-        this.enterRule(localContext, 82, PineV5Parser.RULE_local_stmts_multiline);
+        this.enterRule(localContext, 84, PineV5Parser.RULE_local_stmts_multiline);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 413;
+            this.state = 426;
             this.match(PineV5Parser.BEGIN);
-            this.state = 414;
+            this.state = 427;
             this.local_stmts_list();
-            this.state = 415;
+            this.state = 428;
             this.match(PineV5Parser.END);
             }
         }
@@ -2175,17 +2227,17 @@ export class PineV5Parser extends antlr.Parser {
     }
     public local_stmts_list(): Local_stmts_listContext {
         let localContext = new Local_stmts_listContext(this.context, this.state);
-        this.enterRule(localContext, 84, PineV5Parser.RULE_local_stmts_list);
+        this.enterRule(localContext, 86, PineV5Parser.RULE_local_stmts_list);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 419;
+            this.state = 432;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
             do {
                 {
-                this.state = 419;
+                this.state = 432;
                 this.errorHandler.sync(this);
                 switch (this.tokenStream.LA(1)) {
                 case PineV5Parser.WHILE:
@@ -2221,13 +2273,13 @@ export class PineV5Parser extends antlr.Parser {
                 case PineV5Parser.COLOR_LITERAL:
                 case PineV5Parser.ID:
                     {
-                    this.state = 417;
+                    this.state = 430;
                     this.local_stmt_multiline();
                     }
                     break;
                 case PineV5Parser.LEND:
                     {
-                    this.state = 418;
+                    this.state = 431;
                     this.match(PineV5Parser.LEND);
                     }
                     break;
@@ -2235,10 +2287,10 @@ export class PineV5Parser extends antlr.Parser {
                     throw new antlr.NoViableAltException(this);
                 }
                 }
-                this.state = 421;
+                this.state = 434;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
-            } while (((((_la - 3)) & ~0x1F) === 0 && ((1 << (_la - 3)) & 2688548743) !== 0) || ((((_la - 37)) & ~0x1F) === 0 && ((1 << (_la - 37)) & 2101395507) !== 0));
+            } while ((((_la) & ~0x1F) === 0 && ((1 << _la) & 67105848) !== 0) || ((((_la - 33)) & ~0x1F) === 0 && ((1 << (_la - 33)) & 2820146789) !== 0) || ((((_la - 65)) & ~0x1F) === 0 && ((1 << (_la - 65)) & 15) !== 0));
             }
         }
         catch (re) {
@@ -2256,26 +2308,26 @@ export class PineV5Parser extends antlr.Parser {
     }
     public local_stmt_multiline(): Local_stmt_multilineContext {
         let localContext = new Local_stmt_multilineContext(this.context, this.state);
-        this.enterRule(localContext, 86, PineV5Parser.RULE_local_stmt_multiline);
+        this.enterRule(localContext, 88, PineV5Parser.RULE_local_stmt_multiline);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 423;
+            this.state = 436;
             this.local_stmt_content();
-            this.state = 428;
+            this.state = 441;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 58) {
+            while (_la === 59) {
                 {
                 {
-                this.state = 424;
+                this.state = 437;
                 this.match(PineV5Parser.COMMA);
-                this.state = 425;
+                this.state = 438;
                 this.local_stmt_content();
                 }
                 }
-                this.state = 430;
+                this.state = 443;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -2296,32 +2348,32 @@ export class PineV5Parser extends antlr.Parser {
     }
     public ids_array(): Ids_arrayContext {
         let localContext = new Ids_arrayContext(this.context, this.state);
-        this.enterRule(localContext, 88, PineV5Parser.RULE_ids_array);
+        this.enterRule(localContext, 90, PineV5Parser.RULE_ids_array);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 431;
+            this.state = 444;
             this.match(PineV5Parser.LSQBR);
-            this.state = 432;
+            this.state = 445;
             this.id();
-            this.state = 437;
+            this.state = 450;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 58) {
+            while (_la === 59) {
                 {
                 {
-                this.state = 433;
+                this.state = 446;
                 this.match(PineV5Parser.COMMA);
-                this.state = 434;
+                this.state = 447;
                 this.id();
                 }
                 }
-                this.state = 439;
+                this.state = 452;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
-            this.state = 440;
+            this.state = 453;
             this.match(PineV5Parser.RSQBR);
             }
         }
@@ -2340,32 +2392,32 @@ export class PineV5Parser extends antlr.Parser {
     }
     public arith_exprs(): Arith_exprsContext {
         let localContext = new Arith_exprsContext(this.context, this.state);
-        this.enterRule(localContext, 90, PineV5Parser.RULE_arith_exprs);
+        this.enterRule(localContext, 92, PineV5Parser.RULE_arith_exprs);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 442;
+            this.state = 455;
             this.match(PineV5Parser.LSQBR);
-            this.state = 443;
+            this.state = 456;
             this.arith_expr();
-            this.state = 448;
+            this.state = 461;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 58) {
+            while (_la === 59) {
                 {
                 {
-                this.state = 444;
+                this.state = 457;
                 this.match(PineV5Parser.COMMA);
-                this.state = 445;
+                this.state = 458;
                 this.arith_expr();
                 }
                 }
-                this.state = 450;
+                this.state = 463;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
-            this.state = 451;
+            this.state = 464;
             this.match(PineV5Parser.RSQBR);
             }
         }
@@ -2384,32 +2436,32 @@ export class PineV5Parser extends antlr.Parser {
     }
     public for_expr(): For_exprContext {
         let localContext = new For_exprContext(this.context, this.state);
-        this.enterRule(localContext, 92, PineV5Parser.RULE_for_expr);
+        this.enterRule(localContext, 94, PineV5Parser.RULE_for_expr);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 453;
+            this.state = 466;
             this.match(PineV5Parser.FOR_STMT);
-            this.state = 454;
+            this.state = 467;
             this.var_def();
-            this.state = 455;
+            this.state = 468;
             this.match(PineV5Parser.FOR_STMT_TO);
-            this.state = 456;
+            this.state = 469;
             this.ternary_expr();
-            this.state = 459;
+            this.state = 472;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (_la === 36) {
+            if (_la === 37) {
                 {
-                this.state = 457;
+                this.state = 470;
                 this.match(PineV5Parser.FOR_STMT_BY);
-                this.state = 458;
+                this.state = 471;
                 this.ternary_expr();
                 }
             }
 
-            this.state = 461;
+            this.state = 474;
             this.stmts_block();
             }
         }
@@ -2428,11 +2480,11 @@ export class PineV5Parser extends antlr.Parser {
     }
     public stmts_block(): Stmts_blockContext {
         let localContext = new Stmts_blockContext(this.context, this.state);
-        this.enterRule(localContext, 94, PineV5Parser.RULE_stmts_block);
+        this.enterRule(localContext, 96, PineV5Parser.RULE_stmts_block);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 463;
+            this.state = 476;
             this.fun_body_multiline();
             }
         }
@@ -2451,25 +2503,25 @@ export class PineV5Parser extends antlr.Parser {
     }
     public ternary_expr(): Ternary_exprContext {
         let localContext = new Ternary_exprContext(this.context, this.state);
-        this.enterRule(localContext, 96, PineV5Parser.RULE_ternary_expr);
+        this.enterRule(localContext, 98, PineV5Parser.RULE_ternary_expr);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 465;
+            this.state = 478;
             this.or_expr();
-            this.state = 471;
+            this.state = 484;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (_la === 43) {
+            if (_la === 44) {
                 {
-                this.state = 466;
+                this.state = 479;
                 this.match(PineV5Parser.COND);
-                this.state = 467;
+                this.state = 480;
                 this.ternary_expr();
-                this.state = 468;
+                this.state = 481;
                 this.match(PineV5Parser.COND_ELSE);
-                this.state = 469;
+                this.state = 482;
                 this.ternary_expr();
                 }
             }
@@ -2491,26 +2543,26 @@ export class PineV5Parser extends antlr.Parser {
     }
     public or_expr(): Or_exprContext {
         let localContext = new Or_exprContext(this.context, this.state);
-        this.enterRule(localContext, 98, PineV5Parser.RULE_or_expr);
+        this.enterRule(localContext, 100, PineV5Parser.RULE_or_expr);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 473;
+            this.state = 486;
             this.and_expr();
-            this.state = 478;
+            this.state = 491;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 39) {
+            while (_la === 40) {
                 {
                 {
-                this.state = 474;
+                this.state = 487;
                 this.match(PineV5Parser.OR);
-                this.state = 475;
+                this.state = 488;
                 this.and_expr();
                 }
                 }
-                this.state = 480;
+                this.state = 493;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -2531,26 +2583,26 @@ export class PineV5Parser extends antlr.Parser {
     }
     public and_expr(): And_exprContext {
         let localContext = new And_exprContext(this.context, this.state);
-        this.enterRule(localContext, 100, PineV5Parser.RULE_and_expr);
+        this.enterRule(localContext, 102, PineV5Parser.RULE_and_expr);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 481;
+            this.state = 494;
             this.eq_expr();
-            this.state = 486;
+            this.state = 499;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 40) {
+            while (_la === 41) {
                 {
                 {
-                this.state = 482;
+                this.state = 495;
                 this.match(PineV5Parser.AND);
-                this.state = 483;
+                this.state = 496;
                 this.eq_expr();
                 }
                 }
-                this.state = 488;
+                this.state = 501;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -2571,33 +2623,33 @@ export class PineV5Parser extends antlr.Parser {
     }
     public eq_expr(): Eq_exprContext {
         let localContext = new Eq_exprContext(this.context, this.state);
-        this.enterRule(localContext, 102, PineV5Parser.RULE_eq_expr);
+        this.enterRule(localContext, 104, PineV5Parser.RULE_eq_expr);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 489;
+            this.state = 502;
             this.cmp_expr();
-            this.state = 494;
+            this.state = 507;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 45 || _la === 46) {
+            while (_la === 46 || _la === 47) {
                 {
                 {
-                this.state = 490;
+                this.state = 503;
                 _la = this.tokenStream.LA(1);
-                if(!(_la === 45 || _la === 46)) {
+                if(!(_la === 46 || _la === 47)) {
                 this.errorHandler.recoverInline(this);
                 }
                 else {
                     this.errorHandler.reportMatch(this);
                     this.consume();
                 }
-                this.state = 491;
+                this.state = 504;
                 this.cmp_expr();
                 }
                 }
-                this.state = 496;
+                this.state = 509;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -2618,33 +2670,33 @@ export class PineV5Parser extends antlr.Parser {
     }
     public cmp_expr(): Cmp_exprContext {
         let localContext = new Cmp_exprContext(this.context, this.state);
-        this.enterRule(localContext, 104, PineV5Parser.RULE_cmp_expr);
+        this.enterRule(localContext, 106, PineV5Parser.RULE_cmp_expr);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 497;
+            this.state = 510;
             this.add_expr();
-            this.state = 502;
+            this.state = 515;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (((((_la - 47)) & ~0x1F) === 0 && ((1 << (_la - 47)) & 15) !== 0)) {
+            while (((((_la - 48)) & ~0x1F) === 0 && ((1 << (_la - 48)) & 15) !== 0)) {
                 {
                 {
-                this.state = 498;
+                this.state = 511;
                 _la = this.tokenStream.LA(1);
-                if(!(((((_la - 47)) & ~0x1F) === 0 && ((1 << (_la - 47)) & 15) !== 0))) {
+                if(!(((((_la - 48)) & ~0x1F) === 0 && ((1 << (_la - 48)) & 15) !== 0))) {
                 this.errorHandler.recoverInline(this);
                 }
                 else {
                     this.errorHandler.reportMatch(this);
                     this.consume();
                 }
-                this.state = 499;
+                this.state = 512;
                 this.add_expr();
                 }
                 }
-                this.state = 504;
+                this.state = 517;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -2665,38 +2717,38 @@ export class PineV5Parser extends antlr.Parser {
     }
     public add_expr(): Add_exprContext {
         let localContext = new Add_exprContext(this.context, this.state);
-        this.enterRule(localContext, 106, PineV5Parser.RULE_add_expr);
+        this.enterRule(localContext, 108, PineV5Parser.RULE_add_expr);
         let _la: number;
         try {
             let alternative: number;
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 505;
+            this.state = 518;
             this.mult_expr();
-            this.state = 510;
+            this.state = 523;
             this.errorHandler.sync(this);
-            alternative = this.interpreter.adaptivePredict(this.tokenStream, 55, this.context);
+            alternative = this.interpreter.adaptivePredict(this.tokenStream, 56, this.context);
             while (alternative !== 2 && alternative !== antlr.ATN.INVALID_ALT_NUMBER) {
                 if (alternative === 1) {
                     {
                     {
-                    this.state = 506;
+                    this.state = 519;
                     _la = this.tokenStream.LA(1);
-                    if(!(_la === 51 || _la === 52)) {
+                    if(!(_la === 52 || _la === 53)) {
                     this.errorHandler.recoverInline(this);
                     }
                     else {
                         this.errorHandler.reportMatch(this);
                         this.consume();
                     }
-                    this.state = 507;
+                    this.state = 520;
                     this.mult_expr();
                     }
                     }
                 }
-                this.state = 512;
+                this.state = 525;
                 this.errorHandler.sync(this);
-                alternative = this.interpreter.adaptivePredict(this.tokenStream, 55, this.context);
+                alternative = this.interpreter.adaptivePredict(this.tokenStream, 56, this.context);
             }
             }
         }
@@ -2715,33 +2767,33 @@ export class PineV5Parser extends antlr.Parser {
     }
     public mult_expr(): Mult_exprContext {
         let localContext = new Mult_exprContext(this.context, this.state);
-        this.enterRule(localContext, 108, PineV5Parser.RULE_mult_expr);
+        this.enterRule(localContext, 110, PineV5Parser.RULE_mult_expr);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 513;
+            this.state = 526;
             this.unary_expr();
-            this.state = 518;
+            this.state = 531;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (((((_la - 53)) & ~0x1F) === 0 && ((1 << (_la - 53)) & 7) !== 0)) {
+            while (((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & 7) !== 0)) {
                 {
                 {
-                this.state = 514;
+                this.state = 527;
                 _la = this.tokenStream.LA(1);
-                if(!(((((_la - 53)) & ~0x1F) === 0 && ((1 << (_la - 53)) & 7) !== 0))) {
+                if(!(((((_la - 54)) & ~0x1F) === 0 && ((1 << (_la - 54)) & 7) !== 0))) {
                 this.errorHandler.recoverInline(this);
                 }
                 else {
                     this.errorHandler.reportMatch(this);
                     this.consume();
                 }
-                this.state = 515;
+                this.state = 528;
                 this.unary_expr();
                 }
                 }
-                this.state = 520;
+                this.state = 533;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -2762,9 +2814,9 @@ export class PineV5Parser extends antlr.Parser {
     }
     public unary_expr(): Unary_exprContext {
         let localContext = new Unary_exprContext(this.context, this.state);
-        this.enterRule(localContext, 110, PineV5Parser.RULE_unary_expr);
+        this.enterRule(localContext, 112, PineV5Parser.RULE_unary_expr);
         try {
-            this.state = 528;
+            this.state = 541;
             this.errorHandler.sync(this);
             switch (this.tokenStream.LA(1)) {
             case PineV5Parser.AS:
@@ -2789,34 +2841,34 @@ export class PineV5Parser extends antlr.Parser {
             case PineV5Parser.ID:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 521;
+                this.state = 534;
                 this.sqbr_expr();
                 }
                 break;
             case PineV5Parser.NOT:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 522;
+                this.state = 535;
                 this.match(PineV5Parser.NOT);
-                this.state = 523;
+                this.state = 536;
                 this.sqbr_expr();
                 }
                 break;
             case PineV5Parser.PLUS:
                 this.enterOuterAlt(localContext, 3);
                 {
-                this.state = 524;
+                this.state = 537;
                 this.match(PineV5Parser.PLUS);
-                this.state = 525;
+                this.state = 538;
                 this.sqbr_expr();
                 }
                 break;
             case PineV5Parser.MINUS:
                 this.enterOuterAlt(localContext, 4);
                 {
-                this.state = 526;
+                this.state = 539;
                 this.match(PineV5Parser.MINUS);
-                this.state = 527;
+                this.state = 540;
                 this.sqbr_expr();
                 }
                 break;
@@ -2839,22 +2891,22 @@ export class PineV5Parser extends antlr.Parser {
     }
     public sqbr_expr(): Sqbr_exprContext {
         let localContext = new Sqbr_exprContext(this.context, this.state);
-        this.enterRule(localContext, 112, PineV5Parser.RULE_sqbr_expr);
+        this.enterRule(localContext, 114, PineV5Parser.RULE_sqbr_expr);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 530;
+            this.state = 543;
             this.atom();
-            this.state = 535;
+            this.state = 548;
             this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 58, this.context) ) {
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 59, this.context) ) {
             case 1:
                 {
-                this.state = 531;
+                this.state = 544;
                 this.match(PineV5Parser.LSQBR);
-                this.state = 532;
+                this.state = 545;
                 this.arith_expr();
-                this.state = 533;
+                this.state = 546;
                 this.match(PineV5Parser.RSQBR);
                 }
                 break;
@@ -2876,40 +2928,40 @@ export class PineV5Parser extends antlr.Parser {
     }
     public atom(): AtomContext {
         let localContext = new AtomContext(this.context, this.state);
-        this.enterRule(localContext, 114, PineV5Parser.RULE_atom);
+        this.enterRule(localContext, 116, PineV5Parser.RULE_atom);
         try {
-            this.state = 544;
+            this.state = 557;
             this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 59, this.context) ) {
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 60, this.context) ) {
             case 1:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 537;
+                this.state = 550;
                 this.fun_call();
                 }
                 break;
             case 2:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 538;
+                this.state = 551;
                 this.id();
                 }
                 break;
             case 3:
                 this.enterOuterAlt(localContext, 3);
                 {
-                this.state = 539;
+                this.state = 552;
                 this.literal();
                 }
                 break;
             case 4:
                 this.enterOuterAlt(localContext, 4);
                 {
-                this.state = 540;
+                this.state = 553;
                 this.match(PineV5Parser.LPAR);
-                this.state = 541;
+                this.state = 554;
                 this.arith_expr();
-                this.state = 542;
+                this.state = 555;
                 this.match(PineV5Parser.RPAR);
                 }
                 break;
@@ -2930,32 +2982,32 @@ export class PineV5Parser extends antlr.Parser {
     }
     public fun_actual_args(): Fun_actual_argsContext {
         let localContext = new Fun_actual_argsContext(this.context, this.state);
-        this.enterRule(localContext, 116, PineV5Parser.RULE_fun_actual_args);
+        this.enterRule(localContext, 118, PineV5Parser.RULE_fun_actual_args);
         let _la: number;
         try {
-            this.state = 552;
+            this.state = 565;
             this.errorHandler.sync(this);
-            switch (this.interpreter.adaptivePredict(this.tokenStream, 61, this.context) ) {
+            switch (this.interpreter.adaptivePredict(this.tokenStream, 62, this.context) ) {
             case 1:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 546;
+                this.state = 559;
                 this.kw_args();
                 }
                 break;
             case 2:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 547;
+                this.state = 560;
                 this.pos_args();
-                this.state = 550;
+                this.state = 563;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
-                if (_la === 58) {
+                if (_la === 59) {
                     {
-                    this.state = 548;
+                    this.state = 561;
                     this.match(PineV5Parser.COMMA);
-                    this.state = 549;
+                    this.state = 562;
                     this.kw_args();
                     }
                 }
@@ -2979,30 +3031,30 @@ export class PineV5Parser extends antlr.Parser {
     }
     public pos_args(): Pos_argsContext {
         let localContext = new Pos_argsContext(this.context, this.state);
-        this.enterRule(localContext, 118, PineV5Parser.RULE_pos_args);
+        this.enterRule(localContext, 120, PineV5Parser.RULE_pos_args);
         try {
             let alternative: number;
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 554;
+            this.state = 567;
             this.arith_expr();
-            this.state = 559;
+            this.state = 572;
             this.errorHandler.sync(this);
-            alternative = this.interpreter.adaptivePredict(this.tokenStream, 62, this.context);
+            alternative = this.interpreter.adaptivePredict(this.tokenStream, 63, this.context);
             while (alternative !== 2 && alternative !== antlr.ATN.INVALID_ALT_NUMBER) {
                 if (alternative === 1) {
                     {
                     {
-                    this.state = 555;
+                    this.state = 568;
                     this.match(PineV5Parser.COMMA);
-                    this.state = 556;
+                    this.state = 569;
                     this.arith_expr();
                     }
                     }
                 }
-                this.state = 561;
+                this.state = 574;
                 this.errorHandler.sync(this);
-                alternative = this.interpreter.adaptivePredict(this.tokenStream, 62, this.context);
+                alternative = this.interpreter.adaptivePredict(this.tokenStream, 63, this.context);
             }
             }
         }
@@ -3021,26 +3073,26 @@ export class PineV5Parser extends antlr.Parser {
     }
     public kw_args(): Kw_argsContext {
         let localContext = new Kw_argsContext(this.context, this.state);
-        this.enterRule(localContext, 120, PineV5Parser.RULE_kw_args);
+        this.enterRule(localContext, 122, PineV5Parser.RULE_kw_args);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 562;
+            this.state = 575;
             this.kw_arg();
-            this.state = 567;
+            this.state = 580;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            while (_la === 58) {
+            while (_la === 59) {
                 {
                 {
-                this.state = 563;
+                this.state = 576;
                 this.match(PineV5Parser.COMMA);
-                this.state = 564;
+                this.state = 577;
                 this.kw_arg();
                 }
                 }
-                this.state = 569;
+                this.state = 582;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
             }
@@ -3061,15 +3113,15 @@ export class PineV5Parser extends antlr.Parser {
     }
     public kw_arg(): Kw_argContext {
         let localContext = new Kw_argContext(this.context, this.state);
-        this.enterRule(localContext, 122, PineV5Parser.RULE_kw_arg);
+        this.enterRule(localContext, 124, PineV5Parser.RULE_kw_arg);
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 570;
+            this.state = 583;
             this.id();
-            this.state = 571;
+            this.state = 584;
             this.match(PineV5Parser.DEFINE);
-            this.state = 574;
+            this.state = 587;
             this.errorHandler.sync(this);
             switch (this.tokenStream.LA(1)) {
             case PineV5Parser.SWITCH:
@@ -3099,13 +3151,13 @@ export class PineV5Parser extends antlr.Parser {
             case PineV5Parser.COLOR_LITERAL:
             case PineV5Parser.ID:
                 {
-                this.state = 572;
+                this.state = 585;
                 this.arith_expr();
                 }
                 break;
             case PineV5Parser.LSQBR:
                 {
-                this.state = 573;
+                this.state = 586;
                 this.arith_exprs();
                 }
                 break;
@@ -3129,16 +3181,16 @@ export class PineV5Parser extends antlr.Parser {
     }
     public literal(): LiteralContext {
         let localContext = new LiteralContext(this.context, this.state);
-        this.enterRule(localContext, 124, PineV5Parser.RULE_literal);
+        this.enterRule(localContext, 126, PineV5Parser.RULE_literal);
         try {
-            this.state = 578;
+            this.state = 591;
             this.errorHandler.sync(this);
             switch (this.tokenStream.LA(1)) {
             case PineV5Parser.INT_LITERAL:
             case PineV5Parser.FLOAT_LITERAL:
                 this.enterOuterAlt(localContext, 1);
                 {
-                this.state = 576;
+                this.state = 589;
                 this.num_literal();
                 }
                 break;
@@ -3147,7 +3199,7 @@ export class PineV5Parser extends antlr.Parser {
             case PineV5Parser.COLOR_LITERAL:
                 this.enterOuterAlt(localContext, 2);
                 {
-                this.state = 577;
+                this.state = 590;
                 this.other_literal();
                 }
                 break;
@@ -3170,14 +3222,14 @@ export class PineV5Parser extends antlr.Parser {
     }
     public num_literal(): Num_literalContext {
         let localContext = new Num_literalContext(this.context, this.state);
-        this.enterRule(localContext, 126, PineV5Parser.RULE_num_literal);
+        this.enterRule(localContext, 128, PineV5Parser.RULE_num_literal);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 580;
+            this.state = 593;
             _la = this.tokenStream.LA(1);
-            if(!(_la === 63 || _la === 64)) {
+            if(!(_la === 64 || _la === 65)) {
             this.errorHandler.recoverInline(this);
             }
             else {
@@ -3201,14 +3253,14 @@ export class PineV5Parser extends antlr.Parser {
     }
     public other_literal(): Other_literalContext {
         let localContext = new Other_literalContext(this.context, this.state);
-        this.enterRule(localContext, 128, PineV5Parser.RULE_other_literal);
+        this.enterRule(localContext, 130, PineV5Parser.RULE_other_literal);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
             {
-            this.state = 582;
+            this.state = 595;
             _la = this.tokenStream.LA(1);
-            if(!(((((_la - 42)) & ~0x1F) === 0 && ((1 << (_la - 42)) & 25165825) !== 0))) {
+            if(!(((((_la - 43)) & ~0x1F) === 0 && ((1 << (_la - 43)) & 25165825) !== 0))) {
             this.errorHandler.recoverInline(this);
             }
             else {
@@ -3232,7 +3284,7 @@ export class PineV5Parser extends antlr.Parser {
     }
 
     public static readonly _serializedATN: number[] = [
-        4,1,71,585,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
+        4,1,72,598,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,
         6,2,7,7,7,2,8,7,8,2,9,7,9,2,10,7,10,2,11,7,11,2,12,7,12,2,13,7,13,
         2,14,7,14,2,15,7,15,2,16,7,16,2,17,7,17,2,18,7,18,2,19,7,19,2,20,
         7,20,2,21,7,21,2,22,7,22,2,23,7,23,2,24,7,24,2,25,7,25,2,26,7,26,
@@ -3241,211 +3293,216 @@ export class PineV5Parser extends antlr.Parser {
         2,40,7,40,2,41,7,41,2,42,7,42,2,43,7,43,2,44,7,44,2,45,7,45,2,46,
         7,46,2,47,7,47,2,48,7,48,2,49,7,49,2,50,7,50,2,51,7,51,2,52,7,52,
         2,53,7,53,2,54,7,54,2,55,7,55,2,56,7,56,2,57,7,57,2,58,7,58,2,59,
-        7,59,2,60,7,60,2,61,7,61,2,62,7,62,2,63,7,63,2,64,7,64,1,0,1,0,1,
-        0,1,0,1,1,1,1,3,1,137,8,1,1,1,1,1,1,2,1,2,1,2,4,2,144,8,2,11,2,12,
-        2,145,1,2,1,2,1,3,3,3,151,8,3,1,3,1,3,1,3,3,3,156,8,3,1,4,1,4,3,
-        4,160,8,4,1,4,3,4,163,8,4,1,5,1,5,1,5,1,5,1,6,1,6,1,6,4,6,172,8,
-        6,11,6,12,6,173,1,6,1,6,1,7,3,7,179,8,7,1,7,1,7,1,7,1,7,3,7,185,
-        8,7,1,8,1,8,1,8,1,9,1,9,1,9,1,9,3,9,194,8,9,1,10,1,10,1,10,1,10,
-        3,10,200,8,10,1,11,1,11,1,11,1,11,1,11,3,11,207,8,11,5,11,209,8,
-        11,10,11,12,11,212,9,11,1,12,3,12,215,8,12,1,12,3,12,218,8,12,1,
-        12,1,12,1,12,3,12,223,8,12,1,13,1,13,1,13,1,13,5,13,229,8,13,10,
-        13,12,13,232,9,13,1,13,1,13,1,14,1,14,3,14,238,8,14,1,15,1,15,3,
-        15,242,8,15,1,15,1,15,3,15,246,8,15,1,15,1,15,1,16,1,16,1,16,1,16,
-        1,16,1,16,3,16,256,8,16,1,17,1,17,1,17,1,17,5,17,262,8,17,10,17,
-        12,17,265,9,17,3,17,267,8,17,1,17,1,17,1,18,3,18,272,8,18,1,18,3,
-        18,275,8,18,1,18,3,18,278,8,18,1,18,1,18,1,18,1,18,1,19,3,19,285,
-        8,19,1,19,3,19,288,8,19,1,19,3,19,291,8,19,1,19,1,19,1,19,1,19,1,
-        20,1,20,1,21,1,21,1,21,1,21,1,21,1,21,1,21,1,21,1,21,1,21,1,21,3,
-        21,310,8,21,1,22,1,22,1,22,1,22,1,22,1,22,1,22,1,22,3,22,320,8,22,
-        1,23,1,23,1,23,1,23,3,23,326,8,23,1,24,1,24,1,25,1,25,1,26,1,26,
-        1,27,1,27,1,27,5,27,337,8,27,10,27,12,27,340,9,27,1,28,1,28,1,29,
-        1,29,1,29,3,29,347,8,29,1,29,1,29,1,30,1,30,1,30,1,30,5,30,355,8,
-        30,10,30,12,30,358,9,30,1,30,1,30,1,30,3,30,363,8,30,3,30,365,8,
-        30,1,31,1,31,5,31,369,8,31,10,31,12,31,372,9,31,1,31,1,31,1,32,1,
-        32,1,32,5,32,379,8,32,10,32,12,32,382,9,32,1,33,1,33,3,33,386,8,
-        33,1,34,1,34,1,34,1,34,1,34,1,35,1,35,1,35,1,35,1,35,1,36,1,36,1,
-        37,1,37,1,37,5,37,403,8,37,10,37,12,37,406,9,37,1,38,1,38,1,39,1,
-        39,1,40,1,40,1,41,1,41,1,41,1,41,1,42,1,42,4,42,420,8,42,11,42,12,
-        42,421,1,43,1,43,1,43,5,43,427,8,43,10,43,12,43,430,9,43,1,44,1,
-        44,1,44,1,44,5,44,436,8,44,10,44,12,44,439,9,44,1,44,1,44,1,45,1,
-        45,1,45,1,45,5,45,447,8,45,10,45,12,45,450,9,45,1,45,1,45,1,46,1,
-        46,1,46,1,46,1,46,1,46,3,46,460,8,46,1,46,1,46,1,47,1,47,1,48,1,
-        48,1,48,1,48,1,48,1,48,3,48,472,8,48,1,49,1,49,1,49,5,49,477,8,49,
-        10,49,12,49,480,9,49,1,50,1,50,1,50,5,50,485,8,50,10,50,12,50,488,
-        9,50,1,51,1,51,1,51,5,51,493,8,51,10,51,12,51,496,9,51,1,52,1,52,
-        1,52,5,52,501,8,52,10,52,12,52,504,9,52,1,53,1,53,1,53,5,53,509,
-        8,53,10,53,12,53,512,9,53,1,54,1,54,1,54,5,54,517,8,54,10,54,12,
-        54,520,9,54,1,55,1,55,1,55,1,55,1,55,1,55,1,55,3,55,529,8,55,1,56,
-        1,56,1,56,1,56,1,56,3,56,536,8,56,1,57,1,57,1,57,1,57,1,57,1,57,
-        1,57,3,57,545,8,57,1,58,1,58,1,58,1,58,3,58,551,8,58,3,58,553,8,
-        58,1,59,1,59,1,59,5,59,558,8,59,10,59,12,59,561,9,59,1,60,1,60,1,
-        60,5,60,566,8,60,10,60,12,60,569,9,60,1,61,1,61,1,61,1,61,3,61,575,
-        8,61,1,62,1,62,3,62,579,8,62,1,63,1,63,1,64,1,64,1,64,0,0,65,0,2,
+        7,59,2,60,7,60,2,61,7,61,2,62,7,62,2,63,7,63,2,64,7,64,2,65,7,65,
+        1,0,1,0,1,0,1,0,1,1,1,1,3,1,139,8,1,1,1,1,1,1,2,1,2,1,2,4,2,146,
+        8,2,11,2,12,2,147,1,2,1,2,1,3,3,3,153,8,3,1,3,1,3,1,3,3,3,158,8,
+        3,1,4,1,4,3,4,162,8,4,1,4,3,4,165,8,4,1,5,1,5,1,5,1,5,1,6,1,6,1,
+        6,4,6,174,8,6,11,6,12,6,175,1,6,1,6,1,7,3,7,181,8,7,1,7,1,7,1,7,
+        1,7,3,7,187,8,7,1,8,1,8,1,8,1,9,1,9,1,9,1,9,3,9,196,8,9,1,10,1,10,
+        1,10,1,10,3,10,202,8,10,1,11,1,11,1,11,1,11,1,11,3,11,209,8,11,5,
+        11,211,8,11,10,11,12,11,214,9,11,1,12,3,12,217,8,12,1,12,3,12,220,
+        8,12,1,12,1,12,1,12,3,12,225,8,12,1,13,1,13,1,13,1,13,5,13,231,8,
+        13,10,13,12,13,234,9,13,1,13,1,13,1,14,1,14,3,14,240,8,14,1,15,1,
+        15,1,15,3,15,245,8,15,1,15,1,15,1,15,1,15,1,16,1,16,3,16,253,8,16,
+        1,16,1,16,3,16,257,8,16,1,16,1,16,1,17,1,17,1,17,1,17,1,17,1,17,
+        3,17,267,8,17,1,18,1,18,1,18,1,18,5,18,273,8,18,10,18,12,18,276,
+        9,18,3,18,278,8,18,1,18,1,18,1,19,3,19,283,8,19,1,19,3,19,286,8,
+        19,1,19,3,19,289,8,19,1,19,1,19,1,19,1,19,1,20,3,20,296,8,20,1,20,
+        3,20,299,8,20,1,20,3,20,302,8,20,1,20,1,20,1,20,1,20,1,21,1,21,1,
+        22,1,22,1,22,1,22,1,22,1,22,1,22,1,22,1,22,1,22,1,22,1,22,3,22,322,
+        8,22,1,23,1,23,1,23,1,23,1,23,1,23,1,23,1,23,3,23,332,8,23,1,24,
+        1,24,1,24,1,24,1,24,3,24,339,8,24,1,25,1,25,1,26,1,26,1,27,1,27,
+        1,28,1,28,1,28,5,28,350,8,28,10,28,12,28,353,9,28,1,29,1,29,1,30,
+        1,30,1,30,3,30,360,8,30,1,30,1,30,1,31,1,31,1,31,1,31,5,31,368,8,
+        31,10,31,12,31,371,9,31,1,31,1,31,1,31,3,31,376,8,31,3,31,378,8,
+        31,1,32,1,32,5,32,382,8,32,10,32,12,32,385,9,32,1,32,1,32,1,33,1,
+        33,1,33,5,33,392,8,33,10,33,12,33,395,9,33,1,34,1,34,3,34,399,8,
+        34,1,35,1,35,1,35,1,35,1,35,1,36,1,36,1,36,1,36,1,36,1,37,1,37,1,
+        38,1,38,1,38,5,38,416,8,38,10,38,12,38,419,9,38,1,39,1,39,1,40,1,
+        40,1,41,1,41,1,42,1,42,1,42,1,42,1,43,1,43,4,43,433,8,43,11,43,12,
+        43,434,1,44,1,44,1,44,5,44,440,8,44,10,44,12,44,443,9,44,1,45,1,
+        45,1,45,1,45,5,45,449,8,45,10,45,12,45,452,9,45,1,45,1,45,1,46,1,
+        46,1,46,1,46,5,46,460,8,46,10,46,12,46,463,9,46,1,46,1,46,1,47,1,
+        47,1,47,1,47,1,47,1,47,3,47,473,8,47,1,47,1,47,1,48,1,48,1,49,1,
+        49,1,49,1,49,1,49,1,49,3,49,485,8,49,1,50,1,50,1,50,5,50,490,8,50,
+        10,50,12,50,493,9,50,1,51,1,51,1,51,5,51,498,8,51,10,51,12,51,501,
+        9,51,1,52,1,52,1,52,5,52,506,8,52,10,52,12,52,509,9,52,1,53,1,53,
+        1,53,5,53,514,8,53,10,53,12,53,517,9,53,1,54,1,54,1,54,5,54,522,
+        8,54,10,54,12,54,525,9,54,1,55,1,55,1,55,5,55,530,8,55,10,55,12,
+        55,533,9,55,1,56,1,56,1,56,1,56,1,56,1,56,1,56,3,56,542,8,56,1,57,
+        1,57,1,57,1,57,1,57,3,57,549,8,57,1,58,1,58,1,58,1,58,1,58,1,58,
+        1,58,3,58,558,8,58,1,59,1,59,1,59,1,59,3,59,564,8,59,3,59,566,8,
+        59,1,60,1,60,1,60,5,60,571,8,60,10,60,12,60,574,9,60,1,61,1,61,1,
+        61,5,61,579,8,61,10,61,12,61,582,9,61,1,62,1,62,1,62,1,62,3,62,588,
+        8,62,1,63,1,63,3,63,592,8,63,1,64,1,64,1,65,1,65,1,65,0,0,66,0,2,
         4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,
         50,52,54,56,58,60,62,64,66,68,70,72,74,76,78,80,82,84,86,88,90,92,
         94,96,98,100,102,104,106,108,110,112,114,116,118,120,122,124,126,
-        128,0,11,3,0,10,10,13,24,67,67,1,0,11,12,1,0,13,15,1,0,16,24,1,0,
-        25,29,1,0,45,46,1,0,47,50,1,0,51,52,1,0,53,55,1,0,63,64,2,0,42,42,
-        65,66,612,0,130,1,0,0,0,2,134,1,0,0,0,4,140,1,0,0,0,6,150,1,0,0,
-        0,8,159,1,0,0,0,10,164,1,0,0,0,12,168,1,0,0,0,14,178,1,0,0,0,16,
-        186,1,0,0,0,18,189,1,0,0,0,20,195,1,0,0,0,22,201,1,0,0,0,24,214,
-        1,0,0,0,26,224,1,0,0,0,28,237,1,0,0,0,30,239,1,0,0,0,32,255,1,0,
-        0,0,34,257,1,0,0,0,36,271,1,0,0,0,38,284,1,0,0,0,40,296,1,0,0,0,
-        42,309,1,0,0,0,44,319,1,0,0,0,46,325,1,0,0,0,48,327,1,0,0,0,50,329,
-        1,0,0,0,52,331,1,0,0,0,54,333,1,0,0,0,56,341,1,0,0,0,58,343,1,0,
-        0,0,60,350,1,0,0,0,62,370,1,0,0,0,64,375,1,0,0,0,66,385,1,0,0,0,
-        68,387,1,0,0,0,70,392,1,0,0,0,72,397,1,0,0,0,74,399,1,0,0,0,76,407,
-        1,0,0,0,78,409,1,0,0,0,80,411,1,0,0,0,82,413,1,0,0,0,84,419,1,0,
-        0,0,86,423,1,0,0,0,88,431,1,0,0,0,90,442,1,0,0,0,92,453,1,0,0,0,
-        94,463,1,0,0,0,96,465,1,0,0,0,98,473,1,0,0,0,100,481,1,0,0,0,102,
-        489,1,0,0,0,104,497,1,0,0,0,106,505,1,0,0,0,108,513,1,0,0,0,110,
-        528,1,0,0,0,112,530,1,0,0,0,114,544,1,0,0,0,116,552,1,0,0,0,118,
-        554,1,0,0,0,120,562,1,0,0,0,122,570,1,0,0,0,124,578,1,0,0,0,126,
-        580,1,0,0,0,128,582,1,0,0,0,130,131,5,4,0,0,131,132,3,96,48,0,132,
-        133,3,94,47,0,133,1,1,0,0,0,134,136,5,5,0,0,135,137,3,96,48,0,136,
-        135,1,0,0,0,136,137,1,0,0,0,137,138,1,0,0,0,138,139,3,4,2,0,139,
-        3,1,0,0,0,140,143,5,1,0,0,141,144,3,6,3,0,142,144,5,3,0,0,143,141,
-        1,0,0,0,143,142,1,0,0,0,144,145,1,0,0,0,145,143,1,0,0,0,145,146,
-        1,0,0,0,146,147,1,0,0,0,147,148,5,2,0,0,148,5,1,0,0,0,149,151,3,
-        96,48,0,150,149,1,0,0,0,150,151,1,0,0,0,151,152,1,0,0,0,152,155,
-        5,57,0,0,153,156,3,74,37,0,154,156,3,94,47,0,155,153,1,0,0,0,155,
-        154,1,0,0,0,156,7,1,0,0,0,157,160,3,52,26,0,158,160,3,54,27,0,159,
-        157,1,0,0,0,159,158,1,0,0,0,160,162,1,0,0,0,161,163,3,26,13,0,162,
-        161,1,0,0,0,162,163,1,0,0,0,163,9,1,0,0,0,164,165,5,6,0,0,165,166,
-        3,54,27,0,166,167,3,12,6,0,167,11,1,0,0,0,168,171,5,1,0,0,169,172,
-        3,14,7,0,170,172,5,3,0,0,171,169,1,0,0,0,171,170,1,0,0,0,172,173,
-        1,0,0,0,173,171,1,0,0,0,173,174,1,0,0,0,174,175,1,0,0,0,175,176,
-        5,2,0,0,176,13,1,0,0,0,177,179,3,50,25,0,178,177,1,0,0,0,178,179,
-        1,0,0,0,179,180,1,0,0,0,180,181,3,8,4,0,181,184,3,54,27,0,182,183,
-        5,56,0,0,183,185,3,46,23,0,184,182,1,0,0,0,184,185,1,0,0,0,185,15,
-        1,0,0,0,186,187,5,7,0,0,187,188,3,66,33,0,188,17,1,0,0,0,189,193,
-        5,9,0,0,190,194,3,10,5,0,191,194,3,16,8,0,192,194,3,66,33,0,193,
-        190,1,0,0,0,193,191,1,0,0,0,193,192,1,0,0,0,194,19,1,0,0,0,195,196,
-        5,8,0,0,196,199,3,22,11,0,197,198,5,10,0,0,198,200,3,54,27,0,199,
-        197,1,0,0,0,199,200,1,0,0,0,200,21,1,0,0,0,201,210,3,54,27,0,202,
-        206,5,54,0,0,203,207,3,54,27,0,204,207,5,63,0,0,205,207,5,64,0,0,
-        206,203,1,0,0,0,206,204,1,0,0,0,206,205,1,0,0,0,207,209,1,0,0,0,
-        208,202,1,0,0,0,209,212,1,0,0,0,210,208,1,0,0,0,210,211,1,0,0,0,
-        211,23,1,0,0,0,212,210,1,0,0,0,213,215,3,50,25,0,214,213,1,0,0,0,
-        214,215,1,0,0,0,215,217,1,0,0,0,216,218,3,8,4,0,217,216,1,0,0,0,
-        217,218,1,0,0,0,218,219,1,0,0,0,219,222,3,54,27,0,220,221,5,56,0,
-        0,221,223,3,46,23,0,222,220,1,0,0,0,222,223,1,0,0,0,223,25,1,0,0,
-        0,224,225,5,49,0,0,225,230,3,28,14,0,226,227,5,58,0,0,227,229,3,
-        28,14,0,228,226,1,0,0,0,229,232,1,0,0,0,230,228,1,0,0,0,230,231,
-        1,0,0,0,231,233,1,0,0,0,232,230,1,0,0,0,233,234,5,47,0,0,234,27,
-        1,0,0,0,235,238,3,52,26,0,236,238,3,54,27,0,237,235,1,0,0,0,237,
-        236,1,0,0,0,238,29,1,0,0,0,239,241,3,54,27,0,240,242,3,26,13,0,241,
-        240,1,0,0,0,241,242,1,0,0,0,242,243,1,0,0,0,243,245,5,59,0,0,244,
-        246,3,116,58,0,245,244,1,0,0,0,245,246,1,0,0,0,246,247,1,0,0,0,247,
-        248,5,60,0,0,248,31,1,0,0,0,249,256,3,20,10,0,250,256,3,18,9,0,251,
-        256,3,10,5,0,252,256,3,16,8,0,253,256,3,66,33,0,254,256,3,64,32,
-        0,255,249,1,0,0,0,255,250,1,0,0,0,255,251,1,0,0,0,255,252,1,0,0,
-        0,255,253,1,0,0,0,255,254,1,0,0,0,256,33,1,0,0,0,257,266,5,59,0,
-        0,258,263,3,24,12,0,259,260,5,58,0,0,260,262,3,24,12,0,261,259,1,
-        0,0,0,262,265,1,0,0,0,263,261,1,0,0,0,263,264,1,0,0,0,264,267,1,
-        0,0,0,265,263,1,0,0,0,266,258,1,0,0,0,266,267,1,0,0,0,267,268,1,
-        0,0,0,268,269,5,60,0,0,269,35,1,0,0,0,270,272,3,48,24,0,271,270,
-        1,0,0,0,271,272,1,0,0,0,272,274,1,0,0,0,273,275,3,50,25,0,274,273,
-        1,0,0,0,274,275,1,0,0,0,275,277,1,0,0,0,276,278,3,8,4,0,277,276,
-        1,0,0,0,277,278,1,0,0,0,278,279,1,0,0,0,279,280,3,54,27,0,280,281,
-        5,56,0,0,281,282,3,46,23,0,282,37,1,0,0,0,283,285,3,48,24,0,284,
-        283,1,0,0,0,284,285,1,0,0,0,285,287,1,0,0,0,286,288,3,50,25,0,287,
-        286,1,0,0,0,287,288,1,0,0,0,288,290,1,0,0,0,289,291,3,8,4,0,290,
-        289,1,0,0,0,290,291,1,0,0,0,291,292,1,0,0,0,292,293,3,88,44,0,293,
-        294,5,56,0,0,294,295,3,46,23,0,295,39,1,0,0,0,296,297,7,0,0,0,297,
-        41,1,0,0,0,298,310,3,36,18,0,299,310,3,38,19,0,300,310,3,30,15,0,
-        301,310,3,60,30,0,302,310,3,58,29,0,303,310,3,92,46,0,304,310,3,
-        0,0,0,305,310,3,2,1,0,306,310,3,76,38,0,307,310,3,78,39,0,308,310,
-        3,46,23,0,309,298,1,0,0,0,309,299,1,0,0,0,309,300,1,0,0,0,309,301,
-        1,0,0,0,309,302,1,0,0,0,309,303,1,0,0,0,309,304,1,0,0,0,309,305,
-        1,0,0,0,309,306,1,0,0,0,309,307,1,0,0,0,309,308,1,0,0,0,310,43,1,
-        0,0,0,311,320,3,36,18,0,312,320,3,38,19,0,313,320,3,46,23,0,314,
-        320,3,90,45,0,315,320,3,58,29,0,316,320,3,0,0,0,317,320,3,76,38,
-        0,318,320,3,78,39,0,319,311,1,0,0,0,319,312,1,0,0,0,319,313,1,0,
-        0,0,319,314,1,0,0,0,319,315,1,0,0,0,319,316,1,0,0,0,319,317,1,0,
-        0,0,319,318,1,0,0,0,320,45,1,0,0,0,321,326,3,96,48,0,322,326,3,60,
-        30,0,323,326,3,92,46,0,324,326,3,2,1,0,325,321,1,0,0,0,325,322,1,
-        0,0,0,325,323,1,0,0,0,325,324,1,0,0,0,326,47,1,0,0,0,327,328,7,1,
-        0,0,328,49,1,0,0,0,329,330,7,2,0,0,330,51,1,0,0,0,331,332,7,3,0,
-        0,332,53,1,0,0,0,333,338,3,40,20,0,334,335,5,71,0,0,335,337,3,40,
-        20,0,336,334,1,0,0,0,337,340,1,0,0,0,338,336,1,0,0,0,338,339,1,0,
-        0,0,339,55,1,0,0,0,340,338,1,0,0,0,341,342,7,4,0,0,342,57,1,0,0,
-        0,343,346,3,54,27,0,344,347,5,30,0,0,345,347,3,56,28,0,346,344,1,
-        0,0,0,346,345,1,0,0,0,347,348,1,0,0,0,348,349,3,46,23,0,349,59,1,
-        0,0,0,350,351,5,32,0,0,351,352,3,96,48,0,352,364,3,94,47,0,353,355,
-        5,3,0,0,354,353,1,0,0,0,355,358,1,0,0,0,356,354,1,0,0,0,356,357,
-        1,0,0,0,357,359,1,0,0,0,358,356,1,0,0,0,359,362,5,33,0,0,360,363,
-        3,60,30,0,361,363,3,94,47,0,362,360,1,0,0,0,362,361,1,0,0,0,363,
-        365,1,0,0,0,364,356,1,0,0,0,364,365,1,0,0,0,365,61,1,0,0,0,366,369,
-        3,32,16,0,367,369,5,3,0,0,368,366,1,0,0,0,368,367,1,0,0,0,369,372,
-        1,0,0,0,370,368,1,0,0,0,370,371,1,0,0,0,371,373,1,0,0,0,372,370,
-        1,0,0,0,373,374,5,0,0,1,374,63,1,0,0,0,375,380,3,42,21,0,376,377,
-        5,58,0,0,377,379,3,42,21,0,378,376,1,0,0,0,379,382,1,0,0,0,380,378,
-        1,0,0,0,380,381,1,0,0,0,381,65,1,0,0,0,382,380,1,0,0,0,383,386,3,
-        68,34,0,384,386,3,70,35,0,385,383,1,0,0,0,385,384,1,0,0,0,386,67,
-        1,0,0,0,387,388,3,54,27,0,388,389,3,34,17,0,389,390,5,57,0,0,390,
-        391,3,72,36,0,391,69,1,0,0,0,392,393,3,54,27,0,393,394,3,34,17,0,
-        394,395,5,57,0,0,395,396,3,80,40,0,396,71,1,0,0,0,397,398,3,74,37,
-        0,398,73,1,0,0,0,399,404,3,44,22,0,400,401,5,58,0,0,401,403,3,44,
-        22,0,402,400,1,0,0,0,403,406,1,0,0,0,404,402,1,0,0,0,404,405,1,0,
-        0,0,405,75,1,0,0,0,406,404,1,0,0,0,407,408,5,37,0,0,408,77,1,0,0,
-        0,409,410,5,38,0,0,410,79,1,0,0,0,411,412,3,82,41,0,412,81,1,0,0,
-        0,413,414,5,1,0,0,414,415,3,84,42,0,415,416,5,2,0,0,416,83,1,0,0,
-        0,417,420,3,86,43,0,418,420,5,3,0,0,419,417,1,0,0,0,419,418,1,0,
-        0,0,420,421,1,0,0,0,421,419,1,0,0,0,421,422,1,0,0,0,422,85,1,0,0,
-        0,423,428,3,44,22,0,424,425,5,58,0,0,425,427,3,44,22,0,426,424,1,
-        0,0,0,427,430,1,0,0,0,428,426,1,0,0,0,428,429,1,0,0,0,429,87,1,0,
-        0,0,430,428,1,0,0,0,431,432,5,61,0,0,432,437,3,54,27,0,433,434,5,
-        58,0,0,434,436,3,54,27,0,435,433,1,0,0,0,436,439,1,0,0,0,437,435,
-        1,0,0,0,437,438,1,0,0,0,438,440,1,0,0,0,439,437,1,0,0,0,440,441,
-        5,62,0,0,441,89,1,0,0,0,442,443,5,61,0,0,443,448,3,46,23,0,444,445,
-        5,58,0,0,445,447,3,46,23,0,446,444,1,0,0,0,447,450,1,0,0,0,448,446,
-        1,0,0,0,448,449,1,0,0,0,449,451,1,0,0,0,450,448,1,0,0,0,451,452,
-        5,62,0,0,452,91,1,0,0,0,453,454,5,34,0,0,454,455,3,36,18,0,455,456,
-        5,35,0,0,456,459,3,96,48,0,457,458,5,36,0,0,458,460,3,96,48,0,459,
-        457,1,0,0,0,459,460,1,0,0,0,460,461,1,0,0,0,461,462,3,94,47,0,462,
-        93,1,0,0,0,463,464,3,80,40,0,464,95,1,0,0,0,465,471,3,98,49,0,466,
-        467,5,43,0,0,467,468,3,96,48,0,468,469,5,44,0,0,469,470,3,96,48,
-        0,470,472,1,0,0,0,471,466,1,0,0,0,471,472,1,0,0,0,472,97,1,0,0,0,
-        473,478,3,100,50,0,474,475,5,39,0,0,475,477,3,100,50,0,476,474,1,
-        0,0,0,477,480,1,0,0,0,478,476,1,0,0,0,478,479,1,0,0,0,479,99,1,0,
-        0,0,480,478,1,0,0,0,481,486,3,102,51,0,482,483,5,40,0,0,483,485,
-        3,102,51,0,484,482,1,0,0,0,485,488,1,0,0,0,486,484,1,0,0,0,486,487,
-        1,0,0,0,487,101,1,0,0,0,488,486,1,0,0,0,489,494,3,104,52,0,490,491,
-        7,5,0,0,491,493,3,104,52,0,492,490,1,0,0,0,493,496,1,0,0,0,494,492,
-        1,0,0,0,494,495,1,0,0,0,495,103,1,0,0,0,496,494,1,0,0,0,497,502,
-        3,106,53,0,498,499,7,6,0,0,499,501,3,106,53,0,500,498,1,0,0,0,501,
-        504,1,0,0,0,502,500,1,0,0,0,502,503,1,0,0,0,503,105,1,0,0,0,504,
-        502,1,0,0,0,505,510,3,108,54,0,506,507,7,7,0,0,507,509,3,108,54,
-        0,508,506,1,0,0,0,509,512,1,0,0,0,510,508,1,0,0,0,510,511,1,0,0,
-        0,511,107,1,0,0,0,512,510,1,0,0,0,513,518,3,110,55,0,514,515,7,8,
-        0,0,515,517,3,110,55,0,516,514,1,0,0,0,517,520,1,0,0,0,518,516,1,
-        0,0,0,518,519,1,0,0,0,519,109,1,0,0,0,520,518,1,0,0,0,521,529,3,
-        112,56,0,522,523,5,41,0,0,523,529,3,112,56,0,524,525,5,51,0,0,525,
-        529,3,112,56,0,526,527,5,52,0,0,527,529,3,112,56,0,528,521,1,0,0,
-        0,528,522,1,0,0,0,528,524,1,0,0,0,528,526,1,0,0,0,529,111,1,0,0,
-        0,530,535,3,114,57,0,531,532,5,61,0,0,532,533,3,46,23,0,533,534,
-        5,62,0,0,534,536,1,0,0,0,535,531,1,0,0,0,535,536,1,0,0,0,536,113,
-        1,0,0,0,537,545,3,30,15,0,538,545,3,54,27,0,539,545,3,124,62,0,540,
-        541,5,59,0,0,541,542,3,46,23,0,542,543,5,60,0,0,543,545,1,0,0,0,
-        544,537,1,0,0,0,544,538,1,0,0,0,544,539,1,0,0,0,544,540,1,0,0,0,
-        545,115,1,0,0,0,546,553,3,120,60,0,547,550,3,118,59,0,548,549,5,
-        58,0,0,549,551,3,120,60,0,550,548,1,0,0,0,550,551,1,0,0,0,551,553,
-        1,0,0,0,552,546,1,0,0,0,552,547,1,0,0,0,553,117,1,0,0,0,554,559,
-        3,46,23,0,555,556,5,58,0,0,556,558,3,46,23,0,557,555,1,0,0,0,558,
-        561,1,0,0,0,559,557,1,0,0,0,559,560,1,0,0,0,560,119,1,0,0,0,561,
-        559,1,0,0,0,562,567,3,122,61,0,563,564,5,58,0,0,564,566,3,122,61,
-        0,565,563,1,0,0,0,566,569,1,0,0,0,567,565,1,0,0,0,567,568,1,0,0,
-        0,568,121,1,0,0,0,569,567,1,0,0,0,570,571,3,54,27,0,571,574,5,56,
-        0,0,572,575,3,46,23,0,573,575,3,90,45,0,574,572,1,0,0,0,574,573,
-        1,0,0,0,575,123,1,0,0,0,576,579,3,126,63,0,577,579,3,128,64,0,578,
-        576,1,0,0,0,578,577,1,0,0,0,579,125,1,0,0,0,580,581,7,9,0,0,581,
-        127,1,0,0,0,582,583,7,10,0,0,583,129,1,0,0,0,66,136,143,145,150,
-        155,159,162,171,173,178,184,193,199,206,210,214,217,222,230,237,
-        241,245,255,263,266,271,274,277,284,287,290,309,319,325,338,346,
-        356,362,364,368,370,380,385,404,419,421,428,437,448,459,471,478,
-        486,494,502,510,518,528,535,544,550,552,559,567,574,578
+        128,130,0,11,3,0,10,10,14,25,68,68,1,0,12,13,1,0,14,16,1,0,17,25,
+        1,0,26,30,1,0,46,47,1,0,48,51,1,0,52,53,1,0,54,56,1,0,64,65,2,0,
+        43,43,66,67,627,0,132,1,0,0,0,2,136,1,0,0,0,4,142,1,0,0,0,6,152,
+        1,0,0,0,8,161,1,0,0,0,10,166,1,0,0,0,12,170,1,0,0,0,14,180,1,0,0,
+        0,16,188,1,0,0,0,18,191,1,0,0,0,20,197,1,0,0,0,22,203,1,0,0,0,24,
+        216,1,0,0,0,26,226,1,0,0,0,28,239,1,0,0,0,30,241,1,0,0,0,32,250,
+        1,0,0,0,34,266,1,0,0,0,36,268,1,0,0,0,38,282,1,0,0,0,40,295,1,0,
+        0,0,42,307,1,0,0,0,44,321,1,0,0,0,46,331,1,0,0,0,48,338,1,0,0,0,
+        50,340,1,0,0,0,52,342,1,0,0,0,54,344,1,0,0,0,56,346,1,0,0,0,58,354,
+        1,0,0,0,60,356,1,0,0,0,62,363,1,0,0,0,64,383,1,0,0,0,66,388,1,0,
+        0,0,68,398,1,0,0,0,70,400,1,0,0,0,72,405,1,0,0,0,74,410,1,0,0,0,
+        76,412,1,0,0,0,78,420,1,0,0,0,80,422,1,0,0,0,82,424,1,0,0,0,84,426,
+        1,0,0,0,86,432,1,0,0,0,88,436,1,0,0,0,90,444,1,0,0,0,92,455,1,0,
+        0,0,94,466,1,0,0,0,96,476,1,0,0,0,98,478,1,0,0,0,100,486,1,0,0,0,
+        102,494,1,0,0,0,104,502,1,0,0,0,106,510,1,0,0,0,108,518,1,0,0,0,
+        110,526,1,0,0,0,112,541,1,0,0,0,114,543,1,0,0,0,116,557,1,0,0,0,
+        118,565,1,0,0,0,120,567,1,0,0,0,122,575,1,0,0,0,124,583,1,0,0,0,
+        126,591,1,0,0,0,128,593,1,0,0,0,130,595,1,0,0,0,132,133,5,4,0,0,
+        133,134,3,98,49,0,134,135,3,96,48,0,135,1,1,0,0,0,136,138,5,5,0,
+        0,137,139,3,98,49,0,138,137,1,0,0,0,138,139,1,0,0,0,139,140,1,0,
+        0,0,140,141,3,4,2,0,141,3,1,0,0,0,142,145,5,1,0,0,143,146,3,6,3,
+        0,144,146,5,3,0,0,145,143,1,0,0,0,145,144,1,0,0,0,146,147,1,0,0,
+        0,147,145,1,0,0,0,147,148,1,0,0,0,148,149,1,0,0,0,149,150,5,2,0,
+        0,150,5,1,0,0,0,151,153,3,98,49,0,152,151,1,0,0,0,152,153,1,0,0,
+        0,153,154,1,0,0,0,154,157,5,58,0,0,155,158,3,76,38,0,156,158,3,96,
+        48,0,157,155,1,0,0,0,157,156,1,0,0,0,158,7,1,0,0,0,159,162,3,54,
+        27,0,160,162,3,56,28,0,161,159,1,0,0,0,161,160,1,0,0,0,162,164,1,
+        0,0,0,163,165,3,26,13,0,164,163,1,0,0,0,164,165,1,0,0,0,165,9,1,
+        0,0,0,166,167,5,6,0,0,167,168,3,56,28,0,168,169,3,12,6,0,169,11,
+        1,0,0,0,170,173,5,1,0,0,171,174,3,14,7,0,172,174,5,3,0,0,173,171,
+        1,0,0,0,173,172,1,0,0,0,174,175,1,0,0,0,175,173,1,0,0,0,175,176,
+        1,0,0,0,176,177,1,0,0,0,177,178,5,2,0,0,178,13,1,0,0,0,179,181,3,
+        52,26,0,180,179,1,0,0,0,180,181,1,0,0,0,181,182,1,0,0,0,182,183,
+        3,8,4,0,183,186,3,56,28,0,184,185,5,57,0,0,185,187,3,48,24,0,186,
+        184,1,0,0,0,186,187,1,0,0,0,187,15,1,0,0,0,188,189,5,7,0,0,189,190,
+        3,68,34,0,190,17,1,0,0,0,191,195,5,9,0,0,192,196,3,10,5,0,193,196,
+        3,16,8,0,194,196,3,68,34,0,195,192,1,0,0,0,195,193,1,0,0,0,195,194,
+        1,0,0,0,196,19,1,0,0,0,197,198,5,8,0,0,198,201,3,22,11,0,199,200,
+        5,10,0,0,200,202,3,56,28,0,201,199,1,0,0,0,201,202,1,0,0,0,202,21,
+        1,0,0,0,203,212,3,56,28,0,204,208,5,55,0,0,205,209,3,56,28,0,206,
+        209,5,64,0,0,207,209,5,65,0,0,208,205,1,0,0,0,208,206,1,0,0,0,208,
+        207,1,0,0,0,209,211,1,0,0,0,210,204,1,0,0,0,211,214,1,0,0,0,212,
+        210,1,0,0,0,212,213,1,0,0,0,213,23,1,0,0,0,214,212,1,0,0,0,215,217,
+        3,52,26,0,216,215,1,0,0,0,216,217,1,0,0,0,217,219,1,0,0,0,218,220,
+        3,8,4,0,219,218,1,0,0,0,219,220,1,0,0,0,220,221,1,0,0,0,221,224,
+        3,56,28,0,222,223,5,57,0,0,223,225,3,48,24,0,224,222,1,0,0,0,224,
+        225,1,0,0,0,225,25,1,0,0,0,226,227,5,50,0,0,227,232,3,28,14,0,228,
+        229,5,59,0,0,229,231,3,28,14,0,230,228,1,0,0,0,231,234,1,0,0,0,232,
+        230,1,0,0,0,232,233,1,0,0,0,233,235,1,0,0,0,234,232,1,0,0,0,235,
+        236,5,48,0,0,236,27,1,0,0,0,237,240,3,54,27,0,238,240,3,56,28,0,
+        239,237,1,0,0,0,239,238,1,0,0,0,240,29,1,0,0,0,241,244,5,35,0,0,
+        242,245,3,90,45,0,243,245,3,56,28,0,244,242,1,0,0,0,244,243,1,0,
+        0,0,245,246,1,0,0,0,246,247,5,11,0,0,247,248,3,98,49,0,248,249,3,
+        96,48,0,249,31,1,0,0,0,250,252,3,56,28,0,251,253,3,26,13,0,252,251,
+        1,0,0,0,252,253,1,0,0,0,253,254,1,0,0,0,254,256,5,60,0,0,255,257,
+        3,118,59,0,256,255,1,0,0,0,256,257,1,0,0,0,257,258,1,0,0,0,258,259,
+        5,61,0,0,259,33,1,0,0,0,260,267,3,20,10,0,261,267,3,18,9,0,262,267,
+        3,10,5,0,263,267,3,16,8,0,264,267,3,68,34,0,265,267,3,66,33,0,266,
+        260,1,0,0,0,266,261,1,0,0,0,266,262,1,0,0,0,266,263,1,0,0,0,266,
+        264,1,0,0,0,266,265,1,0,0,0,267,35,1,0,0,0,268,277,5,60,0,0,269,
+        274,3,24,12,0,270,271,5,59,0,0,271,273,3,24,12,0,272,270,1,0,0,0,
+        273,276,1,0,0,0,274,272,1,0,0,0,274,275,1,0,0,0,275,278,1,0,0,0,
+        276,274,1,0,0,0,277,269,1,0,0,0,277,278,1,0,0,0,278,279,1,0,0,0,
+        279,280,5,61,0,0,280,37,1,0,0,0,281,283,3,50,25,0,282,281,1,0,0,
+        0,282,283,1,0,0,0,283,285,1,0,0,0,284,286,3,52,26,0,285,284,1,0,
+        0,0,285,286,1,0,0,0,286,288,1,0,0,0,287,289,3,8,4,0,288,287,1,0,
+        0,0,288,289,1,0,0,0,289,290,1,0,0,0,290,291,3,56,28,0,291,292,5,
+        57,0,0,292,293,3,48,24,0,293,39,1,0,0,0,294,296,3,50,25,0,295,294,
+        1,0,0,0,295,296,1,0,0,0,296,298,1,0,0,0,297,299,3,52,26,0,298,297,
+        1,0,0,0,298,299,1,0,0,0,299,301,1,0,0,0,300,302,3,8,4,0,301,300,
+        1,0,0,0,301,302,1,0,0,0,302,303,1,0,0,0,303,304,3,90,45,0,304,305,
+        5,57,0,0,305,306,3,48,24,0,306,41,1,0,0,0,307,308,7,0,0,0,308,43,
+        1,0,0,0,309,322,3,38,19,0,310,322,3,40,20,0,311,322,3,32,16,0,312,
+        322,3,62,31,0,313,322,3,60,30,0,314,322,3,94,47,0,315,322,3,30,15,
+        0,316,322,3,0,0,0,317,322,3,2,1,0,318,322,3,78,39,0,319,322,3,80,
+        40,0,320,322,3,48,24,0,321,309,1,0,0,0,321,310,1,0,0,0,321,311,1,
+        0,0,0,321,312,1,0,0,0,321,313,1,0,0,0,321,314,1,0,0,0,321,315,1,
+        0,0,0,321,316,1,0,0,0,321,317,1,0,0,0,321,318,1,0,0,0,321,319,1,
+        0,0,0,321,320,1,0,0,0,322,45,1,0,0,0,323,332,3,38,19,0,324,332,3,
+        40,20,0,325,332,3,48,24,0,326,332,3,92,46,0,327,332,3,60,30,0,328,
+        332,3,0,0,0,329,332,3,78,39,0,330,332,3,80,40,0,331,323,1,0,0,0,
+        331,324,1,0,0,0,331,325,1,0,0,0,331,326,1,0,0,0,331,327,1,0,0,0,
+        331,328,1,0,0,0,331,329,1,0,0,0,331,330,1,0,0,0,332,47,1,0,0,0,333,
+        339,3,98,49,0,334,339,3,62,31,0,335,339,3,94,47,0,336,339,3,30,15,
+        0,337,339,3,2,1,0,338,333,1,0,0,0,338,334,1,0,0,0,338,335,1,0,0,
+        0,338,336,1,0,0,0,338,337,1,0,0,0,339,49,1,0,0,0,340,341,7,1,0,0,
+        341,51,1,0,0,0,342,343,7,2,0,0,343,53,1,0,0,0,344,345,7,3,0,0,345,
+        55,1,0,0,0,346,351,3,42,21,0,347,348,5,72,0,0,348,350,3,42,21,0,
+        349,347,1,0,0,0,350,353,1,0,0,0,351,349,1,0,0,0,351,352,1,0,0,0,
+        352,57,1,0,0,0,353,351,1,0,0,0,354,355,7,4,0,0,355,59,1,0,0,0,356,
+        359,3,56,28,0,357,360,5,31,0,0,358,360,3,58,29,0,359,357,1,0,0,0,
+        359,358,1,0,0,0,360,361,1,0,0,0,361,362,3,48,24,0,362,61,1,0,0,0,
+        363,364,5,33,0,0,364,365,3,98,49,0,365,377,3,96,48,0,366,368,5,3,
+        0,0,367,366,1,0,0,0,368,371,1,0,0,0,369,367,1,0,0,0,369,370,1,0,
+        0,0,370,372,1,0,0,0,371,369,1,0,0,0,372,375,5,34,0,0,373,376,3,62,
+        31,0,374,376,3,96,48,0,375,373,1,0,0,0,375,374,1,0,0,0,376,378,1,
+        0,0,0,377,369,1,0,0,0,377,378,1,0,0,0,378,63,1,0,0,0,379,382,3,34,
+        17,0,380,382,5,3,0,0,381,379,1,0,0,0,381,380,1,0,0,0,382,385,1,0,
+        0,0,383,381,1,0,0,0,383,384,1,0,0,0,384,386,1,0,0,0,385,383,1,0,
+        0,0,386,387,5,0,0,1,387,65,1,0,0,0,388,393,3,44,22,0,389,390,5,59,
+        0,0,390,392,3,44,22,0,391,389,1,0,0,0,392,395,1,0,0,0,393,391,1,
+        0,0,0,393,394,1,0,0,0,394,67,1,0,0,0,395,393,1,0,0,0,396,399,3,70,
+        35,0,397,399,3,72,36,0,398,396,1,0,0,0,398,397,1,0,0,0,399,69,1,
+        0,0,0,400,401,3,56,28,0,401,402,3,36,18,0,402,403,5,58,0,0,403,404,
+        3,74,37,0,404,71,1,0,0,0,405,406,3,56,28,0,406,407,3,36,18,0,407,
+        408,5,58,0,0,408,409,3,82,41,0,409,73,1,0,0,0,410,411,3,76,38,0,
+        411,75,1,0,0,0,412,417,3,46,23,0,413,414,5,59,0,0,414,416,3,46,23,
+        0,415,413,1,0,0,0,416,419,1,0,0,0,417,415,1,0,0,0,417,418,1,0,0,
+        0,418,77,1,0,0,0,419,417,1,0,0,0,420,421,5,38,0,0,421,79,1,0,0,0,
+        422,423,5,39,0,0,423,81,1,0,0,0,424,425,3,84,42,0,425,83,1,0,0,0,
+        426,427,5,1,0,0,427,428,3,86,43,0,428,429,5,2,0,0,429,85,1,0,0,0,
+        430,433,3,88,44,0,431,433,5,3,0,0,432,430,1,0,0,0,432,431,1,0,0,
+        0,433,434,1,0,0,0,434,432,1,0,0,0,434,435,1,0,0,0,435,87,1,0,0,0,
+        436,441,3,46,23,0,437,438,5,59,0,0,438,440,3,46,23,0,439,437,1,0,
+        0,0,440,443,1,0,0,0,441,439,1,0,0,0,441,442,1,0,0,0,442,89,1,0,0,
+        0,443,441,1,0,0,0,444,445,5,62,0,0,445,450,3,56,28,0,446,447,5,59,
+        0,0,447,449,3,56,28,0,448,446,1,0,0,0,449,452,1,0,0,0,450,448,1,
+        0,0,0,450,451,1,0,0,0,451,453,1,0,0,0,452,450,1,0,0,0,453,454,5,
+        63,0,0,454,91,1,0,0,0,455,456,5,62,0,0,456,461,3,48,24,0,457,458,
+        5,59,0,0,458,460,3,48,24,0,459,457,1,0,0,0,460,463,1,0,0,0,461,459,
+        1,0,0,0,461,462,1,0,0,0,462,464,1,0,0,0,463,461,1,0,0,0,464,465,
+        5,63,0,0,465,93,1,0,0,0,466,467,5,35,0,0,467,468,3,38,19,0,468,469,
+        5,36,0,0,469,472,3,98,49,0,470,471,5,37,0,0,471,473,3,98,49,0,472,
+        470,1,0,0,0,472,473,1,0,0,0,473,474,1,0,0,0,474,475,3,96,48,0,475,
+        95,1,0,0,0,476,477,3,82,41,0,477,97,1,0,0,0,478,484,3,100,50,0,479,
+        480,5,44,0,0,480,481,3,98,49,0,481,482,5,45,0,0,482,483,3,98,49,
+        0,483,485,1,0,0,0,484,479,1,0,0,0,484,485,1,0,0,0,485,99,1,0,0,0,
+        486,491,3,102,51,0,487,488,5,40,0,0,488,490,3,102,51,0,489,487,1,
+        0,0,0,490,493,1,0,0,0,491,489,1,0,0,0,491,492,1,0,0,0,492,101,1,
+        0,0,0,493,491,1,0,0,0,494,499,3,104,52,0,495,496,5,41,0,0,496,498,
+        3,104,52,0,497,495,1,0,0,0,498,501,1,0,0,0,499,497,1,0,0,0,499,500,
+        1,0,0,0,500,103,1,0,0,0,501,499,1,0,0,0,502,507,3,106,53,0,503,504,
+        7,5,0,0,504,506,3,106,53,0,505,503,1,0,0,0,506,509,1,0,0,0,507,505,
+        1,0,0,0,507,508,1,0,0,0,508,105,1,0,0,0,509,507,1,0,0,0,510,515,
+        3,108,54,0,511,512,7,6,0,0,512,514,3,108,54,0,513,511,1,0,0,0,514,
+        517,1,0,0,0,515,513,1,0,0,0,515,516,1,0,0,0,516,107,1,0,0,0,517,
+        515,1,0,0,0,518,523,3,110,55,0,519,520,7,7,0,0,520,522,3,110,55,
+        0,521,519,1,0,0,0,522,525,1,0,0,0,523,521,1,0,0,0,523,524,1,0,0,
+        0,524,109,1,0,0,0,525,523,1,0,0,0,526,531,3,112,56,0,527,528,7,8,
+        0,0,528,530,3,112,56,0,529,527,1,0,0,0,530,533,1,0,0,0,531,529,1,
+        0,0,0,531,532,1,0,0,0,532,111,1,0,0,0,533,531,1,0,0,0,534,542,3,
+        114,57,0,535,536,5,42,0,0,536,542,3,114,57,0,537,538,5,52,0,0,538,
+        542,3,114,57,0,539,540,5,53,0,0,540,542,3,114,57,0,541,534,1,0,0,
+        0,541,535,1,0,0,0,541,537,1,0,0,0,541,539,1,0,0,0,542,113,1,0,0,
+        0,543,548,3,116,58,0,544,545,5,62,0,0,545,546,3,48,24,0,546,547,
+        5,63,0,0,547,549,1,0,0,0,548,544,1,0,0,0,548,549,1,0,0,0,549,115,
+        1,0,0,0,550,558,3,32,16,0,551,558,3,56,28,0,552,558,3,126,63,0,553,
+        554,5,60,0,0,554,555,3,48,24,0,555,556,5,61,0,0,556,558,1,0,0,0,
+        557,550,1,0,0,0,557,551,1,0,0,0,557,552,1,0,0,0,557,553,1,0,0,0,
+        558,117,1,0,0,0,559,566,3,122,61,0,560,563,3,120,60,0,561,562,5,
+        59,0,0,562,564,3,122,61,0,563,561,1,0,0,0,563,564,1,0,0,0,564,566,
+        1,0,0,0,565,559,1,0,0,0,565,560,1,0,0,0,566,119,1,0,0,0,567,572,
+        3,48,24,0,568,569,5,59,0,0,569,571,3,48,24,0,570,568,1,0,0,0,571,
+        574,1,0,0,0,572,570,1,0,0,0,572,573,1,0,0,0,573,121,1,0,0,0,574,
+        572,1,0,0,0,575,580,3,124,62,0,576,577,5,59,0,0,577,579,3,124,62,
+        0,578,576,1,0,0,0,579,582,1,0,0,0,580,578,1,0,0,0,580,581,1,0,0,
+        0,581,123,1,0,0,0,582,580,1,0,0,0,583,584,3,56,28,0,584,587,5,57,
+        0,0,585,588,3,48,24,0,586,588,3,92,46,0,587,585,1,0,0,0,587,586,
+        1,0,0,0,588,125,1,0,0,0,589,592,3,128,64,0,590,592,3,130,65,0,591,
+        589,1,0,0,0,591,590,1,0,0,0,592,127,1,0,0,0,593,594,7,9,0,0,594,
+        129,1,0,0,0,595,596,7,10,0,0,596,131,1,0,0,0,67,138,145,147,152,
+        157,161,164,173,175,180,186,195,201,208,212,216,219,224,232,239,
+        244,252,256,266,274,277,282,285,288,295,298,301,321,331,338,351,
+        359,369,375,377,381,383,393,398,417,432,434,441,450,461,472,484,
+        491,499,507,515,523,531,541,548,557,563,565,572,580,587,591
     ];
 
     private static __ATN: antlr.ATN;
@@ -3944,6 +4001,41 @@ export class Type_argContext extends antlr.ParserRuleContext {
 }
 
 
+export class For_in_exprContext extends antlr.ParserRuleContext {
+    public constructor(parent: antlr.ParserRuleContext | null, invokingState: number) {
+        super(parent, invokingState);
+    }
+    public FOR_STMT(): antlr.TerminalNode {
+        return this.getToken(PineV5Parser.FOR_STMT, 0)!;
+    }
+    public IN(): antlr.TerminalNode {
+        return this.getToken(PineV5Parser.IN, 0)!;
+    }
+    public ternary_expr(): Ternary_exprContext {
+        return this.getRuleContext(0, Ternary_exprContext)!;
+    }
+    public stmts_block(): Stmts_blockContext {
+        return this.getRuleContext(0, Stmts_blockContext)!;
+    }
+    public ids_array(): Ids_arrayContext | null {
+        return this.getRuleContext(0, Ids_arrayContext);
+    }
+    public id(): IdContext | null {
+        return this.getRuleContext(0, IdContext);
+    }
+    public override get ruleIndex(): number {
+        return PineV5Parser.RULE_for_in_expr;
+    }
+    public override accept<Result>(visitor: PineV5ParserVisitor<Result>): Result | null {
+        if (visitor.visitFor_in_expr) {
+            return visitor.visitFor_in_expr(this);
+        } else {
+            return visitor.visitChildren(this);
+        }
+    }
+}
+
+
 export class Fun_callContext extends antlr.ParserRuleContext {
     public constructor(parent: antlr.ParserRuleContext | null, invokingState: number) {
         super(parent, invokingState);
@@ -4203,6 +4295,9 @@ export class Global_stmt_contentContext extends antlr.ParserRuleContext {
     public for_expr(): For_exprContext | null {
         return this.getRuleContext(0, For_exprContext);
     }
+    public for_in_expr(): For_in_exprContext | null {
+        return this.getRuleContext(0, For_in_exprContext);
+    }
     public while_expr(): While_exprContext | null {
         return this.getRuleContext(0, While_exprContext);
     }
@@ -4284,6 +4379,9 @@ export class Arith_exprContext extends antlr.ParserRuleContext {
     }
     public for_expr(): For_exprContext | null {
         return this.getRuleContext(0, For_exprContext);
+    }
+    public for_in_expr(): For_in_exprContext | null {
+        return this.getRuleContext(0, For_in_exprContext);
     }
     public switch_expr(): Switch_exprContext | null {
         return this.getRuleContext(0, Switch_exprContext);

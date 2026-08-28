@@ -921,28 +921,54 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     const id = this.anonCounter++;
     const res = `_res${id}`;
 
-    // Forward lexical scanner to find the loop's OWN trailing 'return'.
+    const safeBody = this.captureLoopResult(rawBody, res);
+
+    const s = `_s${id}`, e = `_e${id}`, st = `_st${id}`, up = `_up${id}`;
+    
+    // Pure primitive loop execution
+    const loopDef = `for (let ${s} = ${startVal}, ${e} = ${endVal}, ${st} = Math.abs(${stepVal}), ${up} = ${s} <= ${e}, ${varName} = ${s}; ${up} ? ${varName} <= ${e} : ${varName} >= ${e}; ${varName} += (${up} ? ${st} : -${st}))`;
+
+    // Wrap it all together. Explicitly ensures `break` and `continue` work natively.
     //
-    // ── Why nesting alone is not enough ─────────────────────────────────────
-    //
-    // The body can contain whole FUNCTIONS — an if-expression emits
-    // `(() => { … })()`, and its returns belong to that function, not to the
-    // loop. Ranking by brace depth and taking the shallowest picked one of them
-    // whenever the loop had no trailing return of its own, which is exactly the
-    // case for a statement-`if` body:
-    //
-    //     v = if high > low
-    //             1
-    //         else
-    //             2
-    //
-    // came out as `if (…) { return 1; } else { _res0 = 2; }`, so the else
-    // branch assigned the LOOP's result variable and the expression evaluated
-    // to undefined. Silent: no error, just an `na` on every bar that took the
-    // else.
-    //
-    // So function bodies are tracked separately from plain blocks, and only a
-    // return at function depth 0 can be the loop's.
+    // `= NaN`, not bare: a loop that never runs its body has no
+    // `return_expression` to evaluate, and Pine's answer for a value that was
+    // never produced is `na`. Left uninitialised this returned JavaScript
+    // `undefined`, which reads as NaN in arithmetic but is not `na` to `na(x)`.
+    const loop = `let ${res} = NaN;\n  ${loopDef} {\n    ${safeBody}\n  }\n  return ${res};`;
+
+    return `(() => {\n  ${loop}\n})()`;
+  }
+
+  /**
+   * Rewrites a loop body's OWN trailing `return X` into `<res> = X`.
+   *
+   * Extracted from `visitFor_expr` so `for … in` (v5) can reuse it verbatim.
+   * Every loop in the language is an EXPRESSION whose value is the last
+   * `return_expression` its body evaluated, and a block emits that value as a
+   * `return` — which inside a real JavaScript `for` would leave the enclosing
+   * function instead.
+   *
+   * ── Why nesting alone is not enough ─────────────────────────────────────
+   *
+   * The body can contain whole FUNCTIONS — an if-expression emits
+   * `(() => { … })()`, and its returns belong to that function, not to the
+   * loop. Ranking by brace depth and taking the shallowest picked one of them
+   * whenever the loop had no trailing return of its own, which is exactly the
+   * case for a statement-`if` body:
+   *
+   *     v = if high > low
+   *             1
+   *         else
+   *             2
+   *
+   * came out as `if (…) { return 1; } else { _res0 = 2; }`, so the else branch
+   * assigned the LOOP's result variable and the expression evaluated to
+   * undefined. Silent: no error, just an `na` on every bar that took the else.
+   *
+   * So function bodies are tracked separately from plain blocks, and only a
+   * return at function depth 0 can be the loop's.
+   */
+  protected captureLoopResult(rawBody: string, res: string): string {
     let inString = false;
     let stringChar = '';
     /** One entry per open '{'; true when it opens a FUNCTION body. */
@@ -1002,16 +1028,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
         const target = topLevelReturns[topLevelReturns.length - 1];
         safeBody = rawBody.substring(0, target.index) + `${res} = ` + rawBody.substring(target.index + 7);
     }
-
-    const s = `_s${id}`, e = `_e${id}`, st = `_st${id}`, up = `_up${id}`;
-    
-    // Pure primitive loop execution
-    const loopDef = `for (let ${s} = ${startVal}, ${e} = ${endVal}, ${st} = Math.abs(${stepVal}), ${up} = ${s} <= ${e}, ${varName} = ${s}; ${up} ? ${varName} <= ${e} : ${varName} >= ${e}; ${varName} += (${up} ? ${st} : -${st}))`;
-
-    // Wrap it all together. Explicitly ensures `break` and `continue` work natively.
-    const loop = `let ${res};\n  ${loopDef} {\n    ${safeBody}\n  }\n  return ${res};`;
-
-    return `(() => {\n  ${loop}\n})()`;
+    return safeBody;
   }
 
   visitStmts_block(ctx: Stmts_blockContext): string {
