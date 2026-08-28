@@ -200,6 +200,19 @@ export const V4_ONLY_NAMES: readonly string[] = [
     // the v3 documentation has no `alert(` anywhere — so this is v4+.
     "alert", "alert.freq_once_per_bar", "alert.freq_once_per_bar_close",
     "alert.freq_all",
+
+    // The one `str.` name that predates the namespace's own version.
+    //
+    // `str.*` is v5 — `tostring` becomes `str.tostring`, and the other twenty
+    // members arrive with it — but `str.replace_all` is on the v4 manual's
+    // TABLES and ARRAYS pages, inside `//@version=4` examples:
+    //
+    //     _s := str.replace_all(_s, "25", "00")
+    //
+    // under "Produces a string format usable with tostring() to restrict
+    // precision to ticks". It is the ONLY `str.` name any v4 example spells,
+    // which is why the namespace stays v5 and this one member is named here.
+    "str.replace_all",
 ];
 
 export const V4_RENAMES: readonly RenameSpec[] = [

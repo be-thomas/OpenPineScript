@@ -66,6 +66,12 @@ function isV5Only(key: string): boolean {
     // An exact key — the typed `input.*` functions, whose ROOT is shared with
     // v4's constants of the same name and therefore cannot be gated wholesale.
     if (v5OnlyNames.has(key)) return true;
+
+    // ...and the mirror of it: a member that arrived a version EARLY. `str.*`
+    // is a v5 namespace, but `str.replace_all` is used in `//@version=4`
+    // examples on the v4 manual's own tables and arrays pages. Naming the
+    // member is what keeps the rest of `str.*` out of v4.
+    if (v4OnlyNames.has(key)) return false;
     const root = rootOf(key);
     return key !== root && v5OnlyNamespaces.has(root);
 }

@@ -180,3 +180,45 @@ describe("a keyword argument's NAME is not a read of that word", () => {
     )).not.toThrow();
   });
 });
+
+describe("str.replace_all predates the str namespace", () => {
+  /**
+   * SOURCING. `str.*` is v5 — `tostring` becomes `str.tostring`, and the rest
+   * of the namespace arrives with it. But the v4 manual's TABLES page carries
+   *
+   *     _s := str.replace_all(_s, "25", "00")
+   *
+   * inside a `//@version=4` example, under "Produces a string format usable
+   * with tostring() to restrict precision to ticks", and the v4 arrays page
+   * uses it too. Gating the whole namespace at v5 rejected three of
+   * TradingView's own v4 scripts.
+   *
+   * It is the ONLY `str.` name any v4 example spells, which is why it is named
+   * one member at a time rather than by moving the namespace.
+   */
+  it("v4 accepts it", () => {
+    expect(() => compileScript('//@version=4\nstudy("t")\nx = str.replace_all("aa", "a", "b")\n'))
+      .not.toThrow();
+  });
+
+  it("...and it actually replaces every occurrence", () => {
+    expect(evaluate(4, 'x = str.replace_all("a-a-a", "a", "b")', "x")).toBe("b-b-b");
+  });
+
+  it("v5 keeps it", () => {
+    expect(() => compileScript('//@version=5\nindicator("t")\nx = str.replace_all("a", "a", "b")\n'))
+      .not.toThrow();
+  });
+
+  it("v3 does not have it", () => {
+    expect(() => compileScript('//@version=3\nstudy("t")\nx = str.replace_all("a", "a", "b")\n'))
+      .toThrow(/is not available in Pine Script v3/);
+  });
+
+  it("the rest of str.* is still v5 — the namespace did not move", () => {
+    for (const name of ["str.length", "str.tostring", "str.split", "str.format"]) {
+      expect(() => compileScript(`//@version=4\nstudy("t")\nx = ${name}("a")\n`),
+             name).toThrow(/is not available in Pine Script v4/);
+    }
+  });
+});
