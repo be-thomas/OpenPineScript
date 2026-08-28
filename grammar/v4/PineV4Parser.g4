@@ -49,9 +49,28 @@ decl_mod : VAR | VARIP ;
  */
 type_qual : SERIES | SIMPLE | CONST ;
 
+/**
+ * A built-in type, optionally as an ARRAY of that type.
+ *
+ * From the v4 manual's arrays page: "The `[]` modifier is appended to the type
+ * name when declaring arrays", with the syntax
+ *
+ *     <type>[] <identifier> = <expression>
+ *     var <type>[] <identifier> = <expression>
+ *
+ * The page also says when it is load-bearing rather than decoration: the
+ * `<type>[]` part is "redundant, except if you initialize an array variable to
+ * `na`" — because `array.new_float(0)` states the type itself and `na` cannot.
+ * `float[] prices = na` is the page's own example, and it is the one form that
+ * has no other spelling.
+ *
+ * No ambiguity with history access: `type_name` appears only as the prefix of a
+ * declaration, where the next token is the name being declared.
+ */
 type_name
-  : INT_TYPE | FLOAT_TYPE | BOOL_TYPE | STRING_TYPE | COLOR_TYPE
-  | LINE_TYPE | LABEL_TYPE | BOX_TYPE | TABLE_TYPE
+  : ( INT_TYPE | FLOAT_TYPE | BOOL_TYPE | STRING_TYPE | COLOR_TYPE
+    | LINE_TYPE | LABEL_TYPE | BOX_TYPE | TABLE_TYPE
+    ) ( LSQBR RSQBR )?
   ;
 
 /**
