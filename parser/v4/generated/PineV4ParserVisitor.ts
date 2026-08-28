@@ -9,6 +9,7 @@ import { Id_partContext } from "./PineV4Parser.js";
 import { IdContext } from "./PineV4Parser.js";
 import { Var_defContext } from "./PineV4Parser.js";
 import { Var_defsContext } from "./PineV4Parser.js";
+import { Compound_assign_opContext } from "./PineV4Parser.js";
 import { Var_assignContext } from "./PineV4Parser.js";
 import { Global_stmt_contentContext } from "./PineV4Parser.js";
 import { Local_stmt_contentContext } from "./PineV4Parser.js";
@@ -103,6 +104,12 @@ export class PineV4ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitVar_defs?: (ctx: Var_defsContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV4Parser.compound_assign_op`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitCompound_assign_op?: (ctx: Compound_assign_opContext) => Result;
     /**
      * Visit a parse tree produced by `PineV4Parser.var_assign`.
      * @param ctx the parse tree

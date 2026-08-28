@@ -578,7 +578,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   }
 
   /**
-   * `p.x := expr` — a field WRITE.
+   * `p.x := expr` — a field WRITE, and `p.x += expr` with it.
    *
    * Not routed through the inherited `visitVar_assign`: that emits
    * `<name> = ctx.new_var(…)`, and the name it would build here is a
@@ -603,7 +603,17 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       target = `ctx.field(${target}, ${JSON.stringify(parts[i])})`;
     }
     const field = parts[parts.length - 1];
-    return `ctx.setField(${target}, ${JSON.stringify(field)}, ${this.visit(ctx.arith_expr())})`;
+
+    // `p.x += 1` reads the field, applies the operator, and writes it back.
+    // Without this the operator would be dropped silently and the field would
+    // simply take the right-hand side — `p.x += 1` becoming `p.x := 1`.
+    const op = this.compoundOperatorOf(ctx as any);
+    const value = this.visit(ctx.arith_expr());
+    const next = op
+      ? this.compoundValue(op, `ctx.field(${target}, ${JSON.stringify(field)})`, value)
+      : value;
+
+    return `ctx.setField(${target}, ${JSON.stringify(field)}, ${next})`;
   }
 
   /**

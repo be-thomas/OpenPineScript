@@ -93,9 +93,14 @@ export class V2ToJsVisitor extends V1ToJsVisitor {
       : this.scopes.declared.has(name);
     if (known) return;
 
+    // Name the operator the script actually used. v4 admits `+=` and its four
+    // siblings through this same rule, and reporting ':=' for a `+=` sends the
+    // reader looking for a line that is not there.
+    const operator = (ctx as any).getChild(1)?.getText() ?? ":=";
+
     throw this.err(
       ctx,
-      `'${name}' is not declared, so it cannot be assigned with ':='. ` +
+      `'${name}' is not declared, so it cannot be assigned with '${operator}'. ` +
       `Declare it first (e.g. '${name} = 0.0').`
     );
   }

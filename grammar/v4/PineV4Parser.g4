@@ -73,3 +73,24 @@ id : id_part ( DOT id_part )* ;
 
 var_def  : decl_mod? type_qual? type_name? id DEFINE arith_expr ;
 var_defs : decl_mod? type_qual? type_name? ids_array DEFINE arith_expr ;
+
+/**
+ * `x += expr` and its four siblings.
+ *
+ * Modelled as a widening of v2's `var_assign` rather than as a new statement,
+ * because that is what TradingView says it is:
+ *
+ *   "A compound assignment operator combines an arithmetic operator with the
+ *    reassignment operator. It provides a shorthand way to perform an
+ *    arithmetic calculation on a variable and then assign the result back to
+ *    that same variable."
+ *
+ * Everything that already holds for ':=' therefore holds here for free — it is
+ * admitted in exactly the same statement positions, and
+ * V2ToJsVisitor.enforceDeclaredBeforeReassignment still requires the target to
+ * have been declared, which is right: `x += 1` on an undeclared `x` has no
+ * previous value to add to.
+ */
+compound_assign_op : PLUS_ASSIGN | MINUS_ASSIGN | MUL_ASSIGN | DIV_ASSIGN | MOD_ASSIGN ;
+
+var_assign : id ( ASSIGN | compound_assign_op ) arith_expr ;

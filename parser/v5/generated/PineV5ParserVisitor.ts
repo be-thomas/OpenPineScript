@@ -30,6 +30,7 @@ import { Decl_modContext } from "./PineV5Parser.js";
 import { Type_qualContext } from "./PineV5Parser.js";
 import { Type_nameContext } from "./PineV5Parser.js";
 import { IdContext } from "./PineV5Parser.js";
+import { Compound_assign_opContext } from "./PineV5Parser.js";
 import { Var_assignContext } from "./PineV5Parser.js";
 import { Pine_scriptContext } from "./PineV5Parser.js";
 import { Global_stmtContext } from "./PineV5Parser.js";
@@ -244,6 +245,12 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitId?: (ctx: IdContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV5Parser.compound_assign_op`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitCompound_assign_op?: (ctx: Compound_assign_opContext) => Result;
     /**
      * Visit a parse tree produced by `PineV5Parser.var_assign`.
      * @param ctx the parse tree

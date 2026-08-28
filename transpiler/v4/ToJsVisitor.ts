@@ -12,6 +12,9 @@
  *     `var` is the only one with emit consequences; the type prefix is checked
  *     and discarded, and the qualifiers are discarded outright.
  *
+ *     The five compound assignment operators, `+= -= *= /= %=` (March 2021).
+ *     Sourced from the v4 release notes; see PineV4Lexer.g4 for the quote.
+ *
  *   NAMES (transpiler/common/profiles/index.ts + runtime)
  *     The 3a rename table — `n` → `bar_index`, `red` → `color.red`,
  *     `period` → `timeframe.period`, and the rest. Those are lookups, not emit
@@ -29,6 +32,7 @@ import { V4_RENAMES } from "../../runtime/v1/stdlib/renames";
 import {
   Var_defContext,
   Var_defsContext,
+  Var_assignContext,
   IdContext,
 } from "../../parser/v4/generated/PineV4Parser";
 
@@ -154,5 +158,53 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
       `'${persistence}' on a tuple declaration is not implemented yet. ` +
       `Declare the elements separately, or drop '${persistence}'.`
     );
+  }
+
+  // ── Compound assignment ───────────────────────────────────────────────────
+
+  /**
+   * The arithmetic half of a compound assignment — `"+"` for `+=` — or null
+   * when the statement is a plain `:=`.
+   */
+  protected compoundOperatorOf(ctx: Var_assignContext): string | null {
+    const op = (ctx as any).compound_assign_op?.();
+    return op ? op.getText().slice(0, -1) : null;
+  }
+
+  /**
+   * `current <op> value`, emitted EXACTLY as the binary operator would be.
+   *
+   * TradingView defines `x += y` as "an arithmetic operator combined with the
+   * reassignment operator", so it has to mean precisely `x := x + y` — which
+   * for `+` and `-` is not the JavaScript operator. `opsv2_safe_add` is what
+   * `visitAdd_expr` emits, and it is what makes `na + 1` come out `na` and
+   * `"a" + "b"` concatenate. Emitting a raw `+` here would have made compound
+   * assignment the one place in the language where `na` behaved differently.
+   *
+   * `value` is parenthesised because not every emitted expression is
+   * self-contained: `visitOr_expr` produces `a || b` with no brackets, so
+   * `x *= a or b` would otherwise bind as `(x * a) || b`.
+   */
+  protected compoundValue(op: string, current: string, value: string): string {
+    if (op === "+") return `opsv2_safe_add(${current}, (${value}))`;
+    if (op === "-") return `opsv2_safe_sub(${current}, (${value}))`;
+    return `(${current} ${op} (${value}))`;
+  }
+
+  /**
+   * `x += expr`.
+   *
+   * Routed through the same guard as `:=` — the target must already be
+   * declared, which for a compound assignment is not a formality: there is no
+   * previous value to add to otherwise.
+   */
+  override visitVar_assign(ctx: Var_assignContext): string {
+    const op = this.compoundOperatorOf(ctx);
+    if (!op) return super.visitVar_assign(ctx as any);
+
+    this.enforceDeclaredBeforeReassignment(ctx as any);
+    const name = this.visit(ctx.id());
+    const value = this.visit(ctx.arith_expr());
+    return `${name} = ctx.new_var("${name}", ${this.compoundValue(op, name, value)})`;
   }
 }

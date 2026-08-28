@@ -197,7 +197,25 @@ describe("v4's keyword tokens do not break dotted names", () => {
   const parser = stripComments(read(4, "Parser"));
 
   /** Token names declared by v4 itself, e.g. `COLOR_TYPE : 'color' ;`. */
+  /**
+   * Token name → its literal, for `NAME : 'literal' ;` declarations.
+   *
+   * The literal is what decides whether the hazard applies. Only a token whose
+   * literal is a WORD ever lexed as an ID, so only a word token has to be
+   * re-admitted to `id_part`. v4's compound-assignment operators — `+=`, `-=`,
+   * `*=`, `/=`, `%=` — are punctuation: they were a syntax error before v4, not
+   * an identifier, and admitting them as name parts would make `a += b` a
+   * legal NAME.
+   */
+  const literals = new Map<string, string>(
+    [...lexer.matchAll(/^\s*([A-Z][A-Z0-9_]*)\s*:\s*'([^']*)'\s*;/gm)]
+      .map(m => [m[1], m[2]] as [string, string]),
+  );
+
   const declared = [...lexer.matchAll(/^\s*([A-Z][A-Z0-9_]*)\s*:/gm)].map(m => m[1]);
+
+  /** Tokens that used to lex as an ID, and so must still be usable as a name. */
+  const wordTokens = declared.filter(t => /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(literals.get(t) ?? ""));
 
   const idPart = /id_part\s*:([^;]*);/.exec(parser)?.[1] ?? "";
 
@@ -205,6 +223,22 @@ describe("v4's keyword tokens do not break dotted names", () => {
     expect(declared.length).toBeGreaterThan(0);
     expect(declared).toContain("VAR");
   });
+
+  it("v4 declares both word and punctuation tokens (guards the split above)", () => {
+    expect(wordTokens).toContain("COLOR_TYPE");
+    expect(wordTokens).not.toContain("PLUS_ASSIGN");
+    expect(declared).toContain("PLUS_ASSIGN");
+  });
+
+  for (const token of declared.filter(t => !wordTokens.includes(t))) {
+    it(`${token} is punctuation — not admitted as a name part`, () => {
+      expect(
+        idPart,
+        `${token}'s literal is not a word, so it never lexed as an ID. ` +
+        `Admitting it to id_part would make an operator legal inside a name.`,
+      ).not.toMatch(new RegExp(`\\b${token}\\b`));
+    });
+  }
 
   // VAR and VARIP are reserved words in v4 and may not name anything, so they
   // are the two that must NOT be admitted.
@@ -214,7 +248,7 @@ describe("v4's keyword tokens do not break dotted names", () => {
     });
   }
 
-  for (const token of declared.filter(t => t !== "VAR" && t !== "VARIP")) {
+  for (const token of wordTokens.filter(t => t !== "VAR" && t !== "VARIP")) {
     it(`${token} is admitted as a name part`, () => {
       expect(
         idPart,

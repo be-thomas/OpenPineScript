@@ -64,3 +64,29 @@ LINE_TYPE   : 'line'   ;
 LABEL_TYPE  : 'label'  ;
 BOX_TYPE    : 'box'    ;
 TABLE_TYPE  : 'table'  ;
+
+// --- Compound assignment operators -----------------------------------------
+// Quoted, from the TradingView v4 release notes, March 2021:
+//
+//   "New assignment operators were added:
+//    `+=` - addition assignment, `-=` - subtraction assignment,
+//    `*=` - multiplication assignment, `/=` - division assignment,
+//    `%=` - modulus assignment"
+//
+// So these belong at v4, not v5 — `lookBack += 2` appears in the v4 manual
+// itself (examples/v4/tradingview-docs/v4-essential-colors-07.pine).
+//
+// These are the first v4 tokens that are PUNCTUATION rather than words. That
+// distinction matters to PineV4Parser.id_part: a word token has to be
+// re-admitted as a name part because it stopped lexing as an ID, and `+=`
+// never was one. grammar_layering.test.ts makes the same split.
+//
+// No ordering hazard. An ANTLR lexer takes the LONGEST match and only breaks
+// ties by rule order, so '+=' wins over the inherited one-character PLUS on
+// length alone — and '/=' cannot be confused with the two-character '//' that
+// opens a comment, because neither is a prefix of the other.
+PLUS_ASSIGN  : '+=' ;
+MINUS_ASSIGN : '-=' ;
+MUL_ASSIGN   : '*=' ;
+DIV_ASSIGN   : '/=' ;
+MOD_ASSIGN   : '%=' ;
