@@ -125,7 +125,12 @@ function generateConfig(stdlibPath: string) {
                 const nestedPrefix = `${prefix}${varName}.`;
                 const accessorBase = isDefault ? `(${moduleName}.default || ${moduleName})` : `${moduleName}.${varName}`;
 
-                init.getProperties().forEach(prop => {
+                const walkObject = (
+                    literal: import("ts-morph").ObjectLiteralExpression,
+                    nestedPrefix: string,
+                    accessorBase: string,
+                ) => {
+                literal.getProperties().forEach(prop => {
                     if (Node.isPropertyAssignment(prop)) {
                         const propName = prop.getName().replace(/['"]/g, '');
                         if (propName === "__IS_NAMESPACE__") return; 
@@ -166,6 +171,24 @@ function generateConfig(stdlibPath: string) {
                                 .some(range => /@getter\b/.test(range.getText()));
                         }
 
+                        // A property that is ITSELF an object literal is a
+                        // nested namespace, not a value.
+                        //
+                        // `chart.point` is the case: `chart.point.new(...)`,
+                        // `.now(...)`, `.from_index(...)`. Without recursing,
+                        // the whole object was recorded as one `chart.point`
+                        // entry with `is_value: true`, so every constructor
+                        // under it was absent from the registry and
+                        // `chart.point.new(...)` emitted a call to nothing.
+                        if (initializer && Node.isObjectLiteralExpression(initializer)) {
+                            walkObject(
+                                initializer,
+                                `${fullKey}.`,
+                                `${accessorBase}[${JSON.stringify(propName)}]`,
+                            );
+                            return;
+                        }
+
                         // Determine return type logic
                         const type = moduleName === 'color' ? 'color' : 'any';
                         const returnsObj = { kind: "scalar", type };
@@ -180,6 +203,9 @@ function generateConfig(stdlibPath: string) {
                         registryEntries.push(`      },`);
                     }
                 });
+                };
+
+                walkObject(init, nestedPrefix, accessorBase);
             }
         });
 

@@ -337,3 +337,94 @@ export const text = {
     align_top: "top",
     align_bottom: "bottom",
 };
+
+// ── polyline ────────────────────────────────────────────────────────────────
+//
+// v5, October 2023. A polyline joins an ARRAY of `chart.point` objects, which
+// is what separates it from `line`: one object, many segments, and a `closed`
+// flag that turns it into a fillable shape.
+//
+// Signature and defaults, quoted from the manual's Lines and boxes page:
+//
+//   polyline.new(points, curved, closed, xloc, line_color, fill_color,
+//                line_style, line_width, force_overlay) → series polyline
+//
+//   points       "an array of chart.point objects that determine the
+//                 coordinates"
+//   curved       "whether the drawing uses curved line segments"    false
+//   closed       "whether the polyline will connect the last chart.point ...
+//                 to the first"                                     false
+//   xloc         "which field from each chart.point the polyline uses for
+//                 x-coordinates"                        xloc.bar_index
+//   line_color   "color of all line segments"           color.blue
+//   fill_color   "color of the closed space filled by the polyline"  na
+//   line_style   "style of the polyline"                line.style_solid
+//   line_width   "width of the polyline, in pixels"     1
+//   force_overlay "if true, displays on main chart pane" false
+//
+// The points array is COPIED into the drawing record. A polyline in Pine holds
+// its own coordinates: pushing to the array afterwards does not move the
+// drawing, and sharing the live array here would make it look as though it did.
+
+export const polyline = {
+    new: (
+        ctx: Context, points: any, curved: any = false, closed: any = false,
+        xloc: any = "bar_index", line_color: any = "#2196F3", fill_color: any = undefined,
+        line_style: any = "solid", line_width: any = 1, force_overlay: any = false,
+    ) => {
+        const raw = v(points);
+        if (!Array.isArray(raw)) {
+            throw new Error("polyline.new: points must be an array of chart.point objects");
+        }
+        return ctx.newDrawing("polyline", {
+            points: raw.map(p => ({ ...v(p) })),
+            curved: Boolean(v(curved)), closed: Boolean(v(closed)),
+            xloc: v(xloc), line_color: v(line_color), fill_color: v(fill_color),
+            line_style: v(line_style), line_width: n(line_width),
+            force_overlay: Boolean(v(force_overlay)),
+        });
+    },
+
+    delete: (ctx: Context, id: any) => {
+        ctx.deleteDrawing(v(id));
+    },
+
+    /**
+     * Every polyline currently on the chart, oldest first.
+     * @getter
+     */
+    all: (ctx: Context): string[] => ctx.drawingIds("polyline"),
+};
+
+// ── linefill ────────────────────────────────────────────────────────────────
+//
+// v4, November 2020. Fills the space between two `line` drawings; the fill
+// follows them when either moves, which is why it references their ids rather
+// than copying their coordinates.
+//
+//   linefill.new(line1, line2, color) → series linefill
+//   linefill.delete(id)
+//   linefill.set_color(id, color)
+//   linefill.all      "a read-only array containing the IDs of all linefills"
+
+export const linefill = {
+    new: (ctx: Context, line1: any, line2: any, color: any) => ctx.newDrawing("linefill", {
+        line1: v(line1), line2: v(line2), color: v(color),
+    }),
+
+    set_color: (ctx: Context, id: any, color: any) =>
+        setProp(ctx, id, "linefill.set_color", "color", color),
+
+    get_line1: (ctx: Context, id: any) => getProp(ctx, id, "linefill.get_line1", "line1"),
+    get_line2: (ctx: Context, id: any) => getProp(ctx, id, "linefill.get_line2", "line2"),
+
+    delete: (ctx: Context, id: any) => {
+        ctx.deleteDrawing(v(id));
+    },
+
+    /**
+     * Every linefill currently on the chart, oldest first.
+     * @getter
+     */
+    all: (ctx: Context): string[] => ctx.drawingIds("linefill"),
+};

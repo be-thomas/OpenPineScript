@@ -151,6 +151,17 @@ export const V5_ONLY_NAMESPACES: readonly string[] = [
     // different set of built-ins that happen to live in the same file, and
     // `isV5Only` skips a key equal to its own root, so they survive the cut.
     "chart", "format", "display", "font",
+    // Drawing types added after v4:
+    //   polyline  October 2023 — "polylines were introduced as drawings that
+    //             sequentially connect the coordinates from an array of up to
+    //             10,000 chart points"; `chart.point.new()` arrived with it,
+    //             and is covered by the `chart` root above
+    //   linefill  absent from every v4 release note and from all 148 v4
+    //             examples vendored from the manual
+    "polyline", "linefill",
+    // Field selectors for the non-price `request.*` calls, and the price
+    // adjustment a ticker id can carry. All v5, like the requests themselves.
+    "dividends", "splits", "earnings", "adjustment",
 ];
 
 /**

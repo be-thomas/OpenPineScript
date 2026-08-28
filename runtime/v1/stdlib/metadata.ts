@@ -583,6 +583,46 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: chart.pointfigure
       },
+      "chart.point.new": {
+          uses_context: false,
+          args: ["index","time","price"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["point"]["new"]
+      },
+      "chart.point.now": {
+          uses_context: true,
+          args: ["price"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["point"]["now"]
+      },
+      "chart.point.from_index": {
+          uses_context: false,
+          args: ["index","price"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["point"]["from_index"]
+      },
+      "chart.point.from_time": {
+          uses_context: false,
+          args: ["time","price"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["point"]["from_time"]
+      },
+      "chart.point.copy": {
+          uses_context: false,
+          args: ["p"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.chart["point"]["copy"]
+      },
       "chart.bg_color": {
           uses_context: true,
           args: [],
@@ -2071,6 +2111,78 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: drawings.text["align_bottom"]
       },
+      "polyline.new": {
+          uses_context: true,
+          args: ["points","curved","closed","xloc","line_color","fill_color","line_style","line_width","force_overlay"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.polyline["new"]
+      },
+      "polyline.delete": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.polyline["delete"]
+      },
+      "polyline.all": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.polyline["all"]
+      },
+      "linefill.new": {
+          uses_context: true,
+          args: ["line1","line2","color"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.linefill["new"]
+      },
+      "linefill.set_color": {
+          uses_context: true,
+          args: ["id","color"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.linefill["set_color"]
+      },
+      "linefill.get_line1": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.linefill["get_line1"]
+      },
+      "linefill.get_line2": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.linefill["get_line2"]
+      },
+      "linefill.delete": {
+          uses_context: true,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.linefill["delete"]
+      },
+      "linefill.all": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.linefill["all"]
+      },
       "runtime.error": {
           uses_context: true,
           args: ["message"],
@@ -2798,6 +2910,86 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: request.request["quandl"]
+      },
+      "dividends.gross": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.dividends["gross"]
+      },
+      "dividends.net": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.dividends["net"]
+      },
+      "splits.numerator": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.splits["numerator"]
+      },
+      "splits.denominator": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.splits["denominator"]
+      },
+      "earnings.actual": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.earnings["actual"]
+      },
+      "earnings.estimate": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.earnings["estimate"]
+      },
+      "earnings.standardized": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.earnings["standardized"]
+      },
+      "adjustment.none": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.adjustment["none"]
+      },
+      "adjustment.splits": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.adjustment["splits"]
+      },
+      "adjustment.dividends": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: request.adjustment["dividends"]
       },
       "scale.right": {
           uses_context: false,

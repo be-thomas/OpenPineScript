@@ -97,3 +97,50 @@ export const request = {
     quandl: (ctx: Context, ticker: any, _gaps: any, index: any = 0): number =>
         resolve(ctx, "quandl", [ticker, index]),
 };
+
+// ── The field and adjustment constants ──────────────────────────────────────
+//
+// Each names WHICH number a `request.*` call should return, or which price
+// adjustment a ticker id should carry. They are plain string constants: this
+// engine hands them straight back to `resolve` above, which looks the field up
+// in whatever the host supplied.
+//
+// Their VALUES are the field keys the request functions already default to, so
+// `request.dividends(id)` and `request.dividends(id, dividends.gross)` reach the
+// same data — which is what TradingView documents, since `gross` IS the default.
+//
+// v5, like the rest of this file. The registry split in ./index.ts keeps them
+// out of the v1–v4 views.
+
+/** Which dividend figure `request.dividends` returns. */
+export const dividends = {
+    gross: "dividends_gross",
+    net: "dividends_net",
+};
+
+/** Which half of the split ratio `request.splits` returns. */
+export const splits = {
+    numerator: "splits_numerator",
+    denominator: "splits_denominator",
+};
+
+/** Which earnings figure `request.earnings` returns. */
+export const earnings = {
+    actual: "earnings_actual",
+    estimate: "earnings_estimate",
+    standardized: "earnings_standardized",
+};
+
+/**
+ * Which corporate actions a ticker id's prices are adjusted for.
+ *
+ * Passed to `ticker.new` / `ticker.modify`. This engine runs one price series —
+ * the bars it was handed — so the adjustment cannot change any number here; it
+ * is carried so that a script naming it compiles and runs, and so a host that
+ * does keep adjusted and unadjusted feeds can read it off the ticker id.
+ */
+export const adjustment = {
+    none: "adjustment_none",
+    splits: "adjustment_splits",
+    dividends: "adjustment_dividends",
+};

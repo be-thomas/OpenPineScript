@@ -10,6 +10,7 @@
  * boundaries, so getting them wrong changes the numbers, not just a label.
  */
 import { Context } from "../context";
+import { val } from "../../../utils/v2/common";
 
 /**
  * The chart's timeframe as a string: "1", "5", "60", "D", "W", "M".
@@ -244,7 +245,138 @@ function luminance(hex: string): number {
   return 0.2126 * channel(0) + 0.7152 * channel(1) + 0.0722 * channel(2);
 }
 
+/** One coordinate on the chart. */
+interface ChartPoint {
+  index: number;
+  time: number;
+  price: number;
+}
+
+// ── `chart.point` — v5's coordinate object ──────────────────────────────────
+//
+// A built-in TYPE rather than a function namespace: `chart.point` has three
+// fields and five constructors, and is what `polyline.new` takes an array of.
+//
+//   index  the bar index coordinate
+//   time   the timestamp coordinate
+//   price  the y coordinate
+//
+// A point carries BOTH x coordinates and the drawing chooses between them with
+// `xloc`, which is why every constructor fills in whichever it was not given:
+// `chart.point.from_index(i, p)` has no time, and a polyline drawn with
+// `xloc.bar_time` would then have nothing to place it by. TradingView leaves
+// the unsupplied field `na`; so does this.
+//
+// Represented as a plain object, exactly as a user-defined type is (see
+// `Context.newObject`), so `p.price` reads through the same field accessor.
+
+
+const point = {
+  /**
+   * `chart.point.new(index, time, price)` — every field given.
+   */
+  new: (index: any, time: any, price: any): ChartPoint => ({
+    index: Number(val(index)),
+    time: Number(val(time)),
+    price: Number(val(price)),
+  }),
+
+  /**
+   * `chart.point.now(price)` — the CURRENT bar's index and time.
+   *
+   * The only constructor that needs the Context, and the reason is the whole
+   * point of it: "now" is a fact about the run, not about the arguments.
+   */
+  now: (ctx: Context, price: any): ChartPoint => ({
+    index: ctx.currentBarIndex,
+    time: ctx.time,
+    price: Number(val(price)),
+  }),
+
+  /**
+   * `chart.point.from_index(index, price)` — time left `na`.
+   */
+  from_index: (index: any, price: any): ChartPoint => ({
+    index: Number(val(index)),
+    time: NaN,
+    price: Number(val(price)),
+  }),
+
+  /**
+   * `chart.point.from_time(time, price)` — index left `na`.
+   */
+  from_time: (time: any, price: any): ChartPoint => ({
+    index: NaN,
+    time: Number(val(time)),
+    price: Number(val(price)),
+  }),
+
+  /** `chart.point.copy(point)` — a new point with the same three fields. */
+  copy: (p: any): ChartPoint => {
+    const src = val(p) ?? {};
+    return { index: src.index, time: src.time, price: src.price };
+  },
+};
+
 export const chart = {
+  /**
+   * `chart.point` — v5's coordinate object.
+   *
+   * Written INLINE rather than as a `const` referenced by shorthand: the
+   * registry generator walks object literals with ts-morph and does not
+   * evaluate the file, so `point,` pointing at a declaration elsewhere produced
+   * no `chart.point.*` keys at all. Same rule, and the same reason, as the
+   * "written out literally" note at the top of ./drawings.ts.
+   */
+  point: {
+    /** `chart.point.new(index, time, price)` — every field given. */
+    new: (index: any, time: any, price: any): ChartPoint => ({
+      index: Number(val(index)),
+      time: Number(val(time)),
+      price: Number(val(price)),
+    }),
+
+    /**
+     * `chart.point.now(price)` — the CURRENT bar's index and time.
+     *
+     * The only constructor that needs the Context, and that is the whole point
+     * of it: "now" is a fact about the run, not about the arguments.
+     */
+    now: (ctx: Context, price: any): ChartPoint => ({
+      index: ctx.currentBarIndex,
+      time: ctx.time,
+      price: Number(val(price)),
+    }),
+
+    /** `chart.point.from_index(index, price)` — time left `na`. */
+    from_index: (index: any, price: any): ChartPoint => ({
+      index: Number(val(index)),
+      time: NaN,
+      price: Number(val(price)),
+    }),
+
+    /** `chart.point.from_time(time, price)` — index left `na`. */
+    from_time: (time: any, price: any): ChartPoint => ({
+      index: NaN,
+      time: Number(val(time)),
+      price: Number(val(price)),
+    }),
+
+    /** `chart.point.copy(point)` — a new point with the same three fields. */
+    copy: (p: any): ChartPoint => {
+      const src = val(p) ?? {};
+      return { index: src.index, time: src.time, price: src.price };
+    },
+  },
+
+  /**
+   * `chart.point` — v5's coordinate object. Declared below this literal and
+   * referenced here, because the registry generator reads the object it is
+   * nested INSIDE: `chart.point.new` is a key only if `point` is a property of
+   * `chart`.
+   */
+  point,
+
   /**
    * The chart's background colour.
    *

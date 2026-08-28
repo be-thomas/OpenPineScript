@@ -146,7 +146,7 @@ interface RuntimeSnapshot {
  */
 export interface Drawing {
     id: string;
-    kind: 'line' | 'label' | 'box' | 'table';
+    kind: 'line' | 'label' | 'box' | 'table' | 'polyline' | 'linefill';
     /** The bar the drawing was created on. */
     bar: number;
     props: Record<string, any>;
@@ -461,6 +461,10 @@ export class Context {
         line: 50,
         label: 50,
         box: 50,
+        // Pine's default is 50 drawings of each kind, raised by
+        // `max_polylines_count` and friends on the declaration statement.
+        polyline: 50,
+        linefill: 50,
     };
 
     /** Registers a drawing and returns its id, evicting the oldest past the cap. */
@@ -620,6 +624,18 @@ export class Context {
     }
 
     /** Looks a drawing up, or throws — a stale id is a bug, not a no-op. */
+    /**
+     * Every live drawing of one kind, oldest first — `polyline.all`,
+     * `linefill.all`, `label.all`.
+     *
+     * Reads the EVICTION QUEUE rather than filtering `drawings`, so the order
+     * is the one Pine documents (creation order) and deleted ids are already
+     * gone from it.
+     */
+    public drawingIds(kind: Drawing["kind"]): string[] {
+        return [...(this.drawingOrder.get(kind) ?? [])];
+    }
+
     public getDrawing(id: any, fn: string): Drawing {
         const key = String(id instanceof Series ? id.valueOf() : id);
         const drawing = this.drawings.get(key);
@@ -852,9 +868,27 @@ export class Context {
             }
 
             // 3. Handle Keyword Arguments
+            //
+            // A kwargs bundle is a plain object whose keys are ALL emitter-
+            // prefixed — `{ opsv2_title: "x" }` — which is what `visitKw_args`
+            // produces and what nothing else does.
+            //
+            // Shape alone is not enough, and the difference is not academic. A
+            // `chart.point` is `{index, time, price}` and a user-defined type
+            // instance is `{__type, …fields}`; both are plain objects, so
+            //
+            //     array.from(chart.point.from_index(0, 1), chart.point.from_index(1, 2))
+            //
+            // treated its SECOND point as keyword arguments and built a
+            // one-element array. No error — just a polyline with half its
+            // coordinates.
             const lastArg = args[args.length - 1];
-            const hasKwargs = lastArg && typeof lastArg === 'object' && !Array.isArray(lastArg) 
+            const looksLikeBundle = lastArg && typeof lastArg === 'object' && !Array.isArray(lastArg)
                             && !(lastArg instanceof Series) && lastArg.constructor === Object;
+            const bundleKeys = looksLikeBundle ? Object.keys(lastArg) : [];
+            const hasKwargs = looksLikeBundle
+                            && bundleKeys.length > 0
+                            && bundleKeys.every(k => k.startsWith(PREFIX));
 
             let finalArgs = args;
 
