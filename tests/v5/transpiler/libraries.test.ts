@@ -213,3 +213,79 @@ describe("call-site state is not shared with the library", () => {
     expect(value(ctx, "theirs")).toBe(20);
   });
 });
+
+describe("a library may export an ENUM", () => {
+  /**
+   * SOURCING. From the manual's libraries page, `library("Signal")` exports
+   *
+   *     export enum State
+   *         long    = "Long"
+   *         short   = "Short"
+   *         neutral = "Neutral"
+   *
+   * and the importing script reads `Signal.State.long`, declares
+   * `Signal.State mySignal`, and compares members with `==`.
+   *
+   * ── Why it needed its own path ─────────────────────────────────────────────
+   *
+   * An import's namespace object is built from the library's exported names,
+   * and each one was spelled either as a TYPE factory or as a function. An enum
+   * is neither, so it was emitted inside the library's IIFE and left there —
+   * the read failed with "'Signal' is not a namespace", which is true of the
+   * alias and beside the point.
+   */
+  const SIGNAL =
+    '//@version=5\nlibrary("Signal")\n' +
+    'export enum State\n    long = "Long"\n    short = "Short"\n    neutral = "Neutral"\n';
+
+  const HEAD = '//@version=5\nindicator("t")\n';
+
+  const importing = (body: string) =>
+    HEAD + "import userName/Signal/1 as Signal\n" + body;
+
+  const withLib = (body: string) =>
+    compileScript(importing(body), { libraries: { "userName/Signal/1": SIGNAL } });
+
+  it("a member reads through the alias", () => {
+    expect(() => withLib("x = Signal.State.long\n")).not.toThrow();
+  });
+
+  it("members compare as themselves", () => {
+    const { js, profile } = withLib(
+      "a = Signal.State.long\nb = Signal.State.long\nc = Signal.State.short\n" +
+      "same = a == b\ndiff = a == c\n",
+    );
+    const ctx = new Context(profile);
+    const exec = compile(js.replace(/\blet\b/g, "var "), ctx, Object.create(null));
+    ctx.setBar(0, 10, 12, 9, 11, 100);
+    exec();
+    expect(ctx.vars.get("opsv2_same")?.valueOf()).toBe(true);
+    expect(ctx.vars.get("opsv2_diff")?.valueOf()).toBe(false);
+  });
+
+  it("the enum works as a declared TYPE", () => {
+    expect(() => withLib("Signal.State s = Signal.State.neutral\n")).not.toThrow();
+  });
+
+  it("a member that does not exist is refused, and lists what does", () => {
+    expect(() => withLib("x = Signal.State.sideways\n"))
+      .toThrow(/'Signal\.State' has no member 'sideways'.*long, short, neutral/s);
+  });
+
+  it("str.tostring gives the declared title across the import", () => {
+    const { js, profile } = withLib("t = str.tostring(Signal.State.short)\n");
+    const ctx = new Context(profile);
+    const exec = compile(js.replace(/\blet\b/g, "var "), ctx, Object.create(null));
+    ctx.setBar(0, 10, 12, 9, 11, 100);
+    exec();
+    expect(ctx.vars.get("opsv2_t")?.valueOf()).toBe("Short");
+  });
+
+  it("an UNEXPORTED enum stays private", () => {
+    const priv = '//@version=5\nlibrary("P")\nenum Hidden\n    a\nexport f() =>\n    1\n';
+    expect(() => compileScript(
+      '//@version=5\nindicator("t")\n' + "import u/P/1 as P\nx = P.Hidden.a\n",
+      { libraries: { "u/P/1": priv } },
+    )).toThrow();
+  });
+});

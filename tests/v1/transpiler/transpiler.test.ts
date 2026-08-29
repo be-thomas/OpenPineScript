@@ -38,6 +38,8 @@ function runPine(pineSource: string): Record<string, unknown> {
   // Inject Context and safe math wrappers into the mock VM sandbox
   sandbox.ctx = ctx;
   sandbox.opsv2_safe_add = (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) + (Number.isNaN(Number(b)) ? 0 : Number(b));
+  sandbox.opsv2_safe_eq = (a: any, b: any) => (a?.valueOf?.() ?? a) == (b?.valueOf?.() ?? b);
+  sandbox.opsv2_safe_ne = (a: any, b: any) => (a?.valueOf?.() ?? a) != (b?.valueOf?.() ?? b);
   sandbox.opsv2_safe_sub = (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) - (Number.isNaN(Number(b)) ? 0 : Number(b));
 
   vm.createContext(sandbox);
@@ -77,6 +79,8 @@ function runInSandbox(pineSource: string, extra: Record<string, unknown>): Recor
 
     // Inject the math wrappers for the mock VM
     opsv2_safe_add: (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) + (Number.isNaN(Number(b)) ? 0 : Number(b)),
+    opsv2_safe_eq: (a: any, b: any) => (a?.valueOf?.() ?? a) == (b?.valueOf?.() ?? b),
+    opsv2_safe_ne: (a: any, b: any) => (a?.valueOf?.() ?? a) != (b?.valueOf?.() ?? b),
     opsv2_safe_sub: (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) - (Number.isNaN(Number(b)) ? 0 : Number(b)),
   };
   

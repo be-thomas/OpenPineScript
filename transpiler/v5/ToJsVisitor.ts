@@ -639,7 +639,31 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     }
 
     if (this.namespaceRoots.has(root)) return null;
-    if (this.importAliases.has(root)) return null;
+
+    if (this.importAliases.has(root)) {
+      // `Signal.State.long` — an enum the imported library exports. The member
+      // list came back with the library, so a typo is caught here rather than
+      // reading `undefined` off the namespace object.
+      const rest = text.slice(dot + 1);
+      const inner = rest.indexOf(".");
+      if (inner > 0) {
+        const enumName = rest.slice(0, inner);
+        const fields = this.libraryEnums.get(`${root}.${enumName}`);
+        if (fields) {
+          const field = rest.slice(inner + 1);
+          if (!fields.includes(field)) {
+            throw new Error(
+              `'${root}.${enumName}' has no member '${field}'. It declares: ` +
+              `${fields.join(", ")}.`,
+            );
+          }
+          return `${this.libraryNamespace(root)}[${JSON.stringify(enumName)}]` +
+                 `[${JSON.stringify(field)}]`;
+        }
+      }
+      return null;
+    }
+
     if (!this.isReceiverName(root)) return null;
 
     let js = this.localName(root);
@@ -1554,12 +1578,13 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       );
     }
 
-    const { js, exports, types, methods, members } =
+    const { js, exports, types, methods, members, enums } =
       this.compileLibrary(path, alias, source, ctx);
     this.importAliases.set(alias, path);
     this.libraryExports.set(path, exports);
     for (const [name, fields] of types) this.libraryTypeFields.set(`${path}::${name}`, fields);
     for (const name of methods) this.libraryMethods.set(name, alias);
+    for (const [name, fields] of enums) this.libraryEnums.set(`${alias}.${name}`, fields);
 
     return [
       `const ${this.libraryNamespace(alias)} = (() => {`,
@@ -1568,6 +1593,14 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       `})();`,
     ].join("\n");
   }
+
+  /**
+   * `alias.EnumName` → its field names, for every enum an import exports.
+   *
+   * Keyed by the ALIAS rather than the path, because that is what a read
+   * spells: two aliases of one library are two namespaces to the script.
+   */
+  protected libraryEnums: Map<string, string[]> = new Map();
 
   /** The emitted name of an imported library's namespace object. */
   protected libraryNamespace(alias: string): string {
@@ -1597,6 +1630,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     types: Map<string, string[]>;
     methods: Set<string>;
     members: string[];
+    enums: Map<string, string[]>;
   } {
     if (this.locationTag.split("@").length > MAX_LIBRARY_DEPTH) {
       throw this.err(ctx, `libraries are nested more than ${MAX_LIBRARY_DEPTH} deep.`);
@@ -1637,6 +1671,16 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       [...inner.userMethods].filter(name => inner.exportedNames.has(name)),
     );
 
+    // An ENUM may be exported too, and a consumer reads it as
+    // `alias.EnumName.member`. TradingView's own libraries page is built on it:
+    // `library("Signal")` exports `enum State`, and the importing script writes
+    // `Signal.State.long`. Without this the enum was emitted inside the IIFE
+    // and left there, and the read failed as "'Signal' is not a namespace".
+    const enums = new Map<string, string[]>();
+    for (const [name, fields] of inner.userEnums) {
+      if (inner.exportedNames.has(name)) enums.set(name, fields.map(f => f.name));
+    }
+
     // Built from the INNER visitor's spelling of each name, not this one's.
     // A type and a function are emitted under different names (`$type_Pair`
     // versus `$fn_scaled`), and both carry the library's own name scope — which
@@ -1644,11 +1688,13 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     const members = [...inner.exportedNames].map(name => {
       const emitted = types.has(name)
         ? inner.typeFactory(name)
-        : inner.funcName(name);
+        : enums.has(name)
+          ? inner.enumFactory(name)
+          : inner.funcName(name);
       return `${JSON.stringify(name)}: ${emitted}`;
     });
 
-    return { js, exports: inner.exportedNames, types, methods, members };
+    return { js, exports: inner.exportedNames, types, methods, members, enums };
   }
 
   /**

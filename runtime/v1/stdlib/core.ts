@@ -79,6 +79,45 @@ export function safe_sub(a: any, b: any): number {
     return asNumber(a) - asNumber(b);
 }
 
+/**
+ * `a == b` and `a != b`, with both sides UNWRAPPED first.
+ *
+ * ── The bug this fixes ──────────────────────────────────────────────────────
+ *
+ * Every script variable is a Series OBJECT, and JavaScript compares two objects
+ * with `==` by REFERENCE. So
+ *
+ *     x = 1.0
+ *     y = 1.0
+ *     equal = x == y      // false
+ *
+ * Two variables holding the same number were never equal, at any version. It
+ * survived because the common shapes hide it: `x == 0` compares an object to a
+ * primitive, which coerces through `valueOf`, and `<`, `>`, `<=`, `>=` coerce
+ * unconditionally. Only `==` and `!=` between two variables reach the reference
+ * comparison, and then they are silently, permanently false.
+ *
+ * ── Why `==` and not `===` after unwrapping ─────────────────────────────────
+ *
+ * Because objects must still compare by reference once unwrapped. An ENUM
+ * member is a plain object with no `valueOf` of its own — deliberately, so that
+ * two enums with identically named and titled fields are not equal, which is
+ * the rule the manual states: "Scripts cannot compare members of different
+ * enums ... even if the fields have identical names and titles." Unwrapping
+ * leaves those objects alone, and `==` then does exactly the right thing for
+ * both cases.
+ *
+ * `na` needs no special handling: it is NaN, and NaN equals nothing including
+ * itself, which is what Pine reports for a comparison involving `na`.
+ */
+export function safe_eq(a: any, b: any): boolean {
+    return val(a) == val(b);
+}
+
+export function safe_ne(a: any, b: any): boolean {
+    return val(a) != val(b);
+}
+
 // --- Type Conversion (v2 Only) ---
 
 // tostring(x): The ONLY casting function in v2

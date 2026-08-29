@@ -922,6 +922,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: core.safe_sub
       },
+      "safe_eq": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_eq
+      },
+      "safe_ne": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_ne
+      },
       "tostring": {
           uses_context: false,
           args: ["x"],

@@ -144,8 +144,11 @@ describe("v2 guards are overridable for a future v3 visitor", () => {
     });
 
     it("overriding enforceNaComparison lets 'x == na' through", () => {
+        // `==` is emitted as a CALL rather than an operator — see `safe_eq` in
+        // runtime/v1/stdlib/core.ts. What this case is about is the guard being
+        // overridable, not the shape of the comparison.
         const js = transpileV3("y = close == na ? 1 : 0\n");
-        assert.match(js, /opsv2_close == opsv2_na/);
+        assert.match(js, /opsv2_safe_eq\(opsv2_close, opsv2_na\)/);
     });
 
     it("overriding enforceNoRecursion lets a function recurse", () => {

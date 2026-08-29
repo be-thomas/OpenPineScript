@@ -1208,13 +1208,31 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return (ctx.getChild(index * 2 - 1) as any)?.getText() ?? "";
   }
 
+  /**
+   * `a == b` / `a != b`.
+   *
+   * Routed through a helper rather than emitted as a bare operator, because
+   * every variable is a Series OBJECT and JavaScript compares two objects by
+   * REFERENCE:
+   *
+   *     x = 1.0
+   *     y = 1.0
+   *     equal = x == y      // false, at every version
+   *
+   * `<`, `>`, `<=` and `>=` coerce through `valueOf` unconditionally, and a
+   * comparison against a literal has only one object in it, so this was the one
+   * shape that reached the reference test — and it was silently, permanently
+   * false. See `safe_eq` for why the helper compares loosely after unwrapping
+   * rather than strictly.
+   */
   visitEq_expr(ctx: Eq_exprContext): string {
     this.enforceNaComparison(ctx);
     const parts = ctx.cmp_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      out = `(${out} ${this.operatorBefore(ctx as any, i)} ${parts[i]})`;
+      const helper = this.operatorBefore(ctx as any, i) === "==" ? "safe_eq" : "safe_ne";
+      out = `opsv2_${helper}(${out}, ${parts[i]})`;
     }
     return out;
   }

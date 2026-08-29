@@ -67,7 +67,11 @@ describe("mixed comparison chains", () => {
   });
 
   it("a != b == c keeps each operator", () => {
-    expect(transpile(DECLS + "x = a != b == c\n")).toContain("(opsv2_a != opsv2_b) == opsv2_c");
+    // `==` and `!=` are emitted as CALLS rather than as operators — see
+    // `safe_eq` in runtime/v1/stdlib/core.ts. The nesting is what this case is
+    // about, and it is still left-associative: the `!=` is the inner one.
+    expect(transpile(DECLS + "x = a != b == c\n"))
+      .toContain("opsv2_safe_eq(opsv2_safe_ne(opsv2_a, opsv2_b), opsv2_c)");
   });
 });
 
