@@ -85,6 +85,120 @@ export function ticker(ctx: Context): string {
   return colon === -1 ? s : s.slice(colon + 1);
 }
 
+// ─── `timeframe.*` — the members with no v1–v4 flat spelling ───────────────
+//
+// The five that DO have one — period, isintraday, isdaily, isweekly, ismonthly
+// — are the flat functions above, which the v4 rename table moves into this
+// namespace. The four below never had another name, so they are written here
+// as an object literal and gated by V5_ONLY_NAMES.
+//
+// Every one of them needs the same thing first: a timeframe STRING understood
+// as a duration. Pine's format, from the timeframe specification:
+//
+//     "5S"   seconds     "5"    minutes     "5D"  days
+//     "5W"   weeks       "5M"   months      ""    the chart's own
+//
+// A bare number is minutes, which is the one rule that cannot be guessed from
+// the string alone.
+
+/** The typical number of seconds in one bar of `spec`, or NaN. */
+function specSeconds(spec: string): number {
+  const s = String(spec).trim().toUpperCase();
+  if (s === "") return NaN;
+
+  const match = /^(\d*)([SDWM]?)$/.exec(s);
+  if (!match) return NaN;
+  const count = match[1] === "" ? 1 : Number(match[1]);
+  if (!Number.isFinite(count) || count <= 0) return NaN;
+
+  // "The typical number of seconds": a month is 30 days and a year is not a
+  // unit here, so these are nominal lengths rather than calendar arithmetic.
+  const UNIT: Record<string, number> = {
+    S: 1, "": 60, D: 86400, W: 604800, M: 2592000,
+  };
+  return count * UNIT[match[2]];
+}
+
+export const timeframe = {
+  /**
+   * `timeframe.in_seconds(timeframe)` — May 2024.
+   *
+   * "The typical number of seconds in the chart's timeframe."
+   *
+   * The argument defaults to the chart's own timeframe, which is how nearly
+   * every published use spells it: `timeframe.in_seconds()` compared against
+   * `timeframe.in_seconds(higherTimeframe)` is the standard guard against
+   * requesting data finer than the chart.
+   *
+   * @getter
+   * @returns {simple int} Seconds per bar.
+   */
+  in_seconds: (ctx: Context, timeframe?: any): number => {
+    const spec = timeframe === undefined || timeframe === null ? "" : String(val(timeframe));
+    return specSeconds(spec === "" ? String(ctx.resolution) : spec);
+  },
+
+  /**
+   * `timeframe.from_seconds(seconds)` — September 2023.
+   *
+   * "Converts a specified number of `seconds` into a valid timeframe string
+   *  based on our timeframe specification format."
+   *
+   * The inverse of `in_seconds`, and not a total one: 90 seconds is not a whole
+   * number of minutes, so the largest unit that divides evenly is chosen and
+   * the remainder stays in the smaller one. Under a minute the answer is
+   * seconds; a value that is not a positive number has no timeframe and gives
+   * `na` rather than a plausible "1".
+   */
+  from_seconds: (seconds: any): string => {
+    const total = Math.trunc(Number(val(seconds)));
+    if (!Number.isFinite(total) || total <= 0) return String(NaN);
+
+    // Largest unit that divides evenly, biggest first — so 604800 is "1W" and
+    // not "10080", which is the same duration spelled less usefully.
+    const UNITS: Array<[number, string]> = [
+      [2592000, "M"], [604800, "W"], [86400, "D"], [60, ""],
+    ];
+    for (const [size, suffix] of UNITS) {
+      if (total % size === 0) return `${total / size}${suffix}`;
+    }
+    return `${total}S`;
+  },
+
+  /**
+   * `timeframe.change(timeframe)` — June 2022.
+   *
+   * "Returns `true` on the first bar of a new `timeframe`, `false` otherwise."
+   *
+   * Answered by comparing which PERIOD the current bar's timestamp falls into
+   * against the previous bar's, so it fires exactly once per period however
+   * many chart bars that period contains — and is false on the very first bar
+   * of the script, which begins no period the script has seen end.
+   */
+  change: (ctx: Context, timeframe: any): boolean => {
+    const seconds = specSeconds(String(val(timeframe) ?? ""));
+    const state = ctx.getPersistentState<{ period: number | null }>(() => ({ period: null }));
+
+    if (!Number.isFinite(seconds) || seconds <= 0) return false;
+    const period = Math.floor(ctx.time / (seconds * 1000));
+
+    const changed = state.period !== null && period !== state.period;
+    state.period = period;
+    return changed;
+  },
+
+  /**
+   * `timeframe.isseconds` — is the chart's timeframe measured in seconds?
+   *
+   * The sixth member of the `is*` family, and the only one with no v1–v3 flat
+   * spelling, because seconds-based timeframes postdate them.
+   *
+   * @getter
+   * @returns {bool}
+   */
+  isseconds: (ctx: Context): boolean => /^\d*S$/.test(String(ctx.resolution).trim().toUpperCase()),
+};
+
 // ─── Day-of-week constants (v1-v3) ─────────────────────────────────────────
 //
 // Pine numbers days from 1 = Sunday, matching dayofweek(). v4 moved these to

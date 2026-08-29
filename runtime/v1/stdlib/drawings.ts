@@ -64,6 +64,22 @@ function getProp(ctx: Context, id: any, fn: string, prop: string): any {
 
 // ── line ────────────────────────────────────────────────────────────────────
 
+/**
+ * Moves one endpoint of a drawing to a `chart.point`.
+ *
+ * The point carries `index`, `time` and `price`; which x it contributes is the
+ * DRAWING's `xloc`, because that is what the drawing will be placed by. A point
+ * built with `from_index` has no time and one built with `from_time` has no
+ * index, so reading the wrong one silently moves the drawing to `na`.
+ */
+function setEndpoint(ctx: Context, id: any, fn: string, point: any,
+                     xKey: string, yKey: string): void {
+    const p = ctx.getDrawing(id, fn).props;
+    const at = v(point) ?? {};
+    p[xKey] = n(p.xloc === "bar_time" ? at.time : at.index);
+    p[yKey] = n(at.price);
+}
+
 export const line = {
     new: (
         ctx: Context, x1: any, y1: any, x2: any, y2: any,
@@ -100,6 +116,20 @@ export const line = {
     },
 
     /**
+     * `line.set_first_point(id, point)` / `set_second_point` — the `chart.point`
+     * spellings of `set_xy1` / `set_xy2`, October 2023.
+     *
+     * A point carries BOTH x coordinates, and which one applies is the line's
+     * own `xloc` — so the drawing decides, not the point. That is the whole
+     * reason these exist beside the xy pair: a script that works in
+     * `chart.point`s should not have to unpack one to move a line.
+     */
+    set_first_point: (ctx: Context, id: any, point: any) =>
+        setEndpoint(ctx, id, "line.set_first_point", point, "x1", "y1"),
+    set_second_point: (ctx: Context, id: any, point: any) =>
+        setEndpoint(ctx, id, "line.set_second_point", point, "x2", "y2"),
+
+    /**
      * The price the line takes at bar `x`, by linear interpolation through its
      * two endpoints — extrapolated beyond them, which is what makes the
      * trendline-projection idiom work.
@@ -115,6 +145,20 @@ export const line = {
     delete: (ctx: Context, id: any) => {
         ctx.deleteDrawing(v(id));
     },
+
+    /**
+     * `line.all` — every live line, oldest first.
+     *
+     * A Pine ARRAY, so `array.size(line.all)` and `line.all.size()` both work, and
+     * so does iterating it to delete the oldest. `polyline.all` and
+     * `linefill.all` are the same thing; these three were simply missing, and a
+     * missing member of a real namespace read as `undefined` — which made
+     * `array.size(label.all)` a call on nothing.
+     *
+     * @getter
+     */
+    all: (ctx: Context): string[] => ctx.drawingIds("line"),
+
     copy: (ctx: Context, id: any) =>
         ctx.newDrawing("line", { ...ctx.getDrawing(id, "line.copy").props }),
 
@@ -159,6 +203,10 @@ export const label = {
     get_y: (ctx: Context, id: any) => getProp(ctx, id, "label.get_y", "y"),
     get_text: (ctx: Context, id: any) => getProp(ctx, id, "label.get_text", "text"),
 
+    /** `label.set_point(id, point)` — `set_xy` from a `chart.point`. */
+    set_point: (ctx: Context, id: any, point: any) =>
+        setEndpoint(ctx, id, "label.set_point", point, "x", "y"),
+
     set_xy: (ctx: Context, id: any, x: any, y: any) => {
         const p = ctx.getDrawing(id, "label.set_xy").props;
         p.x = n(x); p.y = n(y);
@@ -167,6 +215,20 @@ export const label = {
     delete: (ctx: Context, id: any) => {
         ctx.deleteDrawing(v(id));
     },
+
+    /**
+     * `label.all` — every live label, oldest first.
+     *
+     * A Pine ARRAY, so `array.size(label.all)` and `label.all.size()` both work, and
+     * so does iterating it to delete the oldest. `polyline.all` and
+     * `linefill.all` are the same thing; these three were simply missing, and a
+     * missing member of a real namespace read as `undefined` — which made
+     * `array.size(label.all)` a call on nothing.
+     *
+     * @getter
+     */
+    all: (ctx: Context): string[] => ctx.drawingIds("label"),
+
     copy: (ctx: Context, id: any) =>
         ctx.newDrawing("label", { ...ctx.getDrawing(id, "label.copy").props }),
 
@@ -224,6 +286,12 @@ export const box = {
         const p = ctx.getDrawing(id, "box.set_lefttop").props;
         p.left = n(left); p.top = n(top);
     },
+    /** The `chart.point` spellings of the two corner setters. */
+    set_top_left_point: (ctx: Context, id: any, point: any) =>
+        setEndpoint(ctx, id, "box.set_top_left_point", point, "left", "top"),
+    set_bottom_right_point: (ctx: Context, id: any, point: any) =>
+        setEndpoint(ctx, id, "box.set_bottom_right_point", point, "right", "bottom"),
+
     set_rightbottom: (ctx: Context, id: any, right: any, bottom: any) => {
         const p = ctx.getDrawing(id, "box.set_rightbottom").props;
         p.right = n(right); p.bottom = n(bottom);
@@ -232,6 +300,20 @@ export const box = {
     delete: (ctx: Context, id: any) => {
         ctx.deleteDrawing(v(id));
     },
+
+    /**
+     * `box.all` — every live box, oldest first.
+     *
+     * A Pine ARRAY, so `array.size(box.all)` and `box.all.size()` both work, and
+     * so does iterating it to delete the oldest. `polyline.all` and
+     * `linefill.all` are the same thing; these three were simply missing, and a
+     * missing member of a real namespace read as `undefined` — which made
+     * `array.size(label.all)` a call on nothing.
+     *
+     * @getter
+     */
+    all: (ctx: Context): string[] => ctx.drawingIds("box"),
+
     copy: (ctx: Context, id: any) =>
         ctx.newDrawing("box", { ...ctx.getDrawing(id, "box.copy").props }),
 
@@ -241,6 +323,16 @@ export const box = {
 };
 
 // ── table ───────────────────────────────────────────────────────────────────
+
+/** Writes one property of one cell, creating the cell if it is not there yet. */
+function setCell(ctx: Context, table_id: any, fn: string,
+                 column: any, row: any, key: string, value: any): void {
+    const p = ctx.getDrawing(table_id, `table.${fn}`).props;
+    const at = `${n(column)},${n(row)}`;
+    const cell = p.cells.get(at) ?? {};
+    cell[key] = value;
+    p.cells.set(at, cell);
+}
 
 export const table = {
     new: (
@@ -270,13 +362,55 @@ export const table = {
         });
     },
 
-    set_cell_text: (ctx: Context, table_id: any, column: any, row: any, text: any) => {
-        const p = ctx.getDrawing(table_id, "table.set_cell_text").props;
-        const key = `${n(column)},${n(row)}`;
-        const cell = p.cells.get(key) ?? {};
-        cell.text = String(v(text) ?? "");
-        p.cells.set(key, cell);
-    },
+    /**
+     * `table.cell_set_*` — change ONE property of an existing cell.
+     *
+     * The prefix is `cell_set_`, not `set_cell_`. The distinction is the
+     * table's own naming rule: `table.set_*` changes the TABLE (`set_position`,
+     * `set_bgcolor`) and `table.cell_set_*` changes a CELL. Eight of
+     * TradingView's own examples call `table.cell_set_text`, and the misspelled
+     * `set_cell_text` this engine had was reachable by nothing.
+     *
+     * A cell that has not been written yet is created empty rather than
+     * ignored, which is what lets a script lay out a table with `table.cell`
+     * and then update one field of it per bar.
+     */
+    cell_set_text: (ctx: Context, table_id: any, column: any, row: any, text: any) =>
+        setCell(ctx, table_id, "cell_set_text", column, row, "text", String(v(text) ?? "")),
+
+    cell_set_bgcolor: (ctx: Context, table_id: any, column: any, row: any, bgcolor: any) =>
+        setCell(ctx, table_id, "cell_set_bgcolor", column, row, "bgcolor", v(bgcolor)),
+
+    cell_set_text_color: (ctx: Context, table_id: any, column: any, row: any, text_color: any) =>
+        setCell(ctx, table_id, "cell_set_text_color", column, row, "text_color", v(text_color)),
+
+    cell_set_text_size: (ctx: Context, table_id: any, column: any, row: any, text_size: any) =>
+        setCell(ctx, table_id, "cell_set_text_size", column, row, "text_size", v(text_size)),
+
+    cell_set_text_halign: (ctx: Context, table_id: any, column: any, row: any, text_halign: any) =>
+        setCell(ctx, table_id, "cell_set_text_halign", column, row, "text_halign", v(text_halign)),
+
+    cell_set_text_valign: (ctx: Context, table_id: any, column: any, row: any, text_valign: any) =>
+        setCell(ctx, table_id, "cell_set_text_valign", column, row, "text_valign", v(text_valign)),
+
+    cell_set_width: (ctx: Context, table_id: any, column: any, row: any, width: any) =>
+        setCell(ctx, table_id, "cell_set_width", column, row, "width", n(width)),
+
+    cell_set_height: (ctx: Context, table_id: any, column: any, row: any, height: any) =>
+        setCell(ctx, table_id, "cell_set_height", column, row, "height", n(height)),
+
+    /**
+     * `table.merge_cells(table_id, start_column, start_row, end_column, end_row)`.
+     *
+     * Recorded rather than rendered: nothing here draws a table, so a merge is
+     * a fact about the cell range that a host renderer would honour. The
+     * top-left cell of the range carries it, which is where its text lives.
+     */
+    merge_cells: (ctx: Context, table_id: any, start_column: any, start_row: any,
+                  end_column: any, end_row: any) =>
+        setCell(ctx, table_id, "merge_cells", start_column, start_row, "merged", {
+            endColumn: n(end_column), endRow: n(end_row),
+        }),
 
     set_position: (ctx: Context, id: any, position: any) => {
         ctx.getDrawing(id, "table.set_position").props.position = v(position);

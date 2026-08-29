@@ -123,6 +123,110 @@ function format(template: any, args: any[]): string {
 
 const text = (x: any): string => String(val(x) ?? "");
 
+// ─── Date-time patterns ─────────────────────────────────────────────────────
+//
+// `str.format_time` takes a Java `SimpleDateFormat` pattern. The subset below
+// is the one TradingView's own examples use, and it is deliberately a SUBSET:
+// an unrecognised letter run is copied through verbatim rather than dropped, so
+// a pattern this engine does not understand shows up in the output instead of
+// vanishing from it.
+
+/** Day and month names, in the abbreviated and full forms `E`/`MMM` select. */
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+                     "July", "August", "September", "October", "November", "December"];
+
+const pad = (n: number, width: number): string => String(Math.abs(n)).padStart(width, "0");
+
+/**
+ * The calendar fields of `ms` as seen from `timezone`.
+ *
+ * Read back out of `Intl.DateTimeFormat` rather than computed, because a named
+ * zone means a rule set — daylight saving, historical offsets — that no fixed
+ * offset can stand in for. An unknown zone falls back to UTC rather than
+ * throwing: a bad timezone string should not take the whole script down.
+ */
+function zonedParts(ms: number, timezone?: string): {
+  year: number; month: number; day: number;
+  hour: number; minute: number; second: number; weekday: number; offset: number;
+} {
+  const zone = timezone && timezone.toUpperCase() !== "UTC" ? timezone : "UTC";
+  let local: Date;
+  try {
+    // The trick: format the instant in `zone` with an ISO-ish layout, then read
+    // it back as if it were UTC. The difference from the original instant IS
+    // the zone's offset at that moment.
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone, hour12: false,
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+    }).formatToParts(new Date(ms));
+    const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? 0);
+    // `hour12: false` renders midnight as 24 in some ICU versions.
+    const hour = get("hour") % 24;
+    local = new Date(Date.UTC(get("year"), get("month") - 1, get("day"), hour, get("minute"), get("second")));
+  } catch {
+    local = new Date(ms);
+  }
+  return {
+    year: local.getUTCFullYear(), month: local.getUTCMonth() + 1, day: local.getUTCDate(),
+    hour: local.getUTCHours(), minute: local.getUTCMinutes(), second: local.getUTCSeconds(),
+    weekday: local.getUTCDay(),
+    offset: Math.round((local.getTime() - ms) / 60000),
+  };
+}
+
+/** One run of the same pattern letter, rendered. */
+function patternField(letter: string, count: number, p: ReturnType<typeof zonedParts>): string | null {
+  switch (letter) {
+    case "y": return count === 2 ? pad(p.year % 100, 2) : pad(p.year, count);
+    case "M": return count >= 4 ? MONTH_NAMES[p.month - 1]
+                 : count === 3 ? MONTH_NAMES[p.month - 1].slice(0, 3)
+                 : pad(p.month, count);
+    case "d": return pad(p.day, count);
+    case "H": return pad(p.hour, count);
+    case "h": return pad(p.hour % 12 === 0 ? 12 : p.hour % 12, count);
+    case "m": return pad(p.minute, count);
+    case "s": return pad(p.second, count);
+    case "S": return pad(0, count);                       // sub-second: bars have none
+    case "E": return count >= 4 ? DAY_NAMES[p.weekday] : DAY_NAMES[p.weekday].slice(0, 3);
+    case "a": return p.hour < 12 ? "AM" : "PM";
+    case "Z": {
+      const sign = p.offset < 0 ? "-" : "+";
+      return `${sign}${pad(Math.trunc(Math.abs(p.offset) / 60), 2)}${pad(Math.abs(p.offset) % 60, 2)}`;
+    }
+    default: return null;                                  // copied through verbatim
+  }
+}
+
+function formatTime(ms: number, format: string, timezone?: string): string {
+  if (!Number.isFinite(ms)) return "NaN";
+  const p = zonedParts(ms, timezone);
+
+  let out = "";
+  for (let i = 0; i < format.length; ) {
+    const ch = format[i];
+
+    // A quoted run is literal — `'T'` is the letter T, not a year field — and
+    // `''` inside one is a single apostrophe.
+    if (ch === "'") {
+      if (format[i + 1] === "'") { out += "'"; i += 2; continue; }
+      const end = format.indexOf("'", i + 1);
+      if (end === -1) { out += format.slice(i + 1); break; }
+      out += format.slice(i + 1, end);
+      i = end + 1;
+      continue;
+    }
+
+    let count = 1;
+    while (format[i + count] === ch) count++;
+    const rendered = /[A-Za-z]/.test(ch) ? patternField(ch, count, p) : null;
+    out += rendered ?? format.slice(i, i + count);
+    i += count;
+  }
+  return out;
+}
+
 export const str = {
     // --- Conversion --------------------------------------------------------
 
@@ -220,6 +324,52 @@ export const str = {
 
     replace_all: (source: any, target: any, replacement: any): string =>
         text(source).split(text(target)).join(text(replacement)),
+
+    /**
+     * `str.replace(source, target, replacement, occurrence)` — ONE occurrence.
+     *
+     * The sibling of `replace_all`, and the difference is the fourth argument:
+     * `occurrence` is a zero-based index selecting WHICH match to replace, and
+     * defaults to 0 — the first. An index past the last match leaves the string
+     * alone, which is the same answer as "there was nothing to replace".
+     */
+    replace: (source: any, target: any, replacement: any, occurrence: any = 0): string => {
+        const s = text(source);
+        const find = text(target);
+        const nth = Math.trunc(Number(val(occurrence)) || 0);
+        if (find === "" || nth < 0) return s;
+
+        let at = -1;
+        for (let seen = 0; seen <= nth; seen++) {
+            at = s.indexOf(find, at + (seen === 0 ? 0 : 1));
+            if (at === -1) return s;
+        }
+        return s.slice(0, at) + text(replacement) + s.slice(at + find.length);
+    },
+
+    /** `str.trim(string)` — leading and trailing whitespace removed. */
+    trim: (string: any): string => text(string).trim(),
+
+    /**
+     * `str.format_time(time, format, timezone)` — October 2022.
+     *
+     * "Converts a timestamp to a formatted string using the specified format
+     *  and time zone."
+     *
+     * The format is a Java `SimpleDateFormat` pattern, which is what
+     * TradingView's own examples pass — "yyyy-MM-dd", "HH:mm:ss",
+     * "yyyy-MM-dd'T'HH:mm:ss". The subset implemented is the one those patterns
+     * use, and an unrecognised letter run is left as written rather than
+     * silently dropped: a pattern this engine does not understand should be
+     * visible in the output, not invisible.
+     *
+     * Quoted runs are literal — `'T'` is the letter T and not a year field —
+     * because a date-time pattern without that rule cannot express ISO 8601,
+     * which is the commonest thing anyone formats.
+     */
+    format_time: (ctx: Context, time: any, format: any = "yyyy-MM-dd'T'HH:mm:ssZ",
+                  timezone?: any): string =>
+        formatTime(Number(val(time)), text(format), timezone == null ? undefined : text(timezone)),
 
     upper: (source: any): string => text(source).toUpperCase(),
     lower: (source: any): string => text(source).toLowerCase(),

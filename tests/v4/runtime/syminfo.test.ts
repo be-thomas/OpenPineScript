@@ -127,14 +127,48 @@ describe("version gating", () => {
     expect(read("x = syminfo.type", AAPL, 5)).toBe("stock");
   });
 
+  /**
+   * The NAMESPACE is not a v4 addition, which is the opposite of what this
+   * suite used to assert.
+   *
+   * The v3-to-v4 migration guide renames exactly two things into it — "The
+   * `ticker` and `tickerid` variables are renamed to `syminfo.ticker` and
+   * `syminfo.tickerid` respectively" — and renames nothing to `syminfo.mintick`,
+   * `syminfo.prefix`, `syminfo.pointvalue`, `syminfo.currency` or
+   * `syminfo.timezone`. A member v4 did not rename already had its dotted
+   * spelling, and TradingView's v3-archive documentation confirms it: two
+   * `//@version=2` examples, on the strategies and how-tos pages, read
+   * `syminfo.mintick` and `syminfo.prefix` directly.
+   *
+   * How far back beyond v2 that goes cannot be checked — there is no archived
+   * v1 documentation — so the namespace is treated as always having been there.
+   */
   for (const version of [1, 2, 3]) {
-    it(`v${version} has no syminfo namespace`, () => {
+    it(`v${version} HAS the namespace, minus the two members v4 renamed`, () => {
       expect(() => transpile(`//@version=${version}\nstudy("t")\nx = syminfo.mintick\n`))
-        .toThrow(/'syminfo' is not a namespace in Pine Script v/);
+        .not.toThrow();
+      expect(() => transpile(`//@version=${version}\nstudy("t")\nx = syminfo.prefix\n`))
+        .not.toThrow();
+    });
+
+    it(`v${version} refuses syminfo.ticker and syminfo.tickerid — those ARE v4`, () => {
+      for (const name of ["syminfo.ticker", "syminfo.tickerid"]) {
+        expect(() => transpile(`//@version=${version}\nstudy("t")\nx = ${name}\n`), name)
+          .toThrow(/is not available in Pine Script v\d\. It was added in a later version/);
+      }
     });
   }
 
-  it("the v1–v3 flat spellings still work there", () => {
+  it("the v1–v3 flat spellings of those two still work there", () => {
     expect(() => transpile('//@version=3\nstudy("t")\nx = ticker\n')).not.toThrow();
+    expect(() => transpile('//@version=3\nstudy("t")\nx = tickerid\n')).not.toThrow();
+  });
+
+  it("a member of it that does not exist is still an error", () => {
+    // The namespace being older does not make it open-ended: an unknown member
+    // must not read as `undefined`, which is the defect this whole family of
+    // checks exists for.
+    expect(() => transpile('//@version=2\nstudy("t")\nx = syminfo.nonesuch\n'))
+      .toThrow(/'syminfo' has no member 'nonesuch'/);
   });
 });

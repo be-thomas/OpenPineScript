@@ -425,38 +425,30 @@ describe("v2 corpus executes end to end (validation/v2/)", () => {
   });
 
   /**
-   * Annotated //@version=2, but written against a LATER version's built-ins.
+   * A file that WAS asserted to fail, and no longer does.
    *
-   * gap_down_reversal_strategy.pine reads `syminfo.timezone` and calls the
-   * six-argument `timestamp(timezone, y, m, d, h, m)`. Both arrived in Pine v4:
-   * v4 is the release that moved chart information into the `syminfo.*`
-   * namespace and added the timezone parameter to the time functions. Under
-   * //@version=2 TradingView reports `Undeclared identifier 'syminfo'`.
+   * gap_down_reversal_strategy.pine reads `syminfo.timezone`, and this suite
+   * used to reject it on the grounds that `syminfo.*` arrived in v4. That was
+   * wrong. The v3-to-v4 migration guide renames exactly two things into the
+   * namespace — "The `ticker` and `tickerid` variables are renamed to
+   * `syminfo.ticker` and `syminfo.tickerid` respectively" — and renames nothing
+   * to `syminfo.timezone`, `syminfo.mintick` or `syminfo.prefix`. A member v4
+   * did not rename already had its dotted spelling, and TradingView's v3-archive
+   * documentation shows two `//@version=2` examples using `syminfo.mintick` and
+   * `syminfo.prefix` directly.
    *
-   * So this is NOT a gap — running it is not something a correct engine does.
-   * It is asserted to fail, and to fail on that identifier, which is a stronger
-   * statement than the "known gap" line it replaces. Kept in the corpus because
-   * it still exercises ':=', if/else as an expression and strategy.exit through
-   * the transpiler.
+   * The other half of the old reasoning — that `timestamp(timezone, y, m, d, h,
+   * m)` is v4 — is not gated, because no release note dates it and inventing a
+   * version boundary is worse than admitting a call that may be a version early.
    *
-   * (The engine reports it at RUNTIME rather than at compile time, because
-   * there is no undeclared-identifier pass yet. Same verdict, later.)
+   * So the file is now an ordinary member of the runnable set, and this note is
+   * what remains of the claim. It is kept because a mistake about which version
+   * owns a name is exactly the kind of thing that gets re-derived wrongly.
    */
-  const WRONG_VERSION_BUILTINS: Record<string, RegExp> = {
-    "gap_down_reversal_strategy.pine": /syminfo/,
-  };
 
   for (const file of runnable) {
     const rel = `validation/v2/${file}`;
     const gap = KNOWN_RUNTIME_GAPS[rel];
-    const laterVersionBuiltin = WRONG_VERSION_BUILTINS[file];
-
-    if (laterVersionBuiltin) {
-      it(`${file} is rejected — it uses a v4 built-in under //@version=2`, () => {
-        expect(() => runScript(read(rel))).toThrow(laterVersionBuiltin);
-      });
-      continue;
-    }
 
     it(`${file} ${gap ? `is a known gap: ${gap}` : `runs over ${BARS.length} bars`}`, () => {
       const source = read(rel);

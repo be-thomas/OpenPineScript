@@ -19,6 +19,15 @@ export interface Trade {
 export interface Position {
     size: number;      // + for Long, - for Short
     avgPrice: number;
+    /**
+     * The bar the position was OPENED on, and the order id that opened it.
+     *
+     * Recorded so `strategy.opentrades.entry_bar_index` and `.entry_id` have
+     * something to answer with. Undefined while flat, which is the same fact as
+     * `size === 0` and reads as `na` either way.
+     */
+    entryBarIndex?: number;
+    entryId?: string;
 }
 
 /**
@@ -702,7 +711,25 @@ export class Context {
 
     // 5. Strategy State (Public)
     public position: Position = { size: 0, avgPrice: 0 };
+
+    /** Bar timestamp by bar index — see the note where it is written. */
+    public barTimes: number[] = [];
+
+    /** The bar a timestamp falls on, or NaN when no bar has carried it. */
+    public barIndexOfTime(time: number): number {
+        const at = this.barTimes.indexOf(time);
+        return at < 0 ? NaN : at;
+    }
     public cash: number = 100000; 
+
+    /**
+     * The equity the strategy started with, for `strategy.initial_capital`.
+     *
+     * Held separately from `cash`, which moves with every fill — the two are
+     * equal only until the first trade closes, and the difference between them
+     * IS the realised profit.
+     */
+    public initialCapital: number = 100000;
     public trades: Trade[] = [];
     public orders: any[] = [];
 
@@ -801,6 +828,7 @@ export class Context {
 
         // 5. Reset Strategy State
         this.position = { size: 0, avgPrice: 0 };
+        this.barTimes = [];
         this.cash = 100000;
         this.trades = [];
         this.orders = [];
@@ -1285,6 +1313,10 @@ export class Context {
 
     public setBar(time: number, open: number, high: number, low: number, close: number, volume: number) {
         if (this.currentBarIndex === 0) this.firstBarTime = time;
+        // Bar timestamps, indexed by bar. `strategy.closedtrades.*` records a
+        // trade's entry and exit as TIMES, and the accessors report them as bar
+        // indices, so one side has to be able to translate.
+        this.barTimes[this.currentBarIndex] = time;
         // 1. Update Public Props
         this.time = time;
         this.open = open;

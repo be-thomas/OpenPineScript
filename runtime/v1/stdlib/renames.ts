@@ -58,10 +58,21 @@ const COLORS = group("color", [
  * v4 — only the type constants move — so `input` is deliberately absent from
  * the removal list at the bottom of this file.
  */
-const INPUT_TYPES = group("input", [
-  "integer", "float", "bool", "string", "resolution", "session", "symbol",
-  "source",
-]);
+const INPUT_TYPES: RenameSpec[] = [
+  ...group("input", [
+    "integer", "float", "bool", "string", "resolution", "session", "symbol",
+    "source",
+  ]),
+  // `input.color` is a v4 ADDITION rather than a rename — v3 has no input type
+  // constant of that name, and flat `color` at v3 is the `color()` function.
+  // The v4 release notes introduce it directly:
+  //
+  //     color c_labelColor = input(color.green, "Main Color", input.color)
+  //
+  // so it is declared by value, the way `plot.style_cross` is. v5 turns the
+  // same spelling into a FUNCTION, which V5_ONLY_NAMES installs over this.
+  { to: "input.color", value: "color" },
+];
 
 /**
  * Plot styles gain a `style_` prefix as well as a namespace:
@@ -122,11 +133,6 @@ const SYMINFO: RenameSpec[] = [
 export const V4_ONLY_NAMESPACES: readonly string[] = [
   "array", "line", "label", "box", "table",
   "xloc", "yloc", "extend", "position", "text", "order",
-  // `syminfo` gets here two ways and both are v4. `syminfo.ticker` and
-  // `syminfo.tickerid` are v1–v3 flat names the table below renames; the other
-  // ten members have no earlier spelling at all and live in ./syminfo.ts. The
-  // root is listed so neither kind resolves at v1–v3.
-  "syminfo",
   // `session` is v4, not v5. From the v4 release notes, April 2021:
   //
   //   "session.ismarket - returns true if the current bar is a part of the
@@ -201,6 +207,28 @@ export const V4_ONLY_NAMES: readonly string[] = [
     "alert", "alert.freq_once_per_bar", "alert.freq_once_per_bar_close",
     "alert.freq_all",
 
+    // Seconds-based timeframes, and the `is*` member that reports one. The
+    // other five `timeframe.is*` are v1–v3 flat names the table below renames;
+    // this one never had a flat spelling because seconds postdate them.
+    "timeframe.isseconds",
+
+    // The only two `syminfo.` members that are v4.
+    //
+    // The NAMESPACE is not a v4 addition, which is the opposite of what this
+    // list used to say. The v3-to-v4 migration guide renames exactly two things
+    // into it — "The `ticker` and `tickerid` variables are renamed to
+    // `syminfo.ticker` and `syminfo.tickerid` respectively" — and renames
+    // nothing to `syminfo.mintick`, `syminfo.prefix`, `syminfo.pointvalue`,
+    // `syminfo.currency` or `syminfo.timezone`. A member that v4 did not rename
+    // already had its dotted spelling, and TradingView's v3-archive
+    // documentation confirms it directly: two `//@version=2` examples on the
+    // strategies and how-tos pages read `syminfo.mintick` and `syminfo.prefix`.
+    //
+    // How far back beyond v2 that goes cannot be checked — there is no archived
+    // v1 documentation — so the namespace is treated as always having been
+    // there, and only what the guide names is gated.
+    "syminfo.ticker", "syminfo.tickerid",
+
     // The one `str.` name that predates the namespace's own version.
     //
     // `str.*` is v5 — `tostring` becomes `str.tostring`, and the other twenty
@@ -274,4 +302,9 @@ export const V4_REMOVED: readonly string[] = (() => {
  */
 export const UNIMPLEMENTED_BUILTINS: ReadonlySet<string> = new Set([
   "accdist", "iii", "nvi", "obv", "pvi", "pvt", "wad", "wvad",
+  // ...and their v5 spellings. The flat name is what v1–v4 write and the
+  // dotted one is what v5 writes; both must reach the poison pill rather than
+  // one of them reading as an absent namespace member.
+  "ta.accdist", "ta.iii", "ta.nvi", "ta.obv", "ta.pvi", "ta.pvt",
+  "ta.wad", "ta.wvad",
 ]);

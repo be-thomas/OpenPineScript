@@ -1427,7 +1427,10 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    * object is appended unchanged and `expression=` is deferred wherever it lands.
    */
   protected emitSecurity(ctx: Fun_callContext): string {
-    const callId = `"security${this.getLocId(ctx)}"`;
+    // The callee's OWN name, so a diagnostic points at the function the script
+    // wrote. v5 routes `request.security_lower_tf` through here as well, and
+    // labelling both "security" made a runtime error name the wrong one.
+    const callId = `"${ctx.id().getText()}${this.getLocId(ctx)}"`;
     const transpiledName = this.visit(ctx.id());
     const aa = ctx.fun_actual_args();
 
@@ -1632,6 +1635,51 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     throw this.err(ctx, `Undeclared identifier '${name}'.`);
   }
 
+  /**
+   * A member of a KNOWN namespace that this version does not have.
+   *
+   * The mirror of `checkUndeclaredRead`, and it existed for neither reason nor
+   * design: an unknown BARE name was rejected, while an unknown MEMBER of a
+   * real namespace fell through to `opsv2_syminfo.opsv2_nonesuch` and read as
+   * `undefined` on every bar. Nothing said so. `color.from_gradient` at v2 — a
+   * v4 addition — compiled, and every colour computed from it was `na` forever.
+   *
+   * Split by whether the name exists at ALL, because the two are different
+   * problems: `syminfo.tickerid` at v2 is a MIGRATION question with a version
+   * for an answer, and `syminfo.nonesuch` is a typo.
+   *
+   * Overridable because v5 has dotted names that are not namespace members —
+   * fields, enum members, library calls — and resolves those first.
+   */
+  protected checkNamespaceMember(root: string, text: string, ctx: IdContext): void {
+    if (this.registry[text]) return;
+
+    // A name this engine knows and deliberately does not implement is bound as
+    // a poison pill, which reports its own reason when READ. Saying it does not
+    // exist would be a lie, and would fire on a script that never reaches it.
+    if (UNIMPLEMENTED_BUILTINS.has(text)) return;
+
+    // The namespace itself may be a value as well as a namespace (`line` is a
+    // v1–v3 plot style and a v4 drawing type), and a bare root is not a member.
+    if (text === root) return;
+
+    // ...and neither is an INNER namespace. `strategy.risk` holds
+    // `strategy.risk.max_drawdown` and is not a key of its own, so it is a name
+    // this version knows even though nothing answers to it directly.
+    const prefix = text + ".";
+    if (Object.keys(this.registry).some(key => key.startsWith(prefix))) return;
+
+    if (text in REGISTRY) {
+      throw this.err(
+        ctx,
+        `'${text}' is not available in Pine Script v${this.version}. ` +
+        `It was added in a later version.`,
+      );
+    }
+
+    throw this.err(ctx, `'${root}' has no member '${text.slice(root.length + 1)}'.`);
+  }
+
   visitId(ctx: IdContext): string {
     const text = ctx.getText();
 
@@ -1662,6 +1710,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
           `'${text}' cannot be resolved.`,
         );
       }
+      this.checkNamespaceMember(root, text, ctx);
     }
 
     // strategy.* namespace (getters/constants too) requires strategy() context.

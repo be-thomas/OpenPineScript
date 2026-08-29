@@ -338,4 +338,10 @@ export const currency = {
     NONE: "", USD: "USD", EUR: "EUR", GBP: "GBP", JPY: "JPY",
     CHF: "CHF", AUD: "AUD", CAD: "CAD", NZD: "NZD", HKD: "HKD",
     SGD: "SGD", INR: "INR", RUB: "RUB", ZAR: "ZAR", TRY: "TRY",
+    // The rest of the ISO 4217 set TradingView exposes. A missing member of an
+    // existing namespace used to read as `undefined`, so `currency.KRW` became
+    // a strategy quoted in `[object Undefined]` rather than an error.
+    KRW: "KRW", BRL: "BRL", CNY: "CNY", DKK: "DKK", ILS: "ILS",
+    MYR: "MYR", NOK: "NOK", PHP: "PHP", PLN: "PLN", SEK: "SEK",
+    THB: "THB", MXN: "MXN", ARS: "ARS", BTC: "BTC", ETH: "ETH",
 };

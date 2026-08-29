@@ -83,6 +83,51 @@ export const array = {
     },
     size: (id: any) => arr(id, "size").length,
 
+    /**
+     * `array.first(id)` and `array.last(id)` — January 2023.
+     *
+     * "Returns the array's first element" / "Returns the array's last element."
+     *
+     * An EMPTY array is an error rather than `na`, which is the same rule
+     * `array.get` follows for an out-of-range index: the two are the same
+     * mistake, and answering `na` would let a script average nothing and plot
+     * it.
+     */
+    first: (id: any) => {
+        const a = arr(id, "first");
+        if (!a.length) throw new Error("array.first: array is empty");
+        return a[0];
+    },
+    last: (id: any) => {
+        const a = arr(id, "last");
+        if (!a.length) throw new Error("array.last: array is empty");
+        return a[a.length - 1];
+    },
+
+    /**
+     * `array.binary_search(id, val)` — the index of `val`, or -1.
+     *
+     * Requires the array to be sorted ASCENDING, which is the contract of every
+     * binary search and is why the three `binary_search*` functions exist
+     * alongside `array.indexof`: on a sorted array they are the fast answer, and
+     * on an unsorted one they are a wrong one. This engine does not verify the
+     * ordering — checking it would cost the very thing the function is for.
+     */
+    binary_search: (id: any, value: any) => {
+        const a = arr(id, "binary_search");
+        const target = val(value);
+        let lo = 0;
+        let hi = a.length - 1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            const here = val(a[mid]);
+            if (here === target) return mid;
+            if (here < target) lo = mid + 1;
+            else hi = mid - 1;
+        }
+        return -1;
+    },
+
     // --- Mutation ----------------------------------------------------------
     push: (id: any, value: any) => { arr(id, "push").push(val(value)); },
     pop: (id: any) => {

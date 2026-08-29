@@ -174,6 +174,18 @@ export const V5_ONLY_NAMESPACES: readonly string[] = [
  * of ./inputs.ts for how one runtime object serves both readings.
  */
 export const V5_ONLY_NAMES: readonly string[] = [
+    // Members of namespaces that predate them, each dated from the release
+    // notes. `timeframe` is a v4 namespace and `array` a v4 one, so a member
+    // added years later has to be named rather than gated with its root.
+    //
+    //   "The typical number of seconds in the chart's timeframe."      May 2024
+    //   "Converts a specified number of `seconds` into a valid
+    //    timeframe string ..."                                       Sept 2023
+    //   "Returns `true` on the first bar of a new `timeframe` ..."    June 2022
+    //   "Returns the array's first element" / "... last element"       Jan 2023
+    "timeframe.in_seconds", "timeframe.from_seconds", "timeframe.change",
+    "array.first", "array.last", "array.binary_search",
+
     "input.int", "input.float", "input.bool", "input.string", "input.color",
     "input.timeframe", "input.session", "input.symbol", "input.source",
     "input.time", "input.price", "input.text_area",
@@ -197,12 +209,24 @@ export const V5_ONLY_NAMES: readonly string[] = [
     "session.islastbar", "session.islastbar_regular",
 ];
 
+/**
+ * Plot styles v5 ADDS, which are therefore values rather than renames.
+ *
+ * `plot.style_stepline_diamond` has no v1–v4 spelling — the style itself is
+ * new — so there is nothing for it to inherit from, and it is declared here the
+ * way `plot.style_cross` is in the v4 table: by value.
+ */
+const PLOT_STYLES_V5: RenameSpec[] = [
+    { to: "plot.style_stepline_diamond", value: "stepline_diamond" },
+];
+
 export const V5_RENAMES: readonly RenameSpec[] = [
     ...TA,
     ...MATH,
     ...REQUEST,
     ...TICKER,
     ...STR,
+    ...PLOT_STYLES_V5,
 ];
 
 /**

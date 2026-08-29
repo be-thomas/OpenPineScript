@@ -323,7 +323,16 @@ export function entry(ctx: Context, id: string, dir: string, qty: any = 1, overr
         ctx.position.avgPrice = currentPrice;
     }
 
+    const wasFlat = ctx.position.size === 0;
     ctx.position.size += newQty;
+
+    // Stamp the OPENING fill only. A pyramided add does not restart the trade,
+    // so `strategy.opentrades.entry_bar_index` must keep naming the bar the
+    // position began on.
+    if (wasFlat) {
+        ctx.position.entryBarIndex = ctx.currentBarIndex;
+        ctx.position.entryId = id;
+    }
 
     // Track filled orders for intraday limit
     rs.daily_filled_orders++;
@@ -366,6 +375,8 @@ export function close_all(ctx: Context, comment: string = "") {
 
     ctx.position.size = 0;
     ctx.position.avgPrice = 0;
+    ctx.position.entryBarIndex = undefined;
+    ctx.position.entryId = undefined;
     getPendingExits(ctx).clear();
 }
 
@@ -611,5 +622,174 @@ export function equity(ctx: Context): number {
     }
     return ctx.cash + unrealized;
 }
+
+/**
+ * `strategy.position_avg_price` — the average entry price of the OPEN position.
+ *
+ * `na` while flat rather than 0: a script that plots it should draw nothing
+ * between trades, and zero would draw a line at the bottom of the chart.
+ *
+ * @getter
+ */
+export function position_avg_price(ctx: Context): number {
+    return ctx.position.size === 0 ? NaN : ctx.position.avgPrice;
+}
+
+/**
+ * `strategy.closedtrades` — how many trades have been closed.
+ *
+ * Also the root of the `strategy.closedtrades.*` accessors, which live in
+ * ./trades.ts; see the note there for why the two cannot share a file.
+ *
+ * @getter
+ */
+export function closedtrades(ctx: Context): number {
+    return ctx.trades.length;
+}
+
+/**
+ * `strategy.netprofit` — total REALISED profit, in the strategy's currency.
+ *
+ * Realised only: an open position's paper gain is `strategy.openprofit`, and
+ * the two together are what `strategy.equity` reports. Summed from the closed
+ * trades rather than tracked incrementally, so it cannot drift from them.
+ *
+ * @getter
+ */
+export function netprofit(ctx: Context): number {
+    return ctx.trades.reduce((total, t) => total + t.pnl, 0);
+}
+
+/**
+ * `strategy.openprofit` — the UNREALISED profit of the open position.
+ *
+ * @getter
+ */
+export function openprofit(ctx: Context): number {
+    return ctx.position.size === 0
+        ? 0
+        : (ctx.close - ctx.position.avgPrice) * ctx.position.size;
+}
+
+/**
+ * `strategy.grossprofit` and `strategy.grossloss` — the two halves of
+ * `netprofit`, both reported as POSITIVE numbers.
+ *
+ * @getter
+ */
+export function grossprofit(ctx: Context): number {
+    return ctx.trades.reduce((total, t) => total + Math.max(t.pnl, 0), 0);
+}
+
+/** @getter */
+export function grossloss(ctx: Context): number {
+    return ctx.trades.reduce((total, t) => total - Math.min(t.pnl, 0), 0);
+}
+
+/**
+ * `strategy.initial_capital` — the equity the strategy started with.
+ *
+ * @getter
+ */
+export function initial_capital(ctx: Context): number {
+    return ctx.initialCapital;
+}
+
+/**
+ * `strategy.wintrades` / `strategy.losstrades` / `strategy.eventrades` — how
+ * the closed trades came out.
+ *
+ * A trade that broke exactly even is neither a win nor a loss, which is why
+ * there are three and not two: `wintrades + losstrades` does NOT have to equal
+ * `closedtrades`, and a script that assumes it does misreports its win rate.
+ *
+ * @getter
+ */
+export function wintrades(ctx: Context): number {
+    return ctx.trades.filter(t => t.pnl > 0).length;
+}
+
+/** @getter */
+export function losstrades(ctx: Context): number {
+    return ctx.trades.filter(t => t.pnl < 0).length;
+}
+
+/** @getter */
+export function eventrades(ctx: Context): number {
+    return ctx.trades.filter(t => t.pnl === 0).length;
+}
+
+/**
+ * `strategy.avg_winning_trade` / `strategy.avg_losing_trade` — the mean result
+ * of the winners and of the losers, both as POSITIVE amounts.
+ *
+ * `na` when there are none of that kind, not 0: a strategy that has never lost
+ * has no average loss, and reporting zero would make a profit factor infinite
+ * in one direction and meaningless in the other.
+ *
+ * @getter
+ */
+export function avg_winning_trade(ctx: Context): number {
+    const wins = ctx.trades.filter(t => t.pnl > 0);
+    return wins.length === 0 ? NaN : wins.reduce((s, t) => s + t.pnl, 0) / wins.length;
+}
+
+/** @getter */
+export function avg_losing_trade(ctx: Context): number {
+    const losses = ctx.trades.filter(t => t.pnl < 0);
+    return losses.length === 0 ? NaN : -losses.reduce((s, t) => s + t.pnl, 0) / losses.length;
+}
+
+/** `strategy.avg_trade` — the mean result of ALL closed trades, signed. @getter */
+export function avg_trade(ctx: Context): number {
+    return ctx.trades.length === 0 ? NaN : netprofit(ctx) / ctx.trades.length;
+}
+
+/**
+ * `strategy.netprofit_percent` — realised profit as a percentage of the
+ * starting equity.
+ *
+ * @getter
+ */
+export function netprofit_percent(ctx: Context): number {
+    return ctx.initialCapital === 0 ? NaN : (netprofit(ctx) / ctx.initialCapital) * 100;
+}
+
+/** @getter */
+export function grossprofit_percent(ctx: Context): number {
+    return ctx.initialCapital === 0 ? NaN : (grossprofit(ctx) / ctx.initialCapital) * 100;
+}
+
+/** @getter */
+export function grossloss_percent(ctx: Context): number {
+    return ctx.initialCapital === 0 ? NaN : (grossloss(ctx) / ctx.initialCapital) * 100;
+}
+
+/**
+ * `strategy.account_currency` — the currency the strategy's results are in.
+ *
+ * Set by `strategy(..., currency = ...)`, and `currency.NONE` — the empty
+ * string — when the script did not ask, which means the symbol's own currency.
+ * A script pairs it with `request.currency_rate(syminfo.currency,
+ * strategy.account_currency)` to convert position values.
+ *
+ * @getter
+ */
+export function account_currency(ctx: Context): string {
+    return String(ctx.scriptMeta?.currency ?? "");
+}
+
+// ─── `default_qty_type` constants ──────────────────────────────────────────
+//
+// The three values `strategy(..., default_qty_type = ...)` accepts. They are
+// sentinels, not quantities: what each one MEANS is applied by the order sizer,
+// and the string is only how a script names it.
+
+/** Size orders in contracts/shares — the default. */
+export const fixed = "strategy.fixed";
+/** Size orders as an amount of CASH in the strategy's currency. */
+export const cash = "strategy.cash";
+/** Size orders as a PERCENTAGE of available equity. */
+export const percent_of_equity = "strategy.percent_of_equity";
 
 export const __IS_NAMESPACE__ = true;

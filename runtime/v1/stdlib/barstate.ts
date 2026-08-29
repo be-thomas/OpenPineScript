@@ -52,3 +52,49 @@ export function islast(ctx: Context): boolean {
 export function isfirst(ctx: Context): boolean {
     return ctx.currentBarIndex === 0;
 }
+
+/**
+ * True on every historical bar, and on a realtime bar's CLOSING update.
+ *
+ * "barstate.isconfirmed is true on all historical bars and on the last
+ *  (closing) update of a realtime bar."
+ *
+ * The bar's values will not change again once this is true, which is why it is
+ * the standard guard around anything a script must do once per bar — an alert,
+ * a log line, a queue push. Eighteen of TradingView's own examples use it, and
+ * every one of them was reading `undefined`: a missing member of an EXISTING
+ * namespace does not error, so `if barstate.isconfirmed` was silently never
+ * taken and the scripts drew nothing.
+ *
+ * "The last (closing) update of a realtime bar" is not a script execution in
+ * this engine: `Context.commitBar` settles the forming bar AFTER the script has
+ * run, so a bar is either history — settled — or forming. That makes the test
+ * exactly `not realtime`, which is the first half of the definition and the
+ * whole of it here.
+ *
+ * @getter
+ */
+export function isconfirmed(ctx: Context): boolean {
+    return !ctx.is_realtime;
+}
+
+/**
+ * True on the last bar the script can treat as settled history.
+ *
+ * "barstate.islastconfirmedhistory is true if the script is executing on the
+ *  dataset's last bar when the market is closed, or on the bar immediately
+ *  preceding the realtime bar if the market is open."
+ *
+ * Two readings of one idea, and which applies depends on whether a realtime bar
+ * exists at all. With no realtime bar the last bar IS the last confirmed one;
+ * with one, the bar before it is.
+ *
+ * The commonest guard in TradingView's documentation — twenty-nine examples
+ * draw their tables and labels under it, because it fires exactly once and on
+ * the rightmost settled bar.
+ *
+ * @getter
+ */
+export function islastconfirmedhistory(ctx: Context): boolean {
+    return ctx.is_realtime ? false : ctx.is_last;
+}

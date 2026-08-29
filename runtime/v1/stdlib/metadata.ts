@@ -15,6 +15,7 @@ import * as font from "./font";
 import * as format from "./format";
 import * as input from "./input";
 import * as inputs from "./inputs";
+import * as late_members from "./late_members";
 import * as logging from "./logging";
 import * as maps from "./maps";
 import * as math from "./math";
@@ -29,6 +30,7 @@ import * as strategy from "./strategy";
 import * as syminfo from "./syminfo";
 import * as ta from "./ta";
 import * as time from "./time";
+import * as trades from "./trades";
 import * as ui from "./ui";
 
 export interface PineType {
@@ -175,6 +177,30 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: arrays.array["size"]
+      },
+      "array.first": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["first"]
+      },
+      "array.last": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["last"]
+      },
+      "array.binary_search": {
+          uses_context: false,
+          args: ["id","value"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: arrays.array["binary_search"]
       },
       "array.push": {
           uses_context: false,
@@ -480,6 +506,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: barstate.isfirst
       },
+      "barstate.isconfirmed": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: barstate.isconfirmed
+      },
+      "barstate.islastconfirmedhistory": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: barstate.islastconfirmedhistory
+      },
       "cast.float": {
           uses_context: false,
           args: ["x"],
@@ -607,6 +649,38 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"Never returns — P&F columns cannot be rebuilt here."},
           is_value: false,
           ref: chart.pointfigure
+      },
+      "timeframe.in_seconds": {
+          uses_context: true,
+          args: ["timeframe"],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.timeframe["in_seconds"]
+      },
+      "timeframe.from_seconds": {
+          uses_context: false,
+          args: ["seconds"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.timeframe["from_seconds"]
+      },
+      "timeframe.change": {
+          uses_context: true,
+          args: ["timeframe"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.timeframe["change"]
+      },
+      "timeframe.isseconds": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: chart.timeframe["isseconds"]
       },
       "chart.point.new": {
           uses_context: false,
@@ -1352,6 +1426,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: drawings.line["set_xy2"]
       },
+      "line.set_first_point": {
+          uses_context: true,
+          args: ["id","point"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_first_point"]
+      },
+      "line.set_second_point": {
+          uses_context: true,
+          args: ["id","point"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["set_second_point"]
+      },
       "line.get_price": {
           uses_context: true,
           args: ["id","x"],
@@ -1367,6 +1457,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: drawings.line["delete"]
+      },
+      "line.all": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.line["all"]
       },
       "line.copy": {
           uses_context: true,
@@ -1544,6 +1642,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: drawings.label["get_text"]
       },
+      "label.set_point": {
+          uses_context: true,
+          args: ["id","point"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["set_point"]
+      },
       "label.set_xy": {
           uses_context: true,
           args: ["id","x","y"],
@@ -1559,6 +1665,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: drawings.label["delete"]
+      },
+      "label.all": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.label["all"]
       },
       "label.copy": {
           uses_context: true,
@@ -1848,6 +1962,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: drawings.box["set_lefttop"]
       },
+      "box.set_top_left_point": {
+          uses_context: true,
+          args: ["id","point"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_top_left_point"]
+      },
+      "box.set_bottom_right_point": {
+          uses_context: true,
+          args: ["id","point"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_bottom_right_point"]
+      },
       "box.set_rightbottom": {
           uses_context: true,
           args: ["id","right","bottom"],
@@ -1863,6 +1993,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: drawings.box["delete"]
+      },
+      "box.all": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["all"]
       },
       "box.copy": {
           uses_context: true,
@@ -1912,13 +2050,77 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: drawings.table["cell"]
       },
-      "table.set_cell_text": {
+      "table.cell_set_text": {
           uses_context: true,
           args: ["table_id","column","row","text"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
-          ref: drawings.table["set_cell_text"]
+          ref: drawings.table["cell_set_text"]
+      },
+      "table.cell_set_bgcolor": {
+          uses_context: true,
+          args: ["table_id","column","row","bgcolor"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell_set_bgcolor"]
+      },
+      "table.cell_set_text_color": {
+          uses_context: true,
+          args: ["table_id","column","row","text_color"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell_set_text_color"]
+      },
+      "table.cell_set_text_size": {
+          uses_context: true,
+          args: ["table_id","column","row","text_size"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell_set_text_size"]
+      },
+      "table.cell_set_text_halign": {
+          uses_context: true,
+          args: ["table_id","column","row","text_halign"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell_set_text_halign"]
+      },
+      "table.cell_set_text_valign": {
+          uses_context: true,
+          args: ["table_id","column","row","text_valign"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell_set_text_valign"]
+      },
+      "table.cell_set_width": {
+          uses_context: true,
+          args: ["table_id","column","row","width"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell_set_width"]
+      },
+      "table.cell_set_height": {
+          uses_context: true,
+          args: ["table_id","column","row","height"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell_set_height"]
+      },
+      "table.merge_cells": {
+          uses_context: true,
+          args: ["table_id","start_column","start_row","end_column","end_row"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["merge_cells"]
       },
       "table.set_position": {
           uses_context: true,
@@ -2456,6 +2658,70 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: inputs.input["enum"]
       },
+      "math.pi": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: late_members.math["pi"]
+      },
+      "math.e": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: late_members.math["e"]
+      },
+      "math.phi": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: late_members.math["phi"]
+      },
+      "math.rphi": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: late_members.math["rphi"]
+      },
+      "ta.max": {
+          uses_context: true,
+          args: ["source"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: late_members.ta["max"]
+      },
+      "ta.min": {
+          uses_context: true,
+          args: ["source"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: late_members.ta["min"]
+      },
+      "ticker.inherit": {
+          uses_context: false,
+          args: ["tickerid","from_tickerid"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: late_members.ticker["inherit"]
+      },
+      "ticker.modify": {
+          uses_context: false,
+          args: ["tickerid","session","adjustment","rest"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: late_members.ticker["modify"]
+      },
       "log.info": {
           uses_context: true,
           args: ["message","args"],
@@ -2936,6 +3202,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: request.request["earnings"]
       },
+      "request.security_lower_tf": {
+          uses_context: true,
+          args: ["symbol","timeframe","expression","rest"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: request.request["security_lower_tf"]
+      },
       "request.quandl": {
           uses_context: true,
           args: ["ticker","gaps","index"],
@@ -2943,6 +3217,30 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: request.request["quandl"]
+      },
+      "request.currency_rate": {
+          uses_context: true,
+          args: ["from","to"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: request.request["currency_rate"]
+      },
+      "request.economic": {
+          uses_context: true,
+          args: ["country_code","field","gaps"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: request.request["economic"]
+      },
+      "request.seed": {
+          uses_context: true,
+          args: ["source","symbol","expression","rest"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: request.request["seed"]
       },
       "dividends.gross": {
           uses_context: false,
@@ -3232,6 +3530,30 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: str.str["replace_all"]
       },
+      "str.replace": {
+          uses_context: false,
+          args: ["source","target","replacement","occurrence"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["replace"]
+      },
+      "str.trim": {
+          uses_context: false,
+          args: ["string"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["trim"]
+      },
+      "str.format_time": {
+          uses_context: true,
+          args: ["time","format","timezone"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: str.str["format_time"]
+      },
       "str.upper": {
           uses_context: false,
           args: ["source"],
@@ -3360,6 +3682,142 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: strategy.equity
       },
+      "strategy.position_avg_price": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.position_avg_price
+      },
+      "strategy.closedtrades": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.closedtrades
+      },
+      "strategy.netprofit": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.netprofit
+      },
+      "strategy.openprofit": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.openprofit
+      },
+      "strategy.grossprofit": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.grossprofit
+      },
+      "strategy.grossloss": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.grossloss
+      },
+      "strategy.initial_capital": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.initial_capital
+      },
+      "strategy.wintrades": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.wintrades
+      },
+      "strategy.losstrades": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.losstrades
+      },
+      "strategy.eventrades": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.eventrades
+      },
+      "strategy.avg_winning_trade": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.avg_winning_trade
+      },
+      "strategy.avg_losing_trade": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.avg_losing_trade
+      },
+      "strategy.avg_trade": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.avg_trade
+      },
+      "strategy.netprofit_percent": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.netprofit_percent
+      },
+      "strategy.grossprofit_percent": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.grossprofit_percent
+      },
+      "strategy.grossloss_percent": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.grossloss_percent
+      },
+      "strategy.account_currency": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.account_currency
+      },
       "strategy.commission.percent": {
           uses_context: false,
           args: [],
@@ -3487,6 +3945,30 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: true,
           ref: strategy.short
+      },
+      "strategy.fixed": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: strategy.fixed
+      },
+      "strategy.cash": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: strategy.cash
+      },
+      "strategy.percent_of_equity": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: strategy.percent_of_equity
       },
       "syminfo.ticker": {
           uses_context: true,
@@ -4144,6 +4626,102 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: time.time_tradingday
       },
+      "strategy.opentrades.entry_price": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["opentrades"]["entry_price"]
+      },
+      "strategy.opentrades.entry_bar_index": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["opentrades"]["entry_bar_index"]
+      },
+      "strategy.opentrades.entry_id": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["opentrades"]["entry_id"]
+      },
+      "strategy.opentrades.profit": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["opentrades"]["profit"]
+      },
+      "strategy.opentrades.size": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["opentrades"]["size"]
+      },
+      "strategy.closedtrades.entry_price": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["closedtrades"]["entry_price"]
+      },
+      "strategy.closedtrades.exit_price": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["closedtrades"]["exit_price"]
+      },
+      "strategy.closedtrades.entry_id": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["closedtrades"]["entry_id"]
+      },
+      "strategy.closedtrades.entry_bar_index": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["closedtrades"]["entry_bar_index"]
+      },
+      "strategy.closedtrades.exit_bar_index": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["closedtrades"]["exit_bar_index"]
+      },
+      "strategy.closedtrades.profit": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["closedtrades"]["profit"]
+      },
+      "strategy.closedtrades.size": {
+          uses_context: true,
+          args: ["trade_num"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: trades.strategy["closedtrades"]["size"]
+      },
       "plot": {
           uses_context: true,
           args: ["series","title","color","linewidth","style"],
@@ -4559,6 +5137,126 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: true,
           ref: ui.currency["TRY"]
+      },
+      "currency.KRW": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["KRW"]
+      },
+      "currency.BRL": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["BRL"]
+      },
+      "currency.CNY": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["CNY"]
+      },
+      "currency.DKK": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["DKK"]
+      },
+      "currency.ILS": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["ILS"]
+      },
+      "currency.MYR": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["MYR"]
+      },
+      "currency.NOK": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["NOK"]
+      },
+      "currency.PHP": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["PHP"]
+      },
+      "currency.PLN": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["PLN"]
+      },
+      "currency.SEK": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["SEK"]
+      },
+      "currency.THB": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["THB"]
+      },
+      "currency.MXN": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["MXN"]
+      },
+      "currency.ARS": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["ARS"]
+      },
+      "currency.BTC": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["BTC"]
+      },
+      "currency.ETH": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: ui.currency["ETH"]
       },
       "color_red": {
           uses_context: false,

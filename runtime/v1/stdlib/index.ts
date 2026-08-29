@@ -346,10 +346,29 @@ export function createStdlib(ctx: Context) {
                 // the merge is not an optimisation: without it, whether
                 // `log.info` exists depends on filename alphabetisation.
                 const existing = current[part];
-                if (existing && typeof existing === "object" && typeof entry.ref === "function") {
+                if (existing && typeof existing === "object" && entry.ref !== null
+                    && (typeof entry.ref === "function" || typeof entry.ref === "object")) {
                     Object.assign(entry.ref, existing);
+                    current[part] = entry.ref;
+                } else if (existing && typeof existing === "object") {
+                    // A PRIMITIVE arriving on top of a namespace. `line` is the
+                    // case: it is the v1–v3 plot-style string AND the root of
+                    // v4's drawing namespace, and both are in the union — so
+                    // whichever the generator emitted last decided. Assigning
+                    // the string dropped `line.all`, `line.new` and the other
+                    // twenty members, and which way it went depended on
+                    // filename order.
+                    //
+                    // The value is kept, on a namespace that carries it: the
+                    // same non-enumerable `valueOf` device the intermediate
+                    // branch below uses, so `plot(x, style = line)` still reads
+                    // "line" through `val()` while `line.all` resolves.
+                    const holder = valueBearingNamespace(entry.ref as any);
+                    Object.assign(holder, existing);
+                    current[part] = holder;
+                } else {
+                    current[part] = entry.ref;
                 }
-                current[part] = entry.ref;
             } else {
                 // Intermediate part: ensure the nested object exists.
                 //

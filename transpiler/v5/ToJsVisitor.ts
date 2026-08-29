@@ -787,7 +787,10 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     // message rather than "opsv2_study is not a function".
     this.enforceRenamedInV5(name, ctx);
 
-    if (name === "request.security") {
+    // Both members of the security family defer their `expression`: it is
+    // evaluated in the REQUESTED context, not this one, so it has to reach the
+    // runtime as a thunk rather than as a value computed on the chart bar.
+    if (name === "request.security" || name === "request.security_lower_tf") {
       return this.withCallee(name, () => this.emitSecurity(ctx as any));
     }
 
@@ -916,10 +919,63 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     const library = this.importAliases.get(root);
     if (library !== undefined) return this.emitLibraryCall(root, library, tail, ctx);
 
-    if (this.namespaceRoots.has(root)) return null;
+    if (this.namespaceRoots.has(root)) return this.emitNamespaceValueMethod(name, ctx);
     if (!this.isReceiverName(root)) return null;
 
     return this.emitMethodCall(root, tail, ctx);
+  }
+
+  /**
+   * `label.all.size()` — a method called on a namespace member's VALUE.
+   *
+   * `id` is greedy, so the whole of `label.all.size` arrives as one dotted
+   * name and the ordinary namespace path asks the registry for a function of
+   * that name. There is none: `label.all` is an ARRAY, and `size` is a method
+   * on it.
+   *
+   * So the longest registry-known PREFIX is taken as the receiver and whatever
+   * follows is applied to it — the same split `emitChainedMethod` performs on a
+   * dotted call suffix, arrived at from the other side. Returns null when no
+   * prefix resolves, which leaves the existing "has no member" diagnostic to
+   * report the name the script actually wrote.
+   */
+  protected emitNamespaceValueMethod(name: string, ctx: Fun_callContext): string | null {
+    if (this.registry[name]) return null;   // an ordinary namespace function
+
+    const parts = name.split(".");
+    for (let take = parts.length - 1; take >= 2; take--) {
+      const receiver = parts.slice(0, take).join(".");
+      const entry = this.registry[receiver];
+      if (!entry) continue;
+
+      // The receiver is emitted the way any read of it would be — a getter has
+      // to be CALLED, or the method lands on the function object instead of on
+      // the array it returns.
+      const at = this.getLocId(ctx as SourceLocated);
+      const read = entry.is_getter
+        ? `ctx.call("${receiver}${at}", ${this.namespacedName(receiver)})`
+        : this.namespacedName(receiver);
+
+      const method = parts[take];
+      const rest = parts.slice(take + 1);
+      const args = this.withCallee(
+        method,
+        () => (ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : ""),
+      );
+      const tail = args ? `, ${args}` : "";
+
+      // Any parts between the receiver and the method are field reads.
+      const target = rest.length
+        ? rest.reduce((js, part) => `ctx.field(${js}, ${JSON.stringify(part)})`, read)
+        : read;
+      return `ctx.builtinMethod("${at}", ${target}, ${JSON.stringify(method)}${tail})`;
+    }
+    return null;
+  }
+
+  /** `label.all` → `opsv2_label.opsv2_all`, the way visitId prefixes a dotted read. */
+  protected namespacedName(dotted: string): string {
+    return dotted.split(".").map(p => `${this.PREFIX}${p}`).join(".");
   }
 
   /** `Point.new(…)` and `Point.copy(p)` — the two calls a TYPE answers. */

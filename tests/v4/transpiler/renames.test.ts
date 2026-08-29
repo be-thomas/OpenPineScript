@@ -118,14 +118,20 @@ describe("v3 does not gain the v4 namespaces", () => {
   for (const name of ["color.red", "timeframe.period", "syminfo.ticker", "dayofweek.monday"]) {
     it(`v3 refuses ${name}`, () => {
       const root = name.split(".")[0];
-      // `color` IS a v3 namespace (color.new), so that one is caught by the
-      // member being absent rather than the root — assert only what applies.
-      if (root === "color") {
-        expect(() => compileScript(`//@version=3\nstudy("t")\nx = ${name}\n`)).not.toThrow();
-        return;
-      }
-      expect(() => compileScript(`//@version=3\nstudy("t")\nx = ${name}\n`))
-        .toThrow(new RegExp(`'${root}' is not a namespace in Pine Script v3`));
+      // Two different refusals, and which one applies depends on whether v3
+      // knows the ROOT.
+      //
+      //   timeframe / dayofweek   not namespaces at v3 at all
+      //   color / syminfo         real v3 namespaces whose MEMBER is v4
+      //
+      // The second used to compile and read `undefined`, because a missing
+      // member of an existing namespace was not checked. Both are errors now,
+      // and the message says which of the two problems it is.
+      const message = ["color", "syminfo"].includes(root)
+        ? new RegExp(`'${name.replace(".", "\\.")}' is not available in Pine Script v3`)
+        : new RegExp(`'${root}' is not a namespace in Pine Script v3`);
+
+      expect(() => compileScript(`//@version=3\nstudy("t")\nx = ${name}\n`)).toThrow(message);
     });
   }
 });
