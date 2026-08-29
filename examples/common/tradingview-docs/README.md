@@ -9,8 +9,8 @@ this engine nor its author wrote.
 | `//@version=2` | 26 | 26 (100%) |
 | `//@version=3` | 18 | 17 (94%) |
 | `//@version=4` | 148 | 146 (99%) |
-| `//@version=5` | 571 | 543 (95%) |
-| **Total** | **763** | **732 (96%)** |
+| `//@version=5` | 571 | 553 (97%) |
+| **Total** | **763** | **742 (97%)** |
 
 ## These files are not edited. Ever.
 
@@ -73,19 +73,35 @@ came from.
   an error looks exactly like a script with an error, so nothing structural
   separates them.
 
-## What the 31 remaining failures are
+## What the 21 remaining failures are
 
-**None of them is a known engine gap.** Twenty-two are PINNED in
+**None of them is a known engine gap.** Eleven are PINNED in
 [`conformance/common/docs_corpus_integrity.test.ts`](../../../conformance/common/docs_corpus_integrity.test.ts)
 so the denominator stays honest — adding one requires saying why.
 
 | Count | Cause |
 |---|---|
-| 10 | TradingView publishes it BROKEN — a `str.format` mask with a real newline inside the quotes, which is not a Pine literal |
-| 9 | an `import`, which needs the library's source. The docs publish the library beside the script for three of them, and the integrity suite proves both halves compile together |
-| 5 | published to DEMONSTRATE a compilation error — three scope demos, a script that plots a name it never declares, and one whose own comment reads "Causes compilation error" |
+| 10 | an `import`, which needs the library's source. The docs publish the library beside the script for three of them, and the integrity suite proves both halves compile together |
+| 4 | published to DEMONSTRATE a compilation error — three scope demos, and a script that plots a name it never declares |
 | 5 | the block is DOCUMENTATION, not a script: a reStructuredText directive, an elided body, prose left in the same code block |
 | 2 | an indent that dedents to a level it never opened. One is deliberate — the page is about that message — and one is not |
+
+### The two pins that were wrong
+
+Ten of the eleven files pinned as "TradingView publishes them BROKEN" are gone
+from that list, because they were not broken. All ten wrap a string literal
+across code lines, which the manual's Strings page documents as a real rule:
+"programmers can use line wrapping to define single-line literal strings across
+multiple code lines, where each wrapped line has an indentation of one or more
+spaces … the resulting character sequence adds only one space to the start of
+the wrapped lines". Deprecated, but not absent. Three unrelated pages doing the
+same thing should have been the tell.
+
+The eleventh was `v5-writing-limitations-10`, pinned as compiling under neither
+of two real Pine rules. Only one of them was real: v5 restricts mutable
+arguments for `request.security_lower_tf()` and not for `request.security()`,
+and TradingView's own comment on the offending line names the scope count — a
+limit this engine does not model — as the sole error. It compiles now.
 
 ### What closed the gap
 
@@ -115,6 +131,8 @@ with a dedicated test file, after the corpus made the absence visible:
 | `varip` on a UDT field | v5 | 1 |
 | method OVERLOADING by receiver type | v5 | 1 |
 | an exported `enum` reaching the importing script | v5 | 1 |
+| a string literal WRAPPED across code lines | v1 | 10 |
+| the mutable-argument rule narrowed to `request.security_lower_tf` | v5 | 1 |
 
 **And 34 missing built-ins**, found all at once. `checkUndeclaredRead` rejected a
 bare name nothing declares; its mirror — an unknown MEMBER of a real namespace —
@@ -143,17 +161,17 @@ Three changed no count and mattered more than any row above:
 
 ## Compiling is not the same as running
 
-Of the 732 that compile, running each one over the 506-bar
+Of the 742 that compile, running each one over the 506-bar
 `mock_data/common/AAPL_mock.csv`:
 
 | Result | Count | Meaning |
 |---|---|---|
-| ran, produced output | 360 | plots, trades or logs came out |
-| no output | 183 | most have no plotting call at all — drawings and tables only. The rest need data this run does not have (a strategy gated on `n > 4000` over 506 bars) |
+| ran, produced output | 366 | plots, trades or logs came out |
+| no output | 187 | most have no plotting call at all — drawings and tables only. The rest need data this run does not have (a strategy gated on `n > 4000` over 506 bars) |
 | all-`na` output | 123 | mostly expected: the script is gated on an intraday session, or on a symbol this dataset is not |
 | runtime error | 66 | every one is a NAMED diagnostic — see below |
 
-**No script in this corpus raises a `ReferenceError`, and every one of the 732
+**No script in this corpus raises a `ReferenceError`, and every one of the 742
 emits JavaScript that parses.** Both used to be false. `ReferenceError` was once
 the largest failure class — 45 files dying with a bare `opsv2_<name> is not
 defined` on the first bar — and three scripts compiled to JavaScript that
@@ -190,6 +208,8 @@ TradingView's own release notes before being changed:
 | An unknown MEMBER of a known namespace read as `undefined` rather than erroring | 34 distinct built-ins, across 100+ files |
 | `x == y` between two variables was always false — Series are objects, and `==` on two objects is reference equality | an enum comparison that looked like an enum problem |
 | A PRIMITIVE arriving on top of a namespace destroyed it, so `line.all` resolved or not depending on filename order | `line.all` throwing where `label.all` worked |
+| A string literal wrapped across code lines was an unterminated string | 10 files, on three unrelated pages, pinned as "TradingView publishes them broken" |
+| A mutable variable passed to `request.security` was refused at v5, where only `request.security_lower_tf` refuses it | TradingView's own scope-count demo, whose comment names a different error |
 
 The `random` row is the shape most of these take. TradingView's v4 release notes say
 `random(min, max, seed)` is a v4 function; this engine had it gated as v5-only
