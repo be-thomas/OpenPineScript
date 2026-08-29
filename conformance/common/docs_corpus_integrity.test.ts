@@ -19,6 +19,7 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { compileScript } from "../../transpiler/common";
 
 const ROOT = path.resolve(__dirname, "../..");
 const EXAMPLES = path.join(ROOT, "examples");
@@ -237,6 +238,57 @@ describe("scripts that do not compile on purpose", () => {
     expect(src).toMatch(/c_holiday/);
     expect(src).not.toMatch(/c_holiday\s*=/);
   });
+});
+
+/**
+ * Scripts that `import` a library.
+ *
+ * Nine vendored files do, and none of them compiles on its own — an import
+ * needs the library's SOURCE, which this engine cannot fetch from TradingView.
+ * That is by design and not a gap.
+ *
+ * Three of the nine are different, and worth proving: the documentation page
+ * publishes the library and the script that uses it as adjacent code blocks, so
+ * both halves ARE in the corpus. Compiling them together is the only end-to-end
+ * check of the import machinery against code this repo did not write — and it
+ * is what turned up that an exported `enum` never reached the importing script.
+ */
+const LIBRARY_PAIRS: ReadonlyArray<[string, string, string]> = [
+  ["userName/Point/1", "v5-concepts-libraries-05", "v5-concepts-libraries-06"],
+  ["TradingView/PivotLabels/1", "v5-concepts-libraries-07", "v5-concepts-libraries-08"],
+  ["userName/Signal/1", "v5-concepts-libraries-09", "v5-concepts-libraries-10"],
+];
+
+/** The six whose library is not published anywhere in the docs. */
+const LIBRARIES_NOT_PUBLISHED: readonly string[] = [
+  "v5/v5-concepts-libraries-12.pine",   // PineCoders/AllTimeHighLow/1
+  "v5/v5-faq-alerts-01.pine",           // TradingView/ta/7
+  "v5/v5-faq-alerts-06.pine",           // PineCoders/Time/4
+  "v5/v5-faq-alerts-08.pine",           // TradingView/ta/7
+  "v5/v5-faq-data-structures-18.pine",  // PineCoders/getSeries/1
+  "v5/v5-faq-functions-04.pine",        // PineCoders/ConditionalAverages/1
+];
+
+describe("scripts that import a library", () => {
+  for (const [path, library, user] of LIBRARY_PAIRS) {
+    it(`${user} compiles against ${library}`, () => {
+      const source = read(`v5/${user}.pine`);
+      const libraries = { [path]: read(`v5/${library}.pine`) };
+      expect(() => compileScript(source, { libraries })).not.toThrow();
+    });
+
+    it(`...and does NOT compile without it`, () => {
+      expect(() => compileScript(read(`v5/${user}.pine`)))
+        .toThrow(/no source was supplied for the library/);
+    });
+  }
+
+  for (const file of LIBRARIES_NOT_PUBLISHED) {
+    it(`${file} imports a library the docs do not publish`, () => {
+      expect(() => compileScript(read(file)))
+        .toThrow(/no source was supplied for the library/);
+    });
+  }
 });
 
 describe("the corpus is there at all", () => {

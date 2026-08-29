@@ -3,7 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org)
 [![Pine Script](https://img.shields.io/badge/Pine%20Script-v1%20%E2%80%93%20v5-orange.svg)](#supported-pine-script-versions)
-[![Tests](https://img.shields.io/badge/tests-1684%20passing-success.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1860%20passing-success.svg)](#testing)
 
 **OpenPineScript is an open-source Pine Script engine.** It compiles TradingView
 Pine Script source (`.pine`) to JavaScript and executes it against your own OHLCV
@@ -129,11 +129,11 @@ logs.
 
 | Declared version | Scripts | Compile today |
 |---|---|---|
-| `//@version=2` | 26 | 23 (88%) |
+| `//@version=2` | 26 | 26 (100%) |
 | `//@version=3` | 18 | 17 (94%) |
 | `//@version=4` | 148 | 146 (99%) |
-| `//@version=5` | 571 | 537 (94%) |
-| **Total** | **763** | **723 (95%)** |
+| `//@version=5` | 571 | 543 (95%) |
+| **Total** | **763** | **732 (96%)** |
 
 Byte-identity is checked rather than promised —
 [`scripts/common/fetch-doc-examples.mjs`](scripts/common/fetch-doc-examples.mjs) re-downloads
@@ -144,17 +144,17 @@ every page and compares SHA-256 digests against
 node scripts/common/fetch-doc-examples.mjs verify
 ```
 
-Every one of the 723 also emits VALID JavaScript, and running all of them over
-506 bars produces no `ReferenceError` — an unimplemented built-in is reported as
-`Undeclared identifier` at compile time, the way TradingView reports it, rather
-than crashing on the first bar.
+Every one of the 732 also emits VALID JavaScript, and running all of them over
+506 bars produces no `ReferenceError` — an unknown name is reported at COMPILE
+time, the way TradingView reports it, rather than crashing on the first bar or,
+worse, reading as `undefined` and taking a branch nobody meant.
 
-| Running all 723 over the sample dataset | |
+| Running all 732 over the sample dataset | |
 |---|---|
-| plots real values | 330 |
-| runs, plots only `na` | 110 |
-| runs, produces no output at all | 159 |
-| raises a runtime error | 124 |
+| plots real values | 360 |
+| runs, plots only `na` | 123 |
+| runs, produces no output at all | 183 |
+| raises a runtime error | 66 |
 
 `na` and no-output are usually correct: a script gated on
 `barstate.islastconfirmedhistory`, an intraday session, or a symbol this dataset
@@ -162,13 +162,15 @@ is not, has nothing to draw. The runtime errors are dominated by the
 non-standard chart types (`renko`, `linebreak`, `pointfigure`), which refuse
 rather than approximate.
 
-The 40 that do not compile are no longer a map of missing syntax. Twenty of them
-are not runnable Pine at all — TradingView publishes them broken, or they are
+The 31 that do not compile contain no known engine gap. Twenty-two are not
+runnable Pine at all — TradingView publishes them broken, or they are
 documentation blocks rather than scripts, or they exist to DEMONSTRATE a
 compilation error — and are pinned as such in
 [`conformance/common/docs_corpus_integrity.test.ts`](conformance/common/docs_corpus_integrity.test.ts)
-so the denominator stays honest. Nine import a library whose source the
-documentation does not ship. Every one is broken down by cause in the
+so the denominator stays honest. The other nine `import` a library, which needs
+that library's source; for the three whose library the docs publish alongside
+them, the same suite proves both halves compile together. Every one is broken
+down by cause in the
 [corpus README](examples/common/tradingview-docs/README.md), along with the defects
 running it has already fixed. The files are © TradingView and are not covered by
 this repository's licence.
@@ -243,7 +245,7 @@ Report written: ./results/comparison_report.json
 npm test
 ```
 
-1,684 tests pass across 65 files. None fail.
+1,860 tests pass across 69 files. None fail.
 
 Two patterns carry most of the weight:
 
