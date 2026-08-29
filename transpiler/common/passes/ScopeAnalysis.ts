@@ -106,6 +106,23 @@ export interface ScopeInfo {
    * from "does not return a tuple at all".
    */
   tupleArity: ReadonlyMap<string, number>;
+  /**
+   * name → its Pine TYPE, where that is knowable without evaluating anything.
+   *
+   * v5 dispatches an overloaded method on its receiver: "The underlying type of
+   * each variable determines which overload of `getType()` the compiler will
+   * use." So the compiler needs a type for a bare name, and this is the least
+   * machinery that supplies one.
+   *
+   * Deliberately conservative — it answers "provably this type", not "probably
+   * this type", and is absent for anything it cannot prove. The consumer turns
+   * an absence into a diagnostic that names the overloads it could not choose
+   * between, so a wrong guess is never silently dispatched on.
+   *
+   * Script scope only, for the same reason `booleans` is: a function-local
+   * shadowing a global would otherwise retype the global.
+   */
+  staticTypes: ReadonlyMap<string, string>;
 }
 
 /** Half-open in neither direction: both token indices are inside the scope. */
@@ -200,6 +217,76 @@ function tupleArityOfBody(node: any): number | null {
   return tupleArityOfContents(lastContents(node.fun_body_multiline?.()));
 }
 
+/**
+ * The type a declaration STATES — `float x = na`, `array<float> a = …`.
+ *
+ * v5 spells it `field_type`, which carries the type arguments with it; v4 has
+ * only `type_name`. Written out rather than inferred, so it wins over anything
+ * the initialiser might suggest.
+ */
+function declaredTypeOf(node: any): string | null {
+  const text = (node.field_type?.() ?? node.type_name?.())?.getText();
+  return text || null;
+}
+
+/** The type of a `Type.new(…)` / `input.int(…)` style call, or null. */
+function typeOfCall(callee: string): string | null {
+  // `input.int(20, "Samples")` is an int, and the rest of the family follows
+  // its own name. `input.source` is a series float.
+  const INPUTS: Record<string, string> = {
+    "input.int": "int", "input.float": "float", "input.bool": "bool",
+    "input.string": "string", "input.color": "color", "input.source": "float",
+    "input.price": "float", "input.time": "int", "input.timeframe": "string",
+    "input.symbol": "string", "input.session": "string", "input.text_area": "string",
+  };
+  if (INPUTS[callee]) return INPUTS[callee];
+
+  // `Point.new(…)` — a user type's constructor. The `.new` suffix is what
+  // identifies it; the root is the type. A built-in `label.new` names a
+  // built-in type, which is equally the answer.
+  const dot = callee.lastIndexOf(".");
+  if (dot > 0 && callee.slice(dot + 1) === "new") return callee.slice(0, dot);
+  return null;
+}
+
+/**
+ * The type of an EXPRESSION, where it is provable, or null.
+ *
+ * Literals and a handful of calls, and nothing else — no arithmetic, no
+ * ternaries, no reads of other variables. Each of those would need a promotion
+ * rule (`int + float` is a float) that this pass has no business owning, and
+ * being absent is a safe answer here where being wrong is not.
+ */
+function inferredTypeOf(node: any): string | null {
+  if (!node) return null;
+  const kind = ruleName(node);
+
+  if (kind === "Num_literalContext") {
+    return node.INT_LITERAL?.() ? "int" : "float";
+  }
+  if (kind === "Other_literalContext") {
+    if (node.BOOL_LITERAL?.()) return "bool";
+    if (node.STR_LITERAL?.()) return "string";
+    if (node.COLOR_LITERAL?.()) return "color";
+    return null;
+  }
+  if (kind === "Fun_callContext") {
+    // A chained call's type is the last link's, which this pass does not model.
+    if (node.call_suffix?.()?.length) return null;
+    return typeOfCall(textOf(node.id?.()));
+  }
+  if (kind === "IdContext") {
+    // `color.white` and its sixteen siblings. A namespace read is the only
+    // bare identifier whose type is spelled in its own name.
+    return textOf(node).startsWith("color.") ? "color" : null;
+  }
+
+  // Single-child wrapper rules (arith_expr → ternary_expr → … → atom): descend
+  // so the classification survives the chain, exactly as isStaticallyBool does.
+  const kids = children(node).filter(c => typeof c?.getChildCount === "function");
+  return kids.length === 1 ? inferredTypeOf(kids[0]) : null;
+}
+
 function spanOf(node: any): Span | null {
   const start = node?.start?.tokenIndex;
   const stop = node?.stop?.tokenIndex;
@@ -264,6 +351,7 @@ class Collector {
   readonly functionScoped = new Set<string>();
   readonly scopesOf = new Map<string, Array<Span | null>>();
   readonly tupleArity = new Map<string, number>();
+  readonly staticTypes = new Map<string, string>();
 
   /** The local scopes currently open, innermost last. */
   private scopeStack: Array<Span | null> = [];
@@ -354,6 +442,12 @@ class Collector {
           if (this.fnDepth === 0 && isStaticallyBool(node.arith_expr?.(), this.booleans)) {
             this.booleans.add(name);
           }
+          if (this.fnDepth === 0 && !this.staticTypes.has(name)) {
+            // Declared beats inferred: `float x = 1` is a float, whatever the
+            // literal says.
+            const type = declaredTypeOf(node) ?? inferredTypeOf(node.arith_expr?.());
+            if (type) this.staticTypes.set(name, type);
+          }
         }
         break;
       }
@@ -427,5 +521,6 @@ export function analyseScopes(tree: ParseTree | ParserRuleContext): ScopeInfo {
     functionScoped: c.functionScoped,
     scopesOf: c.scopesOf,
     tupleArity: c.tupleArity,
+    staticTypes: c.staticTypes,
   };
 }

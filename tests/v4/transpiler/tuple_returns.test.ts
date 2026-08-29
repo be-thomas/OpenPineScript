@@ -32,6 +32,8 @@ import { describe, it, expect } from "vitest";
 import { transpile, compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v5";
 
+const HEAD_V5 = '//@version=5\nindicator("t")\n';
+
 const head = (v: number) =>
   v === 1 ? 'study("t")\n'
           : `//@version=${v}\n${v >= 5 ? 'indicator("t")' : 'study("t")'}\n`;
@@ -175,6 +177,40 @@ describe("as request.security's expression", () => {
       "f() =>\n    close\n" +
       '[a, b] = request.security(syminfo.tickerid, "1D", f())\n';
     expect(() => transpile(src)).toThrow(/does not return a tuple/);
+  });
+});
+
+describe("a METHOD CHAIN destructured", () => {
+  /**
+   * The value being unpacked is the LAST link's:
+   *
+   *     [sampleMean, highBand, lowBand] =
+   *         sourceArray.maintainQueue(sourceInput, newSample).calcBB(multiplier, newSample)
+   *
+   * from the manual's Methods page, where `maintainQueue` "returns ...
+   * `srcArray` object" and `calcBB` returns "a tuple containing the basis,
+   * upper band, and lower band respectively". The arity check read the call's
+   * own `id` — the receiver plus the FIRST method — and so asked
+   * `maintainQueue` whether it returns a tuple, which it does not.
+   */
+  const CHAIN = HEAD_V5 +
+    "method twice(array<float> self) =>\n    self\n" +
+    "method stats(array<float> self) =>\n    [self.get(0), self.get(1)]\n" +
+    "xs = array.from(3.0, 4.0)\n";
+
+  it("unpacks the last link's tuple", () => {
+    expect(read(CHAIN + "[a, b] = xs.twice().stats()\n", "a")).toBe(3);
+    expect(read(CHAIN + "[a, b] = xs.twice().stats()\n", "b")).toBe(4);
+  });
+
+  it("its arity is the last link's too", () => {
+    expect(() => transpile(CHAIN + "[a, b, c] = xs.twice().stats()\n"))
+      .toThrow(/'stats' returns 2 values, but you provided 3/);
+  });
+
+  it("a chain whose last link returns no tuple still says so, and names IT", () => {
+    expect(() => transpile(CHAIN + "[a, b] = xs.stats().twice()\n"))
+      .toThrow(/'twice' does not return a tuple/);
   });
 });
 

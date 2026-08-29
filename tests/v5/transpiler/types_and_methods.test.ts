@@ -224,16 +224,17 @@ describe("methods", () => {
       .toThrow(/method 'broken' has no parameters/);
   });
 
-  it("two methods of one name are refused rather than silently overwritten", () => {
-    // Pine dispatches on the receiver's TYPE and allows this; this engine
-    // dispatches by name and cannot. Refused, not approximated.
+  it("two methods of one name and one receiver TYPE are refused", () => {
+    // Overloads are told apart by the receiver; two that share it are one
+    // method written twice, and the second would silently win.
     const src = HEAD + [
       "method size(int self) =>",
       "    self",
-      "method size(string self) =>",
-      "    str.length(self)",
+      "method size(int self) =>",
+      "    self * 2",
     ].join("\n") + "\n";
-    expect(() => compileScript(src)).toThrow(/method 'size' is already defined/);
+    expect(() => compileScript(src))
+      .toThrow(/method 'size' is already defined for a 'int' receiver/);
   });
 });
 

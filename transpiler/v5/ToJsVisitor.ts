@@ -323,6 +323,17 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    */
   protected userMethods: Set<string> = new Set();
 
+  /**
+   * method name → the receiver type of each declaration of it, in file order.
+   *
+   * A single entry is the ordinary case and changes nothing. Two or more is an
+   * OVERLOAD SET: "User-defined methods can override and overload existing
+   * built-in and user-defined methods with the same identifier ... The
+   * underlying type of each variable determines which overload of `getType()`
+   * the compiler will use."
+   */
+  protected methodOverloads: Map<string, string[]> = new Map();
+
   /** `import … as alias` → the library path it names. */
   protected importAliases: Map<string, string> = new Map();
 
@@ -462,7 +473,16 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       if (isRule(n, "Method_def_stmtContext")) {
         const def = n.fun_def_stmt();
         const inner = def.fun_def_singleline() ?? def.fun_def_multiline();
-        if (inner) this.userMethods.add(inner.id().getText());
+        if (inner) {
+          const name = inner.id().getText();
+          this.userMethods.add(name);
+          // Collected HERE rather than at the definition, because Pine permits
+          // forward references: `a.getType()` may appear above the overload it
+          // resolves to, and the call site has to know the whole set.
+          const overloads = this.methodOverloads.get(name) ?? [];
+          overloads.push(this.receiverTypeOf(inner));
+          this.methodOverloads.set(name, overloads);
+        }
       }
       const count = n.getChildCount?.() ?? 0;
       for (let i = 0; i < count; i++) walk(n.getChild(i));
@@ -783,6 +803,30 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   }
 
   /**
+   * The LAST link of a chain is what a destructuring unpacks.
+   *
+   *     [sampleMean, highBand, lowBand] =
+   *         sourceArray.maintainQueue(sourceInput, newSample).calcBB(multiplier, newSample)
+   *
+   * `maintainQueue` returns the array; `calcBB` returns "a tuple containing the
+   * basis, upper band, and lower band respectively". The base reads the call's
+   * own `id`, which here is the receiver plus the FIRST method — so the arity
+   * check asked `maintainQueue` and was told, correctly, that it returns no
+   * tuple.
+   *
+   * A trailing FIELD suffix is not a callee, so it is skipped: `f().x` unpacks
+   * nothing, and naming `x` would produce a message about a function that does
+   * not exist.
+   */
+  protected override destructuringCallee(call: Fun_callContext): string {
+    const suffixes = ((call as any).call_suffix?.() ?? []) as Call_suffixContext[];
+    for (let i = suffixes.length - 1; i >= 0; i--) {
+      if (suffixes[i].LPAR()) return suffixes[i].id().getText().split(".").pop()!;
+    }
+    return super.destructuringCallee(call as any);
+  }
+
+  /**
    * `a.f().g()` — the chained method calls hanging off a call's result.
    *
    * Folded here rather than inside each emit path, because every one of them
@@ -832,7 +876,11 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     const at = this.getLocId(ctx as SourceLocated);
 
     if (this.userMethods.has(method)) {
-      return `ctx.call("${method}${at}", ${this.funcName(method)}, ${receiver}${tail})`;
+      // The receiver here is a VALUE — the previous link's result — and not a
+      // name, so there is nothing to look a declared type up by. Passing null
+      // makes an overloaded method say so rather than pick one.
+      const overload = this.resolveOverload(method, null, ctx as SourceLocated);
+      return `ctx.call("${method}${at}", ${overload ?? this.funcName(method)}, ${receiver}${tail})`;
     }
 
     const owner = this.libraryMethods.get(method);
@@ -964,7 +1012,10 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     const callId = `"${receiver}.${method}${this.getLocId(ctx as SourceLocated)}"`;
 
     if (this.userMethods.has(method)) {
-      return `ctx.call(${callId}, ${this.funcName(method)}, ${target}${tail})`;
+      // An overload set resolves on the receiver's declared type; a name with a
+      // single declaration takes the ordinary path unchanged.
+      const overload = this.resolveOverload(method, receiver, ctx as SourceLocated);
+      return `ctx.call(${callId}, ${overload ?? this.funcName(method)}, ${target}${tail})`;
     }
 
     // A method this script imported rather than declared. Checked after the
@@ -1265,19 +1316,99 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       );
     }
 
-    if (this.definedMethods.has(name)) {
+    const receiver = this.receiverTypeOf(inner!);
+    const key = `${name}/${receiver}`;
+    if (this.definedMethods.has(key)) {
       throw this.err(
         ctx,
-        `method '${name}' is already defined. OpenPineScript dispatches a method ` +
-        `by NAME, not by receiver type, so two methods cannot share one.`,
+        `method '${name}' is already defined for a '${receiver}' receiver. ` +
+        `Overloads are told apart by their receiver's type, so two cannot share one.`,
       );
     }
-    this.definedMethods.add(name);
+    this.definedMethods.add(key);
 
-    return this.visit(def);
+    // An overload set emits one JavaScript function per receiver type, under a
+    // name that carries the type. `methodFunctionName` is what both the
+    // definition and every call site go through, so the two cannot disagree.
+    return this.withMethodReceiver(receiver, () => this.visit(def));
   }
 
-  /** Method names ALREADY EMITTED, for the duplicate check above. */
+  /**
+   * A method's receiver type — the declared type of its FIRST parameter.
+   *
+   * "Since user-defined methods require explicit type specification for their
+   *  first parameter (the receiver object)", this is always written down, and
+   * it is the whole basis of overload resolution. A parameter with no declared
+   * type is recorded as `?`, which no overload set can be resolved against and
+   * which reads correctly in the diagnostic.
+   */
+  protected receiverTypeOf(inner: Fun_def_singlelineContext | Fun_def_multilineContext): string {
+    const first = (inner as any).fun_head?.()?.fun_param?.()?.[0];
+    return first?.field_type?.()?.getText() ?? "?";
+  }
+
+  /**
+   * The JavaScript name for one method.
+   *
+   * Unqualified while the name has a single declaration, so nothing about a
+   * script without overloads changes; qualified by receiver type as soon as it
+   * has more than one, because two JavaScript functions of the same name are
+   * one function and the second silently wins.
+   */
+  protected methodFunctionName(name: string, receiver: string | null): string {
+    const overloads = this.methodOverloads.get(name) ?? [];
+    if (overloads.length < 2 || receiver === null) return this.funcName(name);
+    return `${this.funcName(name)}$${receiver.replace(/[^A-Za-z0-9_]/g, "_")}`;
+  }
+
+  /** The receiver type of the method definition currently being emitted. */
+  protected emittingMethodFor: string | null = null;
+
+  /**
+   * A method's definition takes the qualified name; every other definition
+   * keeps its own. Only `visitMethod_def_stmt` sets `emittingMethodFor`, and a
+   * definition cannot nest inside another, so the flag cannot leak.
+   */
+  protected override definitionFunctionName(pineName: string): string {
+    return this.emittingMethodFor === null
+      ? super.definitionFunctionName(pineName)
+      : this.methodFunctionName(pineName, this.emittingMethodFor);
+  }
+
+  private withMethodReceiver<T>(receiver: string, body: () => T): T {
+    const previous = this.emittingMethodFor;
+    this.emittingMethodFor = receiver;
+    try { return body(); }
+    finally { this.emittingMethodFor = previous; }
+  }
+
+  /**
+   * Which overload of `name` a receiver spelled `expression` resolves to.
+   *
+   * Returns null when `name` is not overloaded — the caller then takes its
+   * ordinary path. Throws when it IS overloaded and the receiver's type cannot
+   * be proved, because guessing would dispatch to a body written for another
+   * type and return a plausible wrong answer.
+   */
+  protected resolveOverload(name: string, receiverName: string | null, ctx: SourceLocated): string | null {
+    const overloads = this.methodOverloads.get(name) ?? [];
+    if (overloads.length < 2) return null;
+
+    const type = receiverName === null ? undefined : this.scopes.staticTypes?.get(receiverName);
+    if (type !== undefined && overloads.includes(type)) {
+      return this.methodFunctionName(name, type);
+    }
+
+    throw this.err(
+      ctx,
+      `'${name}' is declared ${overloads.length} times, for ${overloads.map(t => `'${t}'`).join(", ")} ` +
+      `receivers, and the type of ${receiverName ? `'${receiverName}'` : "this receiver"} ` +
+      `${type === undefined ? "cannot be determined here" : `is '${type}', which none of them takes`}. ` +
+      `Declare it — 'float ${receiverName ?? "x"} = …' — so the overload can be chosen.`,
+    );
+  }
+
+  /** `name/receiverType` for every method ALREADY EMITTED — the duplicate check above. */
   private definedMethods: Set<string> = new Set();
 
   /**

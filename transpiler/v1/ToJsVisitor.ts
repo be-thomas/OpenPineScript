@@ -306,6 +306,18 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return null;
   }
 
+  /**
+   * Whose return type a `[a, b] = <call>` is asking about.
+   *
+   * The call itself here, because before v5 a call is the whole expression.
+   * v5 overrides it: in `arr.maintainQueue(x).calcBB(y)` the value being
+   * unpacked is `calcBB`'s, not `maintainQueue`'s, and reading the base call
+   * asked the wrong function whether it returns a tuple.
+   */
+  protected destructuringCallee(call: Fun_callContext): string {
+    return call.id().getText();
+  }
+
   /** User-defined functions cannot return tuples. */
   protected enforceNoTupleReturn(ctx: SourceLocated, detail = ""): void {
     throw this.err(ctx, `User-defined functions cannot return tuples.${detail}`);
@@ -519,8 +531,20 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return "";
   }
 
+  /**
+   * The JavaScript name a function DEFINITION is emitted under.
+   *
+   * The same as `funcName` here, and a seam because v5's method overloads are
+   * not: a name declared for several receiver types needs one JavaScript
+   * function per type, and definition and call site must agree on how that name
+   * is spelled.
+   */
+  protected definitionFunctionName(pineName: string): string {
+    return this.funcName(pineName);
+  }
+
   visitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
-    const name = this.funcName(ctx.id().getText());
+    const name = this.definitionFunctionName(ctx.id().getText());
     const params = this.visit(ctx.fun_head());
     this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_singleline(), ctx);
 
@@ -538,7 +562,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   }
 
   visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
-    const name = this.funcName(ctx.id().getText());
+    const name = this.definitionFunctionName(ctx.id().getText());
     const params = this.visit(ctx.fun_head());
     this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_multiline(), ctx);
 
@@ -780,7 +804,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     const funCall = findFunCall(arith);
     
     if (funCall) {
-        const funcName = funCall.id().getText();
+        const funcName = this.destructuringCallee(funCall);
         const entry = this.registry[funcName];
 
         // A call can return a tuple because its ARGUMENT is one:
