@@ -124,6 +124,23 @@ export function isRule(node: unknown, ruleContextName: string): boolean {
   return (node as any)?.constructor?.name === ruleContextName;
 }
 
+/**
+ * Fold a WRAPPED string literal back onto one line.
+ *
+ * The lexer admits a newline inside a string when the next line is indented,
+ * because TradingView's line-continuation pass runs before its lexer does and
+ * the wrap never reaches the token. This is the other half of that rule: the
+ * manual states the resulting sequence "adds only one space to the start of the
+ * wrapped lines, and it does not automatically add line terminators", so the
+ * newline and the indentation together become exactly one space.
+ *
+ * Without this the literal would reach the emitter with a real newline in it and
+ * produce JavaScript that does not parse.
+ */
+export function unwrapString(text: string): string {
+  return text.replace(/\r?\n[ \t]*|\r[ \t]*/g, " ");
+}
+
 export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   /**
    * Depth of user-function bodies currently being emitted.
@@ -1548,6 +1565,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (!t) return "";
     const text = t.getText();
     if (ctx.COLOR_LITERAL()) return JSON.stringify(text);
+    if (ctx.STR_LITERAL()) return unwrapString(text);
     return text;
   }
 

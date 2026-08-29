@@ -71,9 +71,30 @@ FLOAT_LITERAL : [0-9]+ '.' [0-9]* ([eE] [+-]? [0-9]+)?
               | '.' [0-9]+ ([eE] [+-]? [0-9]+)?
               | [0-9]+ [eE] [+-]? [0-9]+
               ;
-STR_LITERAL   : '"' ( ~["\r\n\\] | '\\' . )* '"'
-              | '\'' ( ~['\r\n\\] | '\\' . )* '\''
+// A literal string may be WRAPPED across code lines, and the wrap is part of
+// the token rather than a line break the indenter should see.
+//
+// From the manual's Strings page: "programmers can use line wrapping to define
+// single-line literal strings across multiple code lines, where each wrapped
+// line has an indentation of one or more spaces. However, the resulting
+// character sequence adds only one space to the start of the wrapped lines, and
+// it does not automatically add line terminators. This line-wrapping behavior is
+// deprecated; future versions of Pine Script will not support it."
+//
+// It sits in the BASE lexer because no documentation dates its arrival. It is a
+// consequence of the line-continuation PRE-PASS that TradingView's own published
+// v2 lexer grammar implies — that grammar forbids '\n' inside STR_LITERAL and
+// still declares a LINE_CONTINUATION token, so by the time the lexer runs the
+// wrap has already been folded away. Deprecating it in v6 says it was there
+// before; nothing says when it started. Same reading as `syminfo`: a rule with
+// no stated introduction version is treated as always having been there.
+//
+// The indentation is REQUIRED. A quote left open with the next line at column 0
+// is an unterminated string, and must keep failing.
+STR_LITERAL   : '"' ( ~["\r\n\\] | '\\' . | STR_WRAP )* '"'
+              | '\'' ( ~['\r\n\\] | '\\' . | STR_WRAP )* '\''
               ;
+fragment STR_WRAP : ( '\r'? '\n' | '\r' ) [ \t]+ ;
 // ANTLR4 lexer rules do NOT support {n} repetition — `{6}` is parsed as an
 // ACTION block, so '#' [0-9a-fA-F]{6} matched '#' plus a SINGLE hex digit and
 // left the rest as an identifier ('#0ebb23' lexed as '#0' then 'ebb23').
