@@ -190,10 +190,6 @@ TradingView's own release notes before being changed:
 | An unknown MEMBER of a known namespace read as `undefined` rather than erroring | 34 distinct built-ins, across 100+ files |
 | `x == y` between two variables was always false — Series are objects, and `==` on two objects is reference equality | an enum comparison that looked like an enum problem |
 | A PRIMITIVE arriving on top of a namespace destroyed it, so `line.all` resolved or not depending on filename order | `line.all` throwing where `label.all` worked |
-| A comma-separated body emitted `return let x = …` — JavaScript that does not parse | 3 files failing `new Function(js)` |
-| `str.tostring`'s format argument was silently dropped, so every golden column had been captured unformatted | the v5 rename table overwriting a real implementation |
-| `syminfo.tickerid` read as the `tickerid()` FUNCTION object, because one registry key served both | 89 uses across the corpus |
-| A block's local was visible from global scope, emitting a name nothing binds | 3 files, all of them TradingView's own scope demos |
 
 The `random` row is the shape most of these take. TradingView's v4 release notes say
 `random(min, max, seed)` is a v4 function; this engine had it gated as v5-only
