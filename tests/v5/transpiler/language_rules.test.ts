@@ -251,10 +251,44 @@ describe("request.security", () => {
       .toThrow(/'security' was renamed to 'request\.security' in Pine Script v5/);
   });
 
-  it("the v3 mutable-argument guard still applies", () => {
+  it("the v3 mutable-argument guard NO LONGER applies to request.security", () => {
+    // v5 narrows the rule to one member of the family. The Other timeframes and
+    // data page restricts `request.security()` only inside a loop — "a
+    // request.*() call's evaluated expression cannot depend on the values of
+    // those variables", said of loop-header and loop-local variables — and
+    // TradingView's own `v5-writing-limitations-10` passes a global `var`
+    // mutated by 300 `if` blocks straight into it, naming the scope count as the
+    // only error.
     expect(() => compileScript(
       `${HEAD}s = close\ns := s * 2\nx = request.security(syminfo.tickerid, "D", s)\n`,
+    )).not.toThrow();
+  });
+
+  it("...but it does apply to request.security_lower_tf", () => {
+    // "The expression parameter in request.security_lower_tf() accepts most of
+    //  the same arguments discussed in that section, EXCLUDING direct references
+    //  to collections and mutable variables declared in the script's main
+    //  scope." Said of this function as a difference from request.security().
+    expect(() => compileScript(
+      `${HEAD}s = close\ns := s * 2\nx = request.security_lower_tf(syminfo.tickerid, "1", s)\n`,
     )).toThrow(/cannot use mutable variable 's' as an argument for security/);
+  });
+
+  it("a mutable reached through a CALL is still fine for security_lower_tf", () => {
+    // "direct references" is the wording, and wrapping in a function is the
+    // documented way out of it.
+    expect(() => compileScript(
+      `${HEAD}s = close\ns := s * 2\nf() => s\nx = request.security_lower_tf(syminfo.tickerid, "1", f())\n`,
+    )).not.toThrow();
+  });
+
+  it("v3 and v4 keep the blanket rule", () => {
+    // Nothing in either archive lifts it, so nothing here does either.
+    for (const version of [3, 4]) {
+      expect(() => compileScript(
+        `//@version=${version}\nstudy("t")\ns = close\ns := s * 2\nx = security("AAPL", "D", s)\n`,
+      ), `v${version}`).toThrow(/cannot use mutable variable 's'/);
+    }
   });
 
   it("timeframe= reaches the runtime's `resolution` parameter", () => {

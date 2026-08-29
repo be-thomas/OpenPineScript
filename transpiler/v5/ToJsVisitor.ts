@@ -1119,6 +1119,32 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   }
 
   /**
+   * v5 keeps the mutable-argument restriction for ONE member of the family.
+   *
+   * SOURCING. The manual's Other timeframes and data page states it only of
+   * `request.security_lower_tf`: its `expression` parameter "accepts most of the
+   * same arguments discussed in that section, excluding direct references to
+   * collections and mutable variables declared in the script's main scope". It
+   * is said of that function as a DIFFERENCE from `request.security()`, which
+   * the same page restricts only INSIDE A LOOP — "all parameters defining parts
+   * of the requested context can accept arguments that depend on variables from
+   * the loop's header or mutable variables that change within the loop's local
+   * scope. However, a request.*() call's evaluated expression cannot depend on
+   * the values of those variables."
+   *
+   * TradingView's own `v5-writing-limitations-10` settles it. That script passes
+   * the global `var x = 0`, mutated by 300 `if` blocks, straight into
+   * `request.security()`, and its comment names the only error as "compilation
+   * error since the scope count is now 602". The blanket v3 guard rejected it
+   * one rule too early, for a reason v5 does not have.
+   *
+   * v3 and v4 are untouched: nothing in either archive lifts the rule there.
+   */
+  protected override securityRestrictsMutableArgs(ctx: Fun_callContext): boolean {
+    return ctx.id().getText() === "request.security_lower_tf";
+  }
+
+  /**
    * `strategy.exit()` with no exit condition is rejected (§4d).
    *
    * Positional form is admitted from the fifth argument on: the parameter order
