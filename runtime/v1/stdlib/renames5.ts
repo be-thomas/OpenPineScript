@@ -263,5 +263,20 @@ export const V5_REMOVED: readonly string[] = (() => {
     // the note on TICKER above for why one entry currently serves both.
     removed.delete("syminfo.tickerid");
 
+    // `fixnan` was never renamed. It is in the TA group above so that
+    // `ta.fixnan` resolves, but the FLAT name survives v5 — TradingView's own
+    // v5 plots page writes
+    //
+    //     pivotHigh = fixnan(ta.pivothigh(3,3))
+    //
+    // with `ta.` on one call and not the other, and its prose links the word to
+    // the reference entry `#fun_fixnan` rather than `#fun_ta.fixnan`. The
+    // v4-to-v5 migration guide lists no rename for it either. Three of
+    // TradingView's published v5 examples were rejected by treating it as one.
+    //
+    // Belongs with `na` and `nz` rather than with the technical-analysis
+    // library: it is na HANDLING, and none of that family moved.
+    removed.delete("fixnan");
+
     return [...removed];
 })();

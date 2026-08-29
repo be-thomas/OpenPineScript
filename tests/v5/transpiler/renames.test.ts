@@ -69,11 +69,36 @@ describe("every rename resolves at v5 to what its v4 spelling meant", () => {
   });
 });
 
+/**
+ * Names that are in the rename table so the NEW spelling resolves, and whose
+ * OLD spelling survives anyway.
+ *
+ * `fixnan` is the one that is not obvious. TradingView's v5 plots page writes
+ *
+ *     pivotHigh = fixnan(ta.pivothigh(3,3))
+ *
+ * — `ta.` on one call and not the other — and its prose links the word to the
+ * reference entry `#fun_fixnan`, not `#fun_ta.fixnan`. The migration guide
+ * lists no rename for it either. It belongs with `na` and `nz`, which are na
+ * HANDLING and did not move, rather than with the ta library that did.
+ *
+ * `syminfo.tickerid` is the older case: it is the SOURCE of `ticker.new`, and
+ * only the FUNCTION moved.
+ */
+const SURVIVES_ITS_RENAME = new Set(["syminfo.tickerid", "fixnan"]);
+
 describe("the v4 spelling is refused at v5", () => {
   for (const { to, from } of V5_RENAMES) {
     if (from === undefined || from.includes(".")) continue;
+    if (SURVIVES_ITS_RENAME.has(from)) continue;
     it(`${from} is gone`, () => {
       expect(V5_VIEW[from], `${from} still resolves at v5`).toBeUndefined();
+    });
+  }
+
+  for (const from of SURVIVES_ITS_RENAME) {
+    it(`${from} survives — both spellings resolve at v5`, () => {
+      expect(V5_VIEW[from], `${from} should still resolve at v5`).toBeDefined();
     });
   }
 
@@ -152,7 +177,7 @@ describe("the removal list is derived, not hand-maintained", () => {
   it("every renamed source is removed", () => {
     const removed = new Set(V5_REMOVED);
     for (const { from } of V5_RENAMES) {
-      if (from === undefined || from === "syminfo.tickerid") continue;
+      if (from === undefined || SURVIVES_ITS_RENAME.has(from)) continue;
       expect(removed.has(from), `${from} was renamed but not removed`).toBe(true);
     }
   });
@@ -160,5 +185,11 @@ describe("the removal list is derived, not hand-maintained", () => {
   it("syminfo.tickerid survives, because only the FUNCTION moved", () => {
     expect(V5_VIEW["syminfo.tickerid"]).toBeDefined();
     expect(V5_VIEW["ticker.new"]).toBeDefined();
+  });
+
+  it("fixnan survives, and both spellings compute the same thing", () => {
+    const src = (fn: string) => `y = bar_index == 1 ? na : close\nx = ${fn}(y)`;
+    expect(evaluate(5, src("fixnan"), "x")).toBe(11);
+    expect(evaluate(5, src("ta.fixnan"), "x")).toBe(11);
   });
 });
