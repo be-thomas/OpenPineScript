@@ -18,19 +18,45 @@ export const color_purple = "#9C27B0";
 
 // --- Outputs ---
 
+/**
+ * `transp` — the transparency ARGUMENT that every plotting function used to
+ * take, and that v5 deprecated without removing.
+ *
+ * SOURCING. The v4-to-v5 migration guide: "The `transp=` parameter used in the
+ * signature of many v4 plotting functions was deprecated because it interfered
+ * with RGB functionality." DEPRECATED, not removed — and TradingView's own v5
+ * colours page says as much in a comment above two live calls:
+ *
+ *     // Use `transp` parameter (deprecated and advised against)
+ *     plot(ta.sma(close, 70), "70", color.olive, transp = 40)
+ *
+ * ── Why this exists at all ─────────────────────────────────────────────────
+ *
+ * The parameter was not in these signatures at ANY version, so `ctx.call`
+ * dropped it silently: a v3 script asking for a 40%-transparent line got an
+ * opaque one and no warning. v5 rejected it outright, which was wrong in the
+ * other direction — it refused a script TradingView still runs.
+ *
+ * Applied by baking the value into the colour, which is exactly what the
+ * migration guide tells a script to do for itself.
+ */
+const withTransp = (col: any, transp: any): any =>
+    transp === undefined || transp === null ? col : color(col, transp);
+
 export function plot(
     ctx: Context,
     series: number,
     title: string = "Plot",
     color?: string,
     linewidth: number = 1,
-    style?: number
+    style?: number,
+    transp?: any,
 ): string {
     ctx.registerPlot({
         type: 'line',
         value: Number(series),
         title,
-        color,
+        color: withTransp(color, transp),
         linewidth,
         style
     });
@@ -44,7 +70,8 @@ export function plotshape(
     title: string = "Shape",
     style?: string,
     location?: string,
-    color?: string
+    color?: string,
+    transp?: any,
 ): void {
     let val = Number(series);
 
@@ -57,7 +84,7 @@ export function plotshape(
         type: 'shape',
         value: val,
         title,
-        color,
+        color: withTransp(color, transp),
         style
     });
 }
@@ -68,7 +95,8 @@ export function plotchar(
     title: string = "Char",
     char: string = "★",
     location?: string,
-    color?: string
+    color?: string,
+    transp?: any,
 ): void {
     let val = Number(series);
 
@@ -80,7 +108,7 @@ export function plotchar(
         type: 'char',
         value: val,
         title,
-        color,
+        color: withTransp(color, transp),
         style: char
     });
 }
@@ -111,7 +139,8 @@ export function plotbar(
     low: number,
     close: number,
     title: string = "Bar",
-    color?: string
+    color?: string,
+    transp?: any,
 ): void {
     ctx.registerPlot({
         type: 'candle',
@@ -120,7 +149,7 @@ export function plotbar(
         low: Number(low),
         close: Number(close),
         title,
-        color
+        color: withTransp(color, transp)
     });
 }
 
@@ -131,7 +160,8 @@ export function plotcandle(
     low: number,
     close: number,
     title: string = "Candle",
-    color?: string
+    color?: string,
+    transp?: any,
 ): void {
     ctx.registerPlot({
         type: 'candle',
@@ -140,7 +170,7 @@ export function plotcandle(
         low: Number(low),
         close: Number(close),
         title,
-        color
+        color: withTransp(color, transp)
     });
 }
 
@@ -164,10 +194,14 @@ export function plotarrow(
 // --- Visual Layers ---
 
 export function bgcolor(ctx: Context, color: string, transp?: number): void {
+    // `transp` was declared here and then dropped on the floor. See the note on
+    // `withTransp` above: the argument has always been legal and has never been
+    // applied, so a script asking for a 90%-transparent background got an
+    // opaque one at every version.
     ctx.registerPlot({
         type: 'bgcolor',
         title: `_BGCOLOR_${color}`,
-        color
+        color: withTransp(color, transp)
     });
 }
 
@@ -186,9 +220,10 @@ export function fill(
     color?: string,
     title?: string,
     editable?: boolean,
-    fillgaps?: boolean
+    fillgaps?: boolean,
+    transp?: any,
 ): void {
-    ctx.registerFill(plotId1, plotId2, { color, title });
+    ctx.registerFill(plotId1, plotId2, { color: withTransp(color, transp), title });
 }
 
 

@@ -105,18 +105,46 @@ describe("reserved words", () => {
   });
 });
 
-describe("transp= was removed", () => {
-  it("plot(transp=) is refused, pointing at color.new", () => {
-    expect(() => compileScript(`${HEAD}plot(close, transp=50)\n`))
-      .toThrow(/the 'transp' argument was removed in Pine Script v5/);
+describe("transp= was deprecated, not removed", () => {
+  /**
+   * This suite used to assert that v5 REFUSES `transp=`. It does not, and
+   * TradingView says so twice.
+   *
+   * The migration guide: "The `transp=` parameter used in the signature of many
+   * v4 plotting functions was deprecated because it interfered with RGB
+   * functionality." Deprecated. And the v5 colours page carries two live calls
+   * under its own comment:
+   *
+   *     // Use `transp` parameter (deprecated and advised against)
+   *     plot(ta.sma(close, 70), "70", color.olive, transp = 40)
+   *
+   * Refusing it rejected a script TradingView still runs. The parameter is now
+   * accepted at every version and, for the first time, APPLIED — it was not in
+   * any plotting signature before, so `ctx.call` dropped it silently and a v3
+   * script asking for a 40%-transparent line got an opaque one and no warning.
+   */
+  it("v5 accepts it", () => {
+    expect(() => compileScript(`${HEAD}plot(close, transp=50)\n`)).not.toThrow();
   });
 
-  it("color.new(c, transp) is the replacement and works", () => {
+  it("...and it reaches the colour", () => {
+    // The half of this that matters: before, the argument was accepted at v1–v4
+    // and DROPPED, so the assertion is about the recorded colour and not about
+    // the call compiling.
+    const { ctx, exec } = build(`${HEAD}plot(close, color=color.red, transp=50)\n`);
+    ctx.setBar(0, 10, 12, 9, 11, 100);
+    exec();
+    const recorded = [...(ctx as any).plots.values()][0][0];
+    // 50% of 255 is 128 — #FF5252 gains an 0x80 alpha byte.
+    expect(recorded.color).toBe("#FF525280");
+  });
+
+  it("color.new(c, transp) is still the advised replacement, and works", () => {
     expect(() => compileScript(`${HEAD}plot(close, color=color.new(color.red, 50))\n`))
       .not.toThrow();
   });
 
-  it("v4 still accepts transp=", () => {
+  it("v4 accepts it too", () => {
     expect(() => compileScript('//@version=4\nstudy("t")\nplot(close, transp=50)\n'))
       .not.toThrow();
   });

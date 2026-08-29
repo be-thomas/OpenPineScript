@@ -4724,7 +4724,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plot": {
           uses_context: true,
-          args: ["series","title","color","linewidth","style"],
+          args: ["series","title","color","linewidth","style","transp"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4732,7 +4732,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plotshape": {
           uses_context: true,
-          args: ["series","title","style","location","color"],
+          args: ["series","title","style","location","color","transp"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4740,7 +4740,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plotchar": {
           uses_context: true,
-          args: ["series","title","char","location","color"],
+          args: ["series","title","char","location","color","transp"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4756,7 +4756,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plotbar": {
           uses_context: true,
-          args: ["open","high","low","close","title","color"],
+          args: ["open","high","low","close","title","color","transp"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4764,7 +4764,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plotcandle": {
           uses_context: true,
-          args: ["open","high","low","close","title","color"],
+          args: ["open","high","low","close","title","color","transp"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4796,7 +4796,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "fill": {
           uses_context: true,
-          args: ["plotId1","plotId2","color","title","editable","fillgaps"],
+          args: ["plotId1","plotId2","color","title","editable","fillgaps","transp"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,

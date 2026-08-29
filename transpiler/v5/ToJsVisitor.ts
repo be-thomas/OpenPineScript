@@ -1196,25 +1196,6 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     return callee ? KEYWORD_ALIASES[callee]?.[written] : undefined;
   }
 
-  /**
-   * Rejects `transp=`.
-   *
-   * Removed from every plotting function in v5 (§4c) and replaced by baking the
-   * transparency into the colour. Left alone it would be dropped silently by
-   * `Context.call`, so a v5 script asking for a 90%-transparent fill would get
-   * an opaque one and no warning.
-   */
-  override visitKw_arg(ctx: Kw_argContext): string {
-    if (ctx.id().getText() === "transp") {
-      throw this.err(
-        ctx,
-        `the 'transp' argument was removed in Pine Script v5. Set the ` +
-        `transparency on the colour instead: color.new(c, transp) or color.rgb().`,
-      );
-    }
-    return super.visitKw_arg(ctx as any);
-  }
-
   // ── Declarations: type, method, export, import ────────────────────────────
 
   /** v5's `stmt` gained four alternatives; the base knows two. */
