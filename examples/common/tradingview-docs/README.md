@@ -195,7 +195,7 @@ TradingView's own release notes before being changed:
 | `syminfo.tickerid` read as the `tickerid()` FUNCTION object, because one registry key served both | 89 uses across the corpus |
 | A block's local was visible from global scope, emitting a name nothing binds | 3 files, all of them TradingView's own scope demos |
 
-The last one is the shape most of these take. TradingView's v4 release notes say
+The `random` row is the shape most of these take. TradingView's v4 release notes say
 `random(min, max, seed)` is a v4 function; this engine had it gated as v5-only
 on the stated grounds that it had "no v1–v4 spelling to inherit from". A v4
 script calling `random(0, 255)` — as TradingView's own v4 colour documentation
