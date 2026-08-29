@@ -41,53 +41,40 @@ const read = (rel: string) =>
   fs.readFileSync(path.join(EXAMPLES, rel.split("/")[0], "tradingview-docs", rel.split("/")[1]), "utf8");
 
 /**
- * Does a double-quoted string literal in this file span a newline?
+ * Does a string literal in this file span a code line?
  *
- * Pine has no such literal. Multi-line strings arrived in April 2026 and are
- * written with THREE pairs of quotes — "A multiline string is a literal
- * "string" value enclosed by three pairs of quotation marks (e.g., `"""..."""`)
- * or apostrophes" — so a bare `"` left open at end of line is a broken script,
- * not a language feature this engine is missing.
+ * It may. The manual's Strings page documents the wrap as a real, if deprecated,
+ * rule — "programmers can use line wrapping to define single-line literal
+ * strings across multiple code lines, where each wrapped line has an
+ * indentation of one or more spaces" — and the ten corpus files that do it are
+ * therefore ordinary Pine, not published breakage.
+ *
+ * ── The pin this replaced ───────────────────────────────────────────────────
+ *
+ * These ten were listed here as PUBLISHED_BROKEN, on the reading that Pine has
+ * no multi-line string and that the newline visible in the raw HTML was
+ * TradingView shipping a script it could not run either. The raw HTML was read
+ * correctly; the conclusion from it was wrong. Three separate pages doing the
+ * same thing should have been the tell — a typo does not repeat itself in
+ * `str.format`, `log.info` and a `const string` on three unrelated pages.
+ *
+ * So the detector is kept and its verdict inverted: these files must COMPILE.
+ * The rule itself is tested where it lives, in
+ * tests/v1/transpiler/wrapped_strings.test.ts.
  */
-function hasUnterminatedString(source: string): boolean {
-  let open = false;
+function hasWrappedString(source: string): boolean {
   let seen = false;
   for (const line of source.split("\n")) {
     // Drop escape pairs first, so `\"` inside a string is not counted and
     // `\\` at the end of one does not swallow the closing quote.
     const quotes = (line.replace(/\\./g, "").match(/"/g) ?? []).length;
-    if (quotes % 2 === 1) {
-      if (open) open = false;
-      else { open = true; seen = true; }
-    }
+    if (quotes % 2 === 1) seen = true;
   }
   return seen;
 }
 
-/**
- * Files whose PUBLISHED source is not valid Pine.
- *
- * Every one is a long `str.format` mask that TradingView's page ships with a
- * newline inside the quotes:
- *
- *     "time (GMT): {0, time, yyyy-MM-dd'T'HH:mm:ss}\nhighestClose: {1, number, #.####}
- *      \npercentRank: {2, number, #.##}%\nbarsSinceHigh: {3, number, integer}\nisLow: {4}",
- *
- * This was checked against the raw HTML rather than a rendered view, because a
- * markdown conversion of the page re-joins the line and hides it. The
- * `<div class="pine-colorizer">` block itself contains
- *
- *     ...{1, number, #.####}\n     \\npercentRank...
- *
- * — a real newline (`\n`) between two escaped ones (`\\n`). So the wrap is in
- * what TradingView publishes, not in this repo's scrape, and the vendored file
- * is a faithful copy of a script that would not compile on TradingView either.
- *
- * Left in the corpus rather than deleted or repaired: repairing it would break
- * the byte-identity that `fetch-doc-examples.mjs verify` exists to check, and
- * deleting it would quietly shrink the denominator.
- */
-const PUBLISHED_BROKEN: readonly string[] = [
+/** The files that wrap a string literal. Named, so a new one has to be looked at. */
+const WRAPPED_STRINGS: readonly string[] = [
   "v5/v5-concepts-time-00.pine",
   "v5/v5-concepts-time-24.pine",
   "v5/v5-faq-indicators-00.pine",
@@ -206,13 +193,20 @@ const REFUSED_ON_PURPOSE: readonly string[] = [
   "v5/v5-faq-programming-00.pine",   // reads an `if`-local from global scope
   "v5/v5-faq-programming-02.pine",   // reads a nested block's local from its parent
   "v5/v5-language-loops-04.pine",    // reads a `for`-local after the loop
-  // A different rule, the same intent. TradingView's comment on the offending
-  // line is "Causes compilation error since the scope count is now 602"; the
-  // engine refuses it one rule earlier, because `x` is mutable and mutable
-  // variables cannot be passed to `request.security`. Both are real Pine rules
-  // and the script compiles under neither.
-  "v5/v5-writing-limitations-10.pine",
 ];
+
+/**
+ * The pin that was here and is gone: `v5/v5-writing-limitations-10.pine`.
+ *
+ * It was listed as refused-on-purpose because the engine rejected it — for
+ * passing a mutable `var` to `request.security()`, a v3 rule inherited
+ * unchanged. TradingView's comment on the offending line names a DIFFERENT
+ * error, "Causes compilation error since the scope count is now 602", and the
+ * v5 manual restricts mutable arguments only for `request.security_lower_tf()`.
+ * So the engine was refusing one rule too early, and "both are real Pine rules"
+ * was a way of not noticing. The script now compiles; the scope-count limit is
+ * not modelled, which is a separate and honest gap.
+ */
 
 describe("scripts that do not compile on purpose", () => {
   for (const file of REFUSED_ON_PURPOSE) {
@@ -222,11 +216,6 @@ describe("scripts that do not compile on purpose", () => {
       )).toBe(true);
     });
   }
-
-  it("the limitations demo says so in its own source too", () => {
-    expect(read("v5/v5-writing-limitations-10.pine"))
-      .toMatch(/Causes compilation error/);
-  });
 
   it("the loops demo says so in its own source", () => {
     expect(read("v5/v5-language-loops-04.pine"))
@@ -262,6 +251,7 @@ const LIBRARY_PAIRS: ReadonlyArray<[string, string, string]> = [
 /** The six whose library is not published anywhere in the docs. */
 const LIBRARIES_NOT_PUBLISHED: readonly string[] = [
   "v5/v5-concepts-libraries-12.pine",   // PineCoders/AllTimeHighLow/1
+  "v5/v5-faq-indicators-00.pine",       // PineCoders/VisibleChart/4
   "v5/v5-faq-alerts-01.pine",           // TradingView/ta/7
   "v5/v5-faq-alerts-06.pine",           // PineCoders/Time/4
   "v5/v5-faq-alerts-08.pine",           // TradingView/ta/7
@@ -297,24 +287,25 @@ describe("the corpus is there at all", () => {
   });
 });
 
-describe("scripts whose published source is not valid Pine", () => {
-  it("is exactly the pinned set — no more, no fewer", () => {
-    const found = corpusFiles().filter(f => hasUnterminatedString(read(f)));
-    expect(found.sort()).toEqual([...PUBLISHED_BROKEN].sort());
+describe("scripts that wrap a string literal across code lines", () => {
+  it("is exactly the named set — no more, no fewer", () => {
+    expect(corpusFiles().filter(f => hasWrappedString(read(f))).sort())
+      .toEqual([...WRAPPED_STRINGS].sort());
   });
 
   it("the detector actually fires (guards the case above)", () => {
-    expect(hasUnterminatedString('x = "abc"\n')).toBe(false);
-    expect(hasUnterminatedString('x = "ab\ncd"\n')).toBe(true);
+    expect(hasWrappedString('x = "abc"\n')).toBe(false);
+    expect(hasWrappedString('x = "ab\ncd"\n')).toBe(true);
     // An escaped quote inside a string must not be miscounted.
-    expect(hasUnterminatedString('x = "a\\"b"\n')).toBe(false);
+    expect(hasWrappedString('x = "a\\"b"\n')).toBe(false);
   });
 
-  for (const file of PUBLISHED_BROKEN) {
-    it(`${file} still exists — a pin that names nothing is not a pin`, () => {
-      expect(fs.existsSync(
-        path.join(EXAMPLES, file.split("/")[0], "tradingview-docs", file.split("/")[1]),
-      )).toBe(true);
+  for (const file of WRAPPED_STRINGS) {
+    // v5-faq-indicators-00 wraps a string AND imports a library the docs do not
+    // publish, so it is asserted in that section instead of this one.
+    if (file === "v5/v5-faq-indicators-00.pine") continue;
+    it(`${file} compiles`, () => {
+      expect(() => compileScript(read(file))).not.toThrow();
     });
   }
 });
