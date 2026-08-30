@@ -177,13 +177,14 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    * The same collision applies between a function local and a script-scope
    * variable of the same name, which is ordinary shadowing and must not alias.
    *
-   * ── What this does NOT fix ──────────────────────────────────────────────────
+   * ── The other half ──────────────────────────────────────────────────────────
    *
-   * Pine gives every CALL SITE its own instance of a function's locals; this
-   * engine still shares one per function. That is the wider defect recorded on
-   * `Context.var_def`, and scoping by function is a strict step toward it rather
-   * than a substitute for it: it separates names that are genuinely different
-   * variables, and leaves the per-site question alone.
+   * Pine also gives every CALL SITE its own instance of a function's locals.
+   * That is a run-time question — the same declaration is one variable per
+   * frame — so it is answered by `Context.call`, which opens a series namespace
+   * per user-function frame. This half is the compile-time one: two DIFFERENT
+   * functions that happen to use the same word are two variables, whether or
+   * not either is ever called twice.
    */
   protected fnScope: string[] = [];
 

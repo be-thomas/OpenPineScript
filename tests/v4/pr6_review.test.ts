@@ -158,15 +158,23 @@ describe("array.concat mutates and returns its first argument", () => {
   });
 });
 
-describe("KNOWN LIMIT: `var` in a user function is shared across call sites", () => {
-  // Not a regression test — a pin. TradingView gives 1,2,3 for both a and b,
-  // because each call site there gets its own instance of the function's
-  // locals. This engine shares one series per NAME across all call sites, for
-  // every function local and not just `var` ones, so both counters advance the
-  // same underlying value.
-  //
-  // If this ever starts failing because the numbers became 1,2,3 — delete the
-  // test and the note on Context.var_def. That is the fix landing.
+describe("a function's locals are per CALL SITE", () => {
+  /**
+   * "Each function call has its own instance of the series variables."
+   *
+   * This was the engine's longest-standing known wrong answer, pinned here for
+   * a long time as a limit rather than a bug. `a` and `b` below advanced ONE
+   * counter between them — a = 1,3,5 and b = 2,4,6 where TradingView gives
+   * 1,2,3 for both — because a local's series was registered under its NAME and
+   * nothing else, so every call site shared it.
+   *
+   * Two changes together fix it. The emitter qualifies a local's series key by
+   * the FUNCTION it is declared in, which stops two different functions from
+   * aliasing each other's `result`; and `Context.call` opens a series namespace
+   * per user-function FRAME, which stops two calls of the same function from
+   * sharing one. `var`'s "has this site initialised" flag moved into the frame
+   * with it, or the second call site would have read the first one's slot.
+   */
   const SRC = HEAD + [
     "f() =>",
     "    var c = 0",
@@ -176,17 +184,47 @@ describe("KNOWN LIMIT: `var` in a user function is shared across call sites", ()
     "b = f()",
   ].join("\n") + "\n";
 
-  it("documents the current, wrong, behaviour", () => {
-    expect(series(SRC, "a")).toEqual([1, 3, 5]);
-    expect(series(SRC, "b")).toEqual([2, 4, 6]);
+  it("two calls of one function count separately", () => {
+    expect(series(SRC, "a")).toEqual([1, 2, 3]);
+    expect(series(SRC, "b")).toEqual([1, 2, 3]);
   });
 
-  it("the cause is not specific to `var` — plain locals share a name too", () => {
-    const { js } = build(HEAD + "g() =>\n    t = close * 2\n    t\np = g()\nq = g()\n");
-    expect(js).toContain('new_var("opsv2_t"');
+  it("a plain local is per call site too, not just a `var` one", () => {
+    // The original defect was never specific to `var`: `t = close * 2` inside a
+    // function was one series shared by every caller, so the HISTORY a function
+    // read back (`t[1]`) interleaved its call sites.
+    const src = HEAD + [
+      "g(x) =>",
+      "    t = x",
+      "    nz(t[1])",
+      "p = g(close)",
+      "q = g(open)",
+    ].join("\n") + "\n";
+    // Every bar here has close 11 and open 10, so `p` must read back 11 and `q`
+    // 10. Sharing one `t` made both read whichever call ran last.
+    expect(series(src, "p")).toEqual([0, 11, 11]);
+    expect(series(src, "q")).toEqual([0, 10, 10]);
   });
 
-  it("but a `var` at SCRIPT scope is correct, which is the common case", () => {
+  it("a `var` at SCRIPT scope is unaffected", () => {
     expect(series(HEAD + "var c = 0\nc := c + 1\n", "c")).toEqual([1, 2, 3]);
+  });
+
+  it("two different functions may use the same local name", () => {
+    // The other half, and the one the corpus found: `hex()` declared
+    // `string result` and `hexMap()` declared `result = map.new<int, string>()`,
+    // and one series served both — so a map came back out as a string.
+    const src = HEAD + [
+      "one() =>",
+      "    r = 1",
+      "    r",
+      "two() =>",
+      "    r = 100",
+      "    r",
+      "x = one()",
+      "y = two()",
+    ].join("\n") + "\n";
+    expect(series(src, "x")).toEqual([1, 1, 1]);
+    expect(series(src, "y")).toEqual([100, 100, 100]);
   });
 });

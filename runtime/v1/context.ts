@@ -218,6 +218,44 @@ function toHeikinAshi(candles: SecurityCandle[]): SecurityCandle[] {
 export class Context {
     // 1. Internal Execution State (Private)
     protected callStack: string[] = [];
+
+    /**
+     * The series NAMESPACE of the user-function frame currently executing.
+     *
+     * Empty at script scope, and `<call id>|` inside a user function — nested
+     * one level per frame, so a function called from two places has two
+     * namespaces and a function called from inside another has one per outer
+     * frame.
+     *
+     * ── Why this exists ─────────────────────────────────────────────────────
+     *
+     * "each function call has its own instance of the series variables" is how
+     * Pine works, and this engine gave every call site ONE instance:
+     *
+     *     f() =>
+     *         var c = 0
+     *         c := c + 1
+     *         c
+     *     a = f()
+     *     b = f()
+     *
+     * yielded a = 1,3,5 and b = 2,4,6, where TradingView gives 1,2,3 for both.
+     * Both calls advanced the same counter. The same held for every function
+     * local, not just `var` ones: `t = close * 2` inside a function was one
+     * series shared by every caller, so a function's HISTORY (`t[1]`) mixed the
+     * call sites together.
+     *
+     * The emitter already qualifies a local's name by its FUNCTION, which stops
+     * two different functions from colliding. This is the other half: two calls
+     * of the SAME function are two variables too.
+     */
+    private seriesScope = "";
+    private seriesScopes: string[] = [];
+
+    /** A series key in the frame that is running — the plain name at script scope. */
+    private scoped(name: string): string {
+        return this.seriesScope + name;
+    }
     private states: Map<string, any> = new Map();
     // Committed baseline for the forming live bar (P3). Null outside live ticks.
     private committedSnapshot: RuntimeSnapshot | null = null;
@@ -1019,6 +1057,17 @@ export class Context {
 
         const identity = id; 
         this.callStack.push(identity);
+
+        // A USER function's frame opens a series namespace; a built-in's does
+        // not, because a built-in holds its state in a closure rather than in
+        // `vars`. The emitter names every user function `<prefix>$fn_<name>`
+        // and puts that name in the call id, which is what makes the two
+        // tellable apart here.
+        const userFrame = id.includes("$fn_");
+        if (userFrame) {
+            this.seriesScopes.push(this.seriesScope);
+            this.seriesScope = `${this.seriesScope}${identity}|`;
+        }
         
         try {
             const fname = removePrefix(extractFunctionName(id)); 
@@ -1094,6 +1143,7 @@ export class Context {
             }
 
         } finally {
+            if (userFrame) this.seriesScope = this.seriesScopes.pop()!;
             this.callStack.pop();
         }
     }
@@ -1175,9 +1225,10 @@ export class Context {
      * @param key  the declaration's @L<line>:C<col> site, so two DIFFERENT
      *             `var` declarations do not share an initialised flag.
      *
-     * ── KNOWN LIMIT: `var` inside a user function ───────────────────────────
+     * ── `var` inside a user function ────────────────────────────────────────
      *
-     * Every call site of a function shares one `var`. Given
+     * Every call site gets its OWN `var`, which is what Pine does — "each
+     * function call has its own instance of the series variables". Given
      *
      *     f() =>
      *         var c = 0
@@ -1186,35 +1237,35 @@ export class Context {
      *     a = f()
      *     b = f()
      *
-     * this yields a = 1,3,5 and b = 2,4,6. TradingView gives 1,2,3 for both:
-     * there, each call site gets its own instance of the function's locals.
+     * both `a` and `b` count 1,2,3.
      *
-     * Keying on `callStack.join("/")` instead — the obvious fix — does not fix
-     * it. The SERIES NAME is shared too: the body emits `new_var("opsv2_c", …)`
-     * for every call site, so per-site initialisation flags just redistribute
-     * the error (a = 1,2 / b = 1,3) rather than removing it.
+     * This was wrong for a long time, and the note that stood here explained
+     * why keying the initialised flag on the call stack was not enough: the
+     * SERIES NAME was shared too, so per-site flags only redistributed the
+     * error. Both halves are now in place — `seriesScope` gives each frame its
+     * own namespace in `vars`, and this method scopes the flag into the same
+     * namespace — so `key` alone is the declaration SITE and the frame supplies
+     * the instance.
      *
-     * The real cause is older and wider than `var`: NO function local is
-     * per-call-site in this engine — `t = close * 2` inside a function is one
-     * `opsv2_t` series shared by every caller. Fixing it means making emitted
-     * local names call-site-scoped at both the declaration and the `:=` site,
-     * across v1–v4. That is a real change, not a tweak here, so this is
-     * recorded rather than papered over.
-     *
-     * `varipSeries` has the same root cause and is therefore keyed by NAME,
-     * not by site: rollback operates on series names, and a `varip x` in one
-     * scope and a `var x` in another are one series here, so both end up
-     * exempt. Keying it by site would not separate them either.
+     * `varipSeries` is scoped with them, so a `varip x` in one frame and a
+     * `var x` in another are no longer one series and no longer share an
+     * exemption from rollback.
      */
     public var_def(name: string, key: string, initFn: () => any, ip: boolean = false): Series {
-        if (ip) this.varipSeries.add(name);
+        // Both the series and the "has this site run yet" flag live in the
+        // FRAME. The flag has to: `var c = 0` at one call site must not count
+        // as initialised for another, or the second site would read the first
+        // one's empty slot and get na forever.
+        const scopedName = this.scoped(name);
+        const scopedKey = this.scoped(key);
+        if (ip) this.varipSeries.add(scopedName);
 
-        if (this.varInitialised.has(key)) {
-            const held = this.vars.get(name);
+        if (this.varInitialised.has(scopedKey)) {
+            const held = this.vars.get(scopedName);
             return this.new_var(name, held ? held.valueOf() : NaN);
         }
 
-        this.varInitialised.add(key);
+        this.varInitialised.add(scopedKey);
         return this.new_var(name, initFn());
     }
 
@@ -1257,11 +1308,12 @@ export class Context {
      * FACTORY: Creates or Updates a Series Object.
      */
     public new_var(name: string, val: any): Series {
-        let series = this.vars.get(name);
+        const key = this.scoped(name);
+        let series = this.vars.get(key);
         
         if (!series) {
-            series = new Series(this, name);
-            this.vars.set(name, series);
+            series = new Series(this, key);
+            this.vars.set(key, series);
         }
 
         let resolvedVal: any;
@@ -1396,7 +1448,10 @@ export class Context {
      * Internal helper for fallback lookups
      */
     public getSeries(name: string, offset: number): number {
-        const series = this.vars.get(name);
+        // The frame first — a self-referential local (`s = nz(s[1]) + close`)
+        // reaches this while its own `let` is still in the temporal dead zone,
+        // and must find ITS instance rather than another call site's.
+        const series = this.vars.get(this.scoped(name)) ?? this.vars.get(name);
         return series ? series.get(offset) : NaN;
     }
 
