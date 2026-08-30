@@ -2,6 +2,7 @@ import { PREFIX, removePrefix, extractFunctionName } from "../../utils/v2/common
 import { Series, SeriesSnapshot } from "./Series";
 import { REGISTRY, viewFor } from "./stdlib";
 import { MATRIX_TAG } from "./stdlib/matrix";
+import { aggregate, periodIndex, specSeconds } from "./timeframes";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 
 // Define Trade Types
@@ -1461,6 +1462,10 @@ export class Context {
         // trade's entry and exit as TIMES, and the accessors report them as bar
         // indices, so one side has to be able to translate.
         this.barTimes[this.currentBarIndex] = time;
+        // The bar itself, so `request.security()` on THIS symbol can be answered
+        // from the chart's own series — see `getSecurityData`. Indexed rather
+        // than pushed, so a re-tick of the same bar overwrites it.
+        this.chartBars[this.currentBarIndex] = { time, open, high, low, close, volume };
         // 1. Update Public Props
         this.time = time;
         this.open = open;
@@ -1711,8 +1716,83 @@ export class Context {
         return this.requestData.get(`${kind}::${key}`);
     }
 
+    /** The chart's own bars, as they arrive. The basis of a derived request. */
+    private chartBars: SecurityCandle[] = [];
+
+    /** Derived higher-timeframe series, keyed by resolution, extended as bars arrive. */
+    private derivedSeries: Map<string, { candles: SecurityCandle[]; upto: number }> = new Map();
+
+    /**
+     * Does `symbol` name the chart's OWN instrument?
+     *
+     * `request.security(syminfo.tickerid, …)` is how nearly every published
+     * script asks for a higher timeframe of what it is already looking at, and
+     * `syminfo.tickerid` is the exchange-qualified spelling of the same thing
+     * `syminfo.ticker` gives bare. An empty symbol means the chart's too.
+     */
+    private isChartSymbol(symbol: string): boolean {
+        if (symbol === "") return true;
+        // `this.symbol` holds the TICKER ID — "NASDAQ:AAPL" if the host gave a
+        // prefix — and `syminfo.ticker` is that with the exchange stripped, so
+        // both spellings name the chart.
+        if (symbol === this.symbol) return true;
+        const colon = this.symbol.indexOf(":");
+        return colon > 0 && symbol === this.symbol.slice(colon + 1);
+    }
+
+    /**
+     * `request.security()` on the chart's own symbol, at the chart's timeframe
+     * or a higher one, answered from the chart's own bars.
+     *
+     * ── Why this is exact and not an approximation ──────────────────────────
+     *
+     * A higher-timeframe bar IS the aggregate of the chart bars inside it: it
+     * opens where the first one opened, closes where the last one closed, spans
+     * their extremes and carries their total volume. That is the relationship
+     * between the two series, not a model of it. TradingView builds its own
+     * weekly candles from the same daily feed.
+     *
+     * Before this, `request.security(syminfo.tickerid, "D", close)` on a daily
+     * chart returned `na` — the most basic call there is, silently empty on
+     * every bar, in twenty-five of TradingView's own examples.
+     *
+     * ── What is still refused ───────────────────────────────────────────────
+     *
+     * A LOWER timeframe, and any other symbol. The manual is explicit about the
+     * first: request.security() on a lower timeframe "will evaluate the
+     * expression from the LTF context", and there is no LTF context to evaluate
+     * it in — the intrabar prices are not in the data. Both keep returning `na`
+     * and recording the request, so a host that HAS the data can supply it.
+     *
+     * ── Causality ───────────────────────────────────────────────────────────
+     *
+     * Only bars the script has already seen are folded. Aggregating the whole
+     * dataset would hand the script the future: the group containing the
+     * current bar would close before its last bar had arrived. `security()`
+     * then applies its own closed-bar rule on top of a series that is already
+     * causal.
+     */
+    private deriveSecurityData(symbol: string, resolution: string): SecurityCandle[] | undefined {
+        if (!this.isChartSymbol(symbol)) return undefined;
+
+        const want = specSeconds(resolution);
+        const have = specSeconds(String(this.resolution));
+        if (!Number.isFinite(want) || !Number.isFinite(have) || want < have) return undefined;
+
+        const seen = this.currentBarIndex + 1;
+        const cached = this.derivedSeries.get(resolution);
+        if (cached && cached.upto === seen) return cached.candles;
+
+        const candles = aggregate(this.chartBars.slice(0, seen), resolution);
+        this.derivedSeries.set(resolution, { candles, upto: seen });
+        return candles;
+    }
+
     public getSecurityData(symbol: string, resolution: string): SecurityCandle[] | undefined {
-        const candles = this.securityData.get(this.secKey(symbol, resolution));
+        // Host-supplied data always wins: it is real data for the context the
+        // script asked for, and a derivation is only ever a fallback.
+        const candles = this.securityData.get(this.secKey(symbol, resolution))
+            ?? this.deriveSecurityData(symbol, resolution);
         if (!candles) return candles;
         // heikinashi(tickerid) marks the symbol rather than wrapping the series,
         // which is how Pine models it — so the transform belongs here, at the

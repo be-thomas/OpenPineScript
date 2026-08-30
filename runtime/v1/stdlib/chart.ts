@@ -11,6 +11,7 @@
  */
 import { Context } from "../context";
 import { val } from "../../../utils/v2/common";
+import { periodIndex, specSeconds as seconds } from "../timeframes";
 
 /**
  * The chart's timeframe as a string: "1", "5", "60", "D", "W", "M".
@@ -102,22 +103,11 @@ export function ticker(ctx: Context): string {
 // the string alone.
 
 /** The typical number of seconds in one bar of `spec`, or NaN. */
-function specSeconds(spec: string): number {
-  const s = String(spec).trim().toUpperCase();
-  if (s === "") return NaN;
-
-  const match = /^(\d*)([SDWM]?)$/.exec(s);
-  if (!match) return NaN;
-  const count = match[1] === "" ? 1 : Number(match[1]);
-  if (!Number.isFinite(count) || count <= 0) return NaN;
-
-  // "The typical number of seconds": a month is 30 days and a year is not a
-  // unit here, so these are nominal lengths rather than calendar arithmetic.
-  const UNIT: Record<string, number> = {
-    S: 1, "": 60, D: 86400, W: 604800, M: 2592000,
-  };
-  return count * UNIT[match[2]];
-}
+// The parsing itself lives in ../timeframes.ts, one level up, so that
+// `request.security` can share it: everything in this directory is scanned by
+// the metadata generator and every exported name here becomes a Pine built-in,
+// which `periodIndex` must not.
+const specSeconds = seconds;
 
 export const timeframe = {
   /**
@@ -176,11 +166,15 @@ export const timeframe = {
    * of the script, which begins no period the script has seen end.
    */
   change: (ctx: Context, timeframe: any): boolean => {
-    const seconds = specSeconds(String(val(timeframe) ?? ""));
+    const spec = String(val(timeframe) ?? "");
     const state = ctx.getPersistentState<{ period: number | null }>(() => ({ period: null }));
 
-    if (!Number.isFinite(seconds) || seconds <= 0) return false;
-    const period = Math.floor(ctx.time / (seconds * 1000));
+    // `periodIndex`, not `time / seconds`: 1970-01-01 was a Thursday, so
+    // dividing by a nominal week grouped Thursday to Wednesday and a weekly
+    // `change` fired on the wrong day. Months are worse — 28 to 31 days against
+    // a nominal 30 drifts a whole month out of step inside two years.
+    const period = periodIndex(ctx.time, spec);
+    if (!Number.isFinite(period)) return false;
 
     const changed = state.period !== null && period !== state.period;
     state.period = period;
