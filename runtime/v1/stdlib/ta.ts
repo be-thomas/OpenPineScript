@@ -1272,8 +1272,24 @@ export function pivotlow(ctx: Context, sourceInput: any, leftbarsInput: any, rig
 }
 
 /**
- * tr: True Range (standalone, not wrapped in RMA like atr)
- * @returns series float
+ * `tr` / `ta.tr` — True Range, as a VARIABLE.
+ *
+ * A getter, because a script reads it by name:
+ *
+ *     trBalance := trBalance + sign(tr - tr[_i])
+ *
+ * is TradingView's own `v4-debugging-11`, and `tr` there is a series, not a
+ * function. Registered without `@getter` it emitted the FUNCTION OBJECT, so
+ * `tr - tr[5]` was arithmetic on a function and every bar of the plot was na —
+ * with no diagnostic, because a built-in that exists is not an undeclared read.
+ *
+ * The one-argument call form `ta.tr(handle_na)` is a separate question. Nothing
+ * in the manual or the release notes states what `handle_na` does, and no
+ * script in the corpus passes it, so no parameter is offered rather than one
+ * that guesses.
+ *
+ * @getter
+ * @returns {series float} The bar's true range.
  */
 export function tr(ctx: Context): number {
     const state = ctx.getPersistentState<{ prevClose: number }>(() => ({ prevClose: NaN }));

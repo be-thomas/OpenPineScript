@@ -4605,8 +4605,8 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       "tr": {
           uses_context: true,
           args: [],
-          is_getter: false,
-          returns: {"kind":"series","type":"float"},
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} The bar's true range."},
           is_value: false,
           ref: ta.tr
       },

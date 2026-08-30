@@ -71,7 +71,20 @@ import {
   Import_stmtContext,
   Fun_headContext,
   Pine_scriptContext,
+  Fun_def_stmtContext,
+  Fun_def_singlelineContext,
+  Fun_def_multilineContext,
 } from "../../parser/v5/generated/PineV5Parser";
+
+/** One declaration of an overloaded function name. */
+interface FnOverload {
+  /** Fewest arguments a call may pass — parameters without a default. */
+  min: number;
+  /** Most — every parameter. */
+  max: number;
+  /** Each parameter's DECLARED type, or null where none is written. */
+  types: Array<string | null>;
+}
 
 /** Anything carrying a source position (see the v1 base for why it is structural). */
 interface SourceLocated {
@@ -462,7 +475,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
 
   /** Walks the whole tree for `type` and `method` declarations. */
   protected collectDeclarations(root: any): void {
-    const walk = (n: any): void => {
+    const walk = (n: any, inMethod = false): void => {
       if (!n) return;
       if (isRule(n, "Type_def_stmtContext")) {
         this.userTypes.set(n.id().getText(), this.fieldsOf(n));
@@ -470,6 +483,20 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       if (isRule(n, "Enum_def_stmtContext")) {
         this.userEnums.set(n.id().getText(), this.enumFieldsOf(n));
       }
+      // A FUNCTION declared more than once is an overload set. Collected in
+      // the same pass, and skipped inside a method declaration — a method's
+      // overloads are told apart by their receiver, which is a different rule
+      // handled by `methodOverloads` just below.
+      if (isRule(n, "Fun_def_stmtContext") && !inMethod) {
+        const inner = (n as Fun_def_stmtContext).fun_def_singleline()
+          ?? (n as Fun_def_stmtContext).fun_def_multiline();
+        if (inner) {
+          const list = this.functionOverloads.get(inner.id().getText()) ?? [];
+          list.push(this.overloadOf(inner));
+          this.functionOverloads.set(inner.id().getText(), list);
+        }
+      }
+
       if (isRule(n, "Method_def_stmtContext")) {
         const def = n.fun_def_stmt();
         const inner = def.fun_def_singleline() ?? def.fun_def_multiline();
@@ -485,7 +512,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
         }
       }
       const count = n.getChildCount?.() ?? 0;
-      for (let i = 0; i < count; i++) walk(n.getChild(i));
+      const nested = inMethod || isRule(n, "Method_def_stmtContext");
+      for (let i = 0; i < count; i++) walk(n.getChild(i), nested);
     };
     walk(root);
   }
@@ -1163,6 +1191,147 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   }
 
   /**
+   * Function OVERLOADING — several definitions of one name.
+   *
+   * SOURCING. From the v5 release notes:
+   *
+   *     // Two parameters
+   *     mult(x1, x2) => x1 * x2
+   *     // Three parameters
+   *     mult(x1, x2, x3) => x1 * x2 * x3
+   *     plot(mult(7, 4))
+   *     plot(mult(7, 4, 2))
+   *
+   * and, for the harder case, "When overloads have the same number of
+   * parameters, all parameters in each overload must be explicitly typified,
+   * and their type combinations must be unique".
+   *
+   * ── What it was doing instead ───────────────────────────────────────────────
+   *
+   * Both definitions were emitted as `function opsv2_$fn_mult(…)`, so the second
+   * simply replaced the first in JavaScript. `mult(7, 4)` then called the
+   * three-parameter body with one argument missing and plotted `na` on every
+   * bar — no error anywhere, because a redeclared function is legal JavaScript.
+   */
+  protected functionOverloads: Map<string, FnOverload[]> = new Map();
+
+  /** The arity range and declared parameter types of one definition. */
+  protected overloadOf(inner: Fun_def_singlelineContext | Fun_def_multilineContext): FnOverload {
+    const params = (inner as any).fun_head?.()?.fun_param?.() ?? [];
+    return {
+      min: params.filter((p: any) => !p.DEFINE?.()).length,
+      max: params.length,
+      types: params.map((p: any) => p.field_type?.()?.getText() ?? null),
+    };
+  }
+
+  /**
+   * The suffix that separates one overload's emitted name from its siblings.
+   *
+   * Arity alone where the arities differ, and the declared types as well where
+   * they do not — which the manual requires to be unique, so the pair always
+   * is. A name with a single definition gets no suffix at all, so nothing about
+   * an ordinary script's output changes.
+   */
+  protected overloadSuffix(o: FnOverload): string {
+    const types = o.types.map(t => (t ?? "any").replace(/[^A-Za-z0-9_]/g, "_")).join("_");
+    return `$${o.max}_${types}`;
+  }
+
+  /** The definition currently being emitted, when its name is overloaded. */
+  private emittingOverload: FnOverload | null = null;
+
+  private withOverload<T>(
+    inner: Fun_def_singlelineContext | Fun_def_multilineContext, body: () => T,
+  ): T {
+    const overloads = this.functionOverloads.get(inner.id().getText()) ?? [];
+    const previous = this.emittingOverload;
+    // Methods carry their own naming rule, and a name declared once needs none.
+    this.emittingOverload =
+      this.emittingMethodFor === null && overloads.length > 1 ? this.overloadOf(inner) : null;
+    try { return body(); }
+    finally { this.emittingOverload = previous; }
+  }
+
+  override visitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
+    return this.withOverload(ctx, () => super.visitFun_def_singleline(ctx as any));
+  }
+
+  override visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
+    return this.withOverload(ctx, () => super.visitFun_def_multiline(ctx as any));
+  }
+
+  /**
+   * The STATIC type of a call argument, as far as it can be known here.
+   *
+   * Literals carry their own type, and a variable carries whatever type its
+   * declaration wrote down. Anything else is null — unknown — and an overload
+   * set that cannot be resolved from what is known says so rather than picking
+   * one, because picking wrong calls a body written for another type and
+   * returns a plausible wrong number.
+   */
+  protected argumentType(expr: ParseTree | null): string | null {
+    if (!expr) return null;
+    const text = expr.getText();
+    if (/^(true|false)$/.test(text)) return "bool";
+    if (/^["']/.test(text)) return "string";
+    if (/^#[0-9a-fA-F]{6,8}$/.test(text)) return "color";
+    if (/^\d+$/.test(text)) return "int";
+    if (/^\d*\.\d+([eE][+-]?\d+)?$|^\d+[eE][+-]?\d+$/.test(text)) return "float";
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(text)) return this.scopes.staticTypes?.get(text) ?? null;
+    return null;
+  }
+
+  /** Does an argument of type `arg` fit a parameter declared `param`? */
+  private fits(param: string | null, arg: string | null, widen: boolean): boolean {
+    if (param === null) return true;              // an untyped parameter takes anything
+    if (arg === null) return false;               // unknown cannot be proved to fit
+    if (param === arg) return true;
+    // "Accepts both 'int' and 'float' values - any 'int' can be automatically
+    // cast to 'float'." Only in the widening pass, so an exact `int` overload
+    // still wins over a `float` one when both exist.
+    return widen && param === "float" && arg === "int";
+  }
+
+  protected override callFunctionName(pineName: string, ctx: Fun_callContext): string {
+    const overloads = this.functionOverloads.get(pineName) ?? [];
+    if (overloads.length < 2) return super.callFunctionName(pineName, ctx);
+
+    const args = ctx.fun_actual_args();
+    const positional = args?.pos_args() ? this.positionalArgs(args.pos_args()!) : [];
+    const keywords = args?.kw_args()?.kw_arg() ?? [];
+    const count = positional.length + keywords.length;
+
+    const byArity = overloads.filter(o => count >= o.min && count <= o.max);
+    if (byArity.length === 0) {
+      throw this.err(
+        ctx,
+        `'${pineName}' is declared ${overloads.length} times and none of them takes ` +
+        `${count} argument(s). The declarations take ` +
+        `${overloads.map(o => o.min === o.max ? `${o.max}` : `${o.min}-${o.max}`).join(", ")}.`,
+      );
+    }
+    if (byArity.length === 1) return this.funcName(pineName) + this.overloadSuffix(byArity[0]);
+
+    // Same arity: the manual requires every parameter to be typed, so the
+    // argument types decide. Exact first, then `int` widened to `float`.
+    const argTypes = positional.map(p => this.argumentType(p));
+    for (const widen of [false, true]) {
+      const hit = byArity.filter(o => argTypes.every((a, i) => this.fits(o.types[i], a, widen)));
+      if (hit.length === 1) return this.funcName(pineName) + this.overloadSuffix(hit[0]);
+    }
+
+    throw this.err(
+      ctx,
+      `'${pineName}' is declared ${overloads.length} times and this call matches ` +
+      `${byArity.length} of them. Overloads with the same number of parameters are told ` +
+      `apart by their types, and the types here ` +
+      `(${argTypes.map(t => t ?? "unknown").join(", ")}) do not pick one. ` +
+      `Declare the arguments — 'float x = …' — so the overload can be chosen.`,
+    );
+  }
+
+  /**
    * v5 keeps the mutable-argument restriction for ONE member of the family.
    *
    * SOURCING. The manual's Other timeframes and data page states it only of
@@ -1501,9 +1670,12 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * definition cannot nest inside another, so the flag cannot leak.
    */
   protected override definitionFunctionName(pineName: string): string {
-    return this.emittingMethodFor === null
+    if (this.emittingMethodFor !== null) {
+      return this.methodFunctionName(pineName, this.emittingMethodFor);
+    }
+    return this.emittingOverload === null
       ? super.definitionFunctionName(pineName)
-      : this.methodFunctionName(pineName, this.emittingMethodFor);
+      : this.funcName(pineName) + this.overloadSuffix(this.emittingOverload);
   }
 
   private withMethodReceiver<T>(receiver: string, body: () => T): T {

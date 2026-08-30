@@ -609,6 +609,17 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return this.funcName(pineName);
   }
 
+  /**
+   * The emitted name a CALL to a user function targets.
+   *
+   * The mirror of `definitionFunctionName`, and a seam for the same reason: v5
+   * lets one name carry several definitions, so the call site has to be able to
+   * choose between them. Identical here, where a name has exactly one body.
+   */
+  protected callFunctionName(pineName: string, _ctx: Fun_callContext): string {
+    return this.funcName(pineName);
+  }
+
   visitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
     const name = this.definitionFunctionName(ctx.id().getText());
     const params = this.visit(ctx.fun_head());
@@ -1470,7 +1481,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     const isUserDefined = this.userFunctions.has(originalName);
 
     const transpiledName = isUserDefined
-      ? this.funcName(originalName)
+      ? this.callFunctionName(originalName, ctx)
       : this.registry[originalName]
         ? `ctx.builtin(${JSON.stringify(originalName)})`
         : this.visit(ctx.id());
@@ -1485,7 +1496,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // metadata — and a user function called `area` would otherwise be handed
     // the built-in constant's entry and rejected as "a value, not a function".
     // `$` cannot occur in a Pine name, so the marked form matches nothing.
-    const idName = isUserDefined ? this.funcName(originalName) : originalName;
+    const idName = isUserDefined ? this.callFunctionName(originalName, ctx) : originalName;
     const callId = `"${idName}${this.getLocId(ctx)}"`;
 
     // 3. Construct the ctx.call wrapper
