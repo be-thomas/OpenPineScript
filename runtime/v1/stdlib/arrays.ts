@@ -29,15 +29,30 @@ import { val } from "../../../utils/v2/common";
 function arr(id: any, fn: string): any[] {
     const a = val(id);
     if (!Array.isArray(a)) {
-        throw new Error(`array.${fn}: expected an array, got ${a === undefined ? "na" : typeof a}`);
+        // `na` unwraps to NaN, which is a number, and reporting it as one named
+        // the wrong thing: `array<int> a = na` then `array.push(a, 111)` — which
+        // is TradingView's own "Out of bounds index" demo — read as
+        // "expected an array, got number".
+        const what = a === undefined || a === null
+            || (typeof a === "number" && Number.isNaN(a)) ? "na" : typeof a;
+        throw new Error(`array.${fn}: expected an array, got ${what}`);
     }
     return a;
 }
 
-/** Pine reports an out-of-range index rather than returning na. */
+/**
+ * Pine reports an out-of-range index rather than returning na.
+ *
+ * A FRACTIONAL index is floored rather than refused. TradingView's own
+ * `v5-language-arrays-06` states the rule in a comment on the line that needs
+ * it — "The index used by `array.get()` will be the equivalent of
+ * `floor(fillNo)`" — and computes that index as
+ * `math.min(lastHiBar / (lookbackInput / 5), 4)`, an ordinary float. Requiring
+ * an integer rejected the script at its first bar.
+ */
 function bounds(a: any[], index: any, fn: string): number {
-    const i = Number(val(index));
-    if (!Number.isInteger(i) || i < 0 || i >= a.length) {
+    const i = Math.floor(Number(val(index)));
+    if (!Number.isFinite(i) || i < 0 || i >= a.length) {
         throw new Error(`array.${fn}: index ${i} is out of bounds (size ${a.length})`);
     }
     return i;

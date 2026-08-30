@@ -91,3 +91,51 @@ export function string(x: any): string | number {
     if (typeof v === "number" && Number.isNaN(v)) return NaN;
     return String(v);
 }
+
+/**
+ * The DRAWING casts — `line()`, `linefill()`, `label()`, `box()`, `table()`.
+ *
+ * The manual names all ten casting functions in one list: "int(), float(),
+ * bool(), color(), string(), line(), linefill(), label(), box(), and table()",
+ * and gives these five their purpose in the sentence that follows —
+ * "Explicit type casting is also handy when declaring variables assigned to
+ * na", with `label myLabel = na` and `myLabel = label(na)` shown as two
+ * spellings of the same thing.
+ *
+ * So a drawing cast is an IDENTITY with one job: it says which type an `na`
+ * is. A drawing id passes through untouched, and an absent value stays absent
+ * rather than becoming a zero or an empty string.
+ *
+ * They live under `cast.*` for the same reason `float` does, and a stronger
+ * one: `line`, `label`, `box` and `table` are already NAMESPACE ROOTS, and
+ * `line` is the v1–v3 plot-style constant on top of that. One flat registry key
+ * cannot be three things, so index.ts installs these under their flat names in
+ * the view of each version whose type they name, and the sandbox merge attaches
+ * the namespace's members to the function — the same shape `plot`, `color` and
+ * `input` already have.
+ *
+ * TradingView's `v5-writing-profiling-and-optimization-34` and
+ * `v5-faq-data-structures-08` both call `box(na)` / `line(na)` to type an
+ * array's element, and died with "The provided reference is not a function".
+ */
+function drawingCast(x: any): any {
+    const v = val(x);
+    if (v === null || v === undefined) return NaN;
+    if (typeof v === "number" && Number.isNaN(v)) return NaN;
+    return v;
+}
+
+/** @returns {series line} `x` as a line id, or na. */
+export function line(x: any): any { return drawingCast(x); }
+
+/** @returns {series linefill} `x` as a linefill id, or na. */
+export function linefill(x: any): any { return drawingCast(x); }
+
+/** @returns {series label} `x` as a label id, or na. */
+export function label(x: any): any { return drawingCast(x); }
+
+/** @returns {series box} `x` as a box id, or na. */
+export function box(x: any): any { return drawingCast(x); }
+
+/** @returns {series table} `x` as a table id, or na. */
+export function table(x: any): any { return drawingCast(x); }

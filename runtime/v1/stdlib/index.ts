@@ -199,13 +199,27 @@ export const V4_REGISTRY: Record<string, StdlibEntry> =
  * three functions back under the same names. `cast.*` itself is dropped, so
  * `cast.float(x)` is not a spelling in any version.
  */
-const V4_CASTS: Record<string, StdlibEntry> = Object.fromEntries(
-    ["float", "bool", "string"].map(name => {
+const castsFor = (names: string[]): Record<string, StdlibEntry> => Object.fromEntries(
+    names.map(name => {
         const entry = V4_NAMESPACE_REGISTRY[`cast.${name}`];
         if (!entry) throw new Error(`stdlib: cast.${name} is missing from the registry`);
         return [name, entry];
     }),
 );
+
+/**
+ * A cast is installed at the version whose TYPE it names, and not before.
+ *
+ * `line`, `label`, `box` and `table` are v4's drawing types, so their casts are
+ * v4; `linefill` arrives with v5, so `linefill(na)` is a v5 spelling only. The
+ * drawing casts merge onto the namespace object of the same name — the sandbox
+ * builder attaches `line.new` and the rest to the function — which is how one
+ * word can be a namespace, a cast and (for `line`) the v1–v3 plot style at once.
+ */
+const V4_CASTS: Record<string, StdlibEntry> =
+    castsFor(["float", "bool", "string", "line", "label", "box", "table"]);
+
+const V5_CASTS: Record<string, StdlibEntry> = castsFor(["linefill"]);
 
 /** Everything under `cast.` — present so it can be excluded, never spelled. */
 const CAST_KEYS = Object.keys(V4_NAMESPACE_REGISTRY).filter(k => k.startsWith("cast."));
@@ -223,8 +237,10 @@ export const V5_REGISTRY: Record<string, StdlibEntry> =
 /** What a v5 script may spell. */
 export const V5_VIEW: Record<string, StdlibEntry> = {
     ...without(V4_VIEW, V5_REMOVED),
-    ...V5_NAMESPACE_REGISTRY,
+    ...without(V5_NAMESPACE_REGISTRY, CAST_KEYS),
     ...V5_REGISTRY,
+    ...V4_CASTS,
+    ...V5_CASTS,
 };
 
 /**

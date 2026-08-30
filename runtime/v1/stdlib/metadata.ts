@@ -546,6 +546,46 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: cast.string
       },
+      "cast.line": {
+          uses_context: false,
+          args: ["x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"line} `x` as a line id, or na."},
+          is_value: false,
+          ref: cast.line
+      },
+      "cast.linefill": {
+          uses_context: false,
+          args: ["x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"linefill} `x` as a linefill id, or na."},
+          is_value: false,
+          ref: cast.linefill
+      },
+      "cast.label": {
+          uses_context: false,
+          args: ["x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"label} `x` as a label id, or na."},
+          is_value: false,
+          ref: cast.label
+      },
+      "cast.box": {
+          uses_context: false,
+          args: ["x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"box} `x` as a box id, or na."},
+          is_value: false,
+          ref: cast.box
+      },
+      "cast.table": {
+          uses_context: false,
+          args: ["x"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"table} `x` as a table id, or na."},
+          is_value: false,
+          ref: cast.table
+      },
       "period": {
           uses_context: true,
           args: [],
