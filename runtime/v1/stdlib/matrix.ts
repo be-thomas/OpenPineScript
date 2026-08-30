@@ -69,6 +69,54 @@ const num = (x: any): number => Number(val(x));
 const rowsOf = (m: Matrix): number => m.length;
 const colsOf = (m: Matrix): number => (m.length === 0 ? 0 : m[0].length);
 
+/**
+ * "Matrix is too large. Maximum size of the matrix is 100,000 elements."
+ *
+ * "The total number of elements in a matrix (matrix.elements_count()) cannot
+ *  exceed 100,000, regardless of its shape."
+ *
+ * TradingView's `v5-language-matrices-39` is the demo for it — 1000 rows of 101
+ * elements — and it ran to completion here, which is a limit not being modelled
+ * rather than a limit being generous.
+ */
+const MAX_ELEMENTS = 100_000;
+
+function checkSize(rows: number, cols: number, fn: string): void {
+    if (rows * cols > MAX_ELEMENTS) {
+        throw new Error(
+            `matrix.${fn}: matrix is too large — ${rows}x${cols} is ${rows * cols} ` +
+            `elements and the maximum is ${MAX_ELEMENTS}`,
+        );
+    }
+}
+
+/**
+ * The `from_*` / `to_*` rule, for `submatrix` and `fill`.
+ *
+ * "When using matrix.*() functions with from_row/column and to_row/column
+ *  indices, the from_* values must be less than the corresponding to_* values,
+ *  with the minimum possible value being 0. Otherwise, the script will raise a
+ *  runtime error."
+ *
+ * And the `to_*` bound is the size, not the last index — TradingView's own
+ * error demo annotates `m.submatrix(from_column = 1, to_column = 4)` on a 2x3
+ * matrix with "The `to_column` index is invalid on this line. The max value
+ * is 3."
+ *
+ * Checked rather than clamped. `m.submatrix(from_row = 2, to_row = 2)` silently
+ * produced an EMPTY matrix, and the script then died two lines later on
+ * `mSub.get(0, 0)` — the right script rejected for the wrong reason, and at the
+ * wrong line.
+ */
+function range(from: number, to: number, limit: number, fn: string, what: string): void {
+    if (!(from >= 0 && from < to && to <= limit)) {
+        throw new Error(
+            `matrix.${fn}: ${what} range ${from}..${to} is invalid ` +
+            `(needs 0 <= from < to <= ${limit})`,
+        );
+    }
+}
+
 function index(n: number, limit: number, fn: string, what: string): number {
     if (!Number.isInteger(n) || n < 0 || n >= limit) {
         throw new Error(`matrix.${fn}: ${what} ${n} is out of bounds (size ${limit})`);
@@ -101,6 +149,7 @@ export const matrix = {
     new: (rows: any = 0, columns: any = 0, initial_value: any = NaN): Matrix => {
         const r = Math.max(0, Math.trunc(num(rows) || 0));
         const c = Math.max(0, Math.trunc(num(columns) || 0));
+        checkSize(r, c, "new");
         const fill = val(initial_value);
         return tag(Array.from({ length: r }, () => new Array(c).fill(fill)));
     },
@@ -233,6 +282,7 @@ export const matrix = {
         if (at < 0 || at > rowsOf(m)) {
             throw new Error(`matrix.add_row: row ${at} is out of bounds (size ${rowsOf(m)})`);
         }
+        checkSize(rowsOf(m) + 1, Math.max(width, values.length), "add_row");
         m.splice(at, 0, values);
     },
 
@@ -264,6 +314,7 @@ export const matrix = {
         if (at < 0 || at > colsOf(m)) {
             throw new Error(`matrix.add_col: column ${at} is out of bounds (size ${colsOf(m)})`);
         }
+        checkSize(height, colsOf(m) + 1, "add_col");
         m.forEach((r, i) => r.splice(at, 0, values[i]));
     },
 
@@ -300,9 +351,11 @@ export const matrix = {
         const r1 = to_row === undefined || to_row === null ? rowsOf(m) : Math.trunc(num(to_row));
         const c0 = Math.trunc(num(from_column) || 0);
         const c1 = to_column === undefined || to_column === null ? colsOf(m) : Math.trunc(num(to_column));
+        range(r0, r1, rowsOf(m), "fill", "row");
+        range(c0, c1, colsOf(m), "fill", "column");
         const v = val(value);
-        for (let r = Math.max(0, r0); r < Math.min(rowsOf(m), r1); r++) {
-            for (let c = Math.max(0, c0); c < Math.min(colsOf(m), c1); c++) m[r][c] = v;
+        for (let r = r0; r < r1; r++) {
+            for (let c = c0; c < c1; c++) m[r][c] = v;
         }
     },
 
@@ -336,6 +389,8 @@ export const matrix = {
         const r1 = to_row === undefined || to_row === null ? rowsOf(m) : Math.trunc(num(to_row));
         const c0 = Math.trunc(num(from_column) || 0);
         const c1 = to_column === undefined || to_column === null ? colsOf(m) : Math.trunc(num(to_column));
+        range(r0, r1, rowsOf(m), "submatrix", "row");
+        range(c0, c1, colsOf(m), "submatrix", "column");
         return tag(m.slice(r0, r1).map(r => r.slice(c0, c1)));
     },
 
