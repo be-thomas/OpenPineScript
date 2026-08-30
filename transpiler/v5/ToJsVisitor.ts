@@ -907,7 +907,19 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       // name, so there is nothing to look a declared type up by. Passing null
       // makes an overloaded method say so rather than pick one.
       const overload = this.resolveOverload(method, null, ctx as SourceLocated);
-      return `ctx.call("${method}${at}", ${overload ?? this.funcName(method)}, ${receiver}${tail})`;
+      const fn = overload ?? this.funcName(method);
+      // The call id carries the EMITTED name, not the Pine one.
+      //
+      // `Context.call` reads the id to find the callee's registry entry, and
+      // that entry decides whether a Context is injected as the first argument
+      // and how keyword arguments map onto parameters. A user method whose name
+      // a built-in also spells — `fill` is both `method fill(array<float> …)`
+      // and Pine's plot-filling function — was handed the BUILT-IN's metadata,
+      // so its receiver arrived as the Context. TradingView's own method-
+      // chaining example, `srcArray.copy().fill(1.0, 0.0, min, val).avg()`, is
+      // exactly that collision. The emitted name is `opsv2_$fn_fill`, which no
+      // registry key can equal.
+      return `ctx.call("${fn}${at}", ${fn}, ${receiver}${tail})`;
     }
 
     const owner = this.libraryMethods.get(method);
@@ -1123,7 +1135,11 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       const overload = this.resolveOverload(
         name, fields.length ? null : receiver, ctx as SourceLocated,
       );
-      return `ctx.call(${callId}, ${overload ?? this.funcName(name)}, ${target}${tail})`;
+      // The EMITTED name in the id, for the reason `emitChainedMethod` gives:
+      // `Context.call` resolves the callee's metadata from it, and a user
+      // method may share a name with a built-in.
+      const fn = overload ?? this.funcName(name);
+      return `ctx.call("${fn}${this.getLocId(ctx as SourceLocated)}", ${fn}, ${target}${tail})`;
     }
 
     // A method this script imported rather than declared. Checked after the
