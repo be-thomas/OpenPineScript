@@ -144,6 +144,13 @@ const EXPECTED: Record<string, RegExp> = {
 
   // ── A deliberate refusal ──────────────────────────────────────────────────
   "v4/v4-annotations-price-levels-hline-00.pine": /'accdist' is a Pine built-in that OpenPineScript does not implement/,
+  // The v5 spelling of the same refusal. It used to read `undefined` instead:
+  // the register poisons `opsv2_accdist` on the sandbox, and v5 writes
+  // `opsv2_ta.opsv2_accdist`, so a sandbox property literally named
+  // "opsv2_ta.accdist" was unreachable by any identifier. The Chaikin
+  // oscillator on TradingView's Text and shapes page was NaN on every bar
+  // while the v4 script one page over correctly refused.
+  "v5/v5-concepts-text-and-shapes-07.pine": /'ta\.accdist' is a Pine built-in that OpenPineScript does not implement/,
   "v4/v4-essential-non-standard-chart-types-data-03.pine": /^renko: /,
   "v4/v4-essential-non-standard-chart-types-data-04.pine": /^linebreak: /,
   "v4/v4-essential-non-standard-chart-types-data-05.pine": /^kagi: /,

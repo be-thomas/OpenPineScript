@@ -113,8 +113,24 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         // is what keeps a script runnable when it only mentions one in a branch
         // the user's inputs never select — which is exactly what
         // conformance/v3/corpus/cci_commodity_channel_index.pine does.
+        //
+        // A DOTTED name is poisoned on its namespace OBJECT, not on the sandbox.
+        // `ta.accdist` is what v5 writes and the emitter renders it
+        // `opsv2_ta.opsv2_accdist`; defining a sandbox property whose NAME
+        // contains a dot creates something no identifier can reach, so the v5
+        // spelling read `undefined` and every bar of
+        //
+        //     osc = ta.ema(ta.accdist, fast) - ta.ema(ta.accdist, slow)
+        //
+        // — TradingView's own Chaikin oscillator example — was NaN, with no
+        // diagnostic, while the v4 script one page over correctly refused. The
+        // whole point of the register is that the two cases differ.
         for (const name of UNIMPLEMENTED_BUILTINS) {
-            Object.defineProperty(sandbox, `${PREFIX}${name}`, {
+            const dot = name.indexOf(".");
+            const target = dot < 0 ? sandbox : sandbox[`${PREFIX}${name.slice(0, dot)}`];
+            const key = `${PREFIX}${dot < 0 ? name : name.slice(dot + 1)}`;
+            if (!target || typeof target !== "object") continue;
+            Object.defineProperty(target, key, {
                 get() {
                     throw new Error(
                         `'${name}' is a Pine built-in that OpenPineScript does not ` +
