@@ -1052,24 +1052,52 @@ export class Context {
     }
 
     // Helper to register an input during dry_run and retrieve value during real run
-    public registerInput(defval: any, title: string = "", type: string = "float"): any {
+    /**
+     * @param meta the input's CONSTRAINTS and grouping — `minval`, `maxval`,
+     *        `step`, `options`, `tooltip`, `inline`, `group`, `confirm`,
+     *        `display`. Recorded on the definition so a host can render the
+     *        control, and the numeric three are ENFORCED on the value below.
+     *
+     *        They used to be accepted and thrown away, on the reasoning that a
+     *        constraint the engine does not enforce is worse than no constraint.
+     *        The reasoning was right and the conclusion was not: the answer is
+     *        to enforce it. `minval` appears on seventeen of TradingView's own
+     *        examples and `options` restricts an input to a fixed set, and a
+     *        user override outside either was being taken at face value.
+     */
+    public registerInput(
+        defval: any, title: string = "", type: string = "float",
+        meta: Record<string, any> = {},
+    ): any {
         const currentId = `input_${this.inputCounter++}`;
-        
+
         // If it's the dry run (first time seeing this), save the definition
         if (this.inputDefs.length < this.inputCounter) {
             this.inputDefs.push({
                 id: currentId,
                 defval,
                 title: title || currentId,
-                type
+                type,
+                ...meta,
             });
         }
 
         // Return user override if it exists, otherwise return the default
-        if (currentId in this.userInputs) {
-            return this.userInputs[currentId];
+        const raw = currentId in this.userInputs ? this.userInputs[currentId] : defval;
+        return Context.constrainInput(raw, meta);
+    }
+
+    /** Clamp to `minval`/`maxval` and fall back to the default outside `options`. */
+    private static constrainInput(value: any, meta: Record<string, any>): any {
+        const options = meta.options;
+        if (Array.isArray(options) && options.length > 0 && !options.includes(value)) {
+            return options.includes(meta.defval) ? meta.defval : options[0];
         }
-        return defval;
+        if (typeof value !== "number" || Number.isNaN(value)) return value;
+        let out = value;
+        if (typeof meta.minval === "number" && out < meta.minval) out = meta.minval;
+        if (typeof meta.maxval === "number" && out > meta.maxval) out = meta.maxval;
+        return out;
     }
 
     /**
@@ -1540,8 +1568,17 @@ export class Context {
             }
         }
 
-        if (series.length > this.currentBarIndex) {
-            series[this.currentBarIndex] = data;
+        // `offset` moves the value to a DIFFERENT BAR, which changes the series
+        // rather than its appearance — "Shifts the plot to the left or right on
+        // the chart. A negative value shifts it left, a positive one right." So
+        // it is applied here, unlike the other display parameters, which this
+        // engine records and does not render.
+        const shift = Number((data as any).offset);
+        const at = this.currentBarIndex + (Number.isFinite(shift) ? Math.trunc(shift) : 0);
+        if (at < 0) return;                       // shifted off the left of the dataset
+        while (series.length < at) series.push(null);
+        if (series.length > at) {
+            series[at] = data;
         } else {
             series.push(data);
         }
@@ -1566,8 +1603,17 @@ export class Context {
             title: title
         };
 
-        if (series.length > this.currentBarIndex) {
-            series[this.currentBarIndex] = data;
+        // `offset` moves the value to a DIFFERENT BAR, which changes the series
+        // rather than its appearance — "Shifts the plot to the left or right on
+        // the chart. A negative value shifts it left, a positive one right." So
+        // it is applied here, unlike the other display parameters, which this
+        // engine records and does not render.
+        const shift = Number((data as any).offset);
+        const at = this.currentBarIndex + (Number.isFinite(shift) ? Math.trunc(shift) : 0);
+        if (at < 0) return;                       // shifted off the left of the dataset
+        while (series.length < at) series.push(null);
+        if (series.length > at) {
+            series[at] = data;
         } else {
             series.push(data);
         }

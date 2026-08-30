@@ -43,6 +43,30 @@ export const color_purple = "#9C27B0";
 const withTransp = (col: any, transp: any): any =>
     transp === undefined || transp === null ? col : color(col, transp);
 
+
+/**
+ * The DISPLAY parameters every plotting function takes and this engine records.
+ *
+ * ── Why they are here at all ────────────────────────────────────────────────
+ *
+ * A keyword argument whose name is not in the callee's signature is dropped by
+ * `Context.call` without a word. Every name below was being dropped, and the
+ * corpus shows how often: `title` on 35 `bgcolor` calls, `size` on 24
+ * `plotchar` calls, `display` on 8 `plot` calls, `wickcolor` and `bordercolor`
+ * on 5 `plotcandle` calls each. A script asking for a named plot got "_BGCOLOR_"
+ * and nothing said so.
+ *
+ * This engine does not RENDER, so recording them on the plot is the whole of
+ * honouring them — with one exception. `offset` moves the value to a different
+ * BAR, which changes the series rather than its appearance, so
+ * `Context.registerPlot` applies it.
+ */
+const shown = (o: Record<string, any>): Record<string, any> => {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(o)) if (v !== undefined) out[k] = v;
+    return out;
+};
+
 export function plot(
     ctx: Context,
     series: number,
@@ -50,7 +74,14 @@ export function plot(
     color?: string,
     linewidth: number = 1,
     style?: number,
+    // `transp` sits where v5 spells `trackprice`, because it is the v1–v4
+    // signature and `trackprice` is not: a positional sixth argument is `transp`
+    // in the versions that have it. Everything after is by name in every
+    // published script.
     transp?: any,
+    trackprice?: any, histbase?: any, offset?: any, join?: any,
+    editable?: any, show_last?: any, display?: any,
+    format?: any, precision?: any, force_overlay?: any,
 ): string {
     ctx.registerPlot({
         type: 'line',
@@ -58,7 +89,9 @@ export function plot(
         title,
         color: withTransp(color, transp),
         linewidth,
-        style
+        style,
+        ...shown({ trackprice, histbase, offset, join, editable, show_last,
+                     display, format, precision, force_overlay }),
     });
     // Return the ID (title) so it can be used by fill()
     return title;
@@ -72,6 +105,9 @@ export function plotshape(
     location?: string,
     color?: string,
     transp?: any,
+    offset?: any, text?: any, textcolor?: any, editable?: any, size?: any,
+    show_last?: any, display?: any, format?: any, precision?: any,
+    force_overlay?: any,
 ): void {
     let val = Number(series);
 
@@ -81,6 +117,8 @@ export function plotshape(
     }
 
     ctx.registerPlot({
+        ...shown({ offset, text, textcolor, editable, size, show_last,
+                     display, format, precision, force_overlay }),
         type: 'shape',
         value: val,
         title,
@@ -97,6 +135,9 @@ export function plotchar(
     location?: string,
     color?: string,
     transp?: any,
+    offset?: any, text?: any, textcolor?: any, editable?: any, size?: any,
+    show_last?: any, display?: any, format?: any, precision?: any,
+    force_overlay?: any,
 ): void {
     let val = Number(series);
 
@@ -105,6 +146,8 @@ export function plotchar(
     }
 
     ctx.registerPlot({
+        ...shown({ offset, text, textcolor, editable, size, show_last,
+                     display, format, precision, force_overlay }),
         type: 'char',
         value: val,
         title,
@@ -119,7 +162,8 @@ export function hline(
     title: string = "HLine",
     color?: string,
     linestyle?: number,
-    linewidth?: number
+    linewidth?: number,
+    editable?: any, display?: any, force_overlay?: any,
 ): string {
     ctx.registerPlot({
         type: 'line',
@@ -127,7 +171,8 @@ export function hline(
         title,
         color,
         linewidth,
-        style: linestyle
+        style: linestyle,
+        ...shown({ editable, display, force_overlay }),
     });
     return title;
 }
@@ -141,8 +186,12 @@ export function plotbar(
     title: string = "Bar",
     color?: string,
     transp?: any,
+    editable?: any, show_last?: any, display?: any,
+    format?: any, precision?: any, force_overlay?: any,
 ): void {
     ctx.registerPlot({
+        ...shown({ editable, show_last, display, format, precision,
+                     force_overlay }),
         type: 'candle',
         open: Number(open),
         high: Number(high),
@@ -162,8 +211,12 @@ export function plotcandle(
     title: string = "Candle",
     color?: string,
     transp?: any,
+    wickcolor?: any, editable?: any, show_last?: any, bordercolor?: any,
+    display?: any, format?: any, precision?: any, force_overlay?: any,
 ): void {
     ctx.registerPlot({
+        ...shown({ wickcolor, editable, show_last, bordercolor,
+                     display, format, precision, force_overlay }),
         type: 'candle',
         open: Number(open),
         high: Number(high),
@@ -193,37 +246,54 @@ export function plotarrow(
 
 // --- Visual Layers ---
 
-export function bgcolor(ctx: Context, color: string, transp?: number): void {
+export function bgcolor(
+    ctx: Context, color: string, transp?: number,
+    offset?: any, editable?: any, show_last?: any, title?: any,
+    display?: any, force_overlay?: any,
+): void {
     // `transp` was declared here and then dropped on the floor. See the note on
     // `withTransp` above: the argument has always been legal and has never been
     // applied, so a script asking for a 90%-transparent background got an
     // opaque one at every version.
     ctx.registerPlot({
         type: 'bgcolor',
-        title: `_BGCOLOR_${color}`,
-        color: withTransp(color, transp)
+        // A declared title names the plot; the synthetic one is the fallback it
+        // always was.
+        title: title === undefined || title === null || title === ""
+            ? `_BGCOLOR_${color}` : String(title),
+        color: withTransp(color, transp),
+        ...shown({ offset, editable, show_last, display, force_overlay }),
     });
 }
 
-export function barcolor(ctx: Context, color: string): void {
+export function barcolor(
+    ctx: Context, color: string,
+    offset?: any, editable?: any, show_last?: any, title?: any, display?: any,
+): void {
     ctx.registerPlot({
         type: 'barcolor',
-        title: "_BARCOLOR_",
-        color
+        title: title === undefined || title === null || title === ""
+            ? "_BARCOLOR_" : String(title),
+        color,
+        ...shown({ offset, editable, show_last, display }),
     });
 }
 
 export function fill(
     ctx: Context,
-    plotId1: string,
-    plotId2: string,
+    plot1: string,
+    plot2: string,
     color?: string,
     title?: string,
     editable?: boolean,
     fillgaps?: boolean,
     transp?: any,
+    display?: any, force_overlay?: any,
 ): void {
-    ctx.registerFill(plotId1, plotId2, { color: withTransp(color, transp), title });
+    ctx.registerFill(plot1, plot2, {
+        color: withTransp(color, transp), title,
+        ...shown({ editable, fillgaps, display, force_overlay }),
+    });
 }
 
 

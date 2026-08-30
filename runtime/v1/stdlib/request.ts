@@ -48,11 +48,25 @@ export function requestKey(parts: readonly any[]): string {
 }
 
 /** Looks a request up, or refuses. See the header for why this is not `na`. */
-function resolve(ctx: Context, kind: string, parts: readonly any[]): number {
+/**
+ * @param ignore_invalid_symbol when true, a context this engine cannot supply
+ *        answers `na` instead of raising. That is the documented meaning —
+ *        "If true, no error is thrown and na is returned" — and it applies just
+ *        as well to data a HOST has not provided as to a symbol TradingView
+ *        cannot find: either way the request has no answer, and the script has
+ *        said it would rather have `na` than stop.
+ */
+function resolve(
+    ctx: Context, kind: string, parts: readonly any[], ignore_invalid_symbol: any = false,
+): number {
     const key = requestKey(parts);
     const samples = ctx.getRequestData(kind, key);
 
     if (!samples) {
+        const ignore = ignore_invalid_symbol !== null && ignore_invalid_symbol !== undefined
+            && typeof (ignore_invalid_symbol as any).valueOf === "function"
+            ? (ignore_invalid_symbol as any).valueOf() : ignore_invalid_symbol;
+        if (ignore === true) return NaN;
         throw new Error(
             `request.${kind}: no data was supplied for '${key}'. OpenPineScript ` +
             `cannot fetch it from TradingView — provide it with ` +
@@ -74,8 +88,13 @@ function resolve(ctx: Context, kind: string, parts: readonly any[]): number {
  * @returns {series float} The reported figure, held until the next report.
  */
 export const request = {
-    financial: (ctx: Context, symbol: any, financial_id: any, period: any, _gaps?: any): number =>
-        resolve(ctx, "financial", [symbol, financial_id, period]),
+    financial: (
+        ctx: Context, symbol: any, financial_id: any, period: any, gaps?: any,
+        ignore_invalid_symbol?: any, currency?: any,
+    ): number => {
+        void gaps; void currency;
+        return resolve(ctx, "financial", [symbol, financial_id, period], ignore_invalid_symbol);
+    },
 
     /** `request.dividends(ticker, field, …)` — field defaults to gross dividends. */
     dividends: (ctx: Context, ticker: any, field: any = "dividends_gross", ..._rest: any[]): number =>

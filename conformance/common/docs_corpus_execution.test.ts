@@ -124,7 +124,9 @@ const EXPECTED: Record<string, RegExp> = {
 
   // ── Host data not supplied ────────────────────────────────────────────────
   "v5/v5-concepts-other-timeframes-and-data-01.pine": /request\.financial: no data was supplied/,
-  "v5/v5-concepts-other-timeframes-and-data-03.pine": /request\.financial: no data was supplied/,
+  // `-03` used to be here. It passes `ignore_invalid_symbol = true`, which the
+  // signature did not name, so the argument was dropped and the request raised
+  // where the script had said it would rather have `na`.
   "v5/v5-concepts-other-timeframes-and-data-40.pine": /request\.currency_rate: no data was supplied/,
   "v5/v5-concepts-other-timeframes-and-data-41.pine": /request\.dividends: no data was supplied/,
   "v5/v5-concepts-other-timeframes-and-data-42.pine": /request\.quandl: no data was supplied/,

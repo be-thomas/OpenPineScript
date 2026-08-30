@@ -1,4 +1,5 @@
 import { Context } from "../context";
+import { utcFromZoned } from "../zones";
 
 /**
  * time.ts - Pine Script v2 Time Functions and Variables
@@ -108,27 +109,78 @@ const parts = {
 // through the registry.
 
 /**
- * Constructs a UNIX timestamp (ms) from calendar components (UTC).
- * Pine months are 1-indexed (January = 1); JS Date.UTC expects 0-indexed.
+ * `timestamp(...)` — a UNIX timestamp in milliseconds, in all three spellings.
+ *
+ * SOURCING. TradingView's `v5-concepts-time-20` demonstrates every one, and
+ * annotates each with the zone it is read in:
+ *
+ *     timestamp("2021-01-01")                          // "in the UTC+0 time zone"
+ *     timestamp(2021, 1, 1, 0, 0)                      // "in the exchange time zone"
+ *     timestamp("America/New_York", 2021, 1, 1, 0, 0)  // in the named zone
+ *     timestamp("UTC0", 2021, 1, 1, 0, 0)              // in "UTC0" (UTC+0)
+ *
+ * ── What this used to be ────────────────────────────────────────────────────
+ *
+ * Only the middle one, and always in UTC. The date-STRING form returned
+ * `Date.UTC(Number("2021-01-01"), …)` — NaN — so `input.time(timestamp(
+ * "2021-01-01"))` was `na` and every plot gated on it drew nothing. The
+ * timezone form had no parameter to bind to, so the zone was dropped and the
+ * answer came back in UTC, silently off by up to half a day.
  *
  * Declared at top level, not as a member of the `time` object: Pine spells this
  * as a global `timestamp(...)`, and the registry generator only hoists top-level
  * exports to unprefixed keys. As an object member it generated
  * "time.timestamp", which no Pine source can reach.
  *
- * @returns {number} UNIX timestamp in milliseconds.
+ * The parameters are named for BOTH shapes, because the keyword form has to
+ * bind: `timestamp(timezone = "UTC+4", year = 2021, …)` and
+ * `timestamp(year = 2021, …)` are the same function. Which shape a positional
+ * call is in is decided by whether the first argument is a string.
+ *
+ * @returns {number} UNIX timestamp in milliseconds, or na.
  */
 export function timestamp(
-    year: number,
-    month: number,
-    day: number,
-    hour: number = 0,
-    minute: number = 0,
-    second: number = 0
+    ctx: Context,
+    timezone?: any,
+    year?: any,
+    month?: any,
+    day?: any,
+    hour?: any,
+    minute?: any,
+    second?: any,
+    dateString?: any,
 ): number {
-    return Date.UTC(
-        Number(year), Number(month) - 1, Number(day),
-        Number(hour), Number(minute), Number(second),
+    const u = (x: any) => (x !== null && x !== undefined && typeof x.valueOf === "function"
+        ? x.valueOf() : x);
+    const num = (x: any, fallback = 0) => {
+        const v = Number(u(x));
+        return Number.isFinite(v) ? v : fallback;
+    };
+
+    const first = u(timezone);
+    const explicitString = u(dateString);
+
+    // `timestamp("2021-01-01")` — a date string and nothing else. Parsed by the
+    // platform, which handles the ISO and RFC forms the manual's examples use
+    // ("2021-01-01", "3 Apr 2022 20:00 -0400"). A date-only ISO string is UTC
+    // midnight, which is what the page's own comment says it should be.
+    const asString = explicitString !== undefined ? explicitString
+        : (typeof first === "string" && u(year) === undefined ? first : undefined);
+    if (asString !== undefined) {
+        const parsed = new Date(String(asString)).getTime();
+        return Number.isFinite(parsed) ? parsed : NaN;
+    }
+
+    // A leading STRING is a time zone; otherwise the calendar fields start at
+    // the first argument and the zone is the exchange's.
+    const zoned = typeof first === "string";
+    const zone = zoned ? String(first) : ctx.timezone;
+    const f = zoned
+        ? [year, month, day, hour, minute, second]
+        : [timezone, year, month, day, hour, minute];
+
+    return utcFromZoned(
+        num(f[0]), num(f[1], 1), num(f[2], 1), num(f[3]), num(f[4]), num(f[5]), zone,
     );
 }
 

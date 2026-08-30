@@ -105,8 +105,12 @@ describe("registry parameter names are Pine's, not TypeScript's", () => {
   });
 
   it("security() names its arguments as Pine does", () => {
+    // The whole published signature, not a prefix of it: a keyword argument
+    // binds by PARAMETER NAME, and a name the signature does not carry is
+    // dropped without a word. `ignore_invalid_symbol` was one of those.
     expect((REGISTRY["security"] as any).args)
-      .toEqual(["symbol", "resolution", "expression", "gaps", "lookahead"]);
+      .toEqual(["symbol", "resolution", "expression", "gaps", "lookahead",
+                "ignore_invalid_symbol", "currency", "calc_bars_count"]);
   });
 
   it("color.new is reachable under the name Pine writes", () => {

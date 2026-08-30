@@ -1900,7 +1900,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "box.new": {
           uses_context: true,
-          args: ["left","top","right","bottom","border_color","border_width","border_style","extend","bgcolor","text","text_size","text_color","text_halign","text_valign","text_wrap","text_font_family"],
+          args: ["left","top","right","bottom","border_color","border_width","border_style","extend","xloc","bgcolor","text","text_size","text_color","text_halign","text_valign","text_wrap","text_font_family"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2628,7 +2628,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input": {
           uses_context: true,
-          args: ["defval","title","type"],
+          args: ["defval","title","type","minval","maxval","confirm","step","options","tooltip","inline","group","display"],
           is_getter: false,
           returns: {"kind":"series","type":"float (or int/bool depending on type)"},
           is_value: false,
@@ -2700,7 +2700,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.int": {
           uses_context: true,
-          args: ["defval","title","minval","maxval","step"],
+          args: ["defval","title","minval","maxval","step","tooltip","inline","group","confirm","display","options"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2708,7 +2708,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.float": {
           uses_context: true,
-          args: ["defval","title","minval","maxval","step"],
+          args: ["defval","title","minval","maxval","step","tooltip","inline","group","confirm","display","options"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2716,7 +2716,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.bool": {
           uses_context: true,
-          args: ["defval","title"],
+          args: ["defval","title","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2724,7 +2724,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.string": {
           uses_context: true,
-          args: ["defval","title","options"],
+          args: ["defval","title","options","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2732,7 +2732,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.color": {
           uses_context: true,
-          args: ["defval","title"],
+          args: ["defval","title","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2740,7 +2740,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.timeframe": {
           uses_context: true,
-          args: ["defval","title","options"],
+          args: ["defval","title","options","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2748,7 +2748,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.session": {
           uses_context: true,
-          args: ["defval","title","options"],
+          args: ["defval","title","options","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2756,7 +2756,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.symbol": {
           uses_context: true,
-          args: ["defval","title"],
+          args: ["defval","title","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2764,7 +2764,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.source": {
           uses_context: true,
-          args: ["defval","title"],
+          args: ["defval","title","tooltip","inline","group","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2772,7 +2772,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.time": {
           uses_context: true,
-          args: ["defval","title"],
+          args: ["defval","title","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2780,7 +2780,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.price": {
           uses_context: true,
-          args: ["defval","title"],
+          args: ["defval","title","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2788,7 +2788,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.text_area": {
           uses_context: true,
-          args: ["defval","title"],
+          args: ["defval","title","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2796,7 +2796,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "input.enum": {
           uses_context: true,
-          args: ["defval","title","rest"],
+          args: ["defval","title","options","tooltip","inline","group","confirm","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -3364,7 +3364,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "security": {
           uses_context: true,
-          args: ["symbol","resolution","expression","gaps","lookahead"],
+          args: ["symbol","resolution","expression","gaps","lookahead","ignore_invalid_symbol","currency","calc_bars_count"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -3380,7 +3380,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "request.financial": {
           uses_context: true,
-          args: ["symbol","financial_id","period","gaps"],
+          args: ["symbol","financial_id","period","gaps","ignore_invalid_symbol","currency"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -3804,7 +3804,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.order": {
           uses_context: true,
-          args: ["id","dir","qty","limit","stop","oca_name","oca_type"],
+          args: ["id","dir","qty","limit","stop","oca_name","oca_type","comment","when","alert_message"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -3812,7 +3812,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.entry": {
           uses_context: true,
-          args: ["id","dir","qty","overridePrice"],
+          args: ["id","direction","qty","limit","stop","oca_name","oca_type","comment","when","alert_message","overridePrice"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -3820,7 +3820,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.close": {
           uses_context: true,
-          args: ["id"],
+          args: ["id","when","comment","qty","qty_percent","alert_message"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -3828,7 +3828,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.close_all": {
           uses_context: true,
-          args: ["comment"],
+          args: ["comment","when","alert_message"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -3836,7 +3836,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.cancel": {
           uses_context: true,
-          args: ["id"],
+          args: ["id","when"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -3852,7 +3852,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.exit": {
           uses_context: true,
-          args: ["id","from_entry","qty","profit","limit","loss","stop","oca_name"],
+          args: ["id","from_entry","qty","profit","limit","loss","stop","oca_name","comment","when","alert_message"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4739,10 +4739,10 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           ref: ta.mode
       },
       "timestamp": {
-          uses_context: false,
-          args: ["year","month","day","hour","minute","second"],
+          uses_context: true,
+          args: ["timezone","year","month","day","hour","minute","second","dateString"],
           is_getter: false,
-          returns: {"kind":"scalar","type":"UNIX timestamp in milliseconds."},
+          returns: {"kind":"scalar","type":"UNIX timestamp in milliseconds, or na."},
           is_value: false,
           ref: time.timestamp
       },
@@ -4932,7 +4932,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plot": {
           uses_context: true,
-          args: ["series","title","color","linewidth","style","transp"],
+          args: ["series","title","color","linewidth","style","transp","trackprice","histbase","offset","join","editable","show_last","display","format","precision","force_overlay"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4940,7 +4940,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plotshape": {
           uses_context: true,
-          args: ["series","title","style","location","color","transp"],
+          args: ["series","title","style","location","color","transp","offset","text","textcolor","editable","size","show_last","display","format","precision","force_overlay"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4948,7 +4948,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plotchar": {
           uses_context: true,
-          args: ["series","title","char","location","color","transp"],
+          args: ["series","title","char","location","color","transp","offset","text","textcolor","editable","size","show_last","display","format","precision","force_overlay"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4956,7 +4956,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "hline": {
           uses_context: true,
-          args: ["price","title","color","linestyle","linewidth"],
+          args: ["price","title","color","linestyle","linewidth","editable","display","force_overlay"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4964,7 +4964,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plotbar": {
           uses_context: true,
-          args: ["open","high","low","close","title","color","transp"],
+          args: ["open","high","low","close","title","color","transp","editable","show_last","display","format","precision","force_overlay"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4972,7 +4972,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "plotcandle": {
           uses_context: true,
-          args: ["open","high","low","close","title","color","transp"],
+          args: ["open","high","low","close","title","color","transp","wickcolor","editable","show_last","bordercolor","display","format","precision","force_overlay"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4988,7 +4988,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "bgcolor": {
           uses_context: true,
-          args: ["color","transp"],
+          args: ["color","transp","offset","editable","show_last","title","display","force_overlay"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4996,7 +4996,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "barcolor": {
           uses_context: true,
-          args: ["color"],
+          args: ["color","offset","editable","show_last","title","display"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -5004,7 +5004,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "fill": {
           uses_context: true,
-          args: ["plotId1","plotId2","color","title","editable","fillgaps","transp"],
+          args: ["plot1","plot2","color","title","editable","fillgaps","transp","display","force_overlay"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,

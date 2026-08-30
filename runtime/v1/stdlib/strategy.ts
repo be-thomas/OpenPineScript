@@ -35,6 +35,17 @@ export const direction = {
     short: short
 };
 
+/**
+ * The same object, under a name a PARAMETER cannot shadow.
+ *
+ * `strategy.entry`'s second parameter is called `direction` — that is the name
+ * the keyword form uses, and the registry records parameter names — which puts
+ * a string in front of this object inside that function. `isLong` then compared
+ * against `undefined`, every entry became a SHORT, and the only sign of it was
+ * an inverted equity curve.
+ */
+const DIR = direction;
+
 // --- OCA CONSTANTS ---
 export const oca = {
     cancel: "cancel",
@@ -237,6 +248,29 @@ function checkRiskHalt(ctx: Context, rs: RiskState): boolean {
 // --- CORE EXECUTIONS ---
 
 /**
+ * `when` — the v1–v4 way of gating an order.
+ *
+ * "when (bool) Condition. If it is false, the command is ignored." v5 removed
+ * the parameter in favour of an `if` block, but every strategy function carried
+ * it before that, and six of TradingView's own v4 examples use it —
+ * `strategy.entry("buy", strategy.long, 4, when = strategy.position_size <= 0)`.
+ *
+ * The parameter was in none of these signatures, so `Context.call` dropped it
+ * and the order fired UNCONDITIONALLY. A strategy that should have entered once
+ * entered on every bar, and the equity curve was wrong with nothing to say so.
+ *
+ * Absent means true, which is the documented default.
+ */
+function gated(when: any): boolean {
+    if (when === undefined || when === null) return true;
+    const v = val(when);
+    if (v === null || v === undefined) return false;
+    if (typeof v === "number") return !Number.isNaN(v) && v !== 0;
+    return Boolean(v);
+}
+
+
+/**
  * Registers a pending entry order (Limit or Stop).
  */
 export function order(
@@ -247,14 +281,20 @@ export function order(
     limit: any = Number.NaN,
     stop: any = Number.NaN,
     oca_name: string = "",
-    oca_type: string = oca.none
+    oca_type: string = oca.none,
+    comment: string = "",
+    when: any = undefined,
+    alert_message: string = "",
 ): void {
+    if (!gated(when)) return;
+    void comment; void alert_message;
+
     const lim = val(limit);
     const stp = val(stop);
 
     // If no limit/stop, it's a market order — execute immediately.
     if (Number.isNaN(lim) && Number.isNaN(stp)) {
-        return entry(ctx, id, dir, qty);
+        return entry(ctx, id, dir, qty, Number.NaN, Number.NaN, oca_name, oca_type);
     }
 
     const entries = getPendingEntries(ctx);
@@ -273,7 +313,35 @@ export function order(
  * Enters a position.
  * If we are in the opposite position, it closes it first (reverses).
  */
-export function entry(ctx: Context, id: string, dir: string, qty: any = 1, overridePrice?: number) {
+export function entry(
+    ctx: Context,
+    id: string,
+    direction: string,
+    qty: any = 1,
+    limit: any = Number.NaN,
+    stop: any = Number.NaN,
+    oca_name: string = "",
+    oca_type: string = oca.none,
+    comment: string = "",
+    when: any = undefined,
+    alert_message: string = "",
+    // Not a Pine parameter. `strategy.order` calls back in here once a pending
+    // limit or stop has been triggered, and passes the price it filled at.
+    overridePrice?: number,
+) {
+    if (!gated(when)) return;
+
+    // A limit or stop price makes this a PENDING order rather than a market
+    // one — "limit (float) Limit price of the order" — and `strategy.order`
+    // already owns that queue.
+    const lim = val(limit);
+    const stp = val(stop);
+    if (overridePrice === undefined && (!Number.isNaN(lim) || !Number.isNaN(stp))) {
+        return order(ctx, id, direction, qty, limit, stop, oca_name, oca_type, comment);
+    }
+
+    const dir = direction;
+    void comment; void alert_message; void oca_name; void oca_type;
     const rs = syncRiskState(ctx);
     if (rs.is_halted) return;
     if (checkRiskHalt(ctx, rs)) return;
@@ -281,12 +349,12 @@ export function entry(ctx: Context, id: string, dir: string, qty: any = 1, overr
     // max_intraday_filled_orders check
     if (rs.daily_filled_orders >= rs.max_intraday_filled_orders) return;
 
-    const isLong = dir === direction.long;
+    const isLong = dir === DIR.long;
 
     // allow_entry_in check
     if (rs.allow_entry_in !== "all") {
-        if (isLong && rs.allow_entry_in !== direction.long) return;
-        if (!isLong && rs.allow_entry_in !== direction.short) return;
+        if (isLong && rs.allow_entry_in !== DIR.long) return;
+        if (!isLong && rs.allow_entry_in !== DIR.short) return;
     }
 
     const currentPrice = overridePrice !== undefined ? overridePrice : ctx.close;
@@ -341,11 +409,20 @@ export function entry(ctx: Context, id: string, dir: string, qty: any = 1, overr
 /**
  * Closes a specific position or all positions.
  */
-export function close(ctx: Context, id: string) {
-    close_all(ctx, `Close ${id}`);
+export function close(
+    ctx: Context, id: string, when: any = undefined, comment: string = "",
+    qty: any = Number.NaN, qty_percent: any = Number.NaN, alert_message: string = "",
+) {
+    if (!gated(when)) return;
+    void qty; void qty_percent; void alert_message;
+    close_all(ctx, comment || `Close ${id}`);
 }
 
-export function close_all(ctx: Context, comment: string = "") {
+export function close_all(
+    ctx: Context, comment: string = "", when: any = undefined, alert_message: string = "",
+) {
+    if (!gated(when)) return;
+    void alert_message;
     if (ctx.position.size === 0) return;
 
     const currentPrice = ctx.close;
@@ -383,7 +460,8 @@ export function close_all(ctx: Context, comment: string = "") {
 /**
  * Cancels a pending order by ID.
  */
-export function cancel(ctx: Context, id: string): void {
+export function cancel(ctx: Context, id: string, when: any = undefined): void {
+    if (!gated(when)) return;
     getPendingEntries(ctx).delete(id);
     getPendingExits(ctx).delete(id);
 }
@@ -410,8 +488,13 @@ export function exit(
     limit: any = Number.NaN,
     loss: any = Number.NaN,
     stop: any = Number.NaN,
-    oca_name: string = ""
+    oca_name: string = "",
+    comment: string = "",
+    when: any = undefined,
+    alert_message: string = "",
 ): void {
+    if (!gated(when)) return;
+    void comment; void alert_message;
     const exits = getPendingExits(ctx);
     exits.set(id, {
         id,
@@ -534,7 +617,11 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
         }
 
         if (!Number.isNaN(price)) {
-            entry(ctx, id, ord.dir, ord.qty, price);
+            // The fill price goes in the LAST slot now: the Pine signature owns
+            // the five before it (`limit`, `stop`, `oca_name`, `oca_type`,
+            // `comment`, `when`, `alert_message`).
+            entry(ctx, id, ord.dir, ord.qty, Number.NaN, Number.NaN,
+                  ord.oca_name, ord.oca_type, "", undefined, "", price);
             filledEntryIds.push(id);
             applyEntryOCA(entries, ord);
         }

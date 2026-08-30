@@ -39,46 +39,80 @@ const text = (x: any): string => {
 /**
  * Every typed input reduces to the same registration.
  *
- * `minval`/`maxval`/`step`/`options` are accepted because published v5 scripts
- * pass them constantly, and dropped because Context.registerInput records a
- * default and a type and nothing else. Recording a constraint the engine does
- * not enforce would be worse than not recording it: the host UI would show a
- * slider whose bounds meant nothing.
+ * `minval`, `maxval`, `step` and `options` used to be accepted positionally
+ * under underscored names and thrown away — so a keyword `minval = 1` matched no
+ * parameter and was dropped without a word, on seventeen of TradingView's own
+ * examples. They are now RECORDED on the definition, and the numeric bounds and
+ * the `options` set are enforced on the value the script gets back.
+ *
+ * `tooltip`, `inline`, `group`, `confirm` and `display` are host-UI metadata:
+ * recorded, because a host renders the controls, and nothing here to enforce.
  */
-const register = (ctx: Context, defval: any, title: any, type: string): any =>
-    ctx.registerInput(val(defval), text(title), type);
+const register = (
+    ctx: Context, defval: any, title: any, type: string, meta: Record<string, any> = {},
+): any => {
+    const clean: Record<string, any> = { defval: val(defval) };
+    for (const [k, v] of Object.entries(meta)) if (v !== undefined) clean[k] = val(v);
+    return ctx.registerInput(val(defval), text(title), type, clean);
+};
 
 export const input = {
-    int: (ctx: Context, defval: any, title?: any, _minval?: any, _maxval?: any, _step?: any) =>
-        register(ctx, defval, title, "integer"),
+    int: (ctx: Context, defval: any, title?: any, minval?: any, maxval?: any, step?: any,
+          tooltip?: any, inline?: any, group?: any, confirm?: any, display?: any,
+          options?: any) =>
+        register(ctx, defval, title, "integer",
+                 { minval, maxval, step, tooltip, inline, group, confirm, display, options }),
 
-    float: (ctx: Context, defval: any, title?: any, _minval?: any, _maxval?: any, _step?: any) =>
-        register(ctx, defval, title, "float"),
+    float: (ctx: Context, defval: any, title?: any, minval?: any, maxval?: any, step?: any,
+            tooltip?: any, inline?: any, group?: any, confirm?: any, display?: any,
+            options?: any) =>
+        register(ctx, defval, title, "float",
+                 { minval, maxval, step, tooltip, inline, group, confirm, display, options }),
 
-    bool: (ctx: Context, defval: any, title?: any) => register(ctx, defval, title, "bool"),
+    bool: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
+           group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "bool", { tooltip, inline, group, confirm, display }),
 
-    string: (ctx: Context, defval: any, title?: any, _options?: any) =>
-        register(ctx, defval, title, "string"),
+    string: (ctx: Context, defval: any, title?: any, options?: any, tooltip?: any,
+             inline?: any, group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "string",
+                 { options, tooltip, inline, group, confirm, display }),
 
-    color: (ctx: Context, defval: any, title?: any) => register(ctx, defval, title, "color"),
+    color: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
+            group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "color", { tooltip, inline, group, confirm, display }),
 
     /** v5's rename of v4's `input.resolution`. */
-    timeframe: (ctx: Context, defval: any, title?: any, _options?: any) =>
-        register(ctx, defval, title, "resolution"),
+    timeframe: (ctx: Context, defval: any, title?: any, options?: any, tooltip?: any,
+                inline?: any, group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "resolution",
+                 { options, tooltip, inline, group, confirm, display }),
 
-    session: (ctx: Context, defval: any, title?: any, _options?: any) =>
-        register(ctx, defval, title, "session"),
+    session: (ctx: Context, defval: any, title?: any, options?: any, tooltip?: any,
+              inline?: any, group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "session",
+                 { options, tooltip, inline, group, confirm, display }),
 
-    symbol: (ctx: Context, defval: any, title?: any) => register(ctx, defval, title, "symbol"),
+    symbol: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
+             group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "symbol", { tooltip, inline, group, confirm, display }),
 
     /** The chart series an indicator runs on — `close`, `hl2`, another plot. */
-    source: (ctx: Context, defval: any, title?: any) => register(ctx, defval, title, "source"),
+    source: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
+             group?: any, display?: any) =>
+        register(ctx, defval, title, "source", { tooltip, inline, group, display }),
 
-    time: (ctx: Context, defval: any, title?: any) => register(ctx, defval, title, "time"),
+    time: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
+           group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "time", { tooltip, inline, group, confirm, display }),
 
-    price: (ctx: Context, defval: any, title?: any) => register(ctx, defval, title, "float"),
+    price: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
+            group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "float", { tooltip, inline, group, confirm, display }),
 
-    text_area: (ctx: Context, defval: any, title?: any) => register(ctx, defval, title, "string"),
+    text_area: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
+                group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "string", { tooltip, inline, group, confirm, display }),
 
     /**
      * `input.enum(defaultValue, title, options, …)` — a dropdown of enum members.
@@ -93,8 +127,10 @@ export const input = {
      * each into the text the dropdown should show. A plain `string` input would
      * offer a free-text box for a value that must be one of a fixed set.
      */
-    enum: (ctx: Context, defval: any, title?: any, ..._rest: any[]) =>
-        register(ctx, defval, title, "enum"),
+    enum: (ctx: Context, defval: any, title?: any, options?: any, tooltip?: any,
+           inline?: any, group?: any, confirm?: any, display?: any) =>
+        register(ctx, defval, title, "enum",
+                 { options, tooltip, inline, group, confirm, display }),
 };
 
 // NOTE FOR ANYONE EDITING THIS FILE: every member above must be written as an

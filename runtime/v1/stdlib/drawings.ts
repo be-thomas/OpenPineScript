@@ -265,7 +265,13 @@ export const box = {
     new: (
         ctx: Context, left: any, top: any, right: any, bottom: any,
         border_color: any = "#2196F3", border_width: any = 1,
-        border_style: any = "solid", extend: any = "none", bgcolor: any = null,
+        border_style: any = "solid", extend: any = "none",
+        // `xloc` decides whether `left`/`right` are BAR INDICES or TIMES, and it
+        // sits between `extend` and `bgcolor` in the published signature. It was
+        // absent, so `box.new(…, xloc = xloc.bar_time)` had its coordinates read
+        // as bar indices — a box drawn at bar 1,700,000,000.
+        xloc: any = "bar_index",
+        bgcolor: any = null,
         // The manual's defaults: "size.auto (default)", "Its default is
         // color.black", "text.align_center (default)" for both alignments,
         // "The default is text.wrap_none", and `font.family_default`. Spelled
@@ -277,7 +283,8 @@ export const box = {
     ) => ctx.newDrawing("box", {
         left: n(left), top: n(top), right: n(right), bottom: n(bottom),
         border_color: v(border_color), border_width: n(border_width),
-        border_style: v(border_style), extend: v(extend), bgcolor: v(bgcolor),
+        border_style: v(border_style), extend: v(extend), xloc: v(xloc),
+        bgcolor: v(bgcolor),
         text: v(text), text_size: v(text_size), text_color: v(text_color),
         text_halign: v(text_halign), text_valign: v(text_valign),
         text_wrap: v(text_wrap), text_font_family: v(text_font_family),
