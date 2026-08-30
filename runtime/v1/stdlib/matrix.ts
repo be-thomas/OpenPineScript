@@ -119,6 +119,75 @@ export const matrix = {
     },
     is_zero: (id: any): boolean => finite(mx(id, "is_zero")).every(x => x === 0),
 
+    /**
+     * The rest of the `matrix.is_*()` family.
+     *
+     * SOURCING. Each description below is the line TradingView's own
+     * `inspect()` example on the Matrices page prints when the predicate is
+     * true, which is as close to a definition as the manual gives:
+     *
+     *   is_binary        "Contains only 1s and 0s."
+     *   is_triangular    "Contains only 0s above and/or below its main diagonal."
+     *   is_diagonal      "Only has nonzero values in its main diagonal."
+     *   is_antidiagonal  "Only has nonzero values in its main antidiagonal."
+     *   is_symmetric     "Equals its transpose."
+     *   is_antisymmetric "Equals the negative of its transpose."
+     *   is_identity      "Is the identity matrix."
+     *
+     * Squareness is required wherever the property is only defined for a square
+     * matrix — a transpose of a 2x3 has a different shape and cannot equal it,
+     * and "its main diagonal" names nothing otherwise.
+     *
+     * `matrix.is_stochastic()` is deliberately NOT here. It is a real Pine
+     * built-in and appears in the same list on that page, but the manual never
+     * says which convention it means — row-stochastic, column-stochastic or
+     * doubly stochastic are three different answers for the same matrix — and a
+     * predicate that is confidently wrong is worse than one that is missing.
+     */
+    is_binary: (id: any): boolean =>
+        mx(id, "is_binary").flat().every(x => num(x) === 0 || num(x) === 1),
+
+    is_identity: (id: any): boolean => {
+        const m = mx(id, "is_identity");
+        if (rowsOf(m) !== colsOf(m)) return false;
+        return m.every((row, i) => row.every((x, j) => num(x) === (i === j ? 1 : 0)));
+    },
+
+    is_diagonal: (id: any): boolean => {
+        const m = mx(id, "is_diagonal");
+        if (rowsOf(m) !== colsOf(m)) return false;
+        return m.every((row, i) => row.every((x, j) => i === j || num(x) === 0));
+    },
+
+    is_antidiagonal: (id: any): boolean => {
+        const m = mx(id, "is_antidiagonal");
+        const n = rowsOf(m);
+        if (n !== colsOf(m)) return false;
+        return m.every((row, i) => row.every((x, j) => i + j === n - 1 || num(x) === 0));
+    },
+
+    is_triangular: (id: any): boolean => {
+        const m = mx(id, "is_triangular");
+        if (rowsOf(m) !== colsOf(m)) return false;
+        const upper = m.every((row, i) => row.every((x, j) => j >= i || num(x) === 0));
+        const lower = m.every((row, i) => row.every((x, j) => j <= i || num(x) === 0));
+        return upper || lower;
+    },
+
+    is_symmetric: (id: any): boolean => {
+        const m = mx(id, "is_symmetric");
+        if (rowsOf(m) !== colsOf(m)) return false;
+        return m.every((row, i) => row.every((x, j) => num(x) === num(m[j][i])));
+    },
+
+    is_antisymmetric: (id: any): boolean => {
+        const m = mx(id, "is_antisymmetric");
+        if (rowsOf(m) !== colsOf(m)) return false;
+        // `-0 === 0` in JavaScript, so a zero diagonal satisfies this the way
+        // the definition requires rather than by accident.
+        return m.every((row, i) => row.every((x, j) => num(x) === -num(m[j][i])));
+    },
+
     // --- Access ------------------------------------------------------------
 
     get: (id: any, row: any, column: any) => {
@@ -174,6 +243,19 @@ export const matrix = {
         const values = array_id === undefined || array_id === null
             ? new Array(height).fill(NaN)
             : (val(array_id) as any[]).slice();
+        // An EMPTY matrix takes its ROW COUNT from the first column added, the
+        // way `add_row` just above takes its column count from the first row.
+        // `matrix.new<float>()` followed by `add_col` is how four of
+        // TradingView's own examples build a matrix — the manual's Matrices page
+        // introduces `add_col` with exactly that shape — and requiring the rows
+        // to exist first rejected every one of them.
+        if (height === 0) {
+            if (at !== 0) {
+                throw new Error(`matrix.add_col: column ${at} is out of bounds (size 0)`);
+            }
+            for (const v of values) m.push([v]);
+            return;
+        }
         if (values.length !== height) {
             throw new Error(
                 `matrix.add_col: column has ${values.length} elements, matrix has ${height} rows`,
@@ -225,6 +307,21 @@ export const matrix = {
     },
 
     // --- Derived matrices --------------------------------------------------
+
+    /**
+     * `matrix.reverse(id)` — reverse the order of every element, in place.
+     *
+     * "This function moves the references of an m-by-n matrix id at the i-th row
+     *  and j-th column to the m - 1 - i row and n - 1 - j column."
+     *
+     * Which is the rows reversed and each row reversed. In place, like the other
+     * structural mutators, and returning nothing.
+     */
+    reverse: (id: any): void => {
+        const m = mx(id, "reverse");
+        m.reverse();
+        for (const row of m) row.reverse();
+    },
 
     copy: (id: any): Matrix => tag(clone(mx(id, "copy"))),
 

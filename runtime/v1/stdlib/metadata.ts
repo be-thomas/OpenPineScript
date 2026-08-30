@@ -1860,7 +1860,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "box.new": {
           uses_context: true,
-          args: ["left","top","right","bottom","border_color","border_width","border_style","extend","bgcolor"],
+          args: ["left","top","right","bottom","border_color","border_width","border_style","extend","bgcolor","text","text_size","text_color","text_halign","text_valign","text_wrap","text_font_family"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -1937,6 +1937,62 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: drawings.box["set_bgcolor"]
+      },
+      "box.set_text": {
+          uses_context: true,
+          args: ["id","text"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_text"]
+      },
+      "box.set_text_size": {
+          uses_context: true,
+          args: ["id","text_size"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_text_size"]
+      },
+      "box.set_text_color": {
+          uses_context: true,
+          args: ["id","text_color"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_text_color"]
+      },
+      "box.set_text_halign": {
+          uses_context: true,
+          args: ["id","text_halign"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_text_halign"]
+      },
+      "box.set_text_valign": {
+          uses_context: true,
+          args: ["id","text_valign"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_text_valign"]
+      },
+      "box.set_text_wrap": {
+          uses_context: true,
+          args: ["id","text_wrap"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_text_wrap"]
+      },
+      "box.set_text_font_family": {
+          uses_context: true,
+          args: ["id","text_font_family"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.box["set_text_font_family"]
       },
       "box.get_left": {
           uses_context: true,
@@ -2930,6 +2986,62 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: matrix.matrix["is_zero"]
       },
+      "matrix.is_binary": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["is_binary"]
+      },
+      "matrix.is_identity": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["is_identity"]
+      },
+      "matrix.is_diagonal": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["is_diagonal"]
+      },
+      "matrix.is_antidiagonal": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["is_antidiagonal"]
+      },
+      "matrix.is_triangular": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["is_triangular"]
+      },
+      "matrix.is_symmetric": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["is_symmetric"]
+      },
+      "matrix.is_antisymmetric": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["is_antisymmetric"]
+      },
       "matrix.get": {
           uses_context: false,
           args: ["id","row","column"],
@@ -3017,6 +3129,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: matrix.matrix["fill"]
+      },
+      "matrix.reverse": {
+          uses_context: false,
+          args: ["id"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: matrix.matrix["reverse"]
       },
       "matrix.copy": {
           uses_context: false,

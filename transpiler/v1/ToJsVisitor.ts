@@ -1813,6 +1813,30 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // 1. Handle Transpilation (Prefixing)
     let transpiledName = text;
     if (text.includes('.')) {
+        // A namespace whose ROOT the script also binds cannot be read through
+        // the sandbox object, because the script's own binding shadows it.
+        //
+        //     extend = extendLines ? extend.right : extend.none
+        //
+        // is ordinary Pine — TradingView resolves the dotted form against the
+        // namespace and the bare form against the variable — and it emitted
+        //
+        //     let opsv2_extend = ctx.new_var("opsv2_extend",
+        //       … ? opsv2_extend.opsv2_right : opsv2_extend.opsv2_none)
+        //
+        // where `opsv2_extend` on the right is the `let` being declared, not the
+        // namespace: "Cannot access 'opsv2_extend' before initialization" on the
+        // first bar. A parameter default has the same shape —
+        // `string position = position.middle_center` — and neither is exotic:
+        // `extend`, `position`, `order` and `earnings` all read naturally as
+        // variable names.
+        //
+        // `ctx.builtin` reaches the registry directly, so nothing in the
+        // script's scope can stand in front of it.
+        const root = text.slice(0, text.indexOf("."));
+        if (this.scopes.bound.has(root) || this.scopes.declared.has(root)) {
+            return `ctx.builtin(${JSON.stringify(text)})`;
+        }
         transpiledName = text.split('.').map(p => `${this.PREFIX}${p}`).join('.');
     } else {
         transpiledName = `${this.PREFIX}${text}`;

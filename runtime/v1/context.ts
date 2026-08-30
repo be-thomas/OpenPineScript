@@ -593,15 +593,23 @@ export class Context {
     public builtinMethod(id: string, receiver: any, name: string, ...args: any[]): any {
         const v = receiver instanceof Series ? receiver.valueOf() : receiver;
 
+        const namespace = Context.receiverNamespace(v);
+
         // `copy` is the one method every kind answers, and each answers it
         // differently — a matrix copies its rows, an array and a map copy
         // themselves, and a user-defined type copies its fields. Only the value
         // knows which it is, so the split happens here rather than at emit time.
-        if (name === "copy" && args.length === 0 && !Array.isArray(v) && !(v instanceof Map)) {
+        //
+        // A DRAWING is the case this got wrong. Its id is a string, so it is
+        // neither an array nor a map and fell through to `copyObject`, which
+        // sees a primitive, has no fields to clone and returns na. `label.copy`
+        // is a real function that clones the drawing on the chart, so anything
+        // with a namespace of its own is left to that namespace. TradingView's
+        // `v5-language-matrices-20` deep-copies a matrix of labels through
+        // `.copy()` and got a matrix of `na` back.
+        if (name === "copy" && args.length === 0 && namespace === null) {
             return this.copyObject(v);
         }
-
-        const namespace = Context.receiverNamespace(v);
 
         if (!namespace) {
             throw new Error(
@@ -625,7 +633,7 @@ export class Context {
         if (v instanceof Map) return "map";
         if (Array.isArray(v)) return (v as any)[MATRIX_TAG] ? "matrix" : "array";
         if (typeof v === "string") {
-            const kind = /^(line|label|box|table)_\d+$/.exec(v);
+            const kind = /^(line|label|box|table|polyline|linefill)_\d+$/.exec(v);
             if (kind) return kind[1];
             return "str";
         }

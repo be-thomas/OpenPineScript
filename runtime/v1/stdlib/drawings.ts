@@ -261,10 +261,16 @@ export const box = {
         ctx: Context, left: any, top: any, right: any, bottom: any,
         border_color: any = "#2196F3", border_width: any = 1,
         border_style: any = "solid", extend: any = "none", bgcolor: any = null,
+        text: any = "", text_size: any = "auto", text_color: any = "#000000",
+        text_halign: any = "align_center", text_valign: any = "align_center",
+        text_wrap: any = "none", text_font_family: any = "default",
     ) => ctx.newDrawing("box", {
         left: n(left), top: n(top), right: n(right), bottom: n(bottom),
         border_color: v(border_color), border_width: n(border_width),
         border_style: v(border_style), extend: v(extend), bgcolor: v(bgcolor),
+        text: v(text), text_size: v(text_size), text_color: v(text_color),
+        text_halign: v(text_halign), text_valign: v(text_valign),
+        text_wrap: v(text_wrap), text_font_family: v(text_font_family),
     }),
 
     set_left: (ctx: Context, id: any, left: any) => setNum(ctx, id, "box.set_left", "left", left),
@@ -276,6 +282,27 @@ export const box = {
     set_border_style: (ctx: Context, id: any, style: any) => setProp(ctx, id, "box.set_border_style", "border_style", style),
     set_extend: (ctx: Context, id: any, extend: any) => setProp(ctx, id, "box.set_extend", "extend", extend),
     set_bgcolor: (ctx: Context, id: any, bgcolor: any) => setProp(ctx, id, "box.set_bgcolor", "bgcolor", bgcolor),
+
+    /**
+     * A box holds TEXT, and the seven setters that write it.
+     *
+     * "box.set_text(), box.set_text_size(), box.set_text_color(),
+     *  box.set_text_halign(), box.set_text_valign(), box.set_text_wrap(), and
+     *  box.set_text_font_family() update the id box's text-related properties",
+     * and `box.new` takes the same seven as `text, text_size, text_color,
+     * text_halign, text_valign, text_wrap, text_font_family`.
+     *
+     * The whole family was missing, so `myBox.set_text(…)` — which
+     * TradingView's own lines-and-boxes example calls — died with "'box' has no
+     * method 'set_text'".
+     */
+    set_text: (ctx: Context, id: any, text: any) => setProp(ctx, id, "box.set_text", "text", text),
+    set_text_size: (ctx: Context, id: any, text_size: any) => setProp(ctx, id, "box.set_text_size", "text_size", text_size),
+    set_text_color: (ctx: Context, id: any, text_color: any) => setProp(ctx, id, "box.set_text_color", "text_color", text_color),
+    set_text_halign: (ctx: Context, id: any, text_halign: any) => setProp(ctx, id, "box.set_text_halign", "text_halign", text_halign),
+    set_text_valign: (ctx: Context, id: any, text_valign: any) => setProp(ctx, id, "box.set_text_valign", "text_valign", text_valign),
+    set_text_wrap: (ctx: Context, id: any, text_wrap: any) => setProp(ctx, id, "box.set_text_wrap", "text_wrap", text_wrap),
+    set_text_font_family: (ctx: Context, id: any, text_font_family: any) => setProp(ctx, id, "box.set_text_font_family", "text_font_family", text_font_family),
 
     get_left: (ctx: Context, id: any) => getProp(ctx, id, "box.get_left", "left"),
     get_top: (ctx: Context, id: any) => getProp(ctx, id, "box.get_top", "top"),
