@@ -221,6 +221,16 @@ export class Context {
     protected callStack: string[] = [];
 
     /**
+     * Keyword arguments passed to a built-in whose signature does not name them.
+     *
+     * `<function>(<argument>)`, deduplicated. Empty is the only acceptable
+     * value: a name Pine accepts and this engine does not model is a gap, and a
+     * silently dropped argument is the worst shape one can take — the script
+     * runs, and does something other than what it says.
+     */
+    public droppedArguments: Set<string> = new Set();
+
+    /**
      * The series NAMESPACE of the user-function frame currently executing.
      *
      * Empty at script scope, and `<call id>|` inside a user function — nested
@@ -1178,6 +1188,16 @@ export class Context {
                     for (const [_key, val] of Object.entries(kwargs)) {
                         const cleanKey = removePrefix(_key); 
                         const index = params.indexOf(cleanKey);
+                        // A keyword the signature does not name is DROPPED, and
+                        // silence is how that class of bug stayed hidden:
+                        // `strategy.entry(when = …)` fired unconditionally,
+                        // `input.int(minval = 1)` clamped nothing, `bgcolor(title
+                        // = …)` named nothing, `plot(offset = …)` did not shift.
+                        // Recording it makes the class visible — the corpus
+                        // execution suite asserts this set is empty across 742
+                        // scripts, so a signature that falls behind is caught
+                        // rather than quietly ignoring what it is handed.
+                        if (index === -1) this.droppedArguments.add(`${fname}(${cleanKey})`);
                         
                         if (index !== -1) {
                             while (finalArgs.length <= index) {

@@ -52,6 +52,9 @@ const dataset: Bar[] = fs
     return { t: +new Date(f[0]), o: +f[1], h: +f[2], l: +f[3], c: +f[4], v: +f[5] };
   });
 
+/** Keyword arguments the corpus passed and no signature named. */
+const dropped = new Set<string>();
+
 /** Every corpus script that compiles, run over `BARS` bars. `null` = no error. */
 function sweep(): Map<string, string | null> {
   const out = new Map<string, string | null>();
@@ -82,6 +85,7 @@ function sweep(): Map<string, string | null> {
       } catch (e: any) {
         out.set(rel, String(e?.message ?? e).split("\n")[0]);
       }
+      for (const name of ctx.droppedArguments) dropped.add(`${rel} ${name}`);
     }
   }
   return out;
@@ -152,6 +156,21 @@ const EXPECTED: Record<string, RegExp> = {
 };
 
 describe("the corpus runs", () => {
+  it("no keyword argument is silently dropped", () => {
+    /**
+     * A keyword whose name is not in the callee's signature is thrown away by
+     * `Context.call`, and nothing says so. That is not a cosmetic gap:
+     * `strategy.entry(when = …)` fired unconditionally, `input.int(minval = 1)`
+     * clamped nothing, `plot(offset = …)` did not shift the series, and
+     * `box.new(xloc = xloc.bar_time)` read times as bar indices. Forty distinct
+     * (function, argument) pairs were being dropped across this corpus.
+     *
+     * The set must stay empty. A signature that falls behind the language is
+     * caught here rather than quietly ignoring what it is handed.
+     */
+    expect([...dropped].sort()).toEqual([]);
+  });
+
   it("has scripts to run at all (guards every case below)", () => {
     expect(RESULTS.size).toBeGreaterThan(700);
   });

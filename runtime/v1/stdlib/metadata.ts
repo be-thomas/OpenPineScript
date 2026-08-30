@@ -3852,7 +3852,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "strategy.exit": {
           uses_context: true,
-          args: ["id","from_entry","qty","profit","limit","loss","stop","oca_name","comment","when","alert_message"],
+          args: ["id","from_entry","qty","qty_percent","profit","limit","loss","stop","trail_price","trail_points","trail_offset","oca_name","comment","when","alert_message"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,

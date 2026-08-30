@@ -38,8 +38,12 @@ describe("Broker Emulator: Asynchronous Strategy Exits", () => {
         const pine = [
             'if n == 0',
             '    strategy.entry("Long", strategy.long)',
-            // Positional mapping: id, from_entry, qty, profit, limit, loss, stop
-            '    strategy.exit("Exit", "Long", na, na, 120, na, 80)'
+            // Written with KEYWORDS. The positional form here used to be
+            // `(id, from_entry, qty, profit, limit, loss, stop)` — the engine's
+            // old signature, which was missing `qty_percent` and named `profit`
+            // and `limit` in the wrong order relative to Pine's
+            // `(id, from_entry, qty, qty_percent, profit, limit, loss, stop, …)`.
+            '    strategy.exit("Exit", "Long", limit = 120, stop = 80)'
         ].join('\n');
         
         const ctx = runStrategy(pine, [
@@ -60,7 +64,7 @@ describe("Broker Emulator: Asynchronous Strategy Exits", () => {
         const pine = [
             'if n == 0',
             '    strategy.entry("Long", strategy.long)',
-            '    strategy.exit("Exit", "Long", na, na, 120, na, 80)'
+            '    strategy.exit("Exit", "Long", limit = 120, stop = 80)'
         ].join('\n');
         
         const ctx = runStrategy(pine, [
@@ -79,7 +83,7 @@ describe("Broker Emulator: Asynchronous Strategy Exits", () => {
         const pine = [
             'if n == 0',
             '    strategy.entry("Short", strategy.short)',
-            '    strategy.exit("Exit", "Short", na, na, 80, na, 120)'
+            '    strategy.exit("Exit", "Short", limit = 80, stop = 120)'
         ].join('\n');
         
         const ctx = runStrategy(pine, [
@@ -99,7 +103,7 @@ describe("Broker Emulator: Asynchronous Strategy Exits", () => {
         const pine = [
             'if n == 0',
             '    strategy.entry("Short", strategy.short)',
-            '    strategy.exit("Exit", "Short", na, na, 80, na, 120)'
+            '    strategy.exit("Exit", "Short", limit = 80, stop = 120)'
         ].join('\n');
         
         const ctx = runStrategy(pine, [
@@ -115,7 +119,7 @@ describe("Broker Emulator: Asynchronous Strategy Exits", () => {
         const pine = [
             'if n == 0',
             '    strategy.entry("Long", strategy.long)',
-            '    strategy.exit("Exit", "Long", na, na, 120, na, 80)'
+            '    strategy.exit("Exit", "Long", limit = 120, stop = 80)'
         ].join('\n');
         
         const ctx = runStrategy(pine, [

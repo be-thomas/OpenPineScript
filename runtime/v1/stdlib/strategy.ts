@@ -64,8 +64,23 @@ export interface PendingExit {
     id: string;
     from_entry: string;
     qty: number;
+    qty_percent: number;
+    /** Profit target, in PRICE. */
     limit: number;
+    /** Stop loss, in PRICE. */
     stop: number;
+    /** Profit target, in TICKS from the entry. */
+    profit: number;
+    /** Stop loss, in TICKS from the entry. */
+    loss: number;
+    /** Trailing-stop activation level, in PRICE. */
+    trail_price: number;
+    /** Trailing-stop activation offset, in TICKS from the entry. */
+    trail_points: number;
+    /** How far behind the extreme the trailing stop follows, in TICKS. */
+    trail_offset: number;
+    /** The best price seen since the trail armed, or NaN while it has not. */
+    trail_peak: number;
     oca_name: string;
 }
 
@@ -484,10 +499,15 @@ export function exit(
     id: string,
     from_entry: string = "",
     qty: any = Number.NaN,
+    // "The percentage of the position to close … Ignored if `qty` is not na."
+    qty_percent: any = Number.NaN,
     profit: any = Number.NaN,
     limit: any = Number.NaN,
     loss: any = Number.NaN,
     stop: any = Number.NaN,
+    trail_price: any = Number.NaN,
+    trail_points: any = Number.NaN,
+    trail_offset: any = Number.NaN,
     oca_name: string = "",
     comment: string = "",
     when: any = undefined,
@@ -496,14 +516,83 @@ export function exit(
     if (!gated(when)) return;
     void comment; void alert_message;
     const exits = getPendingExits(ctx);
+    const existing = exits.get(id);
     exits.set(id, {
         id,
         from_entry,
-        qty: Number.isNaN(val(qty)) ? Math.abs(ctx.position.size) : val(qty),
+        qty: val(qty),
+        qty_percent: val(qty_percent),
         limit: val(limit),
         stop: val(stop),
+        profit: val(profit),
+        loss: val(loss),
+        trail_price: val(trail_price),
+        trail_points: val(trail_points),
+        trail_offset: val(trail_offset),
+        // A script re-issues the same `strategy.exit` call on every bar, so the
+        // trail's high-water mark has to survive the re-registration or it would
+        // reset each time and the stop would never move.
+        trail_peak: existing ? existing.trail_peak : Number.NaN,
         oca_name: oca_name || ""
     });
+}
+
+/**
+ * The prices one pending exit would fill at, on the bar just seen.
+ *
+ * ── Ticks and prices are different parameters ───────────────────────────────
+ *
+ * `strategy.exit` takes a profit target twice: `limit` is a PRICE and `profit`
+ * is a distance in TICKS from the entry. The same for `stop` and `loss`. Only
+ * the two price forms were kept — `profit` and `loss` were accepted and then
+ * left out of the pending record — so
+ *
+ *     strategy.exit("bracket1", "buy", 2, profit = 10, stop = 10)
+ *
+ * (TradingView's own partial-exit demo) armed the stop and silently ignored the
+ * target: a bracket with one side missing, which is worse than no bracket.
+ *
+ * ── Trailing ────────────────────────────────────────────────────────────────
+ *
+ * "trail_points — trailing stop activation level offset, expressed in ticks"
+ * and "trail_offset — trailing stop offset, expressed in ticks". The trail ARMS
+ * when price reaches the activation level, and then follows the best price seen
+ * since, `trail_offset` ticks behind it. `trail_price` gives the activation
+ * level as a price instead of an offset.
+ */
+function exitLevels(
+    ctx: Context, ex: PendingExit, isLong: boolean, high: number, low: number,
+): { limit: number; stop: number } {
+    const tick = ctx.mintick > 0 ? ctx.mintick : 0.01;
+    const entryPrice = ctx.position.avgPrice;
+    const away = (ticks: number, favourable: boolean): number =>
+        entryPrice + (isLong === favourable ? 1 : -1) * ticks * tick;
+
+    const limit = !Number.isNaN(ex.limit) ? ex.limit
+        : !Number.isNaN(ex.profit) ? away(ex.profit, true) : Number.NaN;
+
+    let stop = !Number.isNaN(ex.stop) ? ex.stop
+        : !Number.isNaN(ex.loss) ? away(ex.loss, false) : Number.NaN;
+
+    const activation = !Number.isNaN(ex.trail_price) ? ex.trail_price
+        : !Number.isNaN(ex.trail_points) ? away(ex.trail_points, true) : Number.NaN;
+
+    if (!Number.isNaN(activation) && !Number.isNaN(ex.trail_offset)) {
+        const best = isLong ? high : low;
+        const armed = !Number.isNaN(ex.trail_peak)
+            || (isLong ? high >= activation : low <= activation);
+        if (armed) {
+            ex.trail_peak = Number.isNaN(ex.trail_peak) ? best
+                : (isLong ? Math.max(ex.trail_peak, best) : Math.min(ex.trail_peak, best));
+            const trailing = ex.trail_peak + (isLong ? -1 : 1) * ex.trail_offset * tick;
+            // The tighter of the two stops wins — a trailing stop that has moved
+            // past the fixed one replaces it.
+            stop = Number.isNaN(stop) ? trailing
+                : (isLong ? Math.max(stop, trailing) : Math.min(stop, trailing));
+        }
+    }
+
+    return { limit, stop };
 }
 
 // --- OCA HELPERS ---
@@ -639,22 +728,30 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
     for (const [exitId, pendingExit] of exits.entries()) {
         let executedPrice = Number.NaN;
 
+        const level = exitLevels(ctx, pendingExit, isLong, high, low);
+
         if (isLong) {
-            if (!Number.isNaN(pendingExit.limit) && high >= pendingExit.limit) {
-                executedPrice = pendingExit.limit;
-            } else if (!Number.isNaN(pendingExit.stop) && low <= pendingExit.stop) {
-                executedPrice = pendingExit.stop;
+            if (!Number.isNaN(level.limit) && high >= level.limit) {
+                executedPrice = level.limit;
+            } else if (!Number.isNaN(level.stop) && low <= level.stop) {
+                executedPrice = level.stop;
             }
         } else {
-            if (!Number.isNaN(pendingExit.limit) && low <= pendingExit.limit) {
-                executedPrice = pendingExit.limit;
-            } else if (!Number.isNaN(pendingExit.stop) && high >= pendingExit.stop) {
-                executedPrice = pendingExit.stop;
+            if (!Number.isNaN(level.limit) && low <= level.limit) {
+                executedPrice = level.limit;
+            } else if (!Number.isNaN(level.stop) && high >= level.stop) {
+                executedPrice = level.stop;
             }
         }
 
         if (!Number.isNaN(executedPrice)) {
-            const qty = Number.isNaN(pendingExit.qty) ? Math.abs(ctx.position.size) : pendingExit.qty;
+            const held = Math.abs(ctx.position.size);
+            // "Ignored if `qty` is not na" — an explicit quantity wins over a
+            // percentage, and neither given closes the whole position.
+            const qty = !Number.isNaN(pendingExit.qty) ? pendingExit.qty
+                : !Number.isNaN(pendingExit.qty_percent)
+                    ? held * Math.min(100, Math.max(0, pendingExit.qty_percent)) / 100
+                    : held;
             const pnl = isLong
                 ? (executedPrice - ctx.position.avgPrice) * qty
                 : (ctx.position.avgPrice - executedPrice) * qty;
