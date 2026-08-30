@@ -186,6 +186,10 @@ export const V5_ONLY_NAMES: readonly string[] = [
     "timeframe.in_seconds", "timeframe.from_seconds", "timeframe.change",
     "array.first", "array.last", "array.binary_search",
 
+    // `text` is a v4 namespace for its five alignments; wrapping is a property
+    // of a BOX's text, which arrived with box text in June 2022.
+    "text.wrap_auto", "text.wrap_none",
+
     "input.int", "input.float", "input.bool", "input.string", "input.color",
     "input.timeframe", "input.session", "input.symbol", "input.source",
     "input.time", "input.price", "input.text_area",

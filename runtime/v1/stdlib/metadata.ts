@@ -2450,6 +2450,22 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: drawings.text["align_bottom"]
       },
+      "text.wrap_auto": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.text["wrap_auto"]
+      },
+      "text.wrap_none": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: drawings.text["wrap_none"]
+      },
       "polyline.new": {
           uses_context: true,
           args: ["points","curved","closed","xloc","line_color","fill_color","line_style","line_width","force_overlay"],

@@ -261,8 +261,13 @@ export const box = {
         ctx: Context, left: any, top: any, right: any, bottom: any,
         border_color: any = "#2196F3", border_width: any = 1,
         border_style: any = "solid", extend: any = "none", bgcolor: any = null,
+        // The manual's defaults: "size.auto (default)", "Its default is
+        // color.black", "text.align_center (default)" for both alignments,
+        // "The default is text.wrap_none", and `font.family_default`. Spelled
+        // as the VALUES those constants carry, so a script that passes the
+        // constant and a script that leaves it out record the same thing.
         text: any = "", text_size: any = "auto", text_color: any = "#000000",
-        text_halign: any = "align_center", text_valign: any = "align_center",
+        text_halign: any = "center", text_valign: any = "center",
         text_wrap: any = "none", text_font_family: any = "default",
     ) => ctx.newDrawing("box", {
         left: n(left), top: n(top), right: n(right), bottom: n(bottom),
@@ -497,6 +502,21 @@ export const text = {
     align_right: "right",
     align_top: "top",
     align_bottom: "bottom",
+
+    /**
+     * `text.wrap_*` — a BOX's text wrapping, and v5 only.
+     *
+     * "If its value is text.wrap_auto, the box wraps the text to ensure it does
+     *  not span past its vertical borders. It also clips the wrapped text when
+     *  it extends past the bottom. If the value is text.wrap_none, the box
+     *  displays the text on a single line that can extend beyond its borders.
+     *  The default is text.wrap_none."
+     *
+     * Gated by name in V5_ONLY_NAMES: `text` itself is a v4 namespace, and box
+     * text arrived long after it.
+     */
+    wrap_auto: "auto",
+    wrap_none: "none",
 };
 
 // ── polyline ────────────────────────────────────────────────────────────────
