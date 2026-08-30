@@ -3,6 +3,7 @@ import { Series, SeriesSnapshot } from "./Series";
 import { REGISTRY, viewFor } from "./stdlib";
 import { MATRIX_TAG } from "./stdlib/matrix";
 import { aggregate, periodIndex, specSeconds } from "./timeframes";
+import { processPendingOrders } from "./stdlib/strategy";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 
 // Define Trade Types
@@ -1640,6 +1641,22 @@ export class Context {
     }
 
     public finalizeBar() {
+        // The bar has closed, so its range is known and the broker can match the
+        // orders the script left pending against it.
+        //
+        // ── Why this is here ────────────────────────────────────────────────
+        //
+        // It was called by ONE test harness and by nothing else — not by
+        // `mock_run`, not by the corpus runner, not by the session layer. So
+        // `strategy.exit` registered a bracket that was never matched and
+        // `strategy.order`'s limit and stop entries never filled: a strategy
+        // with a take-profit and a stop-loss produced no exits at all, and its
+        // equity curve was the curve of a position nobody ever closed.
+        //
+        // Idempotent per bar, so a harness that still calls it explicitly does
+        // not fill the same order twice.
+        processPendingOrders(this, this.high, this.low);
+
         this.plots.forEach((series) => {
             if (series.length <= this.currentBarIndex) {
                 series.push(null);

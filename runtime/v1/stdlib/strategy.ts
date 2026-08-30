@@ -640,6 +640,13 @@ function applyExitOCA(exits: Map<string, PendingExit>, filledExit: PendingExit):
  * Called by the runtime engine after script evaluation on each bar.
  */
 export function processPendingOrders(ctx: Context, high: number, low: number): void {
+    // Once per bar. `Context.finalizeBar` calls this for every run, and the
+    // strategy test harness calls it directly as well; without a guard the
+    // second call would fill a pending entry that the first one just placed.
+    const state = ctx as any;
+    if (state._ordersProcessedBar === ctx.currentBarIndex) return;
+    state._ordersProcessedBar = ctx.currentBarIndex;
+
     const rs = syncRiskState(ctx);
 
     // --- Max Intraday Loss check ---
