@@ -3,7 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org)
 [![Pine Script](https://img.shields.io/badge/Pine%20Script-v1%20%E2%80%93%20v5-orange.svg)](#supported-pine-script-versions)
-[![Tests](https://img.shields.io/badge/tests-1885%20passing-success.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-2011%20passing-success.svg)](#testing)
 
 **OpenPineScript is an open-source Pine Script engine.** It compiles TradingView
 Pine Script source (`.pine`) to JavaScript and executes it against your own OHLCV
@@ -151,16 +151,24 @@ worse, reading as `undefined` and taking a branch nobody meant.
 
 | Running all 742 over the sample dataset | |
 |---|---|
-| plots real values | 366 |
-| runs, plots only `na` | 123 |
-| runs, produces no output at all | 187 |
-| raises a runtime error | 66 |
+| plots real values | 371 |
+| runs, plots only `na` | 125 |
+| runs, produces no output at all | 207 |
+| raises a runtime error | 39 |
 
 `na` and no-output are usually correct: a script gated on
 `barstate.islastconfirmedhistory`, an intraday session, or a symbol this dataset
-is not, has nothing to draw. The runtime errors are dominated by the
-non-standard chart types (`renko`, `linebreak`, `pointfigure`), which refuse
-rather than approximate.
+is not, has nothing to draw — and many draw only lines, labels and tables, which
+are recorded rather than plotted.
+
+Every one of the 39 runtime errors is pinned by CAUSE in
+[`conformance/common/docs_corpus_execution.test.ts`](conformance/common/docs_corpus_execution.test.ts),
+so a new one cannot arrive quietly. Seventeen are the script's own error — a
+`runtime.error()` call, or an index the page is written to show failing; twelve
+need host data this engine cannot fetch (`request.financial`, `request.economic`
+and the rest); ten are deliberate refusals (`renko`, `linebreak`, `kagi`,
+`pointfigure` cannot be rebuilt from OHLCV bars, and `accdist`'s published
+definitions disagree on a seed).
 
 The 21 that do not compile contain no known engine gap. Eleven are not runnable
 Pine at all — documentation blocks rather than scripts, or scripts that exist to
@@ -244,7 +252,7 @@ Report written: ./results/comparison_report.json
 npm test
 ```
 
-1,885 tests pass across 70 files. None fail.
+2,011 tests pass across 77 files. None fail.
 
 Two patterns carry most of the weight:
 

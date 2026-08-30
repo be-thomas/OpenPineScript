@@ -133,6 +133,17 @@ with a dedicated test file, after the corpus made the absence visible:
 | an exported `enum` reaching the importing script | v5 | 1 |
 | a string literal WRAPPED across code lines | v1 | 10 |
 | the mutable-argument rule narrowed to `request.security_lower_tf` | v5 | 1 |
+| a method called through a FIELD — `wrapper.data.size()` | v5 | 5 |
+| `matrix.add_col` on an empty matrix, which is how the manual builds one | v5 | 4 |
+| a namespace whose root the script also binds — `extend = extend.right` | v1 | 4 |
+| `.copy()` on a drawing went to the user-type copy and returned `na` | v4 | 2 |
+| the drawing type casts — `line()`, `label()`, `box()`, `table()`, `linefill()` | v4 | 2 |
+| a fractional array index is FLOORED, not refused | v4 | 2 |
+| `box.set_text` and its six siblings, and `text.wrap_*` | v5 | 1 |
+| `matrix.is_binary` and the six other inspection predicates | v5 | 1 |
+| `matrix.reverse` | v5 | 1 |
+| a user method that shares a built-in's name is called as itself | v5 | 1 |
+| an `na` drawing id is a no-op, not an error | v4 | 5 |
 
 **And 34 missing built-ins**, found all at once. `checkUndeclaredRead` rejected a
 bare name nothing declares; its mirror — an unknown MEMBER of a real namespace —
@@ -144,6 +155,26 @@ them), `str.format_time`, `timeframe.in_seconds`/`from_seconds`/`change`,
 its siblings, `table.cell_set_*`, `ticker.modify`/`inherit`,
 `request.security_lower_tf`/`currency_rate`/`economic`/`seed`, and ten
 `strategy.*` statistics.
+
+**And a function's locals are now per CALL SITE.** "Each function call has its
+own instance of the series variables" is how Pine works; this engine registered
+a local's series under its NAME and nothing else, so
+
+    f() =>
+        var c = 0
+        c := c + 1
+        c
+    a = f()
+    b = f()
+
+gave a = 1,3,5 and b = 2,4,6 where TradingView gives 1,2,3 for both — one
+counter, shared. It was not specific to `var`: `t = close * 2` inside a function
+was one series for every caller, so the history a function read back (`t[1]`)
+interleaved its call sites. Two functions that both used the name `result`
+aliased each other outright, which is what the corpus found — a map came back
+out of a `map.new()` local as a string, because another function's `result` was
+one. The emitter now qualifies a local's series key by its function, and
+`Context.call` opens a series namespace per user-function frame.
 
 Three changed no count and mattered more than any row above:
 
@@ -166,10 +197,10 @@ Of the 742 that compile, running each one over the 506-bar
 
 | Result | Count | Meaning |
 |---|---|---|
-| ran, produced output | 366 | plots, trades or logs came out |
-| no output | 187 | most have no plotting call at all — drawings and tables only. The rest need data this run does not have (a strategy gated on `n > 4000` over 506 bars) |
-| all-`na` output | 123 | mostly expected: the script is gated on an intraday session, or on a symbol this dataset is not |
-| runtime error | 66 | every one is a NAMED diagnostic — see below |
+| ran, produced output | 371 | plots, trades or logs came out |
+| no output | 207 | most have no plotting call at all — drawings and tables only. The rest need data this run does not have (a strategy gated on `n > 4000` over 506 bars) |
+| all-`na` output | 125 | mostly expected: the script is gated on an intraday session, or on a symbol this dataset is not |
+| runtime error | 39 | every one is a NAMED diagnostic, and pinned by cause — see below |
 
 **No script in this corpus raises a `ReferenceError`, and every one of the 742
 emits JavaScript that parses.** Both used to be false. `ReferenceError` was once
@@ -181,10 +212,19 @@ were implemented, the emitter no longer emits a name that nothing binds, a name
 bound in a block it is not read from is now `Undeclared identifier` at compile
 time, and an unknown member of a known namespace is too.
 
-The 66 that remain are explicit refusals (`renko`, `linebreak` and `pointfigure`
-cannot be rebuilt from OHLCV bars; `accdist` is not implemented) and bounds
-errors in matrix and array demos. They were 124 before the missing built-ins
-were written.
+The 39 that remain are pinned by CAUSE in
+[`docs_corpus_execution.test.ts`](../../../conformance/common/docs_corpus_execution.test.ts) —
+a regular expression per file, so one that starts failing for a DIFFERENT reason
+fails that suite too. They fall into three kinds:
+
+| Count | Kind |
+|---|---|
+| 17 | the script's own error — a `runtime.error()` call, or an index or shape the page exists to show failing. TradingView's matrices and arrays pages have a section of these, each annotated "Raises an error" in its own source |
+| 12 | host data this engine cannot fetch — `request.financial`, `request.economic`, `request.quandl`, `request.seed`, `request.dividends`, `request.earnings`, `request.currency_rate` |
+| 10 | a deliberate refusal — `renko`, `linebreak`, `kagi` and `pointfigure` cannot be rebuilt from OHLCV bars, and `accdist`'s published definitions disagree on a seed |
+
+They were 124 before the missing built-ins were written, and 66 before the round
+of engine fixes below.
 
 ## What running the corpus fixed
 
