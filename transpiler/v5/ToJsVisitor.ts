@@ -1293,7 +1293,55 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     return widen && param === "float" && arg === "int";
   }
 
+  /**
+   * An enum member may not stand in for a member of a DIFFERENT enum.
+   *
+   * SOURCING. From the manual's Enums page: "Scripts cannot compare members of
+   * different enums or use such members in expressions requiring a specific
+   * enum type, EVEN IF THE FIELDS HAVE IDENTICAL NAMES AND TITLES." A parameter
+   * declared `OscType selection` is such an expression.
+   *
+   * TradingView's own `v5-language-enums-05` is written to show the refusal —
+   * it declares `OscType` and `OscType2` with identical fields, passes an
+   * `OscType2` where an `OscType` belongs, and comments the plot "Raises a
+   * compilation error because only members of `OscType` are allowed." This
+   * engine compiled it and plotted `na` on every bar instead, which is the
+   * worse of the two answers: the script looks like it ran.
+   *
+   * ⚠ The COMPARISON half of that sentence — `OscType.rsi == OscType2.rsi` —
+   * is not refused here. It is the same rule and needs the same type
+   * information on both operands of a binary expression; no corpus script
+   * witnesses it, so it is left as a stated gap rather than a guess. The
+   * runtime keeps the two members distinct regardless, which
+   * tests/v5/transpiler/enums.test.ts asserts.
+   */
+  private checkEnumArguments(pineName: string, ctx: Fun_callContext): void {
+    const declarations = this.functionOverloads.get(pineName) ?? [];
+    // An overloaded name is resolved by type already, and picking the wrong
+    // overload is reported there with a message about overloads.
+    if (declarations.length !== 1) return;
+
+    const args = ctx.fun_actual_args();
+    const positional = args?.pos_args() ? this.positionalArgs(args.pos_args()!) : [];
+    const params = declarations[0].types;
+
+    positional.forEach((arg, i) => {
+      const wanted = params[i];
+      const given = this.argumentType(arg);
+      if (!wanted || !given || wanted === given) return;
+      if (!this.userEnums.has(wanted) || !this.userEnums.has(given)) return;
+      throw this.err(
+        ctx,
+        `Argument ${i + 1} of '${pineName}' is declared '${wanted}', and a member ` +
+        `of '${given}' was passed. Members of different enums are not ` +
+        `interchangeable, even when their fields have identical names and titles.`,
+      );
+    });
+  }
+
   protected override callFunctionName(pineName: string, ctx: Fun_callContext): string {
+    this.checkEnumArguments(pineName, ctx);
+
     const overloads = this.functionOverloads.get(pineName) ?? [];
     if (overloads.length < 2) return super.callFunctionName(pineName, ctx);
 

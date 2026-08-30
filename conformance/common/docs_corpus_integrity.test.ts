@@ -193,6 +193,14 @@ const REFUSED_ON_PURPOSE: readonly string[] = [
   "v5/v5-faq-programming-00.pine",   // reads an `if`-local from global scope
   "v5/v5-faq-programming-02.pine",   // reads a nested block's local from its parent
   "v5/v5-language-loops-04.pine",    // reads a `for`-local after the loop
+  // Passes an `OscType2` member where the parameter is declared `OscType`.
+  // "Scripts cannot compare members of different enums or use such members in
+  // expressions requiring a specific enum type, even if the fields have
+  // identical names and titles" — and the page's own comment on the offending
+  // line reads "Raises a compilation error because only members of `OscType`
+  // are allowed." This engine used to compile it and plot `na` on every bar,
+  // which is the worse answer: the script looks like it ran.
+  "v5/v5-language-enums-05.pine",
 ];
 
 /**
@@ -226,6 +234,16 @@ describe("scripts that do not compile on purpose", () => {
     const src = read("v5/v5-concepts-colors-04.pine");
     expect(src).toMatch(/c_holiday/);
     expect(src).not.toMatch(/c_holiday\s*=/);
+  });
+
+  it("the enums demo says so in its own source, and names the reason", () => {
+    expect(read("v5/v5-language-enums-05.pine"))
+      .toMatch(/Raises a compilation error because only members of `OscType` are allowed/);
+  });
+
+  it("...and the engine gives that reason rather than a generic type error", () => {
+    expect(() => compileScript(read("v5/v5-language-enums-05.pine")))
+      .toThrow(/Members of different enums are not interchangeable/);
   });
 });
 

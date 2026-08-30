@@ -143,6 +143,45 @@ describe("input.enum", () => {
   });
 });
 
+describe("two enums are not interchangeable in a typed position", () => {
+  /**
+   * The other half of the same sentence: "…or use such members in expressions
+   * requiring a specific enum type."
+   *
+   * TradingView's own `v5-language-enums-05` is the witness. It comments its
+   * plot "Raises a compilation error because only members of `OscType` are
+   * allowed", and this engine used to compile it and plot `na` on every bar.
+   */
+  const TWO = "enum A\n    up\n    down\n" + "enum B\n    up\n    down\n";
+  const F = "f(A which) =>\n    1\n";
+
+  it("a member of another enum is refused, and the message says why", () => {
+    expect(() => transpile(HEAD + TWO + F + "A a = A.up\nB b = B.up\nx = f(b)\n"))
+      .toThrow(/Members of different enums are not interchangeable/);
+  });
+
+  it("...and names both enums", () => {
+    expect(() => transpile(HEAD + TWO + F + "B b = B.up\nx = f(b)\n"))
+      .toThrow(/declared 'A', and a member of 'B' was passed/);
+  });
+
+  it("the right enum passes", () => {
+    expect(() => transpile(HEAD + TWO + F + "A a = A.up\nx = f(a)\n")).not.toThrow();
+  });
+
+  it("an untyped parameter still takes either", () => {
+    const g = "g(which) =>\n    1\n";
+    expect(() => transpile(HEAD + TWO + g + "B b = B.up\nx = g(b)\n")).not.toThrow();
+  });
+
+  it("a NON-enum type is not this rule's business", () => {
+    // `f(float x)` handed an int is ordinary widening, and refusing it here
+    // would turn a type check into a type SYSTEM.
+    const h = "h(float x) =>\n    x\n";
+    expect(() => transpile(HEAD + h + "int i = 3\nx = h(i)\n")).not.toThrow();
+  });
+});
+
 describe("an enum as a declared type", () => {
   it("`OscType x = …` parses and binds", () => {
     const src = OSC + 'OscType sel = input.enum(OscType.rsi, "Osc")\nsame = sel == OscType.rsi\n';
