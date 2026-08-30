@@ -612,6 +612,14 @@ export class Context {
         }
 
         if (!namespace) {
+            // The method spelling of the rule on `getDrawing` above: a drawing
+            // accessor called on an absent drawing does nothing and reads `na`.
+            // Only names that BELONG to a drawing namespace and to no
+            // collection qualify, so `array.push` on an `na` array still fails
+            // — which is what TradingView's own "Out of bounds index" demo
+            // shows it doing.
+            if (Context.isNa(v) && Context.drawingOnlyMethods().has(name)) return NaN;
+
             throw new Error(
                 `'.${name}()' cannot be called on this value: it is ` +
                 `${v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? "na" : typeof v} ` +
@@ -626,6 +634,32 @@ export class Context {
         }
 
         return this.call(`${key}${id}`, entry.ref, v, ...args);
+    }
+
+    /**
+     * Method names only the DRAWING namespaces answer.
+     *
+     * Derived from the registry rather than listed, so a drawing member added
+     * later is covered and a name a collection also spells — `copy`, `get`,
+     * `set` — is not. Which of `line` and `box` a name belongs to does not
+     * matter here: the call is a no-op either way.
+     */
+    private static drawingOnly: ReadonlySet<string> | null = null;
+    private static drawingOnlyMethods(): ReadonlySet<string> {
+        if (Context.drawingOnly) return Context.drawingOnly;
+        const DRAWING = ["line", "label", "box", "table", "polyline", "linefill"];
+        const OTHER = ["array", "map", "matrix", "str"];
+        const memberOf = (roots: string[]): Set<string> => {
+            const out = new Set<string>();
+            for (const key of Object.keys(REGISTRY)) {
+                const dot = key.indexOf(".");
+                if (dot > 0 && roots.includes(key.slice(0, dot))) out.add(key.slice(dot + 1));
+            }
+            return out;
+        };
+        const others = memberOf(OTHER);
+        Context.drawingOnly = new Set([...memberOf(DRAWING)].filter(n => !others.has(n)));
+        return Context.drawingOnly;
     }
 
     /** Which built-in namespace owns this value's methods, or null. */
@@ -704,8 +738,55 @@ export class Context {
         return [...(this.drawingOrder.get(kind) ?? [])];
     }
 
+    /** `na`, in the sense every drawing accessor has to answer to. */
+    private static isNa(v: any): boolean {
+        return v === null || v === undefined || (typeof v === "number" && Number.isNaN(v));
+    }
+
+    /**
+     * A stand-in drawing for an `na` id: writes are discarded, reads are `na`.
+     *
+     * ── Why an na id is not an error ────────────────────────────────────────
+     *
+     * Because TradingView's own examples depend on it, on three separate pages.
+     *
+     *   `v5-concepts-lines-and-boxes-02` declares `var line periodLine = na`
+     *   and calls `line.set_color(periodLine, finalColor)` on the first period
+     *   change — before anything has been assigned to it. Its OTHER branch is
+     *   guarded with `else if not na(periodLine)`, so the author knew the value
+     *   could be absent and did not guard the branch where it always is.
+     *
+     *   `v5-language-loops-17` fills an array with `array.new<line>(20)` — 20
+     *   `na` lines — and immediately loops `for pivotLine in pivotLines`
+     *   reading `pivotLine.get_x2()`.
+     *
+     *   `v4-essential-drawings-12` and `-14` are the published Pivot Points
+     *   indicators: three `var line ... = na` declarations and a block that
+     *   moves them before the first assignment.
+     *
+     * All four ran on TradingView, so a setter on an absent drawing does
+     * nothing and a getter on one returns `na`. Modelling that here rather than
+     * at each of the forty call sites keeps `getDrawing`'s contract — "hand me
+     * the record" — and makes a STALE id still an error, which it is.
+     *
+     * Fresh each time, so a discarded write can never be read back.
+     */
+    private static naDrawing(): Drawing {
+        const scratch: Record<string, any> = { cells: new Map() };
+        return {
+            id: "na", kind: "line", bar: -1,
+            props: new Proxy(scratch, {
+                get: (t, k) => (k in t ? t[k as string] : NaN),
+                set: () => true,
+            }),
+        };
+    }
+
     public getDrawing(id: any, fn: string): Drawing {
-        const key = String(id instanceof Series ? id.valueOf() : id);
+        const raw = id instanceof Series ? id.valueOf() : id;
+        if (Context.isNa(raw)) return Context.naDrawing();
+
+        const key = String(raw);
         const drawing = this.drawings.get(key);
         if (!drawing) throw new Error(`${fn}: no such drawing '${key}' (it may have been deleted)`);
         return drawing;
