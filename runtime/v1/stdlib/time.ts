@@ -1,5 +1,5 @@
 import { Context } from "../context";
-import { utcFromZoned } from "../zones";
+import { utcFromZoned, zonedFields } from "../zones";
 
 /**
  * time.ts - Pine Script v2 Time Functions and Variables
@@ -184,24 +184,136 @@ export function timestamp(
     );
 }
 
-// --- Bare global spellings (v1-v3) ---
+// --- The calendar accessors, in both of their spellings ---
 //
-// Pine v1-v3 spell these as globals: `month(time)`, `dayofweek(time)`.
-// The registry generator only hoists TOP-LEVEL exports to unprefixed keys, so
-// as members of the `time` object they were reachable only as `parts.month`,
-// which no Pine source writes.
+// SOURCING. The manual's Time page, on the variables:
 //
-// Declared as functions, not `const` aliases: the generator classifies an
-// exported const as a VALUE, and the call path then refuses to invoke it
-// ("'month' is a value, not a function").
-export function year(t: number): number { return parts.year(t); }
-export function month(t: number): number { return parts.month(t); }
-export function dayofmonth(t: number): number { return parts.dayofmonth(t); }
-export function dayofweek(t: number): number { return parts.dayofweek(t); }
-export function hour(t: number): number { return parts.hour(t); }
-export function minute(t: number): number { return parts.minute(t); }
-export function second(t: number): number { return parts.second(t); }
-export function weekofyear(t: number): number { return parts.weekofyear(t); }
+//   "The `year`, `month`, `weekofyear`, `dayofmonth`, `dayofweek`, `hour`,
+//    `minute`, and `second` variables hold *calendar-based* 'int' values
+//    calculated from the current bar's *opening time*, expressed in the
+//    exchange time zone. These variables reference the same values that
+//    calendar-based functions return when they use the default `timezone`
+//    argument and `time` as the `time` argument."
+//
+// and on the functions: "functionName(time, timezone) -> series int", where
+// `timezone` "determines the time zone of the returned value".
+//
+// One implementation serves both spellings, which is what that last sentence
+// says: the VARIABLE is the FUNCTION called with the bar's own time.
+//
+// ── The failure this closes ─────────────────────────────────────────────────
+//
+// These were declared `year(t: number)` and carried no `@getter`, so a BARE
+// read of one emitted the FUNCTION OBJECT rather than a number. `year > 2014`
+// compared a function to an integer — false on every bar — and
+//
+//     if year > 2014
+//         strategy.entry("LE", strategy.long)
+//
+// which is TradingView's own `v3-essential-strategies-13` on a dataset that
+// spans 2015 to 2017, never entered. Fourteen of the manual's strategy
+// examples were silent for exactly this reason, and 53 corpus scripts read one
+// of these names bare. Nothing reported it: a built-in that exists is not an
+// undeclared read, and comparing a function to a number is legal JavaScript.
+//
+// The zero-argument form `dayofmonth()` appears twice in the corpus and falls
+// out of the same signature.
+//
+// Declared as functions rather than `const` aliases: the generator classifies
+// an exported const as a VALUE, and the call path then refuses to invoke it
+// ("'month' is a value, not a function"). Declared at top level rather than as
+// members of `parts`: only top-level exports are hoisted to the unprefixed
+// registry keys that Pine sources actually write.
+
+/**
+ * One accessor, for the bar's own opening time or an explicit one, in `zone`.
+ *
+ * `ctx.timezone` is the exchange's and defaults to "UTC" — see this file's
+ * header on why every accessor reads UTC rather than the host's zone.
+ */
+function calendar(ctx: Context, field: keyof typeof parts, time: any, timezone: any): number {
+    const u = (x: any) => (x !== null && x !== undefined && typeof x.valueOf === "function"
+        ? x.valueOf() : x);
+    const raw = u(time);
+    const at = raw === undefined || raw === null ? Number(ctx?.time) : Number(raw);
+    if (!Number.isFinite(at)) return NaN;
+
+    const zone = u(timezone);
+    const named = zone === undefined || zone === null ? ctx?.timezone : String(zone);
+    return parts[field](zonedFields(at, named));
+}
+
+/**
+ * `year` / `year(time, timezone)` — the four-digit year.
+ * @getter
+ * @returns {series int} The year of `time` in `timezone`.
+ */
+export function year(ctx: Context, time?: any, timezone?: any): number {
+    return calendar(ctx, "year", time, timezone);
+}
+
+/**
+ * `month` / `month(time, timezone)` — 1 for January, 12 for December.
+ * @getter
+ * @returns {series int} The month of `time` in `timezone`.
+ */
+export function month(ctx: Context, time?: any, timezone?: any): number {
+    return calendar(ctx, "month", time, timezone);
+}
+
+/**
+ * `dayofmonth` / `dayofmonth(time, timezone)` — 1 to 31.
+ * @getter
+ * @returns {series int} The day of the month of `time` in `timezone`.
+ */
+export function dayofmonth(ctx: Context, time?: any, timezone?: any): number {
+    return calendar(ctx, "dayofmonth", time, timezone);
+}
+
+/**
+ * `dayofweek` / `dayofweek(time, timezone)` — Sunday is 1, Saturday is 7.
+ * @getter
+ * @returns {series int} The day of the week of `time` in `timezone`.
+ */
+export function dayofweek(ctx: Context, time?: any, timezone?: any): number {
+    return calendar(ctx, "dayofweek", time, timezone);
+}
+
+/**
+ * `hour` / `hour(time, timezone)` — 0 to 23.
+ * @getter
+ * @returns {series int} The hour of `time` in `timezone`.
+ */
+export function hour(ctx: Context, time?: any, timezone?: any): number {
+    return calendar(ctx, "hour", time, timezone);
+}
+
+/**
+ * `minute` / `minute(time, timezone)` — 0 to 59.
+ * @getter
+ * @returns {series int} The minute of `time` in `timezone`.
+ */
+export function minute(ctx: Context, time?: any, timezone?: any): number {
+    return calendar(ctx, "minute", time, timezone);
+}
+
+/**
+ * `second` / `second(time, timezone)` — 0 to 59.
+ * @getter
+ * @returns {series int} The second of `time` in `timezone`.
+ */
+export function second(ctx: Context, time?: any, timezone?: any): number {
+    return calendar(ctx, "second", time, timezone);
+}
+
+/**
+ * `weekofyear` / `weekofyear(time, timezone)` — the ISO week, 1 to 53.
+ * @getter
+ * @returns {series int} The week of the year of `time` in `timezone`.
+ */
+export function weekofyear(ctx: Context, time?: any, timezone?: any): number {
+    return calendar(ctx, "weekofyear", time, timezone);
+}
 
 // ─── time(resolution, session) ──────────────────────────────────────────────
 

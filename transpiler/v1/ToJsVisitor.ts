@@ -1857,8 +1857,19 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // 2. THE GETTER CHECK
     // If the standard library registry marks this identifier as a getter,
     // we must transpile it into an execution call instead of a static reference!
+    //
+    // ...unless the SCRIPT binds that name. A getter reads through
+    // `ctx.call(id, opsv2_hour)`, and if `opsv2_hour` is the script's own
+    // `let` the call reaches a number rather than the accessor. Pine keeps the
+    // two apart by resolving a declared name to the declaration; so does this.
+    //
+    // Nor when the id is a keyword argument's NAME. `timestamp(year = 2021)`
+    // spells a PARAMETER that happens to share a built-in's name, and it is
+    // emitted as an object key — `{ ctx.call("year@L3:C10", opsv2_year): 2021 }`
+    // is not JavaScript. The same exemption `checkUndeclaredRead` takes.
     const entry = this.registry[text];
-    if (entry && entry.is_getter) {
+    if (entry && entry.is_getter && !this.isKeywordArgumentName(ctx)
+        && !this.scopes.declared.has(text) && !this.scopes.bound.has(text)) {
         const callId = `"${text}${this.getLocId(ctx)}"`;
         return `ctx.call(${callId}, ${transpiledName})`;
     }

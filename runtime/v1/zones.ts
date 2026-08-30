@@ -66,3 +66,25 @@ export function utcFromZoned(
     answer = naive - (asIfUtc(answer, zone) - answer);
     return answer;
 }
+
+/**
+ * An instant re-expressed so its UTC fields ARE the wall clock in `zone`.
+ *
+ * The forward direction of `utcFromZoned`, and the one the calendar accessors
+ * need: `hour(t, "America/New_York")` wants the hour a New York clock shows at
+ * `t`, which is `new Date(zonedFields(t, "America/New_York")).getUTCHours()`.
+ *
+ * The result is NOT a real instant and must not be compared with one. It exists
+ * to be read field by field.
+ */
+export function zonedFields(ms: number, zone: string | undefined): number {
+    if (!Number.isFinite(ms)) return NaN;
+    if (!zone || /^(UTC|GMT)$/i.test(zone.trim())) return ms;
+
+    // ICU knows "America/New_York" and not "UTC+4"; the offset forms are read
+    // by the same parser `utcFromZoned` uses, so the two stay in step.
+    const fixed = fixedOffsetMinutes(zone);
+    if (fixed !== null) return ms + fixed * 60000;
+
+    return asIfUtc(ms, zone);
+}
