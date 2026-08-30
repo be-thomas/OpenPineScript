@@ -175,6 +175,68 @@ describe("switch with a subject", () => {
   });
 });
 
+describe("a switch label may be a VARIABLE, not only a literal", () => {
+  /**
+   * The subject and the label are both routinely Series objects, and the arms
+   * were compared with a bare `==` on the reasoning that loose equality invokes
+   * `valueOf`. It does — but only when ONE side is a primitive. Between two
+   * objects loose equality compares references exactly as strict does, so a
+   * label that was a variable never matched, and a label that was a literal
+   * kept working, which is what hid it.
+   *
+   * TradingView's own slippage demo, `v5-concepts-strategies-41`:
+   *
+   *     float fillPrice = switch bar_index
+   *         entryIndex => strategy.opentrades.entry_price(0)
+   *         exitIndex  => strategy.closedtrades.exit_price(strategy.closedtrades - 1)
+   *
+   * Both of its plots were `na` on every bar, with nothing said.
+   */
+  it("matches a variable label", () => {
+    const src = HEAD + [
+      "a = 2", "b = 5",
+      "r = switch bar_index",
+      "    a => 100.0",
+      "    b => 200.0",
+    ].join("\n") + "\n";
+    expect(series(src, "r", 7)).toEqual([NaN, NaN, 100, NaN, NaN, 200, NaN]);
+  });
+
+  it("a literal label still matches, which is what kept this hidden", () => {
+    const src = HEAD + "r = switch bar_index\n    2 => 100.0\n";
+    expect(series(src, "r", 4)).toEqual([NaN, NaN, 100, NaN]);
+  });
+
+  it("an expression label matches too", () => {
+    const src = HEAD + "a = 1\nr = switch bar_index\n    a + 2 => 9.0\n";
+    expect(series(src, "r", 5)).toEqual([NaN, NaN, NaN, 9, NaN]);
+  });
+
+  it("an ENUM label still matches by identity, which is the rule", () => {
+    // `safe_eq` unwraps a Series and leaves a plain object alone, so an enum
+    // member — which has no `valueOf` of its own, deliberately — keeps
+    // comparing by reference. Two enums with identical fields must not match.
+    const src = HEAD +
+      "enum E\n    a\n    b\n" +
+      "enum F\n    a\n    b\n" +
+      "E sel = E.b\n" +
+      "x = switch sel\n    E.a => 1\n    E.b => 2\n    => 0\n" +
+      "y = switch sel\n    F.a => 1\n    F.b => 2\n    => 0\n";
+    expect(value(src, "x")).toBe(2);
+    expect(value(src, "y")).toBe(0);
+  });
+
+  it("a string label matches by value", () => {
+    const src = HEAD + 's = "b"\nr = switch s\n    "a" => 1\n    "b" => 2\n    => 0\n';
+    expect(value(src, "r")).toBe(2);
+  });
+
+  it("na matches nothing, including itself", () => {
+    const src = HEAD + "float s = na\nr = switch s\n    na => 1\n    => 0\n";
+    expect(value(src, "r")).toBe(0);
+  });
+});
+
 describe("switch without a subject", () => {
   it("takes the first TRUE arm", () => {
     const src = HEAD + [

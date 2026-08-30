@@ -2235,11 +2235,23 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
           continue;
         }
 
-        // Loose '==' deliberately: the subject and the label are both routinely
-        // Series objects, and loose equality is what invokes valueOf on them.
-        // Strict equality would compare object identity and never match.
+        // The same equality `==` gets everywhere else in the language, for the
+        // same reason: `safe_eq` unwraps a Series and then compares loosely.
+        //
+        // This was a bare `==`, on the reasoning that loose equality invokes
+        // valueOf. It does — but only when ONE side is a primitive. Between two
+        // objects, loose equality compares references exactly as strict does,
+        // so a switch whose label is a VARIABLE never matched:
+        //
+        //     float fillPrice = switch bar_index
+        //         entryIndex => strategy.opentrades.entry_price(0)
+        //
+        // is TradingView's own slippage demo, and both of its plots were na on
+        // every bar. A label that is a LITERAL kept working, which is what hid
+        // it. `safe_eq` also leaves plain objects alone, so an enum label —
+        // `OscType.rsi => …` — still matches by identity, which is the rule.
         const test = subjectCtx
-          ? `(${subject} == ${this.visit(label)})`
+          ? `opsv2_safe_eq(${subject}, ${this.visit(label)})`
           : `ctx.truthy(${this.visit(label)})`;
 
         arms.push(`${arms.length ? "else " : ""}if (${test}) ${body}`);
