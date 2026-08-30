@@ -1118,6 +1118,25 @@ export class Context {
      * 2. Context Injection
      * 3. Keyword Argument Resolution (kwargs)
      */
+    /**
+     * How the CURRENT call was written: which parameters the caller named, and
+     * how many arguments it passed positionally.
+     *
+     * `call` flattens keyword arguments into the positional array below, which
+     * is what a JavaScript function can receive — and that flattening throws
+     * away the one thing an OVERLOADED built-in needs. `line.new` has two
+     * published signatures, the registry holds one, and which slot a value
+     * belongs to depends on whether the caller wrote it as `width = 3` or as
+     * the fifth thing in the list. See `pointTail` in stdlib/drawings.ts.
+     *
+     * Set for the duration of one call and restored afterwards, so a built-in
+     * that calls another does not read its caller's shape.
+     */
+    public keywordArguments: ReadonlySet<string> = new Set();
+
+    /** How many arguments the caller passed before any keyword. */
+    public positionalArguments: number = 0;
+
     public call(id: string, fn: Function, ...args: any[]) {
         // DIAGNOSTIC: If this triggers, the transpiler passed a null function reference
         if (typeof fn !== 'function') {
@@ -1177,10 +1196,13 @@ export class Context {
                             && bundleKeys.every(k => k.startsWith(PREFIX));
 
             let finalArgs = args;
+            const namedHere = new Set<string>();
+            let positionalHere = args.length;
 
             if (hasKwargs) {
                 const positionalArgs = args.slice(0, -1);
                 const kwargs = lastArg;
+                positionalHere = positionalArgs.length;
 
                 if (entry.args.length > 0) {
                     finalArgs = [...positionalArgs];
@@ -1199,6 +1221,7 @@ export class Context {
                         // scripts, so a signature that falls behind is caught
                         // rather than quietly ignoring what it is handed.
                         if (index === -1) this.droppedArguments.add(`${fname}(${cleanKey})`);
+                        else namedHere.add(cleanKey);
                         
                         if (index !== -1) {
                             while (finalArgs.length <= index) {
@@ -1215,10 +1238,19 @@ export class Context {
             // 4. Execute with Context Injection
             // We use the entry's 'ref' as a backup if 'fn' passed from the VM is wonky,
             // but primarily we use the 'fn' passed by the transpiled code.
-            if (entry.uses_context) {
-                return fn(this, ...finalArgs); 
-            } else {
-                return fn(...finalArgs);
+            const outerNamed = this.keywordArguments;
+            const outerPositional = this.positionalArguments;
+            this.keywordArguments = namedHere;
+            this.positionalArguments = positionalHere;
+            try {
+                if (entry.uses_context) {
+                    return fn(this, ...finalArgs);
+                } else {
+                    return fn(...finalArgs);
+                }
+            } finally {
+                this.keywordArguments = outerNamed;
+                this.positionalArguments = outerPositional;
             }
 
         } finally {

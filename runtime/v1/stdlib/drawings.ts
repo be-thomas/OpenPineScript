@@ -62,6 +62,114 @@ function getProp(ctx: Context, id: any, fn: string, prop: string): any {
     return ctx.getDrawing(id, fn).props[prop];
 }
 
+
+/**
+ * The `chart.point` overloads of `line.new`, `box.new` and `label.new`.
+ *
+ * SOURCING. October 2023, alongside polylines. From the manual's Lines and
+ * boxes page, the first overload of each:
+ *
+ *   line.new(first_point, second_point, xloc, extend, color, style, width)
+ *   box.new(top_left, bottom_right, border_color, border_width, border_style,
+ *           extend, xloc, bgcolor, text, text_size, …)
+ *   label.new(point, text, xloc, yloc, color, style, textcolor, size, …)
+ *
+ * and the rule for the x it takes: "Whether it uses the `index` or `time`
+ * fields … as x-coordinates depends on the function's `xloc` value."
+ *
+ * ── The failure this closes ─────────────────────────────────────────────────
+ *
+ * Only the coordinate form existed, so `line.new(firstPoint, secondPoint)` read
+ * a chart point where a number belongs: `Number({index, time, price})` is NaN,
+ * and the line was created at (NaN, NaN)-(NaN, NaN). Nothing raised — a
+ * drawing with na coordinates is legal Pine, and TradingView's `line.get_price`
+ * on one legitimately returns na. Eighteen corpus files use these overloads,
+ * and `v5-language-loops-17` is what surfaced it: its `avgActivePivot` divides
+ * by a count of lines it can never read a price from, so the plot was na on
+ * every bar of a page whose whole subject is that line.
+ *
+ * ── How a call is resolved ──────────────────────────────────────────────────
+ *
+ * Both overloads are one JavaScript function, because the registry holds one
+ * signature per name and `Context.call` binds keyword arguments against it.
+ * That signature is the COORDINATE form, so a keyword lands in the slot its
+ * name has there; a POSITIONAL argument lands where the caller put it, which
+ * in the point form is `drop` slots earlier.
+ *
+ * Beyond the coordinates the two lists carry the same names in the same order
+ * — `line.new`'s 5th coordinate-form parameter and its 3rd point-form one are
+ * both `xloc` — so a parameter can be read from its keyword slot, falling back
+ * to its positional one. Every call in the corpus resolves; a call that passed
+ * one parameter positionally AND another by keyword from an earlier slot could
+ * not, and Pine has no way to write one.
+ */
+function isChartPoint(x: any): boolean {
+    const p = val(x);
+    return !!p && typeof p === "object" && !Array.isArray(p)
+        && ("index" in p || "time" in p) && "price" in p;
+}
+
+/**
+ * The tail of a point-form call, re-read against the coordinate signature.
+ *
+ * `drop` is how many coordinate parameters the point form replaces: two for
+ * `line` and `box` (x1,y1,x2,y2 → two points), one for `label` (x,y → one).
+ * `names` are the point form's remaining parameters in order, starting at
+ * point-index `from`.
+ *
+ * A KEYWORD argument was bound by `Context.call` against the coordinate
+ * signature, so it sits `drop` slots to the right of where the point form puts
+ * it. A POSITIONAL argument sits exactly where the caller wrote it. The two
+ * lists carry the same names in the same order past the coordinates —
+ * `line.new`'s 5th coordinate-form parameter and its 3rd point-form one are
+ * both `xloc` — so the call's own shape decides which slot to read, and
+ * `Context` records that shape for exactly this.
+ *
+ * Guessing instead of asking does not work, in either direction. Preferring the
+ * keyword slot reads `label.new(p, "hi", xloc.bar_time, …)`'s third argument as
+ * the label's TEXT; preferring the positional slot reads
+ * `label.new(p, "hi", style = label.style_circle)`'s style as its TEXTCOLOR,
+ * because that keyword landed in the slot the point form gives to textcolor.
+ *
+ * The three `new` functions declare no parameter defaults, and apply them
+ * through `or` below: a JavaScript default fires before the body runs, so a
+ * parameter the caller never wrote would arrive here indistinguishable from
+ * one it did.
+ */
+function pointTail(
+    ctx: Context, args: any[], drop: number, from: number, names: readonly string[],
+): any[] {
+    return names.map((name, k) => {
+        const j = from + k;
+        if (ctx.keywordArguments.has(name)) return args[j + drop];
+        return j < ctx.positionalArguments ? args[j] : undefined;
+    });
+}
+
+/** Each overload's parameters past the points, in the order the manual lists them. */
+const LINE_TAIL = ["xloc", "extend", "color", "style", "width"] as const;
+const BOX_TAIL = ["border_color", "border_width", "border_style", "extend", "xloc",
+                  "bgcolor", "text", "text_size", "text_color", "text_halign",
+                  "text_valign", "text_wrap", "text_font_family"] as const;
+const LABEL_TAIL = ["text", "xloc", "yloc", "color", "style", "textcolor", "size",
+                    "textalign", "tooltip", "text_font_family"] as const;
+
+/** A supplied argument, or the manual's default when there is none. */
+function or(supplied: any, fallback: any): any {
+    return supplied !== undefined ? supplied : fallback;
+}
+
+/** The x a point contributes, given the drawing's own `xloc`. */
+function pointX(point: any, xloc: any): number {
+    const at = val(point) ?? {};
+    return n(val(xloc) === "bar_time" ? at.time : at.index);
+}
+
+/** The price a point carries. */
+function pointY(point: any): number {
+    return n((val(point) ?? {}).price);
+}
+
 // ── line ────────────────────────────────────────────────────────────────────
 
 /**
@@ -81,14 +189,30 @@ function setEndpoint(ctx: Context, id: any, fn: string, point: any,
 }
 
 export const line = {
+    /**
+     * `line.new(x1, y1, x2, y2, …)` and `line.new(first_point, second_point, …)`
+     * — see the note above `isChartPoint` for how the two are told apart, and
+     * why nothing here carries a parameter default.
+     */
     new: (
         ctx: Context, x1: any, y1: any, x2: any, y2: any,
-        xloc: any = "bar_index", extend: any = "none",
-        color: any = "#2196F3", style: any = "solid", width: any = 1,
-    ) => ctx.newDrawing("line", {
-        x1: n(x1), y1: n(y1), x2: n(x2), y2: n(y2),
-        xloc: v(xloc), extend: v(extend), color: v(color), style: v(style), width: n(width),
-    }),
+        xloc?: any, extend?: any, color?: any, style?: any, width?: any,
+    ) => {
+        const points = isChartPoint(x1);
+        const [xl, ex, co, st, wd] = points
+            ? pointTail(ctx, [x1, y1, x2, y2, xloc, extend, color, style, width],
+                        2, 2, LINE_TAIL)
+            : [xloc, extend, color, style, width];
+        const where = or(xl, "bar_index");
+        return ctx.newDrawing("line", {
+            x1: points ? pointX(x1, where) : n(x1),
+            y1: points ? pointY(x1)        : n(y1),
+            x2: points ? pointX(y1, where) : n(x2),
+            y2: points ? pointY(y1)        : n(y2),
+            xloc: v(where), extend: v(or(ex, "none")), color: v(or(co, "#2196F3")),
+            style: v(or(st, "solid")), width: n(or(wd, 1)),
+        });
+    },
 
     set_x1: (ctx: Context, id: any, x: any) => setNum(ctx, id, "line.set_x1", "x1", x),
     set_y1: (ctx: Context, id: any, y: any) => setNum(ctx, id, "line.set_y1", "y1", y),
@@ -174,23 +298,41 @@ export const line = {
 // ── label ───────────────────────────────────────────────────────────────────
 
 export const label = {
+    /**
+     * `label.new(x, y, text, …)` and `label.new(point, text, …)`.
+     *
+     * The point form replaces ONE coordinate pair with one point, so the tail
+     * shifts by one rather than two. `text_font_family` is v5: three of
+     * TradingView's own examples pass it — `label.new(…, text_font_family =
+     * font.family_monospace)` — and an argument the signature does not name is
+     * dropped without a word, so a monospaced label came out proportional and
+     * nothing said so.
+     */
     new: (
-        ctx: Context, x: any, y: any, text: any = "",
-        xloc: any = "bar_index", yloc: any = "price",
-        color: any = "#2196F3", style: any = "label_down",
-        textcolor: any = "#FFFFFF", size: any = "normal",
-        textalign: any = "center", tooltip: any = "",
-        // The typeface, v5. Three of TradingView's own examples pass it —
-        // `label.new(…, text_font_family = font.family_monospace)` — and an
-        // argument the signature does not name is dropped without a word, so a
-        // monospaced label came out proportional and nothing said so.
-        text_font_family: any = "default",
-    ) => ctx.newDrawing("label", {
-        x: n(x), y: n(y), text: String(v(text) ?? ""),
-        xloc: v(xloc), yloc: v(yloc), color: v(color), style: v(style),
-        textcolor: v(textcolor), size: v(size), textalign: v(textalign),
-        tooltip: String(v(tooltip) ?? ""), text_font_family: v(text_font_family),
-    }),
+        ctx: Context, x: any, y: any, text?: any,
+        xloc?: any, yloc?: any, color?: any, style?: any,
+        textcolor?: any, size?: any, textalign?: any, tooltip?: any,
+        text_font_family?: any,
+    ) => {
+        const point = isChartPoint(x);
+        const all = [x, y, text, xloc, yloc, color, style, textcolor, size,
+                     textalign, tooltip, text_font_family];
+        const [tx, xl, yl, co, st, tc, sz, ta, tt, ff] = point
+            ? pointTail(ctx, all, 1, 1, LABEL_TAIL)
+            : [text, xloc, yloc, color, style, textcolor, size, textalign,
+               tooltip, text_font_family];
+        const where = or(xl, "bar_index");
+        return ctx.newDrawing("label", {
+            x: point ? pointX(x, where) : n(x),
+            y: point ? pointY(x)        : n(y),
+            text: String(v(or(tx, "")) ?? ""),
+            xloc: v(where), yloc: v(or(yl, "price")), color: v(or(co, "#2196F3")),
+            style: v(or(st, "label_down")), textcolor: v(or(tc, "#FFFFFF")),
+            size: v(or(sz, "normal")), textalign: v(or(ta, "center")),
+            tooltip: String(v(or(tt, "")) ?? ""),
+            text_font_family: v(or(ff, "default")),
+        });
+    },
 
     set_x: (ctx: Context, id: any, x: any) => setNum(ctx, id, "label.set_x", "x", x),
     set_y: (ctx: Context, id: any, y: any) => setNum(ctx, id, "label.set_y", "y", y),
@@ -262,33 +404,55 @@ export const label = {
 // ── box ─────────────────────────────────────────────────────────────────────
 
 export const box = {
+    /**
+     * `box.new(left, top, right, bottom, …)` and
+     * `box.new(top_left, bottom_right, …)`.
+     *
+     * A box's corners are (left, top) and (right, bottom), so `top_left`
+     * supplies left/top and `bottom_right` supplies right/bottom.
+     *
+     * `xloc` decides whether `left`/`right` are BAR INDICES or TIMES, and it
+     * sits between `extend` and `bgcolor` in the published signature. It was
+     * absent, so `box.new(…, xloc = xloc.bar_time)` had its coordinates read as
+     * bar indices — a box drawn at bar 1,700,000,000.
+     *
+     * The text defaults are the manual's: "size.auto (default)", "Its default
+     * is color.black", "text.align_center (default)" for both alignments, "The
+     * default is text.wrap_none", and `font.family_default`. Spelled as the
+     * VALUES those constants carry, so a script that passes the constant and a
+     * script that leaves it out record the same thing.
+     */
     new: (
         ctx: Context, left: any, top: any, right: any, bottom: any,
-        border_color: any = "#2196F3", border_width: any = 1,
-        border_style: any = "solid", extend: any = "none",
-        // `xloc` decides whether `left`/`right` are BAR INDICES or TIMES, and it
-        // sits between `extend` and `bgcolor` in the published signature. It was
-        // absent, so `box.new(…, xloc = xloc.bar_time)` had its coordinates read
-        // as bar indices — a box drawn at bar 1,700,000,000.
-        xloc: any = "bar_index",
-        bgcolor: any = null,
-        // The manual's defaults: "size.auto (default)", "Its default is
-        // color.black", "text.align_center (default)" for both alignments,
-        // "The default is text.wrap_none", and `font.family_default`. Spelled
-        // as the VALUES those constants carry, so a script that passes the
-        // constant and a script that leaves it out record the same thing.
-        text: any = "", text_size: any = "auto", text_color: any = "#000000",
-        text_halign: any = "center", text_valign: any = "center",
-        text_wrap: any = "none", text_font_family: any = "default",
-    ) => ctx.newDrawing("box", {
-        left: n(left), top: n(top), right: n(right), bottom: n(bottom),
-        border_color: v(border_color), border_width: n(border_width),
-        border_style: v(border_style), extend: v(extend), xloc: v(xloc),
-        bgcolor: v(bgcolor),
-        text: v(text), text_size: v(text_size), text_color: v(text_color),
-        text_halign: v(text_halign), text_valign: v(text_valign),
-        text_wrap: v(text_wrap), text_font_family: v(text_font_family),
-    }),
+        border_color?: any, border_width?: any, border_style?: any, extend?: any,
+        xloc?: any, bgcolor?: any,
+        text?: any, text_size?: any, text_color?: any,
+        text_halign?: any, text_valign?: any,
+        text_wrap?: any, text_font_family?: any,
+    ) => {
+        const points = isChartPoint(left);
+        const all = [left, top, right, bottom, border_color, border_width,
+                     border_style, extend, xloc, bgcolor, text, text_size,
+                     text_color, text_halign, text_valign, text_wrap,
+                     text_font_family];
+        const [bc, bw, bs, ex, xl, bg, tx, ts, tc, th, tv, tw, ff] = points
+            ? pointTail(ctx, all, 2, 2, BOX_TAIL)
+            : all.slice(4);
+        const where = or(xl, "bar_index");
+        return ctx.newDrawing("box", {
+            left:   points ? pointX(left, where) : n(left),
+            top:    points ? pointY(left)        : n(top),
+            right:  points ? pointX(top, where)  : n(right),
+            bottom: points ? pointY(top)         : n(bottom),
+            border_color: v(or(bc, "#2196F3")), border_width: n(or(bw, 1)),
+            border_style: v(or(bs, "solid")), extend: v(or(ex, "none")),
+            xloc: v(where), bgcolor: v(or(bg, null)),
+            text: v(or(tx, "")), text_size: v(or(ts, "auto")),
+            text_color: v(or(tc, "#000000")), text_halign: v(or(th, "center")),
+            text_valign: v(or(tv, "center")), text_wrap: v(or(tw, "none")),
+            text_font_family: v(or(ff, "default")),
+        });
+    },
 
     set_left: (ctx: Context, id: any, left: any) => setNum(ctx, id, "box.set_left", "left", left),
     set_top: (ctx: Context, id: any, top: any) => setNum(ctx, id, "box.set_top", "top", top),
