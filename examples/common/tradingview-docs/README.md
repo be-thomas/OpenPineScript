@@ -144,6 +144,13 @@ with a dedicated test file, after the corpus made the absence visible:
 | `matrix.reverse` | v5 | 1 |
 | a user method that shares a built-in's name is called as itself | v5 | 1 |
 | an `na` drawing id is a no-op, not an error | v4 | 5 |
+| higher-timeframe `request.security` derived from the chart's own bars | v1 | 25 |
+| `barstate.islastconfirmedhistory` fired on no bar at all | v1 | 29 |
+| function OVERLOADING, by arity and by parameter type | v5 | 2 |
+| `tr` is a series VARIABLE, and was emitting the function object | v1 | 4 |
+| `timestamp()`'s date-string and time-zone forms | v1 | 3 |
+| forty keyword arguments that were silently dropped | v1 | 40 pairs |
+| pending orders were matched by one test harness and by nothing else | v1 | every strategy with a bracket |
 
 **And 34 missing built-ins**, found all at once. `checkUndeclaredRead` rejected a
 bare name nothing declares; its mirror — an unknown MEMBER of a real namespace —
@@ -155,6 +162,24 @@ them), `str.format_time`, `timeframe.in_seconds`/`from_seconds`/`change`,
 its siblings, `table.cell_set_*`, `ticker.modify`/`inherit`,
 `request.security_lower_tf`/`currency_rate`/`economic`/`seed`, and ten
 `strategy.*` statistics.
+
+**And no keyword argument is silently dropped any more.** `Context.call` binds a
+keyword by looking its name up in the callee's signature, and discards one it
+does not find — without a word, because a missing parameter looks exactly like
+an argument the caller chose not to pass. Forty distinct (function, argument)
+pairs were being discarded across this corpus, and several of them decide what a
+script DOES: `strategy.entry(when = …)` fired unconditionally,
+`strategy.exit(profit = …)` lost the take-profit side of a bracket,
+`input.int(minval = 1)` clamped nothing, `plot(offset = …)` did not shift the
+series, `box.new(xloc = xloc.bar_time)` read times as bar indices, and
+`bgcolor(title = "Session")` kept its synthetic name. `Context.droppedArguments`
+records any that remain and the execution suite asserts the set is empty.
+
+Two of those exposed something larger. `strategy.exit` never honoured `profit`
+or `loss` — the TICK forms of its two targets — because they were accepted as
+parameters and then left out of the pending record; and `processPendingOrders`
+was called by ONE test harness and by nothing else, so no bracket ever filled in
+a real run.
 
 **And a function's locals are now per CALL SITE.** "Each function call has its
 own instance of the series variables" is how Pine works; this engine registered
@@ -197,10 +222,10 @@ Of the 742 that compile, running each one over the 506-bar
 
 | Result | Count | Meaning |
 |---|---|---|
-| ran, produced output | 371 | plots, trades or logs came out |
-| no output | 207 | most have no plotting call at all — drawings and tables only. The rest need data this run does not have (a strategy gated on `n > 4000` over 506 bars) |
-| all-`na` output | 125 | mostly expected: the script is gated on an intraday session, or on a symbol this dataset is not |
-| runtime error | 39 | every one is a NAMED diagnostic, and pinned by cause — see below |
+| produced output | 644 | plots, drawings, trades or logs came out. 201 of them have no `plot()` call at all — they draw lines, labels and boxes, or open positions |
+| all-`na` plots, nothing drawn | 38 | mostly expected: the script asks for a symbol this dataset is not, an intraday session it does not cover, or a date outside its range |
+| nothing at all | 22 | library sources, and strategies gated on conditions this run does not meet (`n > 4000` over 506 bars) |
+| runtime error | 38 | every one is a NAMED diagnostic, and pinned by cause — see below |
 
 **No script in this corpus raises a `ReferenceError`, and every one of the 742
 emits JavaScript that parses.** Both used to be false. `ReferenceError` was once
@@ -212,7 +237,7 @@ were implemented, the emitter no longer emits a name that nothing binds, a name
 bound in a block it is not read from is now `Undeclared identifier` at compile
 time, and an unknown member of a known namespace is too.
 
-The 39 that remain are pinned by CAUSE in
+The 38 that remain are pinned by CAUSE in
 [`docs_corpus_execution.test.ts`](../../../conformance/common/docs_corpus_execution.test.ts) —
 a regular expression per file, so one that starts failing for a DIFFERENT reason
 fails that suite too. They fall into three kinds:
@@ -220,7 +245,7 @@ fails that suite too. They fall into three kinds:
 | Count | Kind |
 |---|---|
 | 17 | the script's own error — a `runtime.error()` call, or an index or shape the page exists to show failing. TradingView's matrices and arrays pages have a section of these, each annotated "Raises an error" in its own source |
-| 12 | host data this engine cannot fetch — `request.financial`, `request.economic`, `request.quandl`, `request.seed`, `request.dividends`, `request.earnings`, `request.currency_rate` |
+| 11 | host data this engine cannot fetch — `request.financial`, `request.economic`, `request.quandl`, `request.seed`, `request.dividends`, `request.earnings`, `request.currency_rate` |
 | 10 | a deliberate refusal — `renko`, `linebreak`, `kagi` and `pointfigure` cannot be rebuilt from OHLCV bars, and `accdist`'s published definitions disagree on a seed |
 
 They were 124 before the missing built-ins were written, and 66 before the round

@@ -3,7 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org)
 [![Pine Script](https://img.shields.io/badge/Pine%20Script-v1%20%E2%80%93%20v5-orange.svg)](#supported-pine-script-versions)
-[![Tests](https://img.shields.io/badge/tests-2011%20passing-success.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-2049%20passing-success.svg)](#testing)
 
 **OpenPineScript is an open-source Pine Script engine.** It compiles TradingView
 Pine Script source (`.pine`) to JavaScript and executes it against your own OHLCV
@@ -151,24 +151,31 @@ worse, reading as `undefined` and taking a branch nobody meant.
 
 | Running all 742 over the sample dataset | |
 |---|---|
-| plots real values | 371 |
-| runs, plots only `na` | 125 |
-| runs, produces no output at all | 207 |
-| raises a runtime error | 39 |
+| produces output — plots, drawings, trades or logs | 644 |
+| plots only `na`, and draws nothing | 38 |
+| produces nothing at all | 22 |
+| raises a runtime error | 38 |
 
-`na` and no-output are usually correct: a script gated on
-`barstate.islastconfirmedhistory`, an intraday session, or a symbol this dataset
-is not, has nothing to draw — and many draw only lines, labels and tables, which
-are recorded rather than plotted.
+201 of the 644 have no `plot()` call at all: they draw lines, labels and boxes,
+or open positions, or log. `na` and no-output are usually correct too — a script
+asking for a symbol this dataset is not, an intraday session it does not cover,
+or a date outside its range has nothing to draw.
 
-Every one of the 39 runtime errors is pinned by CAUSE in
+Every one of the 38 runtime errors is pinned by CAUSE in
 [`conformance/common/docs_corpus_execution.test.ts`](conformance/common/docs_corpus_execution.test.ts),
 so a new one cannot arrive quietly. Seventeen are the script's own error — a
-`runtime.error()` call, or an index the page is written to show failing; twelve
+`runtime.error()` call, or an index the page is written to show failing; eleven
 need host data this engine cannot fetch (`request.financial`, `request.economic`
 and the rest); ten are deliberate refusals (`renko`, `linebreak`, `kagi`,
 `pointfigure` cannot be rebuilt from OHLCV bars, and `accdist`'s published
 definitions disagree on a seed).
+
+The same suite asserts that **no keyword argument is silently dropped** across
+all 742. `Context.call` binds a keyword by looking its name up in the callee's
+signature and discards one it does not find, which is how
+`strategy.entry(when = …)` came to fire unconditionally and `input.int(minval =
+1)` to clamp nothing. Forty distinct (function, argument) pairs were being
+discarded; the set is now empty and pinned that way.
 
 The 21 that do not compile contain no known engine gap. Eleven are not runnable
 Pine at all — documentation blocks rather than scripts, or scripts that exist to
@@ -252,7 +259,7 @@ Report written: ./results/comparison_report.json
 npm test
 ```
 
-2,011 tests pass across 77 files. None fail.
+2,049 tests pass across 79 files. None fail.
 
 Two patterns carry most of the weight:
 
