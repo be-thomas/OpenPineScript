@@ -180,11 +180,16 @@ export const label = {
         color: any = "#2196F3", style: any = "label_down",
         textcolor: any = "#FFFFFF", size: any = "normal",
         textalign: any = "center", tooltip: any = "",
+        // The typeface, v5. Three of TradingView's own examples pass it —
+        // `label.new(…, text_font_family = font.family_monospace)` — and an
+        // argument the signature does not name is dropped without a word, so a
+        // monospaced label came out proportional and nothing said so.
+        text_font_family: any = "default",
     ) => ctx.newDrawing("label", {
         x: n(x), y: n(y), text: String(v(text) ?? ""),
         xloc: v(xloc), yloc: v(yloc), color: v(color), style: v(style),
         textcolor: v(textcolor), size: v(size), textalign: v(textalign),
-        tooltip: String(v(tooltip) ?? ""),
+        tooltip: String(v(tooltip) ?? ""), text_font_family: v(text_font_family),
     }),
 
     set_x: (ctx: Context, id: any, x: any) => setNum(ctx, id, "label.set_x", "x", x),
@@ -385,12 +390,14 @@ export const table = {
         width: any = 0, height: any = 0, text_color: any = "#000000",
         text_halign: any = "center", text_valign: any = "center",
         text_size: any = "normal", bgcolor: any = null,
+        tooltip: any = "", text_font_family: any = "default",
     ) => {
         const p = ctx.getDrawing(table_id, "table.cell").props;
         p.cells.set(`${n(column)},${n(row)}`, {
             text: String(v(text) ?? ""), width: n(width), height: n(height),
             text_color: v(text_color), text_halign: v(text_halign),
             text_valign: v(text_valign), text_size: v(text_size), bgcolor: v(bgcolor),
+            tooltip: String(v(tooltip) ?? ""), text_font_family: v(text_font_family),
         });
     },
 
@@ -407,6 +414,21 @@ export const table = {
      * ignored, which is what lets a script lay out a table with `table.cell`
      * and then update one field of it per bar.
      */
+    /**
+     * The typeface and the tooltip of one cell.
+     *
+     * `table.cell_set_text_font_family` is not on the manual's Tables page, and
+     * TradingView's `v5-concepts-time-20` calls it anyway —
+     * `displayTable.cell_set_text_font_family(colID, rowID, font.family_monospace)`
+     * — which is the same standard of evidence the `fixnan` and `transp=`
+     * decisions rest on: a published example is the language.
+     */
+    cell_set_text_font_family: (ctx: Context, table_id: any, column: any, row: any, family: any) =>
+        setCell(ctx, table_id, "cell_set_text_font_family", column, row, "text_font_family", v(family)),
+
+    cell_set_tooltip: (ctx: Context, table_id: any, column: any, row: any, tooltip: any) =>
+        setCell(ctx, table_id, "cell_set_tooltip", column, row, "tooltip", String(v(tooltip) ?? "")),
+
     cell_set_text: (ctx: Context, table_id: any, column: any, row: any, text: any) =>
         setCell(ctx, table_id, "cell_set_text", column, row, "text", String(v(text) ?? "")),
 

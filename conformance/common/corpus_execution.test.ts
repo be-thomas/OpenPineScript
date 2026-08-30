@@ -96,6 +96,8 @@ function resample(bars: Bar[], resolution: string): Bar[] {
 }
 
 function runBars(ctx: Context, exec: () => void, bars: Bar[]): void {
+  // The final bar runs as realtime, so the last settled bar is the one before it.
+  ctx.realtimeBars = 1;
   bars.forEach((bar, i) => {
     ctx.currentBarIndex = i;
     ctx.is_new = true;

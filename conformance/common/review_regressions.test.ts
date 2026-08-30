@@ -56,8 +56,10 @@ function firstPlot(source: string, version: PineVersion): number[] {
     const ctx = new Context(c.profile);
     return { ctx, exec: compile(c.js, ctx, { ctx } as any) };
   };
-  const go = (ctx: Context, exec: () => void) =>
-    BARS.forEach((b, i) => {
+  const go = (ctx: Context, exec: () => void) => {
+    // The final bar runs as realtime, so the last settled bar is the one before.
+    ctx.realtimeBars = 1;
+    return BARS.forEach((b, i) => {
       ctx.currentBarIndex = i;
       ctx.is_new = true;
       ctx.is_last = i === BARS.length - 1;
@@ -67,6 +69,7 @@ function firstPlot(source: string, version: PineVersion): number[] {
       exec();
       ctx.finalizeBar();
     });
+  };
 
   let { ctx, exec } = build();
   go(ctx, exec);

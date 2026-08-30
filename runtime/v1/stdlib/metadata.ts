@@ -1580,7 +1580,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "label.new": {
           uses_context: true,
-          args: ["x","y","text","xloc","yloc","color","style","textcolor","size","textalign","tooltip"],
+          args: ["x","y","text","xloc","yloc","color","style","textcolor","size","textalign","tooltip","text_font_family"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -2156,11 +2156,27 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "table.cell": {
           uses_context: true,
-          args: ["table_id","column","row","text","width","height","text_color","text_halign","text_valign","text_size","bgcolor"],
+          args: ["table_id","column","row","text","width","height","text_color","text_halign","text_valign","text_size","bgcolor","tooltip","text_font_family"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: drawings.table["cell"]
+      },
+      "table.cell_set_text_font_family": {
+          uses_context: true,
+          args: ["table_id","column","row","family"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell_set_text_font_family"]
+      },
+      "table.cell_set_tooltip": {
+          uses_context: true,
+          args: ["table_id","column","row","tooltip"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: drawings.table["cell_set_tooltip"]
       },
       "table.cell_set_text": {
           uses_context: true,

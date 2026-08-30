@@ -388,6 +388,35 @@ export class Context {
         return this.datasetSize != null ? this.datasetSize - 1 : this.currentBarIndex;
     }
 
+    /**
+     * How many bars at the END of the run the host marks REALTIME.
+     *
+     * ── Why the host has to say ─────────────────────────────────────────────
+     *
+     * `barstate.islastconfirmedhistory` is "true if the script is executing on
+     * the dataset's last bar when the market is closed, or on the bar
+     * immediately preceding the realtime bar if the market is open". The second
+     * reading needs to be answered ON that preceding bar — one bar before the
+     * realtime flag arrives — so it cannot be inferred from `is_realtime`, which
+     * the host sets bar by bar.
+     *
+     * The same shape as `provideDatasetExtent` above, and for the same reason:
+     * only the caller knows how its run ends. Zero — no realtime bar, the whole
+     * dataset is settled history — is the default, because a host that says
+     * nothing is replaying closed bars. Every harness in this repository that
+     * models an open market (`is_realtime = is_last`) sets it to 1.
+     *
+     * Getting this wrong is silent: with a realtime bar unaccounted for, the
+     * guard fires on NO bar at all, and the twenty-nine documentation examples
+     * that draw their labels and tables under it drew nothing.
+     */
+    public realtimeBars: number = 0;
+
+    /** Bar index of the last bar the script may treat as settled history. */
+    public get lastConfirmedHistoryIndex(): number {
+        return this.lastBarIndex - this.realtimeBars;
+    }
+
     /** Opening time of the last bar in the dataset — `last_bar_time`. */
     public get lastBarTime(): number {
         return this.datasetLastTime != null ? this.datasetLastTime : this.time;

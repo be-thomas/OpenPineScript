@@ -284,6 +284,9 @@ function runHarness(harnessSource: string, bars: Bar[], version: PineVersion): M
   const ctx = new Context(compiled.profile);
   const exec = compile(compiled.js, ctx, { ctx } as any);
 
+  // The final bar is run as REALTIME, so the last SETTLED bar is the one before
+  // it — which is what `barstate.islastconfirmedhistory` asks for.
+  ctx.realtimeBars = 1;
   bars.forEach((bar, i) => {
     ctx.currentBarIndex = i;
     ctx.is_new = true;

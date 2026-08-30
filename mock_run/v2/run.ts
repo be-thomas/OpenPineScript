@@ -466,6 +466,9 @@ async function main() {
     // `last_bar_index` / `last_bar_time` must be answerable on bar 1, and the
     // CSV is the only thing that knows how far the run goes.
     ctx.provideDatasetExtent(bars.length, bars[bars.length - 1].time);
+    // The loop below runs the final bar as REALTIME, so the last SETTLED bar is
+    // the one before it — which is what `barstate.islastconfirmedhistory` asks for.
+    ctx.realtimeBars = 1;
 
     const sandbox = { ctx };
     const executeBar = compile(jsCode, ctx, sandbox);

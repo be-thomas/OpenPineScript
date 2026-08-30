@@ -96,5 +96,23 @@ export function isconfirmed(ctx: Context): boolean {
  * @getter
  */
 export function islastconfirmedhistory(ctx: Context): boolean {
-    return ctx.is_realtime ? false : ctx.is_last;
+    if (ctx.is_realtime) return false;
+
+    // No realtime tail — the market is closed, and the dataset's last bar IS
+    // the last confirmed one. `is_last` says so on its own.
+    if (ctx.realtimeBars === 0) return ctx.is_last;
+
+    // With a realtime tail the answer is due one bar BEFORE `is_last` is ever
+    // true, so it cannot come from that flag; it comes from the declared
+    // extent. A host that runs a realtime bar without declaring how far the
+    // dataset goes has not said enough to answer, and gets `false` rather than
+    // a guess — the same stance `last_bar_index` takes.
+    //
+    // This is what was wrong: the old reading was `is_realtime ? false :
+    // is_last`, and under the convention every harness here uses — the final
+    // bar run as realtime — no bar is both the last one and historical. The
+    // guard fired on NOTHING, and the twenty-nine documentation examples that
+    // draw their labels and tables under it drew nothing at all.
+    return ctx.datasetSize != null
+        && ctx.currentBarIndex === ctx.lastConfirmedHistoryIndex;
 }

@@ -34,6 +34,9 @@ function run(src: string, n = 30) {
   const exec = compile(js.replace(/\blet\b/g, "var "), ctx, Object.create(null));
   const last = (n - 1) * 86400000;
   ctx.provideDatasetExtent(n, last);
+  // The loop runs the final bar as realtime, so the last settled bar is the one
+  // before it.
+  ctx.realtimeBars = 1;
   for (let i = 0; i < n; i++) {
     ctx.is_new = true;
     ctx.is_last = i === n - 1;
