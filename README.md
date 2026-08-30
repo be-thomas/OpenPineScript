@@ -132,8 +132,8 @@ logs.
 | `//@version=2` | 26 | 26 (100%) |
 | `//@version=3` | 18 | 17 (94%) |
 | `//@version=4` | 148 | 146 (99%) |
-| `//@version=5` | 571 | 553 (97%) |
-| **Total** | **763** | **742 (97%)** |
+| `//@version=5` | 571 | 552 (97%) |
+| **Total** | **763** | **741 (97%)** |
 
 Byte-identity is checked rather than promised —
 [`scripts/common/fetch-doc-examples.mjs`](scripts/common/fetch-doc-examples.mjs) re-downloads
@@ -144,40 +144,50 @@ every page and compares SHA-256 digests against
 node scripts/common/fetch-doc-examples.mjs verify
 ```
 
-Every one of the 742 also emits VALID JavaScript, and running all of them over
+Every one of the 741 also emits VALID JavaScript, and running all of them over
 506 bars produces no `ReferenceError` — an unknown name is reported at COMPILE
 time, the way TradingView reports it, rather than crashing on the first bar or,
 worse, reading as `undefined` and taking a branch nobody meant.
 
-| Running all 742 over the sample dataset | |
+| Running all 741 over the sample dataset | |
 |---|---|
-| produces output — plots, drawings, trades or logs | 644 |
-| plots only `na`, and draws nothing | 38 |
-| produces nothing at all | 22 |
-| raises a runtime error | 38 |
+| produces output — plots, drawings, trades or logs | 658 |
+| plots only `na`, and draws nothing | 36 |
+| produces nothing at all | 8 |
+| raises a runtime error | 39 |
 
-201 of the 644 have no `plot()` call at all: they draw lines, labels and boxes,
-or open positions, or log. `na` and no-output are usually correct too — a script
-asking for a symbol this dataset is not, an intraday session it does not cover,
-or a date outside its range has nothing to draw.
+215 of the 658 have no `plot()` call at all: they draw lines, labels and boxes,
+or open positions, or log.
 
-Every one of the 38 runtime errors is pinned by CAUSE in
+The other two columns are accounted for one file at a time rather than assumed.
+All 8 that produce nothing are correct: two are libraries, one declares three
+empty collections, two guard on `bar_index > 4000` where the dataset has 506
+bars, and two on `year > 2020` where it ends in 2017. Of the 36 that plot only
+`na`, all but a handful ask for a symbol this dataset is not or an intraday
+session it does not cover; the rest hide their plot with `offset = -99999`, plot
+`na` outright, or want a date outside 2015–2017. Two are gaps of a different
+kind, and named as such: `v5-language-type-system-47` and
+`v5-writing-limitations-05` are errors TradingView raises and this engine does
+not, one for a `series string` where a `simple string` is required and one for
+the 40-call `request.*()` limit.
+
+Every one of the 39 runtime errors is pinned by CAUSE in
 [`conformance/common/docs_corpus_execution.test.ts`](conformance/common/docs_corpus_execution.test.ts),
 so a new one cannot arrive quietly. Seventeen are the script's own error — a
 `runtime.error()` call, or an index the page is written to show failing; eleven
 need host data this engine cannot fetch (`request.financial`, `request.economic`
-and the rest); ten are deliberate refusals (`renko`, `linebreak`, `kagi`,
+and the rest); eleven are deliberate refusals (`renko`, `linebreak`, `kagi`,
 `pointfigure` cannot be rebuilt from OHLCV bars, and `accdist`'s published
 definitions disagree on a seed).
 
 The same suite asserts that **no keyword argument is silently dropped** across
-all 742. `Context.call` binds a keyword by looking its name up in the callee's
+all 741. `Context.call` binds a keyword by looking its name up in the callee's
 signature and discards one it does not find, which is how
 `strategy.entry(when = …)` came to fire unconditionally and `input.int(minval =
 1)` to clamp nothing. Forty distinct (function, argument) pairs were being
 discarded; the set is now empty and pinned that way.
 
-The 21 that do not compile contain no known engine gap. Eleven are not runnable
+The 22 that do not compile contain no known engine gap. Twelve are not runnable
 Pine at all — documentation blocks rather than scripts, or scripts that exist to
 DEMONSTRATE a compilation error — and are pinned as such in
 [`conformance/common/docs_corpus_integrity.test.ts`](conformance/common/docs_corpus_integrity.test.ts)
@@ -259,7 +269,7 @@ Report written: ./results/comparison_report.json
 npm test
 ```
 
-2,049 tests pass across 79 files. None fail.
+2,148 tests pass across 82 files. None fail.
 
 Two patterns carry most of the weight:
 

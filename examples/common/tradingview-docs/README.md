@@ -9,8 +9,8 @@ this engine nor its author wrote.
 | `//@version=2` | 26 | 26 (100%) |
 | `//@version=3` | 18 | 17 (94%) |
 | `//@version=4` | 148 | 146 (99%) |
-| `//@version=5` | 571 | 553 (97%) |
-| **Total** | **763** | **742 (97%)** |
+| `//@version=5` | 571 | 552 (97%) |
+| **Total** | **763** | **741 (97%)** |
 
 ## These files are not edited. Ever.
 
@@ -73,16 +73,16 @@ came from.
   an error looks exactly like a script with an error, so nothing structural
   separates them.
 
-## What the 21 remaining failures are
+## What the 22 remaining failures are
 
-**None of them is a known engine gap.** Eleven are PINNED in
+**None of them is a known engine gap.** Twelve are PINNED in
 [`conformance/common/docs_corpus_integrity.test.ts`](../../../conformance/common/docs_corpus_integrity.test.ts)
 so the denominator stays honest — adding one requires saying why.
 
 | Count | Cause |
 |---|---|
 | 10 | an `import`, which needs the library's source. The docs publish the library beside the script for three of them, and the integrity suite proves both halves compile together |
-| 4 | published to DEMONSTRATE a compilation error — three scope demos, and a script that plots a name it never declares |
+| 5 | published to DEMONSTRATE a compilation error — three scope demos, a script that plots a name it never declares, and one that passes a member of one enum where another's type is declared |
 | 5 | the block is DOCUMENTATION, not a script: a reStructuredText directive, an elided body, prose left in the same code block |
 | 2 | an indent that dedents to a level it never opened. One is deliberate — the page is about that message — and one is not |
 
@@ -151,6 +151,12 @@ with a dedicated test file, after the corpus made the absence visible:
 | `timestamp()`'s date-string and time-zone forms | v1 | 3 |
 | forty keyword arguments that were silently dropped | v1 | 40 pairs |
 | pending orders were matched by one test harness and by nothing else | v1 | every strategy with a bracket |
+| `year`, `month`, `hour` and their five siblings are series VARIABLES, and were emitting the function object | v1 | 53 |
+| a bare `tickerid` is the chart's id, not the constructor that shares its name | v1 | 71 |
+| `line.new`, `box.new` and `label.new` take `chart.point` objects | v5 | 18 |
+| a `switch` label that is a VARIABLE compares by value, not by reference | v5 | 1 |
+| `ta.accdist` reaches the unimplemented register, as `accdist` already did | v5 | 1 |
+| a member of one enum where another's type is declared is REFUSED | v5 | 1 |
 
 **And 34 missing built-ins**, found all at once. `checkUndeclaredRead` rejected a
 bare name nothing declares; its mirror — an unknown MEMBER of a real namespace —
@@ -217,17 +223,31 @@ Three changed no count and mattered more than any row above:
 
 ## Compiling is not the same as running
 
-Of the 742 that compile, running each one over the 506-bar
+Of the 741 that compile, running each one over the 506-bar
 `mock_data/common/AAPL_mock.csv`:
 
 | Result | Count | Meaning |
 |---|---|---|
-| produced output | 644 | plots, drawings, trades or logs came out. 201 of them have no `plot()` call at all — they draw lines, labels and boxes, or open positions |
-| all-`na` plots, nothing drawn | 38 | mostly expected: the script asks for a symbol this dataset is not, an intraday session it does not cover, or a date outside its range |
-| nothing at all | 22 | library sources, and strategies gated on conditions this run does not meet (`n > 4000` over 506 bars) |
-| runtime error | 38 | every one is a NAMED diagnostic, and pinned by cause — see below |
+| produced output | 658 | plots, drawings, trades or logs came out. 215 of them have no `plot()` call at all — they draw lines, labels and boxes, or open positions |
+| all-`na` plots, nothing drawn | 36 | the script asks for a symbol this dataset is not, an intraday session it does not cover, or a date outside its range — plus a few that hide their plot with `offset = -99999` or plot `na` outright |
+| nothing at all | 8 | two library sources, one that declares three empty collections, and strategies gated on conditions this run does not meet (`n > 4000` over 506 bars, `year > 2020` on a dataset ending in 2017) |
+| runtime error | 39 | every one is a NAMED diagnostic, and pinned by cause — see below |
 
-**No script in this corpus raises a `ReferenceError`, and every one of the 742
+The last two columns are accounted for FILE BY FILE rather than assumed, which
+is the only way they say anything. Doing that is what turned up nine defects in
+one pass: `year`, `month`, `hour` and the rest read as function objects, so
+`year > 2014` was false on every bar and fourteen of TradingView's own strategy
+examples never entered; a bare `tickerid` was the CONSTRUCTOR rather than the
+chart's id; `line.new(firstPoint, secondPoint)` had no `chart.point` overload
+and drew at `na`; `ta.accdist` read `undefined` where its v4 spelling correctly
+refused; and a `switch` label that was a variable never matched.
+
+Two remain, and are named rather than absorbed: `v5-language-type-system-47`
+and `v5-writing-limitations-05` are errors TradingView RAISES and this engine
+does not — a `series string` where a `simple string` is required, and the
+40-call `request.*()` limit.
+
+**No script in this corpus raises a `ReferenceError`, and every one of the 741
 emits JavaScript that parses.** Both used to be false. `ReferenceError` was once
 the largest failure class — 45 files dying with a bare `opsv2_<name> is not
 defined` on the first bar — and three scripts compiled to JavaScript that
@@ -237,7 +257,7 @@ were implemented, the emitter no longer emits a name that nothing binds, a name
 bound in a block it is not read from is now `Undeclared identifier` at compile
 time, and an unknown member of a known namespace is too.
 
-The 38 that remain are pinned by CAUSE in
+The 39 that remain are pinned by CAUSE in
 [`docs_corpus_execution.test.ts`](../../../conformance/common/docs_corpus_execution.test.ts) —
 a regular expression per file, so one that starts failing for a DIFFERENT reason
 fails that suite too. They fall into three kinds:
@@ -246,7 +266,7 @@ fails that suite too. They fall into three kinds:
 |---|---|
 | 17 | the script's own error — a `runtime.error()` call, or an index or shape the page exists to show failing. TradingView's matrices and arrays pages have a section of these, each annotated "Raises an error" in its own source |
 | 11 | host data this engine cannot fetch — `request.financial`, `request.economic`, `request.quandl`, `request.seed`, `request.dividends`, `request.earnings`, `request.currency_rate` |
-| 10 | a deliberate refusal — `renko`, `linebreak`, `kagi` and `pointfigure` cannot be rebuilt from OHLCV bars, and `accdist`'s published definitions disagree on a seed |
+| 11 | a deliberate refusal — `renko`, `linebreak`, `kagi` and `pointfigure` cannot be rebuilt from OHLCV bars, and `accdist`'s published definitions disagree on a seed, in both of its spellings |
 
 They were 124 before the missing built-ins were written, and 66 before the round
 of engine fixes below.
