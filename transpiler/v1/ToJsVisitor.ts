@@ -152,6 +152,54 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    */
   protected fnDepth = 0;
 
+  /**
+   * The user function whose body is being emitted, if any.
+   *
+   * ── The bug this exists for ─────────────────────────────────────────────────
+   *
+   * A local's SERIES is registered on the Context under its emitted JavaScript
+   * name, and that name is `opsv2_<pine name>` wherever the local is written.
+   * The JavaScript `let` is per-call and correctly scoped; the SERIES KEY was
+   * global. So two functions that both use the name `result`
+   *
+   *     hex(int value) =>
+   *         string result = ""
+   *         …
+   *     hexMap(array<int> numbers) =>
+   *         result = map.new<int, string>()
+   *         result.put(number, hex(number))
+   *
+   * shared ONE series. `hex()` set it to a string, `hexMap()` read a map back
+   * out of it, and the script died with "'str' has no method 'put'" — a
+   * diagnostic about a name the script never wrote. TradingView's own
+   * `v5-language-maps-09` and `v5-language-maps-18` are both this.
+   *
+   * The same collision applies between a function local and a script-scope
+   * variable of the same name, which is ordinary shadowing and must not alias.
+   *
+   * ── What this does NOT fix ──────────────────────────────────────────────────
+   *
+   * Pine gives every CALL SITE its own instance of a function's locals; this
+   * engine still shares one per function. That is the wider defect recorded on
+   * `Context.var_def`, and scoping by function is a strict step toward it rather
+   * than a substitute for it: it separates names that are genuinely different
+   * variables, and leaves the per-site question alone.
+   */
+  protected fnScope: string[] = [];
+
+  /**
+   * The key a variable's Series is registered under.
+   *
+   * The emitted JavaScript identifier at script scope, and that identifier
+   * qualified by the enclosing function's emitted name inside a function body.
+   * Every site that writes a series key goes through here so that a declaration,
+   * a `:=`, and a history read can never disagree about which series they mean.
+   */
+  protected seriesKey(jsName: string): string {
+    const fn = this.fnScope[this.fnScope.length - 1];
+    return fn ? `${fn}$${jsName}` : jsName;
+  }
+
   /** Depth of for-loop bodies currently being emitted. */
   protected loopDepth = 0;
 
@@ -572,9 +620,10 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     }
 
     this.fnDepth++;
+    this.fnScope.push(name);
     let body: string;
     try { body = this.singleLineBody(ctx.fun_body_singleline().local_stmt_singleline()); }
-    finally { this.fnDepth--; }   // a guard deeper in the body throws
+    finally { this.fnDepth--; this.fnScope.pop(); }   // a guard deeper in the body throws
     return `function ${name}${params} {\n  ${body};\n}`;
   }
 
@@ -591,9 +640,10 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     }
 
     this.fnDepth++;
+    this.fnScope.push(name);
     let body: string;
     try { body = this.visit(ctx.fun_body_multiline()); }
-    finally { this.fnDepth--; }   // a guard deeper in the body throws
+    finally { this.fnDepth--; this.fnScope.pop(); }   // a guard deeper in the body throws
     return `function ${name}${params} ${body}`;
   }
 
@@ -766,16 +816,18 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // for every caller that did not happen to rewrite `let` to `var` first.
     // Already declared by the hoisted prologue — a second `let` would be a
     // redeclaration error.
+    const key = this.seriesKey(name);
+
     if (this.hoisted.has(pineName)) {
-      return `${name} = ctx.new_var("${name}", ${value})`;
+      return `${name} = ctx.new_var("${key}", ${value})`;
     }
 
     if (this.referencesIdentifier(ctx.arith_expr(), pineName)) {
-      return `let ${name};\n${name} = ctx.new_var("${name}", ${value})`;
+      return `let ${name};\n${name} = ctx.new_var("${key}", ${value})`;
     }
 
     // Use 'let' to create a new variable in the current scope (Shadowing allowed)
-    return `let ${name} = ctx.new_var("${name}", ${value})`;
+    return `let ${name} = ctx.new_var("${key}", ${value})`;
   }
 
   // Handle: [a, b] = myFunc()
@@ -897,7 +949,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     }
 
     const idsArrayJs = `[${ids.join(", ")}]`; 
-    const idsStringsJs = `[${ids.map(id => `"${id}"`).join(", ")}]`;
+    const idsStringsJs = `[${ids.map(id => `"${this.seriesKey(id)}"`).join(", ")}]`;
     const value = this.visit(ctx.arith_expr());
 
     return `let ${idsArrayJs} = ctx.new_vars(${idsStringsJs}, ${value})`;
@@ -1331,7 +1383,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
         // Standard variable history lookup: close[1]
         // We pass the base string as the exact key (e.g., "opsv2_close") 
         // because Context.vars registers them under this exact name.
-        return `ctx.get(${base}, ${index}, "${base}")`;
+        return `ctx.get(${base}, ${index}, "${this.seriesKey(base)}")`;
       } else {
         // Complex expression history lookup: (close > open)[1] or sma(close, 14)[1]
         // We use the Inline Hook strategy to evaluate, store, and fetch in one line!

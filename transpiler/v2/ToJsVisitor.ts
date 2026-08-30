@@ -113,7 +113,7 @@ export class V2ToJsVisitor extends V1ToJsVisitor {
     // No 'let' — this updates the existing binding in the enclosing scope.
     // ctx.new_var() overwrites the current bar's slot and returns the Series, so
     // repeated assignment within one bar still yields exactly one history entry.
-    return `${name} = ctx.new_var("${name}", ${value})`;
+    return `${name} = ctx.new_var("${this.seriesKey(name)}", ${value})`;
   }
 
   /**

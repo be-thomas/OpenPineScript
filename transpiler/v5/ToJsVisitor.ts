@@ -1082,33 +1082,61 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * value knows which it is.
    */
   protected emitMethodCall(receiver: string, method: string, ctx: Fun_callContext): string {
-    const target = this.localName(receiver);
+    // `id` is greedy, so `wrapper.data.size()` reaches here as the receiver
+    // `wrapper` and the "method" `data.size`. Everything before the LAST dot is
+    // a chain of field reads on the receiver; only the last part is the call.
+    //
+    // Without the split, the whole dotted string was handed to
+    // `Context.builtinMethod` as a method name, and no value has a method
+    // called `data.size` — so a perfectly ordinary
+    //
+    //     type Wrapper
+    //         map<string, float> data
+    //     …
+    //     wrapper.data.size()
+    //
+    // died with "'.data.size()' cannot be called on this value: it is object".
+    // The same shape appears as `obj.lbl.set_x()`, `obj.level.get_x1()` and
+    // `obj.prices.get()` across five of TradingView's own examples.
+    const cut = method.lastIndexOf(".");
+    const fields = cut > 0 ? method.slice(0, cut).split(".") : [];
+    const name = cut > 0 ? method.slice(cut + 1) : method;
+
+    const target = fields.reduce(
+      (js, field) => `ctx.field(${js}, ${JSON.stringify(field)})`,
+      this.localName(receiver),
+    );
     const args = this.withCallee(
-      method,
+      name,
       () => (ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : ""),
     );
     const tail = args ? `, ${args}` : "";
 
     const callId = `"${receiver}.${method}${this.getLocId(ctx as SourceLocated)}"`;
 
-    if (this.userMethods.has(method)) {
+    if (this.userMethods.has(name)) {
       // An overload set resolves on the receiver's declared type; a name with a
-      // single declaration takes the ordinary path unchanged.
-      const overload = this.resolveOverload(method, receiver, ctx as SourceLocated);
-      return `ctx.call(${callId}, ${overload ?? this.funcName(method)}, ${target}${tail})`;
+      // single declaration takes the ordinary path unchanged. A FIELD path
+      // carries no declared type of its own, so it is resolved as an unnamed
+      // receiver — which reports honestly rather than dispatching on the type
+      // of the object the field hangs off.
+      const overload = this.resolveOverload(
+        name, fields.length ? null : receiver, ctx as SourceLocated,
+      );
+      return `ctx.call(${callId}, ${overload ?? this.funcName(name)}, ${target}${tail})`;
     }
 
     // A method this script imported rather than declared. Checked after the
     // local one so a script can shadow a library's method, which is the same
     // precedence every other name follows.
-    const owner = this.libraryMethods.get(method);
+    const owner = this.libraryMethods.get(name);
     if (owner !== undefined) {
-      const fn = `${this.libraryNamespace(owner)}[${JSON.stringify(method)}]`;
+      const fn = `${this.libraryNamespace(owner)}[${JSON.stringify(name)}]`;
       return `ctx.call(${callId}, ${fn}, ${target}${tail})`;
     }
 
     return `ctx.builtinMethod("${this.getLocId(ctx as SourceLocated)}", ${target}, ` +
-      `${JSON.stringify(method)}${tail})`;
+      `${JSON.stringify(name)}${tail})`;
   }
 
   /** Runs `emit` with `name` on the callee stack, so visitKw_arg can see it. */

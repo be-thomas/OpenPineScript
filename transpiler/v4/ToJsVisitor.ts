@@ -208,7 +208,7 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
     const key = this.getLocId(ctx as SourceLocated);
     const ip = persistence === "varip" ? ", true" : "";
 
-    return `let ${name} = ctx.var_def("${name}", "${key}", () => (${value})${ip})`;
+    return `let ${name} = ctx.var_def("${this.seriesKey(name)}", "${key}", () => (${value})${ip})`;
   }
 
   /**
@@ -276,7 +276,7 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
     this.enforceDeclaredBeforeReassignment(ctx as any);
     const name = this.visit(ctx.id());
     const value = this.visit(ctx.arith_expr());
-    return `${name} = ctx.new_var("${name}", ${this.compoundValue(op, name, value)})`;
+    return `${name} = ctx.new_var("${this.seriesKey(name)}", ${this.compoundValue(op, name, value)})`;
   }
 
   // ── `else if` ─────────────────────────────────────────────────────────────
