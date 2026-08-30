@@ -1883,6 +1883,28 @@ export class Context {
         return candles;
     }
 
+    /**
+     * Is this request just the chart's own series, under another name?
+     *
+     * True only for a DERIVED series at the chart's own timeframe — the same
+     * symbol, no host data, and a resolution that folds one chart bar into one
+     * requested bar. Then the requested bar and the chart bar ARE the same bar,
+     * and there is no closed-bar rule to apply: `request.security(
+     * syminfo.tickerid, timeframe.period, close)` is the current close.
+     *
+     * Host-supplied data is never this, even at a matching label. A host may
+     * hand over any series it likes under the name "D", and the conservative
+     * closed-bar rule is the right default for something this engine cannot see
+     * inside.
+     */
+    public isOwnChartSeries(symbol: string, resolution: string): boolean {
+        if (this.securityData.has(this.secKey(symbol, resolution))) return false;
+        if (!this.isChartSymbol(symbol)) return false;
+        const want = specSeconds(resolution);
+        const have = specSeconds(String(this.resolution));
+        return Number.isFinite(want) && Number.isFinite(have) && want === have;
+    }
+
     public getSecurityData(symbol: string, resolution: string): SecurityCandle[] | undefined {
         // Host-supplied data always wins: it is real data for the context the
         // script asked for, and a derivation is only ever a fallback.

@@ -94,9 +94,18 @@ export function security(
     //   on  — also the HTF bar the chart bar is INSIDE (data[j].time <= t),
     //         i.e. its close is visible before it happens. This is the
     //         repainting behaviour that was the default before v3.
+    // A request for the chart's OWN series is not deferred. There is no higher
+    // timeframe bar to wait for: the requested bar and the chart bar are the
+    // same bar, and it closes when the chart bar does. Treating it as "still
+    // forming" made `request.security(syminfo.tickerid, timeframe.period,
+    // close)` return the PREVIOUS bar's close — a one-bar lag in the most basic
+    // call there is. Host-supplied data keeps the closed-bar rule; see
+    // `Context.isOwnChartSeries`.
+    const sameContext = ctx.isOwnChartSeries(symbolName, resolutionName);
+
     while (st.done + 1 < data.length) {
         const j = st.done + 1;
-        const visible = mode === "on"
+        const visible = mode === "on" || sameContext
             ? data[j].time <= t
             : j + 1 < data.length && data[j + 1].time <= t;
         if (!visible) break;
