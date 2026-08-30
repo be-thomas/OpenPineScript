@@ -1780,6 +1780,18 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     throw this.err(ctx, `'${root}' has no member '${text.slice(root.length + 1)}'.`);
   }
 
+  /**
+   * The registry key of the VARIABLE, for a name this version also gives to a
+   * function. `undefined` when the name means only one thing.
+   *
+   * A read resolves to the variable and a call to the function, which is what
+   * Pine's separate namespaces do. Only `tickerid` needs it, and only at v1-v3
+   * — see the comment at the use site.
+   */
+  protected variableSpelling(name: string): string | undefined {
+    return name === "tickerid" ? "syminfo.tickerid" : undefined;
+  }
+
   visitId(ctx: IdContext): string {
     const text = ctx.getText();
 
@@ -1857,6 +1869,32 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // 2. THE GETTER CHECK
     // If the standard library registry marks this identifier as a getter,
     // we must transpile it into an execution call instead of a static reference!
+    // A name Pine spells as BOTH a variable and a function.
+    //
+    // "Pine keeps functions and variables in separate namespaces", which is why
+    // `sma = sma(close, 10)` is legal, and v1-v3 spell two different things
+    // `tickerid`: the chart's own ticker id (a VARIABLE) and
+    // `tickerid(prefix, ticker, session)`, which builds one (a FUNCTION). v4
+    // renames only the variable — "The `ticker` and `tickerid` variables are
+    // renamed to `syminfo.ticker` and `syminfo.tickerid` respectively" — so
+    // this collision exists at v1-v3 and nowhere else; v4 and v5 report the
+    // rename before reaching here.
+    //
+    // The registry has one key per name, and the function held it. A bare read
+    // therefore emitted the FUNCTION OBJECT, so TradingView's own
+    //
+    //     l = security(tickerid, r, low)
+    //
+    // requested a symbol named "function tickerid() { … }", got `na` for every
+    // bar, and the strategy gated on `low == l` never entered. `ticker` has the
+    // same shape and is not affected: nothing else claims that key.
+    const asVariable = this.variableSpelling(text);
+    if (asVariable && !this.isKeywordArgumentName(ctx)
+        && !this.scopes.declared.has(text) && !this.scopes.bound.has(text)) {
+        return `ctx.call("${asVariable}${this.getLocId(ctx)}", ` +
+               `ctx.builtin(${JSON.stringify(asVariable)}))`;
+    }
+
     //
     // ...unless the SCRIPT binds that name. A getter reads through
     // `ctx.call(id, opsv2_hour)`, and if `opsv2_hour` is the script's own
