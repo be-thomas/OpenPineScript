@@ -269,9 +269,9 @@ Report written: ./results/comparison_report.json
 npm test
 ```
 
-2,148 tests pass across 82 files. None fail.
+2,191 tests pass across 83 files. None fail.
 
-Two patterns carry most of the weight:
+Three patterns carry most of the weight:
 
 - **Differential testing.** [`tests/v1/ta/naive_ta.ts`](tests/v1/ta/naive_ta.ts)
   is an independent naive reimplementation of the technical-analysis library.
@@ -280,6 +280,49 @@ Two patterns carry most of the weight:
 - **The version matrix.** [`conformance/`](conformance/) asserts every language
   rule at every version, *including the versions where it is illegal* — so
   adding a version cannot silently relax an older one.
+- **Parity against TradingView itself.** The two suites above check the engine
+  against a spec or against another version of itself, and neither can catch an
+  indicator that is subtly, consistently wrong — an `rma` seeded one bar early,
+  an `atr` smoothed with the wrong average. Only TradingView's own numbers can.
+
+### Parity against TradingView
+
+[`conformance/common/scanner_anchors.test.ts`](conformance/common/scanner_anchors.test.ts)
+compares 38 indicators against the values **TradingView computed**, on the bar
+TradingView computed them for:
+
+| | |
+|---|---|
+| moving averages | `SMA`/`EMA` at 5, 10, 20, 30, 50, 100, 200 |
+| oscillators | `RSI` 14 and 7, `MACD` line and signal, `CCI`, `Stoch.RSI` %K/%D, `W%R`, `ROC`, `Mom`, `AO`, `BBPower` |
+| volatility & bands | `ATR`, Bollinger upper/lower, Donchian, Ichimoku base/conversion |
+| trend | `ADX` with +DI and −DI, Parabolic SAR, Hull MA, VWMA |
+
+All 38 agree, 36 of them to 1e-14. The two that do not are understood: `VWMA`
+differs at 5.2e-9 whatever the window length, which is the volume the two sides
+divide by rather than the arithmetic, and `EMA200` carries a seed this fixture's
+window cannot see — 7.6e-6 over 999 bars, 4.3e-15 over the full history.
+
+The comparison is only meaningful if both sides computed from the same bars, and
+TradingView does not publish its history. The fixture sidesteps that by choosing
+a symbol where it does not have to: TradingView's `BINANCE:BTCUSDT` feed is
+Binance's, Binance serves its klines publicly, and
+[the collector](scripts/common/fetch-scanner-anchors.mjs) refuses to write a
+fixture unless the bar TradingView reported matches the bar Binance served to
+the last decimal — so a disagreement is always attributable to the engine.
+
+```bash
+node scripts/common/fetch-scanner-anchors.mjs   # refresh the frozen fixture
+```
+
+It is narrow, and worth saying so: ONE bar rather than a series, over a fixed
+list of indicators chosen by TradingView's screener rather than by this repo. A
+function can agree on the captured bar and be wrong on the one before it. The
+fuller evidence is a chart export, in
+[`tradingview_golden.test.ts`](conformance/common/tradingview_golden.test.ts),
+which carries whole series but needs a human with a TradingView session — six of
+its seven harnesses have not been collected. This suite anchors 38 values that
+were anchored to nothing, and unlike the exports it runs on every commit.
 
 ## Repository layout
 
