@@ -237,20 +237,18 @@ function loadGolden(file: string): Golden {
   }
 
   // The harness is the sibling .pine named by everything before the first dot,
-  // so "v3/golden/harness_core.BTCUSD.1D.csv" runs "v3/golden/harness_core.pine".
+  // and it is compiled as the version of the directory they share — see
+  // `versionOf`. So "v5/golden/harness_core.BTCUSDT.1D.log" runs
+  // "v5/golden/harness_core.pine" AS v5.
+  //
+  // Nothing crosses versions. An earlier draft redirected a v5 export to the v3
+  // file it was generated from, on the reasoning that the v5 harness was only a
+  // collection tool. That made the directory a lie: data sitting in `v5/`
+  // tested the v3 emitter, and v5 — the version most scripts are written in —
+  // had no parity coverage at all. A folder now contains one version's
+  // harnesses and one version's results, and checks that version.
   const dir = path.dirname(file);
-  let harness = path.join(dir, path.basename(file).split(".")[0]);
-
-  // A v5 harness is GENERATED for log collection and cannot be run here — it is
-  // v5, and this engine implements v1-v3. Its banner records the v3 (or v4)
-  // file it was derived from, so an export dropped next to the harness that
-  // produced it still resolves to something runnable.
-  const generated = path.join(GOLDEN_DIR, `${harness}.pine`);
-  if (fs.existsSync(generated)) {
-    const banner = fs.readFileSync(generated, "utf8").slice(0, 2000);
-    const src = /Source:\s*conformance\/(v\d+\/golden\/\S+)\.pine/.exec(banner);
-    if (src) harness = src[1];
-  }
+  const harness = path.join(dir, path.basename(file).split(".")[0]);
 
   return { file, harness, bars, columns };
 }
@@ -307,6 +305,51 @@ function runHarness(harnessSource: string, bars: Bar[], version: PineVersion): M
     const title = sample?.title;
     if (!title) continue;
     out.set(title, series.map(p => (p == null ? NaN : Number((p as any).value))));
+  }
+  return out;
+}
+
+/**
+ * Runs a GENERATED v5 harness and reads its columns back out of its LOGS.
+ *
+ * The v5 harnesses do not plot. They exist so that golden data can be collected
+ * on a free TradingView plan — `log.info()` arrived with v5 and runs on
+ * historical bars, where `alert()` never does — so each one emits the row that
+ * `readExportLines` parses out of the Pine Logs pane.
+ *
+ * This engine implements v5, so the same file runs here, and the SAME tagged
+ * rows come back. That is what makes the second comparison free: one export
+ * checks the v3 emitter through the source harness and the v5 emitter through
+ * the generated one, against identical numbers from TradingView.
+ */
+function runLogHarness(source: string, bars: Bar[], version: PineVersion): Map<string, number[]> {
+  const compiled = compileScript(source, { version });
+  const ctx = new Context(compiled.profile);
+  const exec = compile(compiled.js, ctx, { ctx } as any);
+
+  ctx.realtimeBars = 1;
+  bars.forEach((bar, i) => {
+    ctx.currentBarIndex = i;
+    ctx.is_new = true;
+    ctx.is_last = i === bars.length - 1;
+    ctx.is_history = !ctx.is_last;
+    ctx.is_realtime = ctx.is_last;
+    ctx.setBar(bar.time, bar.open, bar.high, bar.low, bar.close, bar.volume);
+    exec();
+    ctx.finalizeBar();
+  });
+
+  const header = ctx.logs.find(l => l.message.startsWith("OPSHEAD|"));
+  if (!header) throw new Error("the generated harness logged no OPSHEAD| row");
+  const names = header.message.slice("OPSHEAD|".length).split(",").map(n => n.trim());
+
+  const out = new Map<string, number[]>();
+  for (const name of names) if (!OHLCV.has(name.toLowerCase()) && name !== "time") out.set(name, []);
+
+  for (const entry of ctx.logs) {
+    if (!entry.message.startsWith("OPS|")) continue;
+    const cells = entry.message.slice("OPS|".length).split(",");
+    names.forEach((name, i) => out.get(name)?.push(parseCell(cells[i] ?? "")));
   }
   return out;
 }
@@ -372,28 +415,25 @@ describe("TradingView golden data", () => {
   });
 });
 
-for (const file of CSVS) {
-  describe(`${file} matches TradingView`, () => {
-    const golden = loadGolden(file);
-    const harnessPath = path.join(GOLDEN_DIR, `${golden.harness}.pine`);
-    const warmup = WARMUP[path.basename(golden.harness)] ?? DEFAULT_WARMUP;
-
-    const ours = runHarness(
-      fs.readFileSync(harnessPath, "utf8"),
-      golden.bars,
-      versionOf(golden.harness),
-    );
+/**
+ * One emitter's run of one export, compared column by column.
+ *
+ * Extracted so that the v3 (or v4) source harness and the GENERATED v5 harness
+ * are held to exactly the same assertions, with the same messages and the same
+ * vacuity guards. Two copies would drift, and the weaker one would be the one
+ * nobody noticed.
+ */
+function describeComparison(
+  label: string, golden: Golden, ours: Map<string, number[]>, warmup: number,
+) {
+  describe(label, () => {
     const shared = [...golden.columns.keys()].filter(t => ours.has(t));
 
-    it("the export is long enough to be worth comparing", () => {
-      expect(golden.bars.length).toBeGreaterThan(warmup + MIN_POINTS);
-    });
-
-    it("the harness still produces the exported plots", () => {
+    it("the harness still produces the exported columns", () => {
       const missing = [...golden.columns.keys()].filter(t => !ours.has(t));
       expect(
         shared.length,
-        `only ${shared.length} of ${golden.columns.size} columns matched a plot. ` +
+        `only ${shared.length} of ${golden.columns.size} columns matched. ` +
         `Unmatched: ${missing.join(", ")}`,
       ).toBeGreaterThanOrEqual(MIN_COLUMNS);
     });
@@ -472,4 +512,29 @@ for (const file of CSVS) {
       expect(offenders, `first non-na bar differs:\n${offenders.join("\n")}`).toEqual([]);
     });
   });
+}
+
+for (const file of CSVS) {
+  const golden = loadGolden(file);
+  const harnessPath = path.join(GOLDEN_DIR, `${golden.harness}.pine`);
+  const warmup = WARMUP[path.basename(golden.harness)] ?? DEFAULT_WARMUP;
+  const version = versionOf(golden.harness);
+  const source = fs.readFileSync(harnessPath, "utf8");
+
+  // A harness reports either way, and which one it is is written in the file.
+  // The v1-v4 harnesses `plot()`, because "Export chart data…" is what collects
+  // them. The v5 ones `log.info()` a tagged row instead, because Pine Logs is
+  // what collects those and it needs no paid plan. Same program, same column
+  // names; only the transport differs.
+  const ours = source.includes("OPSHEAD|")
+    ? runLogHarness(source, golden.bars, version)
+    : runHarness(source, golden.bars, version);
+
+  describe(`${file}`, () => {
+    it("the export is long enough to be worth comparing", () => {
+      expect(golden.bars.length).toBeGreaterThan(warmup + MIN_POINTS);
+    });
+  });
+
+  describeComparison(`${file} matches TradingView at v${version}`, golden, ours, warmup);
 }

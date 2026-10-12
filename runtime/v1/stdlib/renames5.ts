@@ -21,13 +21,21 @@
  * The lists below are transcribed from dev-docs/01-version-delta-spec.md §4a,
  * which in turn is transcribed from TradingView's v4 → v5 migration guide.
  *
- * `fixnan` and `trix` are the exceptions: neither appears in the guide's
- * enumeration, and both are moved here anyway. The rule the guide states is
- * that the technical-analysis library moved to `ta.` — the enumeration is the
- * list of members, not a set of exceptions to it — and `ta.fixnan` is used by
- * conformance/v5/golden/harness_state.pine, which was generated from the v3
- * harness against that same rule. Leaving them flat would make v5 the only
- * version where part of the TA library has no namespace.
+ * `trix` is the exception: it does not appear in the guide's enumeration and is
+ * moved here anyway, because the rule the guide states is that the
+ * technical-analysis library moved to `ta.` — the enumeration is the list of
+ * members, not a set of exceptions to it.
+ *
+ * `fixnan` was treated the same way and that was WRONG. It is na HANDLING, like
+ * `na` and `nz`, and none of that family moved. The argument for moving it
+ * cited conformance/v5/golden/harness_state.pine calling `ta.fixnan` — which
+ * was circular: the generator produced that spelling from this very list.
+ * TradingView's own compiler settled it, rejecting the generated harness with
+ *
+ *     Could not find function or function reference 'ta.fixnan'
+ *
+ * so `ta.fixnan` does not resolve here either. The FLAT name is the v5
+ * spelling, and the next block keeps it.
  *
  * ── The bar counter is NOT here ─────────────────────────────────────────────
  *
@@ -58,7 +66,7 @@ const group = (namespace: string, names: readonly string[]): RenameSpec[] =>
 const TA = group("ta", [
     "alma", "atr", "barssince", "bb", "bbw", "cci", "change", "cmo", "cog",
     "correlation", "cross", "crossover", "crossunder", "cum", "dev", "dmi",
-    "ema", "falling", "fixnan", "highest", "highestbars", "hma", "kc", "kcw",
+    "ema", "falling", "highest", "highestbars", "hma", "kc", "kcw",
     "linreg", "lowest", "lowestbars", "macd", "median", "mfi", "mode", "mom",
     "percentile_linear_interpolation", "percentile_nearest_rank", "percentrank",
     "pivothigh", "pivotlow", "range", "rising", "rma", "roc", "rsi", "sar",
@@ -267,20 +275,25 @@ export const V5_REMOVED: readonly string[] = (() => {
     // the note on TICKER above for why one entry currently serves both.
     removed.delete("syminfo.tickerid");
 
-    // `fixnan` was never renamed. It is in the TA group above so that
-    // `ta.fixnan` resolves, but the FLAT name survives v5 — TradingView's own
-    // v5 plots page writes
+    // `fixnan` was never renamed, so it is no longer in the TA group above and
+    // nothing here has to put it back. TradingView's v5 plots page writes
     //
     //     pivotHigh = fixnan(ta.pivothigh(3,3))
     //
-    // with `ta.` on one call and not the other, and its prose links the word to
-    // the reference entry `#fun_fixnan` rather than `#fun_ta.fixnan`. The
-    // v4-to-v5 migration guide lists no rename for it either. Three of
-    // TradingView's published v5 examples were rejected by treating it as one.
+    // with `ta.` on one call and not the other, its prose links the word to the
+    // reference entry `#fun_fixnan` rather than `#fun_ta.fixnan`, and the
+    // v4-to-v5 migration guide lists no rename for it. Three of TradingView's
+    // published v5 examples were rejected by treating it as one, and
+    // TradingView's compiler rejects `ta.fixnan` outright.
     //
-    // Belongs with `na` and `nz` rather than with the technical-analysis
-    // library: it is na HANDLING, and none of that family moved.
-    removed.delete("fixnan");
+    // Kept as an assertion rather than deleted: if a future edit puts it back
+    // into a rename group, the flat spelling would silently stop resolving.
+    if (removed.has("fixnan")) {
+        throw new Error(
+            "`fixnan` was marked as renamed at v5. It was not — TradingView " +
+            "rejects `ta.fixnan`. See the note above the TA group.",
+        );
+    }
 
     return [...removed];
 })();

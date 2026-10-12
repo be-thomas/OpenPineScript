@@ -565,6 +565,38 @@ function updateMonotonicDeque(state: DequeState, sourceInput: any, lengthInput: 
     }
 }
 
+
+/**
+ * Has the rolling window seen `length` bars yet?
+ *
+ * SOURCING. TradingView's own output, collected with the golden harness on
+ * BINANCE:BTCUSDT 1D over full history: `ta.highest(high, 20)` is `na` for bars
+ * 0–18 and first carries a value on bar 19. The same holds for `lowest`,
+ * `highestbars`, `lowestbars`, and therefore for `ta.stoch`, which is built on
+ * two of them.
+ *
+ * ── The failure this closes ─────────────────────────────────────────────────
+ *
+ * The deque returned the running extreme from bar 0, so every one of these
+ * produced a number through the whole warm-up where TradingView produces
+ * nothing. The VALUES agreed — once both sides were warm, every bar matched —
+ * which is exactly why this survived: a comparison that skips the bars
+ * TradingView left blank can never see it. It took the golden suite's "agrees
+ * on WHERE the values start" assertion, against real TradingView data, to
+ * surface it.
+ *
+ * It is not cosmetic. `na` is false in a condition and poisons the arithmetic
+ * it reaches, so a script gated on `close > ta.highest(high, 20)[1]` takes a
+ * branch during warm-up here that it would not take on TradingView.
+ *
+ * `globalIdx` counts bars and is incremented by `updateMonotonicDeque`, so it
+ * equals the number seen once that has run. `buffer.length` would not do:
+ * it is trimmed once it passes MAX_BUFFER_SIZE.
+ */
+function windowIsWarm(state: DequeState, lengthInput: any): boolean {
+    return state.globalIdx >= Math.floor(val(lengthInput));
+}
+
 /**
  * Highest value in window.
  *
@@ -579,7 +611,7 @@ export function highest(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get("opsv2_high"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false); 
-    return state.dequeVals[0];
+    return windowIsWarm(state, length) ? state.dequeVals[0] : NaN;
 }
 
 /**
@@ -594,7 +626,7 @@ export function lowest(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get("opsv2_low"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true); 
-    return state.dequeVals[0];
+    return windowIsWarm(state, length) ? state.dequeVals[0] : NaN;
 }
 
 /**
@@ -606,7 +638,7 @@ export function highestbars(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get("opsv2_high"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false);
-    return state.dequeIdxs[0] - (state.globalIdx - 1);
+    return windowIsWarm(state, length) ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
 }
 
 /**
@@ -618,7 +650,7 @@ export function lowestbars(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get("opsv2_low"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true);
-    return state.dequeIdxs[0] - (state.globalIdx - 1);
+    return windowIsWarm(state, length) ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
 }
 
 /**

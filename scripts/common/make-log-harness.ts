@@ -45,7 +45,7 @@ const TA = [
   "highestbars", "lowestbars", "linreg", "correlation", "stoch", "cog", "alma",
   "percentrank", "macd", "tsi", "trix", "cum", "sar", "vwap", "barssince",
   "valuewhen", "rising", "falling", "cross", "crossover", "crossunder",
-  "fixnan", "pivothigh", "pivotlow", "bb", "bbw", "kc", "kcw", "dmi", "wpr",
+  "pivothigh", "pivotlow", "bb", "bbw", "kc", "kcw", "dmi", "wpr",
   "mfi", "hma", "supertrend", "cmo",
   "percentile_nearest_rank", "percentile_linear_interpolation",
 ];
@@ -53,8 +53,22 @@ const TA = [
 const MATH = ["max", "min", "sum", "abs", "round", "floor", "ceil", "pow",
               "sqrt", "log", "log10", "exp", "sign", "avg"];
 
-/** Global in v3 AND v5 — deliberately listed so an unknown name is an error. */
+/**
+ * Global in v3 AND v5 — deliberately listed so an unknown name is an error.
+ *
+ * `fixnan` is here rather than in TA because v5 did NOT move it. TradingView's
+ * own compiler is the evidence: a generated harness calling `ta.fixnan` is
+ * rejected with "Could not find function or function reference 'ta.fixnan'",
+ * which is what sent this list a line shorter. Its v5 plots page writes
+ *
+ *     pivotHigh = fixnan(ta.pivothigh(3, 3))
+ *
+ * with the prefix on one call and not the other, and the v4-to-v5 migration
+ * guide lists no rename for it. It is na HANDLING, like `na` and `nz`, and none
+ * of that family moved.
+ */
 const UNCHANGED = new Set([
+  "fixnan",
   "na", "nz", "time", "timestamp", "year", "month", "dayofmonth", "dayofweek",
   "hour", "minute", "second", "weekofyear", "plot", "strategy", "input",
   "str", "color", "label", "line", "log", "indicator", "alert", "int", "float",

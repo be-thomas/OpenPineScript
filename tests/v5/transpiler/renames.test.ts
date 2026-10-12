@@ -12,7 +12,7 @@
  * name produced, and the v4 name must be REFUSED at v5.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler/common";
+import { compileScript, transpile } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v5";
 import { V5_RENAMES, V5_REMOVED } from "../../../runtime/v1/stdlib/renames5";
 import { V4_VIEW, V5_VIEW } from "../../../runtime/v1/stdlib";
@@ -187,9 +187,23 @@ describe("the removal list is derived, not hand-maintained", () => {
     expect(V5_VIEW["ticker.new"]).toBeDefined();
   });
 
-  it("fixnan survives, and both spellings compute the same thing", () => {
+  it("fixnan survives v5 under its FLAT name", () => {
     const src = (fn: string) => `y = bar_index == 1 ? na : close\nx = ${fn}(y)`;
     expect(evaluate(5, src("fixnan"), "x")).toBe(11);
-    expect(evaluate(5, src("ta.fixnan"), "x")).toBe(11);
+  });
+
+  it("...and `ta.fixnan` is NOT a name, because TradingView says so", () => {
+    // This used to assert the opposite — that both spellings resolve — on the
+    // reasoning that the ta library moved wholesale and the migration guide's
+    // enumeration was a list rather than an exhaustive one. The evidence cited
+    // for it was conformance/v5/golden/harness_state.pine calling `ta.fixnan`,
+    // which was circular: the generator wrote that spelling from the same
+    // assumption. TradingView's compiler rejects the generated harness with
+    // "Could not find function or function reference 'ta.fixnan'", so accepting
+    // it here was drift in the permissive direction — this engine compiling a
+    // script TradingView will not.
+    expect(V5_VIEW["ta.fixnan"]).toBeUndefined();
+    expect(() => transpile('//@version=5\nindicator("t")\nx = ta.fixnan(close)\n'))
+      .toThrow(/'ta' has no member 'fixnan'/);
   });
 });

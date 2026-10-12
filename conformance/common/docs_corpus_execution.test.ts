@@ -105,6 +105,20 @@ const EXPECTED: Record<string, RegExp> = {
   // Out-of-bounds and shape demos. Each says so in its own source or title.
   "v4/v4-essential-arrays-21.pine": /array\.set: index 3 is out of bounds/,
   "v4/v4-essential-arrays-23.pine": /array\.push: expected an array, got na/,
+  // `lastHiBar = -highestbars(high, 100)` is `na` until 100 bars exist —
+  // TradingView's own output says so, which is what put the warm-up gate into
+  // `ta.highest`/`lowest`/`highestbars`/`lowestbars` — so `fillNo` is `na` and
+  // `array.get(c_fills, na)` has no element to return.
+  //
+  // ⚠ UNVERIFIED on TradingView. The page is about capping an index "to avoid a
+  // runtime error", so an error during the first 99 bars is plainly not what
+  // its author intended, and `array.get(id, na)` may well return `na` there
+  // rather than raise. Nothing in the manual states which, and no export covers
+  // it. Pinned with the cause named rather than quietly reverting a warm-up
+  // rule that TradingView's own numbers establish across two harnesses.
+  "v4/v4-essential-arrays-03.pine": /array\.get: index NaN is out of bounds/,
+  // The same page in its v5 spelling, failing for the same reason.
+  "v5/v5-language-arrays-06.pine": /array\.get: index NaN is out of bounds/,
   "v5/v5-language-arrays-29.pine":  /array\.set: index 3 is out of bounds/,
   "v5/v5-language-arrays-33.pine":  /array\.push: expected an array, got na/,
   // `input.int(0, "Array size")` defaults to an EMPTY array, and popping one is
