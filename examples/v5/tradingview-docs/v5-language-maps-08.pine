@@ -1,0 +1,38 @@
+//@version=5
+indicator("Removing key-value pairs demo")
+
+//@function Returns a label to display the keys and values from a map.
+method debugLabel(
+     map<string, int> this, int barIndex = bar_index,
+     color bgColor = color.blue, string note = ""
+ ) =>
+    //@variable A string representing the size, keys, and values in `this` map.
+    string repr = str.format(
+         "{0}\nSize: {1}\nKeys: {2}\nValues: {3}",
+         note, this.size(), str.tostring(this.keys()), str.tostring(this.values())
+     )
+    label.new(
+         barIndex, 0, repr, color = bgColor, style = label.style_label_center,
+         textcolor = color.white, size = size.huge
+     )
+
+if bar_index == last_bar_index - 1
+    //@variable A map containing `string` keys and `int` values.
+    m = map.new<string, int>()
+
+    // Put key-value pairs into `m`.
+    for [i, key] in array.from("A", "B", "C", "D", "E")
+        m.put(key, i)
+    m.debugLabel(bar_index, color.green, "Added pairs")
+
+    //@variable An array of keys to remove from `m`.
+    array<string> removeKeys = array.from("B", "B", "D", "F", "a")
+
+    // Remove each `key` in `removeKeys` from `m`.
+    for key in removeKeys
+        m.remove(key)
+    m.debugLabel(bar_index + 10, color.red, "Removed pairs")
+
+    // Remove all remaining keys from `m`.
+    m.clear()
+    m.debugLabel(bar_index + 20, color.purple, "Cleared the map")

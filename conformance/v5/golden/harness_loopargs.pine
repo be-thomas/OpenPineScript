@@ -1,0 +1,103 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// Hand-written, NOT generated. There is no v3 source: it exists to answer a
+// question the other harnesses raised.
+//
+//   1. Paste into the Pine editor and add to the chart.
+//   2. Open  More (⋮) → Pine Logs.
+//   3. Select all the log lines and copy them.
+//   4. Save as conformance/v5/golden/harness_loopargs.BTCUSDT.1D.log
+//
+// Convergent — every column is a short average — so the standard warm-up
+// allowance applies and this can be exported from anywhere in the chart.
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness — ONE CALL SITE, DIFFERENT ARGUMENTS.
+//
+// The loops harness settled what happens when a series function's call site is
+// reached several times on one bar with the SAME arguments: the state advances
+// once and every read returns the same value. `loopEma / 3` equals
+// `ta.ema(close, 10)` there on every bar, to the last decimal.
+//
+// This asks the question that one could not: what happens when the arguments
+// DIFFER between reaches.
+//
+// ── Why the argument that varies is the SOURCE and not the length ───────────
+//
+// The first draft of this file varied the length, following TradingView's own
+// published "RMA in for loop" example:
+//
+//     for i = 1 to 2
+//         sum := sum + ta.rma(close, i)
+//
+// TradingView refuses to compile that at v5:
+//
+//     Cannot call 'ta.rma' with argument 'length'='i'. An argument of
+//     'series int' type was used but a 'simple int' is expected.
+//
+// A loop induction variable is `series int`, and a length is `simple int`, so
+// the question cannot even be ASKED through a length. It can be asked through
+// the source, which is `series float` and takes `close[i]` quite happily — so
+// that is what varies below.
+//
+// (That refusal is itself a finding, recorded as R-16 in
+// dev-docs/04-skipped-restrictions.md: this engine has no simple/series
+// qualifier on parameters and accepts what TradingView rejects.)
+//
+// ── Reading the result ──────────────────────────────────────────────────────
+//
+// `_v0` reaches ONE call site three times with three different sources. `_v1`,
+// `_v2` and `_v3` are the three readings it could have, each computed at call
+// sites reached once so they are not themselves in question. Whichever `_v0`
+// matches is the rule:
+//
+//   _v1   the FIRST reach feeds the history, later reaches re-read it
+//   _v2   the LAST reach feeds it
+//   _v3   each reach keeps a history of its own
+//
+// ⚠ Until this is collected, OpenPineScript REFUSES the pattern rather than
+// pick one — see Context.requireSameArguments.
+// ─────────────────────────────────────────────────────────────────────────────
+indicator(title="OPS golden loop args", shorttitle="OPS loopargs", overlay=false)
+
+// One call site, three different sources.
+sum = 0.0
+for i = 0 to 2
+    sum := sum + ta.sma(close[i], 10)
+_v0 = sum
+
+// Reading 1: the first reach wins, all three reads return it.
+_v1 = ta.sma(close, 10) * 3
+
+// Reading 2: the last reach wins, all three reads return it.
+_v2 = ta.sma(close[2], 10) * 3
+
+// Reading 3: each reach keeps its own history.
+_v3 = ta.sma(close, 10) + ta.sma(close[1], 10) + ta.sma(close[2], 10)
+
+// The three averages on their own, so a disagreement can be attributed to one
+// of them rather than left ambiguous between them.
+_v4 = ta.sma(close, 10)
+_v5 = ta.sma(close[1], 10)
+_v6 = ta.sma(close[2], 10)
+
+// ── Pine Logs emission ──────────────────────────────────────────────────
+// One row per bar. The OPS| marker lets the loader find the row inside
+// whatever prefix the Pine Logs pane adds when you copy it out.
+if barstate.isfirst
+    log.info("OPSHEAD|time,open,high,low,close,volume,published_pattern,reading_first_wins,reading_last_wins,reading_each_advances,sma_0,sma_1,sma_2")
+
+_row = str.tostring(time, "#") + "," +
+      str.tostring(open, "#.##########") + "," +
+      str.tostring(high, "#.##########") + "," +
+      str.tostring(low, "#.##########") + "," +
+      str.tostring(close, "#.##########") + "," +
+      str.tostring(volume, "#.##########") + "," +
+      str.tostring(_v0, "#.##########") + "," +
+      str.tostring(_v1, "#.##########") + "," +
+      str.tostring(_v2, "#.##########") + "," +
+      str.tostring(_v3, "#.##########") + "," +
+      str.tostring(_v4, "#.##########") + "," +
+      str.tostring(_v5, "#.##########") + "," +
+      str.tostring(_v6, "#.##########")
+
+log.info("OPS|" + _row)

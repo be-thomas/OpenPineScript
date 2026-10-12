@@ -1,0 +1,6 @@
+//@version=5
+indicator("Plotting in the past", "", true)
+plotInThePast = input(false, "Plot in the past")
+pHi = ta.pivothigh(5, 5)
+if not na(pHi)
+    label.new(bar_index[plotInThePast ? 5 : 0], na, str.tostring(pHi, format.mintick) + "\n🠇", yloc = yloc.abovebar, style = label.style_none, textcolor = color.black, size = size.normal)

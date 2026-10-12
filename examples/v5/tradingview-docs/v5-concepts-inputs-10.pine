@@ -1,0 +1,8 @@
+//@version=5
+indicator("MA", "", true)
+tfInput = input.timeframe("D", "Timeframe")
+ma = ta.sma(close, 20)
+securityNoRepaint(sym, tf, src) =>
+    request.security(sym, tf, src[barstate.isrealtime ? 1 : 0])[barstate.isrealtime ? 0 : 1]
+maHTF = securityNoRepaint(syminfo.tickerid, tfInput, ma)
+plot(maHTF, "MA", color.aqua)

@@ -1,0 +1,10 @@
+//@version=3
+study("My Script")
+bton(b) =>
+    b ? 1 : 0
+s = close >= open
+s1 = close[1] >= open[1]
+s2 = close[2] >= open[2]
+sum = bton(s) + bton(s1) + bton(s2)
+col = sum == 1 ? white : sum == 2 ? blue : sum == 3 ? red : na
+bgcolor(col)

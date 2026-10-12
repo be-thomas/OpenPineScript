@@ -1,0 +1,39 @@
+//@version=5
+indicator("Sorting rows example")
+
+//@function Displays the rows of a matrix in a label with a note.
+//@param    this The matrix to display.
+//@param    barIndex The `bar_index` to display the label at.
+//@param    bgColor The background color of the label.
+//@param    textColor The color of the label's text.
+//@param    note The text to display above the rows.
+method debugLabel(
+     matrix<float> this, int barIndex = bar_index, color bgColor = color.blue,
+     color textColor = color.white, string note = ""
+ ) =>
+    labelText = note + "\n" + str.tostring(this)
+    if barstate.ishistory
+        label.new(
+             barIndex, 0, labelText, color = bgColor, style = label.style_label_center,
+             textcolor = textColor, size = size.huge
+         )
+
+//@variable A 3x3 matrix.
+matrix<int> m = matrix.new<int>()
+
+if bar_index == last_bar_index - 1
+    // Add rows to `m`.
+    m.add_row(0, array.from(3, 2, 4))
+    m.add_row(1, array.from(1, 9, 6))
+    m.add_row(2, array.from(7, 8, 9))
+    m.debugLabel(note = "Original")
+
+    // Copy `m` and sort rows in ascending order based on the first column (default).
+    matrix<int> m1 = m.copy()
+    m1.sort()
+    m1.debugLabel(bar_index + 10, color.green, note = "Sorted using col 0\n(Ascending)")
+
+    // Copy `m` and sort rows in descending order based on the second column.
+    matrix<int> m2 = m.copy()
+    m2.sort(1, order.descending)
+    m2.debugLabel(bar_index + 20, color.red, note = "Sorted using col 1\n(Descending)")

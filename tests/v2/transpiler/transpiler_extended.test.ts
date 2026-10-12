@@ -6,7 +6,7 @@ import { describe, it } from "vitest";
 import assert from "node:assert";
 import * as vm from "node:vm";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { Context } from "../../../runtime/v1";
 
 /**
@@ -29,6 +29,12 @@ function runPine(pineSource: string): Record<string, unknown> {
   sandbox.ctx = ctx;
   // Inject built-in series pointers as the real engine does
   sandbox[`${OPSV2}close`] = ctx.vars.get(`${OPSV2}close`);
+  // The comparison helpers the emitter now calls. See `safe_eq` in
+  // runtime/v1/stdlib/core.ts: every variable is a Series OBJECT, and `==`
+  // between two objects is reference equality, so `x == y` for two variables
+  // holding the same number was false.
+  sandbox[`${OPSV2}safe_eq`] = (a: any, b: any) => (a?.valueOf?.() ?? a) == (b?.valueOf?.() ?? b);
+  sandbox[`${OPSV2}safe_ne`] = (a: any, b: any) => (a?.valueOf?.() ?? a) != (b?.valueOf?.() ?? b);
   
   vm.createContext(sandbox);
   vm.runInContext(js, sandbox);

@@ -1,0 +1,14 @@
+//@version=5
+//@strategy_alert_message {{strategy.order.action}} {{strategy.position_size}} {{ticker}} @ {{strategy.order.price}}
+strategy("Alert Message Demo", overlay = true)
+float fastMa = ta.sma(close, 5)
+float slowMa = ta.sma(close, 10)
+
+if ta.crossover(fastMa, slowMa)
+    strategy.entry("buy", strategy.long)
+
+if ta.crossunder(fastMa, slowMa)
+    strategy.entry("sell", strategy.short)
+
+plot(fastMa, "Fast MA", color.aqua)
+plot(slowMa, "Slow MA", color.orange)

@@ -1,0 +1,16 @@
+//@version=5
+indicator("`array.slice()`")
+a = array.new<float>(0)
+array.push(a, 0)
+array.push(a, 1)
+array.push(a, 2)
+array.push(a, 3)
+if barstate.islast
+    // Create a shadow of elements at index 1 and 2 from array `a`.
+    sliceOfA = array.slice(a, 0, 3)
+    label.new(bar_index, 0, "BEFORE\na: " + str.tostring(a) + "\nsliceOfA: " + str.tostring(sliceOfA))
+    // Remove first element of parent array `a`.
+    array.remove(a, 0)
+    // Add a new element at the end of the shallow copy, thus also affecting the original array `a`.
+    array.push(sliceOfA, 4)
+    label.new(bar_index, 0, "AFTER\na: " + str.tostring(a) + "\nsliceOfA: " + str.tostring(sliceOfA), style = label.style_label_up)

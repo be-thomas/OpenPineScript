@@ -1,0 +1,19 @@
+//@version=4
+study("My Script")
+
+biggest(series) =>
+    max = 0.0
+    max := nz(max[1], series)
+    if series > max
+        max := series
+    max
+
+smallest(series) =>
+    min = 0.0
+    min := nz(min[1], series)
+    if series < min
+        min := series
+    min
+
+plot(biggest(close), color=color.green)
+plot(smallest(close), color=color.red)

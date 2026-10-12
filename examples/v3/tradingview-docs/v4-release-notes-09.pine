@@ -1,0 +1,8 @@
+//@version=3
+strategy(title = "My Strategy")
+long() =>
+    strategy.entry("long", true, 1, when = open > high[1])
+    1
+c = 0
+c := true ? 1 : long()
+plot(c)

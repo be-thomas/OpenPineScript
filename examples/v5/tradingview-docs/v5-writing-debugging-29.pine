@@ -1,0 +1,38 @@
+//@version=5
+indicator("Labels at the end of the chart demo", "Chart info", true)
+
+//@function     Draws a label to print the `txt` at the last available time on the chart.
+//              When called from the global scope, the label updates its text using the specified `txt` on every bar.
+//@param txt    The string to display on the chart.
+//@param price  The optional y-axis location of the label. If not specified, draws the label above the last chart bar.
+//@returns      The resulting label ID.
+printLabel(string txt, float price = na) =>
+    int labelTime = math.max(last_bar_time, chart.right_visible_bar_time)
+    var label result = label.new(
+         labelTime, na, txt, xloc.bar_time, na(price) ? yloc.abovebar : yloc.price, na,
+         label.style_none, chart.fg_color, size.large
+     )
+    label.set_text(result, txt)
+    label.set_y(result, price)
+    result
+
+//@variable A formatted string containing information about the current chart.
+string chartInfo = str.format(
+     "Symbol: {0}:{1}\nTimeframe: {2}\nStandard chart: {3}\nReplay active: {4}",
+     syminfo.prefix, syminfo.ticker, timeframe.period, chart.is_standard,
+     str.contains(syminfo.tickerid, "replay")
+ )
+
+//@variable A formatted string containing OHLCV values.
+string ohlcvInfo = str.format(
+     "O: {0, number, #.#####}, H: {1, number, #.#####}, L: {2, number, #.#####}, C: {3, number, #.#####}, V: {4}",
+     open, high, low, close, str.tostring(volume, format.volume)
+ )
+
+// Print "Hello world!" and the `chartInfo` at the end of the chart on the first bar.
+if barstate.isfirst
+    printLabel("Hello world!" + "\n\n\n\n\n\n\n")
+    printLabel(chartInfo + "\n\n")
+
+// Print current `ohlcvInfo` at the end of the chart, updating the displayed text as new data comes in.
+printLabel(ohlcvInfo)

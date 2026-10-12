@@ -1,0 +1,12 @@
+//@version=5
+indicator("Using `var`")
+FILL_COLOR = color.green
+var array<color> fillColors = array.from(
+     color.new(FILL_COLOR, 70),
+     color.new(FILL_COLOR, 75),
+     color.new(FILL_COLOR, 80),
+     color.new(FILL_COLOR, 85),
+     color.new(FILL_COLOR, 90)
+ )
+// Cycle background through the array's colors.
+bgcolor(array.get(fillColors, bar_index % (fillColors.size())))

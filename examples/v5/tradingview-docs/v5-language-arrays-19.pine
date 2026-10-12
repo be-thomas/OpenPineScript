@@ -1,0 +1,13 @@
+//@version=5
+indicator("`array.clear()` example", overlay = true)
+
+// Create a label array and add a label to the array on each new bar.
+var a = array.new<label>()
+label lbl = label.new(bar_index, high, "Text", color = color.red)
+array.push(a, lbl)
+
+var table t = table.new(position.top_right, 1, 1)
+// Clear the array on the last bar. This doesn't remove the labels from the chart. 
+if barstate.islast
+    array.clear(a)
+    table.cell(t, 0, 0, "Array elements count: " + str.tostring(array.size(a)), bgcolor = color.yellow)

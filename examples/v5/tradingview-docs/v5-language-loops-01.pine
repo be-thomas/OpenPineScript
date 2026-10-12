@@ -1,0 +1,11 @@
+//@version=5
+indicator("Unnecessary loops corrected demo", overlay = true)
+
+//@variable The number of bars in the calculation window.
+int lengthInput = input.int(defval = 20, title = "Length")
+
+//@variable The average `close` value over `lengthInput` bars.
+float avgClose = ta.sma(close, lengthInput)
+
+// Plot the `avgClose`.
+plot(avgClose, "Average close", color.blue, 2)

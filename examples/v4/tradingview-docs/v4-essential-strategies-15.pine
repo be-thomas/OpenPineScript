@@ -1,0 +1,8 @@
+//@version=4
+strategy("Currency test", currency=currency.EUR)
+if year > 2020
+    strategy.entry("LE", true, 1000)
+    strategy.exit("LX", "LE", profit=1, loss=1)
+profit = strategy.netprofit
+plot(abs((profit - profit[1])*100), "1 point profit", color=color.blue, linewidth=2)
+plot(1 / close[1], "prev usdeur", color=color.red)

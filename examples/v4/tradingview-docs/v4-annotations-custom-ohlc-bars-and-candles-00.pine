@@ -1,0 +1,3 @@
+//@version=4
+study("Example 1")
+plotbar(open, high, low, close)

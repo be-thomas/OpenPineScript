@@ -1,0 +1,11 @@
+//@version=5
+indicator("")
+v1 = array.new<string>(10, "test")
+v2 = array.new<string>(10, "test")
+array.push(v2, "test1")
+v3 = array.new_float(5, 5)
+v4 = array.new_int(5, 5)
+l1 = label.new(bar_index, close, array.join(v1))
+l2 = label.new(bar_index, close, array.join(v2, ","))
+l3 = label.new(bar_index, close, array.join(v3, ","))
+l4 = label.new(bar_index, close, array.join(v4, ","))

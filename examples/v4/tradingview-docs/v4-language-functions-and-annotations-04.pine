@@ -1,0 +1,4 @@
+//@version=4
+study("Barssince",overlay=false)
+res = close>close[1] ? barssince(close<close[1]) : -1
+plot(res, style=plot.style_histogram, color=res >= 0 ? color.red : color.blue)

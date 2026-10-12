@@ -1,0 +1,4 @@
+//@version=5
+indicator("", "", true)
+body = close - open
+plotarrow(body, colorup = color.teal, colordown = color.orange)

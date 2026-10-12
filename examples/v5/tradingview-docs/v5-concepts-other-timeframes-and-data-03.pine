@@ -1,0 +1,34 @@
+//@version=5
+indicator("`ignore_invalid_symbol` demo", "Market cap estimate", format = format.volume)
+
+//@variable The symbol to request data from.
+string symbol = input.symbol("TSX:SHOP", "Symbol")
+
+//@function Estimates the market capitalization of the specified `tickerID` if the data exists.
+calcMarketCap(simple string tickerID) =>
+    //@variable The quarterly total shares outstanding for the `tickerID`. Returns `na` when the data isn't available.
+    float tso = request.financial(tickerID, "TOTAL_SHARES_OUTSTANDING", "FQ", ignore_invalid_symbol = true)
+    //@variable The `close` price and currency for the `tickerID`. Returns `[na, na]` when the `tickerID` is invalid.
+    [price, currency] = request.security(
+         tickerID, timeframe.period, [close, syminfo.currency], ignore_invalid_symbol = true
+     )
+    // Return a tuple containing the market cap estimate and the quote currency.
+    [tso * price, currency]
+
+//@variable A `table` object with a single cell that displays the `marketCap` and `quoteCurrency`.
+var table infoTable = table.new(position.top_right, 1, 1)
+// Initialize the table's cell on the first bar.
+if barstate.isfirst
+    table.cell(infoTable, 0, 0, "", text_color = color.white, text_size = size.huge, bgcolor = color.teal)
+
+// Get the market cap estimate and quote currency for the `symbol`.
+[marketCap, quoteCurrency] = calcMarketCap(symbol)
+
+if barstate.islast
+    //@variable The formatted text displayed inside the `infoTable`.
+    string tableText = str.format("Market cap:\n{0} {1}", str.tostring(marketCap, format.volume), quoteCurrency)
+    // Update the `infoTable`.
+    table.cell_set_text(infoTable, 0, 0, tableText)
+
+// Plot the `marketCap` value.
+plot(marketCap, "Market cap", color.new(color.purple, 60), style = plot.style_area)

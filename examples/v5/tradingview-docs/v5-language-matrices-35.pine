@@ -1,0 +1,21 @@
+//@version=5
+indicator("Matrix rank example")
+
+//@variable A 3x3 full-rank matrix.
+m1 = matrix.new<float>()
+//@variable A 3x3 rank-deficient matrix.
+m2 = matrix.new<float>()
+
+// Add linearly independent vectors to `m1`.
+m1.add_row(0, array.from(3, 2, 3))
+m1.add_row(1, array.from(4, 6, 6))
+m1.add_row(2, array.from(7, 4, 9))
+
+// Add linearly dependent vectors to `m2`.
+m2.add_row(0, array.from(1, 2, 3))
+m2.add_row(1, array.from(2, 4, 6))
+m2.add_row(2, array.from(3, 6, 9))
+
+// Plot `matrix.rank()` values.
+plot(m1.rank(), color = color.green, linewidth = 3)
+plot(m2.rank(), color = color.red, linewidth = 3)

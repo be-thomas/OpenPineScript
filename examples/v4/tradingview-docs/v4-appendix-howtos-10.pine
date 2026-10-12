@@ -1,0 +1,8 @@
+//@version=4
+study("My Script", overlay=true, scale=scale.none)
+
+is_new_day() =>
+    d = dayofweek
+    na(d[1]) or d != d[1]
+
+plot(barssince(is_new_day()), style=plot.style_cross)

@@ -1,0 +1,18 @@
+//@version=5
+indicator("UTC vs IANA time zone strings demo")
+
+//@variable The hour of the current `time` in the "UTC-4" time zone. 
+//          This variable's value represents the hour in New York only during DST. It is one hour ahead otherwise.
+int hourUTC = hour(time, "UTC-4")
+//@variable The hour of the current `time` in the "America/New_York" time zone. 
+//          This form adjusts to UTC offset changes automatically, so the value always represents the hour in New York. 
+int hourIANA = hour(time, "America/New_York")
+
+//@variable Is translucent blue when `hourUTC` does not equal `hourIANA`, `na` otherwise.
+color bgColor = hourUTC != hourIANA ? color.rgb(33, 149, 243, 80) : na
+
+// Plot the values of `hourUTC` and `hourIANA` for comparison.
+plot(hourUTC,  "UTC-4",            color.blue,   linewidth = 6)
+plot(hourIANA, "America/New_York", color.orange, linewidth = 3)
+// Highlight the main chart pane with the `bgColor`.
+bgcolor(bgColor, title = "Unequal result highlight", force_overlay = true)

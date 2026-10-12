@@ -1,0 +1,3 @@
+//@version=4
+strategy("History SAW demo", overlay=true, pyramiding=100, calc_on_order_fills=true)
+strategy.entry("LE", strategy.long)

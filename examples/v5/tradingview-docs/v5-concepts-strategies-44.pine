@@ -1,0 +1,59 @@
+//@version=5
+strategy(
+     "Individual trade information demo", pyramiding = 5, default_qty_type = strategy.percent_of_equity, 
+     default_qty_value = 1, margin_long = 100, margin_short = 100
+ )
+
+//@variable The number of bars in the `highest` and `lowest` calculation. 
+int lengthInput = input.int(50, "Length", 1)
+string idInput = input.string("Buy0", "Entry ID to analyze", ["Buy0", "Buy1", "Buy2", "Buy3", "Buy4"])
+
+// Calculate the highest, lowest, and median `close` values over `lengthInput` bars.
+float highest = ta.highest(close, lengthInput)
+float lowest  = ta.lowest(close, lengthInput)
+float median  = 0.5 * (highest + lowest)
+
+// Define entry and stop-loss orders when the `close` crosses above the `median` without touching the `highest` value.
+if ta.crossover(close, median) and close != highest and strategy.opentrades < 5
+    strategy.entry("Buy" + str.tostring(strategy.opentrades), strategy.long) 
+    if strategy.opentrades == 0
+        strategy.exit("SL", stop = lowest)
+// Close the entire position when the `close` reaches the `lowest` value.
+if close == lowest
+    strategy.close_all()
+
+// The total number of closed trades with the `idInput` entry, the number of wins, the average number of bars, 
+// and the total profit.
+int   trades  = 0
+int   wins    = 0
+float avgBars = 0
+float totalPL = 0.0
+
+if barstate.islastconfirmedhistory or barstate.isrealtime
+    //@variable A single-cell table displaying information about closed trades with the `idInput` entry ID. 
+    var table infoTable = table.new(position.middle_center, 1, 1, color.purple)
+    // Iterate over closed trade indices.
+    for tradeNum = 0 to strategy.closedtrades - 1
+        // Skip the rest of the current iteration if the `tradeNum` closed trade didn't open with an `idInput` entry.
+        if strategy.closedtrades.entry_id(tradeNum) != idInput
+            continue
+        // Accumulate `trades`, `wins`, `avgBars`, and `totalPL` values.
+        float profit = strategy.closedtrades.profit(tradeNum)
+        trades  += 1
+        wins    += profit > 0 ? 1 : 0
+        avgBars += strategy.closedtrades.exit_bar_index(tradeNum) - strategy.closedtrades.entry_bar_index(tradeNum) + 1
+        totalPL += profit
+    avgBars /= trades
+
+    //@variable A formatted string containing the calculated closed trade information. 
+    string displayText = str.format(
+         "ID: {0}\n\nTotal trades: {1}\nWin trades: {2}\nAvg. bars: {3}\nTotal P/L: {4} {5}",
+         idInput, trades, wins, avgBars, totalPL, strategy.account_currency
+     )
+    // Populate the table's cell with `displayText`. 
+    infoTable.cell(0, 0, displayText, text_color = color.white, text_halign = text.align_left, text_size = size.large)
+
+// Plot the highest, median, and lowest values on the main chart pane. 
+plot(highest, "Highest close", force_overlay = true)
+plot(median, "Median close", force_overlay = true)
+plot(lowest, "Lowest close", force_overlay = true)

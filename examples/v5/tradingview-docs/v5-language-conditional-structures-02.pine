@@ -1,0 +1,15 @@
+//@version=5
+indicator("", "", true)
+string barState = if barstate.islastconfirmedhistory
+    "islastconfirmedhistory"
+else if barstate.isnew
+    "isnew"
+else if barstate.isrealtime
+    "isrealtime"
+else
+    "other"
+
+f_print(_text) => 
+    var table _t = table.new(position.middle_right, 1, 1)
+    table.cell(_t, 0, 0, _text, bgcolor = color.yellow)
+f_print(barState)

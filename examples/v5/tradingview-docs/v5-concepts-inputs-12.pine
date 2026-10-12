@@ -1,0 +1,7 @@
+//@version=5
+indicator("Session input", "", true)
+string sessionInput = input.session("0600-1700", "Session")
+string daysInput = input.string("1234567", tooltip = "1 = Sunday, 7 = Saturday")
+sessionString = sessionInput + ":" + daysInput
+inSession = not na(time(timeframe.period, sessionString))
+bgcolor(inSession ? color.silver : na)

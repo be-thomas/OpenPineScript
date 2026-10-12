@@ -1,0 +1,15 @@
+//@version=5
+strategy("Close demo", "test", overlay = true)
+
+//@variable Is `true` on every 50th bar.
+buyCond = bar_index % 50 == 0
+//@variable Is `true` on every 25th bar except for those that are divisible by 50.
+sellCond = bar_index % 25 == 0 and not buyCond
+
+if buyCond
+    strategy.entry("buy", strategy.long)
+if sellCond
+    strategy.close("buy")
+
+bgcolor(buyCond  ? color.new(color.blue, 90) : na)
+bgcolor(sellCond ? color.new(color.red, 90) : na)

@@ -1,0 +1,33 @@
+//@version=5
+indicator("Intrabar arrays demo", "Intrabar price changes")
+
+//@variable The lower timeframe of the requested data.
+string lowerTimeframe = input.timeframe("1", "Timeframe")
+
+//@variable The close-to-close price change.
+float priceChange = ta.change(close)
+
+//@variable An array of `close` values from available intrabars on the `lowerTimeframe`.
+array<float> intrabarChanges = request.security_lower_tf(syminfo.tickerid, lowerTimeframe, priceChange)
+
+//@variable The total positive intrabar `close` movement on the chart bar.
+float positiveChange = 0.0
+//@variable The total negative intrabar `close` movement on the chart bar.
+float negativeChange = 0.0
+
+// Loop to calculate totals, starting from the chart bar's first available intrabar.
+for change in intrabarChanges
+    // Add the `change` to `positiveChange` if its sign is 1, and add to `negativeChange` if its sign is -1.
+    switch math.sign(change)
+        1  => positiveChange += change
+        -1 => negativeChange += change
+
+//@variable The sum of `positiveChange` and `negativeChange`. Equals the `priceChange` on bars with available intrabars.
+float netChange = positiveChange + negativeChange
+
+// Plot the `positiveChange`, `negativeChange`, and `netChange`.
+plot(positiveChange, "Positive intrabar change", color.teal, style = plot.style_area)
+plot(negativeChange, "Negative intrabar change", color.maroon, style = plot.style_area)
+plot(netChange, "Net intrabar change", color.yellow, 5)
+// Plot the `priceChange` to compare.
+plot(priceChange, "Chart price change", color.orange, 2)

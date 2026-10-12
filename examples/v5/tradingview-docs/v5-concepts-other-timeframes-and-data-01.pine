@@ -1,0 +1,8 @@
+//@version=5
+indicator("Behavior of `request.financial()` demo", format = format.volume)
+
+//@variable The annual cost of goods sold by the chart symbol's issuing company.
+float costOfGoods = request.financial(syminfo.tickerid, "COST_OF_GOODS", "FY")
+
+// Plot the `costOfGoods`.
+plot(costOfGoods, "Cost of goods", color.purple, 3, plot.style_stepline_diamond)

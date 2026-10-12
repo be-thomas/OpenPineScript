@@ -1,0 +1,8 @@
+//@version=5
+indicator("Simple `for` loop demo")
+
+if barstate.islastconfirmedhistory
+    // Define a `for` loop that iterates from `i == 0` to `i == 10`.
+    for i = 0 to 10
+        // Draw a new `label` on the current bar at the `i` level. 
+        label.new(bar_index + i, 0, str.tostring(i), textcolor = color.white, size = size.large)

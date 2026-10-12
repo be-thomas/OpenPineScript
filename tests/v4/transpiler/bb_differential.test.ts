@@ -11,7 +11,7 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v4";
 import { NaiveTA } from "../../v1/ta/naive_ta";
 import { PREFIX as OPSV2 } from "../../../utils/v2/common";

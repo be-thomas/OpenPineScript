@@ -1,0 +1,7 @@
+//@version=5
+
+//@variable The title in the `indicator()` call.
+var NAME = "My indicator for " + syminfo.ticker
+
+indicator(NAME, "", true) // Causes an error because `NAME` is qualified as a "simple string".
+plot(close)

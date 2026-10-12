@@ -1,0 +1,17 @@
+//@version=5
+strategy("Reversing positions demo", overlay = true)
+
+//@variable Is `true` on every 100th bar, `false` otherwise.
+bool buyCondition = bar_index % 100 == 0
+//@variable Is `true` on every 50th bar, `false` otherwise.
+bool sellCondition = bar_index % 50 == 0
+ 
+if buyCondition
+    // Place a "buy" market order to close the short position and enter a long position of 15 shares.
+    strategy.entry("buy", strategy.long, qty = 15)
+else if sellCondition
+    // Place a "sell" market order to close the long position and enter a short position of 5 shares.
+    strategy.entry("sell", strategy.short, qty = 5)
+
+// Highlight the background when the `buyCondition` or `sellCondition` occurs.
+bgcolor(buyCondition  ? color.new(color.blue, 90) : sellCondition ? color.new(color.red, 90) : na)

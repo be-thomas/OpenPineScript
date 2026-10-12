@@ -1,0 +1,15 @@
+//@version=5
+indicator(title="CCI line gradient", precision=2, timeframe="")
+var color GOLD_COLOR   = #CCCC00
+var color VIOLET_COLOR = #AA00FF
+var color BEIGE_COLOR  = #9C6E1B
+float srcInput = input.source(close, title="Source")
+int   lenInput = input.int(20, "Length", minval = 5)
+color bullColorInput = input.color(GOLD_COLOR,   "Bull")
+color bearColorInput = input.color(BEIGE_COLOR, "Bear")
+float signal = ta.cci(srcInput, lenInput)
+color signalColor = color.from_gradient(signal, -200, 200, bearColorInput, bullColorInput)
+plot(signal, "CCI", signalColor)
+bandTopPlotID = hline(100,  "Upper Band", color.silver, hline.style_dashed)
+bandBotPlotID = hline(-100, "Lower Band", color.silver, hline.style_dashed)
+fill(bandTopPlotID, bandBotPlotID, color.new(BEIGE_COLOR, 90), "Background")

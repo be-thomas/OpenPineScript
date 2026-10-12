@@ -1,0 +1,11 @@
+//@version=5
+library("Signal")
+
+//@enum           An enumeration of named signal states.
+//@field long     Represents a "Long" signal.
+//@field short    Represents a "Short" signal.
+//@field neutral  Represents a "Neutral" signal. 
+export enum State
+    long    = "Long"
+    short   = "Short"
+    neutral = "Neutral"

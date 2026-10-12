@@ -9,17 +9,17 @@
  * original and its v3 port over the same bars and assert bar-for-bar equality —
  * which is what "mechanical" has to mean to be worth anything.
  *
- * They also record how the real corpus in validation/ is affected, so the
+ * They also record how the real corpus in validation/v2/ is affected, so the
  * blast radius of the v3 rules on actual published scripts is visible rather
  * than assumed.
  */
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { transpile } from "../../transpiler";
+import { transpile } from "../../transpiler/common";
 import { compile, Context } from "../../runtime/v1";
-import { profileFor } from "../../transpiler/profiles";
-import { attempt, PineVersion } from "../../test-utils/transpileAs";
+import { profileFor } from "../../transpiler/common/profiles";
+import { attempt, PineVersion } from "../../test-utils/common/transpileAs";
 import { PREFIX } from "../../utils/v2/common";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -125,9 +125,9 @@ describe("a mechanical v2→v3 port changes no numbers", () => {
 });
 
 describe("blast radius on the real corpus", () => {
-  const files = fs.readdirSync(path.join(ROOT, "validation"))
+  const files = fs.readdirSync(path.join(ROOT, "validation/v2"))
     .filter(f => f.endsWith(".pine")).sort()
-    .map(f => `validation/${f}`);
+    .map(f => `validation/v2/${f}`);
 
   const classified = files.map(f => {
     const src = fs.readFileSync(path.join(ROOT, f), "utf8");

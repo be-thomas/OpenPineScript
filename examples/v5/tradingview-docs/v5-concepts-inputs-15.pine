@@ -1,0 +1,33 @@
+//@version=5
+indicator("Enum input demo", overlay = true)
+
+//@enum         An enumeration of named values representing signal display modes.
+//@field long   Named value to specify that only long signals are allowed.
+//@field short  Named value to specify that only short signals are allowed.
+//@field both   Named value to specify that either signal type is allowed.
+//@field none   Named value to specify that no signals are allowed. 
+enum SignalType
+    long  = "Only long signals"
+    short = "Only short signals"
+    both  = "Long and short signals"
+    none 
+
+//@variable An enumerator (member) of the `SignalType` enum. Controls the script's signals. 
+SignalType sigInput = input.enum(SignalType.long, "Signal type")
+
+// Calculate moving averages.
+float ma1 = ta.sma(ohlc4, 10)
+float ma2 = ta.sma(ohlc4, 200)
+// Calculate cross signals. 
+bool longCross  = ta.crossover(close, math.max(ma1, ma2))
+bool shortCross = ta.crossunder(close, math.min(ma1, ma2))
+// Calculate long and short signals based on the selected `sigInput` value.
+bool longSignal = (sigInput == SignalType.long or sigInput == SignalType.both) and longCross
+bool shortSignal = (sigInput == SignalType.short or sigInput == SignalType.both) and shortCross
+
+// Plot shapes for the `longSignal` and `shortSignal`.
+plotshape(longSignal, "Long signal", shape.triangleup, location.belowbar, color.teal, size = size.normal)
+plotshape(shortSignal, "Short signal", shape.triangledown, location.abovebar, color.maroon, size = size.normal)
+// Plot the moving averages.
+plot(ma1, "Fast MA")
+plot(ma2, "Slow MA") 

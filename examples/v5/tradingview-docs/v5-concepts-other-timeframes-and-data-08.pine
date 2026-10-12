@@ -1,0 +1,27 @@
+//@version=5
+indicator("Loop-dependent expression demo", dynamic_requests = true, format = format.volume)
+
+//@variable An array of "string" values representing different symbols to request. 
+var array<string> symbols = array.from(
+     "EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURJPY", "GBPJPY", "EURGBP"
+ )
+
+//@variable An array containing the data retrieved for each requested symbol.  
+array<float> requestedData = array.new<float>()
+
+// Retrieve `volume` data for each symbol in the `symbols` array, weighted using the element index.
+// Causes a compilation error because the `expression` in `request.security()` cannot depend on loop variables 
+// or mutable variables that change within the loop's scope. 
+for [i, symbol] in symbols
+    float data = request.security("OANDA:" + symbol, timeframe.period, volume * (10 - i))
+    requestedData.push(data)
+
+// Calculate the average, maximum, and minimum tick volume in the `requestedData`.
+float avgVolume = requestedData.avg()
+float maxVolume = requestedData.max()
+float minVolume = requestedData.min()
+
+// Plot the `avgVolume`, `maxVolume`, and `minVolume`. 
+plot(avgVolume, "Average volume", color.gray,   3)
+plot(maxVolume, "Highest volume", color.teal,   3)
+plot(minVolume, "Lowest volume",  color.maroon, 3)

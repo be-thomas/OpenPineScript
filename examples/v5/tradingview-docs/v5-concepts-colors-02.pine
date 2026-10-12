@@ -1,0 +1,14 @@
+//@version=5
+indicator("Conditional colors", "", true)
+int legsInput = input.int(5, "Pivot Legs", minval = 1)
+color pHiColorInput = input.color(color.olive, "High pivots")
+color pLoColorInput = input.color(color.orange, "Low pivots")
+// Intialize the pivot level variables.
+var float pHi = na
+var float pLo = na
+// When a new pivot is detected, save its value.
+pHi := nz(ta.pivothigh(legsInput, legsInput), pHi)
+pLo := nz(ta.pivotlow( legsInput, legsInput), pLo)
+// When a new pivot is detected, do not plot a color.
+plot(pHi, "High", ta.change(pHi) ? na : pHiColorInput, 2, plot.style_line)
+plot(pLo, "Low",  ta.change(pLo) ? na : pLoColorInput, 2, plot.style_line)

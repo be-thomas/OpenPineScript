@@ -1,0 +1,33 @@
+//@version=5
+indicator("`for row in matrix` demo", "Custom matrix label")
+
+//@variable Generates a random value between 0 and 1, rounded to 4 decimal places. 
+rand() =>
+    math.round(math.random(), 4)
+
+if barstate.islastconfirmedhistory
+    //@variable A matrix of randomized values to format and display in a `label`. 
+    matrix<float> randomMatrix = matrix.new<float>()
+    // Add a row of 9 randomized values and reshape the matrix to 3x3.
+    randomMatrix.add_row(
+         0, array.from(rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand())
+     )
+    randomMatrix.reshape(3, 3)
+
+    //@variable A custom "string" representation of `randomMatrix` information. Modified within a loop.
+    string labelText = "Matrix rows: \n"
+
+    // Loop through the rows in the `randomMatrix`.
+    for row in randomMatrix
+        //@variable The average element value within the `row`.
+        float rowAvg = row.avg()
+        //@variable An upward arrow when the `rowAvg` is above 0.5, a downward arrow otherwise.
+        string directionChar = rowAvg > 0.5 ? "⬆" : "⬇"
+        // Add a "string" representing the `row` array, its average, and the `directionChar` to the `labelText`.
+        labelText += str.format("Row: {0} Avg: {1} {2}\n", row, rowAvg, directionChar)
+    
+    // Draw a `label` displaying the `labelText` on the current bar.
+    label.new(
+         bar_index, 0, labelText, color = color.purple, textcolor = color.white, size = size.huge, 
+         style = label.style_label_center, textalign = text.align_left
+     )

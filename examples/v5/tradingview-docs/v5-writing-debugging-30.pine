@@ -1,0 +1,45 @@
+//@version=5
+indicator("Debugging with tables demo", "History inspection", true)
+
+//@variable The number of bars back in the chart's history to inspect.
+int barsBack = input.int(10, "Bars back", 0, 4999)
+
+//@variable The percent rank of `volume` over 10 bars.
+float weight = ta.percentrank(volume, 10)
+//@variable The 10-bar EMA of `weight * close` values.
+float numerator = ta.ema(weight * close, 10)
+//@variable The 10-bar EMA of `weight` values.
+float denominator = ta.ema(weight, 10)
+//@variable The ratio of the `numerator` to the `denominator`.
+float filter = numerator / denominator
+
+// Plot the `filter`.
+plot(filter, "Custom filter")
+
+//@variable The color of the frame, border, and text in the `debugTable`.
+color tableColor = chart.fg_color
+
+//@variable A table that contains "string" representations of variable names and values on the latest chart bar.
+var table debugTable = table.new(
+     position.top_right, 2, 5, frame_color = tableColor, frame_width = 1, border_color = tableColor, border_width = 1
+ )
+
+// Initialize cells on the last confirmed historical bar.
+if barstate.islastconfirmedhistory
+    table.cell(debugTable, 0, 0, "Variable", text_color = tableColor)
+    table.cell(debugTable, 1, 0, str.format("Value {0, number, integer} bars ago", barsBack), text_color = tableColor)
+    table.cell(debugTable, 0, 1, "weight", text_color = tableColor)
+    table.cell(debugTable, 1, 1, "", text_color = tableColor)
+    table.cell(debugTable, 0, 2, "numerator", text_color = tableColor)
+    table.cell(debugTable, 1, 2, "", text_color = tableColor)
+    table.cell(debugTable, 0, 3, "denominator", text_color = tableColor)
+    table.cell(debugTable, 1, 3, "", text_color = tableColor)
+    table.cell(debugTable, 0, 4, "filter", text_color = tableColor)
+    table.cell(debugTable, 1, 4, "", text_color = tableColor)
+
+// Update value cells on the last available bar.
+if barstate.islast
+    table.cell_set_text(debugTable, 1, 1, str.tostring(weight[barsBack], format.percent))
+    table.cell_set_text(debugTable, 1, 2, str.tostring(numerator[barsBack]))
+    table.cell_set_text(debugTable, 1, 3, str.tostring(denominator[barsBack]))
+    table.cell_set_text(debugTable, 1, 4, str.tostring(filter[barsBack]))

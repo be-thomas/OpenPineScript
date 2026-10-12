@@ -1,0 +1,35 @@
+//@version=5
+indicator("Pivot Points High", overlay = true)
+
+int legsInput = input(10)
+
+// Define the `pivotPoint` UDT containing the time and price of pivots.
+type pivotPoint
+    int openTime
+    float level
+
+// Create an empty `pivotPoint` array.
+var pivotHighArray = array.new<pivotPoint>()
+
+// Detect new pivots (`na` is returned when no pivot is found).
+pivotHighPrice = ta.pivothigh(legsInput, legsInput)
+
+// Add a new `pivotPoint` object to the end of the array for each detected pivot.
+if not na(pivotHighPrice)
+    // A new pivot is found; create a new object of `pivotPoint` type, setting its `openTime` and `level` fields.
+    newPivot = pivotPoint.new(time[legsInput], pivotHighPrice)
+    // Add the new pivot object to the array.
+    array.push(pivotHighArray, newPivot)
+
+// On the last historical bar, draw pivot labels and connecting lines.
+if barstate.islastconfirmedhistory
+    var pivotPoint previousPoint = na
+    for eachPivot in pivotHighArray
+        // Display a label at the pivot point.
+        label.new(eachPivot.openTime, eachPivot.level, str.tostring(eachPivot.level, format.mintick), xloc.bar_time, textcolor = color.white)
+        // Create a line between pivots.
+        if not na(previousPoint)
+            // Only create a line starting at the loop's second iteration because lines connect two pivots.
+            line.new(previousPoint.openTime, previousPoint.level, eachPivot.openTime, eachPivot.level, xloc = xloc.bar_time)
+        // Save the pivot for use in the next iteration.
+        previousPoint := eachPivot

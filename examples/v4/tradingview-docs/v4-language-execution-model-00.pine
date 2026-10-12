@@ -1,0 +1,9 @@
+//@version=4
+study("My Script", overlay=true)
+src = close
+a = sma(src, 5)
+b = sma(src, 50)
+c = cross(a, b)
+plot(a, color=color.blue)
+plot(b, color=color.black)
+plotshape(c, color=color.red)

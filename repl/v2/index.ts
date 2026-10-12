@@ -10,9 +10,9 @@ import { CharStreams, CommonTokenStream, Lexer, Token } from "antlr4ng";
 import { PineV2Lexer } from "../../parser/v2/generated/PineV2Lexer";
 import { PineV2TokenSource } from "../../lexer/v2/PineV2TokenSource";
 import { parse } from "../../parser/v2";
-import { compileScript } from "../../transpiler";
-import type { PineVersion } from "../../transpiler/version";
-import { DEFAULT_PROFILE } from "../../transpiler/profiles";
+import { compileScript } from "../../transpiler/common";
+import type { PineVersion } from "../../transpiler/common/version";
+import { DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 import { Context, run } from "../../runtime/v1";   // Import the runtime runner
 
 // --- ANSI Colors ---

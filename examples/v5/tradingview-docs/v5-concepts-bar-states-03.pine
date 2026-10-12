@@ -1,0 +1,9 @@
+//@version=5
+indicator("")
+updateNo() => 
+    varip int updateNo = na
+    if barstate.isnew
+        updateNo := 1
+    else
+        updateNo += 1
+plot(updateNo())

@@ -1,0 +1,18 @@
+//@version=5
+indicator("RSI and TSI")
+myRSI = ta.rsi(close, 20)
+bullColor = color.from_gradient(myRSI, 50, 80, color.new(color.lime, 70), color.new(color.lime, 0))
+bearColor = color.from_gradient(myRSI, 20, 50, color.new(color.red,   0), color.new(color.red, 70))
+myRSIColor = myRSI > 50 ? bullColor : bearColor
+plot(myRSI, "RSI", myRSIColor, 3)
+hline(100)
+hline(50)
+hline(0)
+
+// 1. Compress TSI's range from -100/100 to -50/50.
+// 2. Shift it higher by 150, so its -50 min value becomes 100.
+myTSI = 150 + (100 * ta.tsi(close, 13, 25) / 2)
+plot(myTSI, "TSI", color.blue, 2)
+plot(ta.ema(myTSI, 13), "TSI EMA", #FF006E)
+hline(200)
+hline(150)

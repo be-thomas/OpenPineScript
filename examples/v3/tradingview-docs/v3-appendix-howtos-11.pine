@@ -1,0 +1,6 @@
+//@version=3
+study("My Script")
+series = close >= open ? close : na
+vw = valuewhen(not na(series), series, 0)
+plot(series, style=linebr, color=red) // series has na values 
+plot(vw) // all na values are replaced with the last non-empty value

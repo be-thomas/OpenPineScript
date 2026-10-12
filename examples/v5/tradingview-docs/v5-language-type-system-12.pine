@@ -1,0 +1,11 @@
+//@version=5
+indicator("Shading the chart's background", overlay = true)
+
+//@variable A "const color" value representing the base for each day's color. 
+color BASE_COLOR = color.rgb(0, 99, 165)
+
+//@variable A "series int" value that modifies the transparency of the `BASE_COLOR` in `color.new()`.
+int transparency = 50 + int(40 * dayofweek / 7)
+
+// Color the background using the modified `BASE_COLOR`.
+bgcolor(color.new(BASE_COLOR, transparency))

@@ -1,0 +1,8 @@
+//@version=5
+indicator("Formatted string demo", overlay = true)
+
+//@variable A "series string" value representing the bar's OHLC data.
+string ohlcString = str.format("Open: {0}\nHigh: {1}\nLow: {2}\nClose: {3}", open, high, low, close)
+
+// Draw a label containing the `ohlcString`.
+label.new(bar_index, high, ohlcString, textcolor = color.white)

@@ -1,0 +1,11 @@
+//@version=5
+indicator("Invalid mult dimensions demo") 
+
+//@variable A 2x3 matrix. 
+matrix<float> m1 = matrix.new<float>(2, 3, 1)
+//@variable A 2x3 matrix.
+matrix<float> m2 = matrix.new<float>(2, 3, 2)
+
+mSum = matrix.mult(m1, m2) // Raises an error. The number of columns in `m1` and rows in `m2` aren't equal.
+
+plot(mSum.get(0, 0))

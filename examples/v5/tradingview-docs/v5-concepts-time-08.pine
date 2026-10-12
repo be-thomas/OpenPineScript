@@ -1,0 +1,43 @@
+//@version=5
+indicator("`timenow` demo", overlay = true, max_labels_count = 500)
+
+if barstate.islast
+    //@variable Holds the UNIX timestamp of the latest script execution for timing updates in the data feed. 
+    varip int lastUpdateTimestamp = timenow
+    //@variable The total number of milliseconds elapsed across the bar's data updates.
+    varip int totalUpdateTime = 0
+    //@variable The number of updates that have occurred on the current bar.
+    varip int numUpdates = 0
+
+    // Add the time elapsed from the `lastUpdateTimestamp` to `totalUpdateTime`, increase the `numUpdates` counter, and 
+    // update the `lastUpdateTimestamp` when the `timenow` value changes.
+    if timenow != lastUpdateTimestamp
+        totalUpdateTime     += timenow - lastUpdateTimestamp
+        numUpdates          += 1
+        lastUpdateTimestamp := timenow
+    
+    //@variable The average number of milliseconds elapsed between the bar's updates.
+    float avgUpdateTime = nz(totalUpdateTime / numUpdates)
+    
+    //@variable Contains the `timenow` value, a custom representation, and the `numUpdates` and `avgUpdateTime` values.
+    string displayText = "`timenow`: " + str.tostring(timenow)
+                         + "\nTime and date (exchange): " + str.format_time(timenow, "HH:mm:ss MM/dd/yy")
+                         + "\nNumber of updates: " + str.tostring(numUpdates)
+                         + "\nAvg. time between updates: " + str.tostring(avgUpdateTime, "#.###") + " ms"
+
+    //@variable The color of the label. Is blue when the bar is open, and gray after it closes. 
+    color labelColor = barstate.isconfirmed ? color.gray : color.blue 
+    //@variable The label's y-coordinate. Alternates between `high` and `low` on every other bar. 
+    float labelPrice = bar_index % 2 == 0 ? high : low
+    //@variable The label's style. Alternates between "lower-right" and "upper-right" styles.
+    labelStyle = bar_index % 2 == 0 ? label.style_label_lower_right : label.style_label_upper_right  
+    // Draw a `labelColor` label anchored to the bar's `time` to show the `displayText`.
+    label.new(
+         time, labelPrice, displayText, xloc.bar_time, color = labelColor, style = labelStyle, 
+         textcolor = color.white, size = size.large
+     ) 
+
+    // Reset the `totalUpdateTime` and `numUpdates` counters when the bar is confirmed (closes). 
+    if barstate.isconfirmed
+        totalUpdateTime := 0
+        numUpdates      := 0

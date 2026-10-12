@@ -1,0 +1,33 @@
+//@version=5
+indicator("Filling the space between lines demo", "Simple linreg channel", true)
+
+//@variable The number of bars in the linear regression calculation.
+int lengthInput = input.int(100)
+
+//@variable The basis line of the regression channel.
+var line basisLine = line.new(na, na, na, na, extend = extend.right, color = chart.fg_color, width = 2)
+//@variable The channel's upper line.
+var line upperLine = line.new(na, na, na, na, extend = extend.right, color = color.teal, width = 2)
+//@variable The channel's lower line.
+var line lowerLine = line.new(na, na, na, na, extend = extend.right, color = color.maroon, width = 2)
+
+//@variable A linefill instance that fills the space between the `basisLine` and `upperLine`.
+var linefill upperFill = linefill.new(basisLine, upperLine, color.new(color.teal, 80))
+//@variable A linefill instance that fills the space between the `basisLine` and `lowerLine`.
+var linefill lowerFill = linefill.new(basisLine, lowerLine, color.new(color.maroon, 80))
+
+// Update the `basisLine` coordinates with current linear regression values.
+basisLine.set_xy1(bar_index + 1 - lengthInput, ta.linreg(close, lengthInput, lengthInput - 1))
+basisLine.set_xy2(bar_index, ta.linreg(close, lengthInput, 0))
+
+//@variable The channel's standard deviation.
+float stDev = 0.0
+for i = 0 to lengthInput - 1
+    stDev += math.pow(close[i] - line.get_price(basisLine, bar_index - i), 2)
+stDev := math.sqrt(stDev / lengthInput) * 2.0
+
+// Update the `upperLine` and `lowerLine` using the values from the `basisLine` and the `stDev`.
+upperLine.set_xy1(basisLine.get_x1(), basisLine.get_y1() + stDev)
+upperLine.set_xy2(basisLine.get_x2(), basisLine.get_y2() + stDev)
+lowerLine.set_xy1(basisLine.get_x1(), basisLine.get_y1() - stDev)
+lowerLine.set_xy2(basisLine.get_x2(), basisLine.get_y2() - stDev)

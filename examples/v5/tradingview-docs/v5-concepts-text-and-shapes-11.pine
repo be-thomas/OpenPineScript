@@ -1,0 +1,7 @@
+//@version=5
+indicator("")
+daysAgoInput = input.int(1, tooltip = "Use negative values to offset in the future")
+if barstate.islast
+    MS_IN_ONE_DAY = 24 * 60 * 60 * 1000
+    oneDayAgo = time - (daysAgoInput * MS_IN_ONE_DAY)
+    label.new(oneDayAgo, high, xloc = xloc.bar_time, style = label.style_label_right)

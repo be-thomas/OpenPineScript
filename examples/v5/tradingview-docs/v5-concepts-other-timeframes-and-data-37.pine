@@ -1,0 +1,21 @@
+//@version=5
+indicator("Avoiding HTF repainting demo", overlay = true)
+
+//@variable The multiplier applied to the chart's timeframe.
+int tfMultiplier = input.int(10, "Timeframe multiplier", 1)
+//@variable The number of bars in the moving average.
+int length = input.int(5, "WMA smoothing length")
+
+//@variable The valid timeframe string closest to `tfMultiplier` times larger than the chart timeframe.
+string timeframe = timeframe.from_seconds(timeframe.in_seconds() * tfMultiplier)
+
+//@variable The weighted MA of `close` prices over `length` bars on the `timeframe`.
+//          This request does not repaint, as it always references the last confirmed WMA value on all bars.
+float requestedWMA = request.security(
+     syminfo.tickerid, timeframe, ta.wma(close, length)[1], lookahead = barmerge.lookahead_on
+ )
+
+// Plot the requested value.
+plot(requestedWMA, "HTF WMA", color.purple, 3)
+// Highlight the background on realtime bars.
+bgcolor(barstate.isrealtime ? color.new(color.orange, 70) : na, title = "Realtime bar highlight")

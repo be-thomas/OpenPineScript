@@ -1,0 +1,13 @@
+//@version=5
+indicator("Function overload")
+
+// Two parameters
+mult(x1, x2) =>
+    x1 * x2
+
+// Three parameters
+mult(x1, x2, x3) =>
+    x1 * x2 * x3
+
+plot(mult(7, 4))
+plot(mult(7, 4, 2))

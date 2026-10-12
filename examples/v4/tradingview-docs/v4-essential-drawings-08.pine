@@ -1,0 +1,9 @@
+//@version=4
+study("Last Bar Close 1", overlay=true)
+
+c = close >= open ? color.lime : color.red
+l = label.new(bar_index, na,
+    text=tostring(close), color=c,
+    style=label.style_label_down, yloc=yloc.abovebar)
+
+label.delete(l[1])

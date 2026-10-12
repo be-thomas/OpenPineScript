@@ -1,0 +1,8 @@
+//@version=5
+indicator("matrix.new<float> example")
+m = matrix.new<float>(1, 1, close)
+float x = na
+if bar_index > 10
+    x := matrix.get(m[10], 0, 0)
+plot(x)
+plot(close)

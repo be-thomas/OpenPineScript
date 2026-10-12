@@ -1,0 +1,14 @@
+//@version=2
+strategy("Fake strategy", overlay=true)
+
+r = input("D", type=resolution)
+l = security(tickerid, r, low)
+h = security(tickerid, r, high)
+
+longCondition = low == l
+if (longCondition)
+    strategy.entry("My Long Entry Id", strategy.long)
+
+shortCondition = high == h
+if (shortCondition)
+    strategy.entry("My Short Entry Id", strategy.short)

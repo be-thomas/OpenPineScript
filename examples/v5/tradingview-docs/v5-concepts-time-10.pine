@@ -1,0 +1,40 @@
+//@version=5
+indicator("Detecting the first day of the month demo", overlay = true, max_labels_count = 500)
+
+//@variable Is `true` only if the current bar opens on the first day of the month in exchange time, `false` otherwise. 
+bool opensOnFirst = dayofmonth == 1
+//@variable Is `true` if the bar opens in one month and closes in another, meaning its time span includes the first day.
+bool containsFirst = month != month(time_close) 
+//@variable Is `true` only if the bar opens in a new month and the current or previous bar does not cover the first day.
+bool skipsFirst = month != month[1] and not (opensOnFirst or containsFirst[1])
+
+//@variable The name of the current bar's opening weekday.
+string weekdayName = switch dayofweek
+    dayofweek.sunday    => "Sunday"
+    dayofweek.monday    => "Monday"
+    dayofweek.tuesday   => "Tuesday"
+    dayofweek.wednesday => "Wednesday"
+    dayofweek.thursday  => "Thursday"
+    dayofweek.friday    => "Friday"
+    dayofweek.saturday  => "Saturday"
+
+//@variable A custom "string" representing the bar's opening date, including the weekday name. 
+string openDateText = weekdayName + str.format_time(time, ", MMM d, yyyy")
+
+// Draw a green label when the bar opens on the first day of the month. 
+if opensOnFirst
+    string labelText = "Bar opened on\n" + openDateText
+    label.new(time, open, labelText, xloc.bar_time, color = color.green, textcolor = color.white, size = size.large)
+// Draw a blue label when the bar opens and closes in different months. 
+if containsFirst
+    string labelText = "Bar includes the first day,\nbut opened on\n" + openDateText
+    label.new(time, open, labelText, xloc.bar_time, color = color.blue, textcolor = color.white, size = size.large)
+// Draw a red label when the chart skips the first day of the month. 
+if skipsFirst
+    string labelText = "Chart doesn't include the first day.\nBar opened on\n" + openDateText
+    label.new(time, open, labelText, xloc.bar_time, color = color.red, textcolor = color.white, size = size.large)
+
+// Highlight the background when the conditions occur.
+bgcolor(opensOnFirst ? color.new(color.green, 70) : na, title = "`opensOnFirst` condition highlight")
+bgcolor(containsFirst ? color.new(color.blue, 70) : na, title = "`containsFirst` condition highlight")
+bgcolor(skipsFirst ? color.new(color.red, 70) : na, title = "`skipsFirst` condition highlight")

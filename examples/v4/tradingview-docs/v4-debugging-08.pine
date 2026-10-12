@@ -1,0 +1,9 @@
+//@version=4
+study("Debugging from inside functions", "", true)
+f_hlca() =>
+    var float _avg = na
+    _hlca = avg(high, low, close, nz(_avg, close))
+    _avg := sma(_hlca, 20)
+
+hlca = f_hlca()
+plot(hlca)

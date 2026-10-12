@@ -26,11 +26,11 @@
  * the let→var rewrite, which is what the CLI and REPL do.
  */
 import { describe, it, expect } from "vitest";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
-import { profileFor } from "../../../transpiler/profiles";
+import { profileFor } from "../../../transpiler/common/profiles";
 import { PREFIX } from "../../../utils/v2/common";
-import type { PineVersion } from "../../../transpiler/version";
+import type { PineVersion } from "../../../transpiler/common/version";
 
 /** Runs `src` verbatim — no let→var rewrite — and traces `name` per bar. */
 function trace(src: string, name: string, bars = 4, version: PineVersion = 2): number[] {

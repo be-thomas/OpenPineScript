@@ -1,0 +1,7 @@
+//@version=4
+study(title="Colored fill")
+line1=sma(close, 5)
+line2=sma(close, 20)
+p1 = plot(line1)
+p2 = plot(line2)
+fill(p1, p2, color = line1 > line2 ? color.green : color.red)

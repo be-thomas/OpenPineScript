@@ -1,0 +1,6 @@
+//@version=4
+study("My Script", overlay = true)
+var l = label.new(bar_index, high, text="Right\n aligned\n text", textalign=text.align_right)
+label.set_xy(l, bar_index, high)
+
+.. image:: images/ReleaseNotes-Label_text_align.png

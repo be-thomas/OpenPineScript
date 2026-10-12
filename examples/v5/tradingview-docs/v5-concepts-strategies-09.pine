@@ -1,0 +1,20 @@
+//@version=5
+strategy("Pyramiding demo", overlay = true)
+
+//@variable Represents the direction of the entry orders. A value of 1 means long, and -1 means short.
+var int direction = 1
+//@variable Is `true` once every 25 bars, `false` otherwise.
+bool entryCondition = bar_index % 25 == 0
+
+// Change the `direction` on every 100th bar.
+if bar_index % 100 == 0
+    direction *= -1
+
+// Place a market order based on the current `direction` when the `entryCondition` occurs.
+if entryCondition
+    strategy.entry("Entry", direction == 1 ? strategy.long : strategy.short)
+
+//@variable When the `entryCondition` occurs, is a blue color if the `direction` is 1 and a red color otherwise.
+color bgColor = entryCondition ? (direction == 1 ? color.new(color.blue, 80) : color.new(color.red, 80)) : na
+// Highlight the chart's background using the `bgColor`. 
+bgcolor(bgColor, title = "Background highlight")

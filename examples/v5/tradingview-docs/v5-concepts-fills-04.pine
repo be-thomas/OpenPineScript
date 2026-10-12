@@ -1,0 +1,32 @@
+//@version=5
+indicator("Box and polyline fills demo")
+
+//@variable The number of visible chart bars, excluding the leftmost and rightmost bars.
+var int barCount = 0
+if time > chart.left_visible_bar_time and time < chart.right_visible_bar_time
+    barCount += 1
+
+//@variable The approximate radius used to calculate the octagon and rectangle coordinates.
+int radius = math.ceil(barCount / 4)
+
+if barstate.islastconfirmedhistory
+    //@variable An array of chart points. The polyline uses all points in this array, but the box only needs two.
+    array<chart.point> points = array.new<chart.point>()
+    //@variable The counterclockwise angle of each point, in radians. Updates on each loop iteration. 
+    float angle = 0.0
+    //@variable The radians to add to the `angle` on each loop iteration.
+    float increment = 0.25 * math.pi
+    // Loop 8 times to calculate octagonal points.
+    for i = 0 to 7
+        //@variable The point's x-coordinate (bar offset).
+        int x = int(math.round(math.cos(angle) * radius))
+        //@variable The point's y-coordinate.
+        float y = math.round(math.sin(angle) * radius)
+        // Push a new chart point into the `points` array and increase the `angle`.
+        points.push(chart.point.from_index(bar_index - radius + x, y))
+        angle += increment
+    // Create a closed polyline to draw the octagon and fill it with translucent blue. 
+    polyline.new(points, closed = true, fill_color = color.new(color.blue, 60))
+    // Create a box for the rectangle using index 3 and 7 for the top-left and bottom-right corners, 
+    // and fill it with opaque purple. 
+    box.new(points.get(3), points.get(7), bgcolor = color.purple)

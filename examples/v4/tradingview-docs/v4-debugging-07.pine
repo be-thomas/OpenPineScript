@@ -1,0 +1,28 @@
+//@version=4
+study("Compound conditions")
+i_period    = input(20)
+i_bullLevel = input(55)
+
+r = rsi(close, i_period)
+
+// Condition #1.
+rsiBull = r > i_bullLevel
+// Condition #2.
+hiChannel = highest(r, i_period * 2)[1]
+aboveHiChannel = r > hiChannel
+// Condition #3.
+channelIsOld = hiChannel >= hiChannel[i_period]
+// Condition #4.
+historyIsBull = sum(rsiBull ? 1 : -1, i_period * 3) > 0
+// Compound condition.
+bull = rsiBull and aboveHiChannel and channelIsOld and historyIsBull
+
+hline(i_bullLevel)
+plot(r, "RSI", color.black)
+plot(hiChannel, "High Channel")
+
+plotchar(rsiBull ? i_bullLevel : na, "rIsBull", "1", location.absolute, color.green, size = size.tiny)
+plotchar(aboveHiChannel ? r : na, "aboveHiChannel", "2", location.absolute, size = size.tiny)
+plotchar(channelIsOld, "channelIsOld", "3", location.bottom, size = size.tiny)
+plotchar(historyIsBull, "historyIsBull", "4", location.top, size = size.tiny)
+bgcolor(bull ? not bull[1] ? color.new(color.green, 50) : color.green : na)

@@ -1,0 +1,24 @@
+//@version=5
+indicator("Deep Copy")
+
+type InfoLabel
+    string info
+    label  lbl
+
+method set(InfoLabel this, int x = na, int y = na, string info = na) =>
+    if not na(x)
+        this.lbl.set_x(x)
+    if not na(y)
+        this.lbl.set_y(y)
+    if not na(info)
+        this.info := info
+        this.lbl.set_text(this.info)
+
+method deepCopy(InfoLabel this) =>
+    InfoLabel.new(this.info, this.lbl.copy())
+
+var parent = InfoLabel.new("", label.new(0, 0))
+var deep   = parent.deepCopy()
+
+parent.set(bar_index, 0, "Parent")
+deep.set(bar_index, 1, "Deep Copy")

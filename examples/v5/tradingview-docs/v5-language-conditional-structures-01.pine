@@ -1,0 +1,6 @@
+//@version=5
+indicator("", "", true)
+var ourLabel = label.new(bar_index, na, na, color = color(na), textcolor = color.orange)
+if barstate.islast
+    label.set_xy(ourLabel, bar_index + 2, hl2[1])
+    label.set_text(ourLabel, str.tostring(bar_index + 1, "# bars in chart"))

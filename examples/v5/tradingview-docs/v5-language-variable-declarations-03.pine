@@ -1,0 +1,11 @@
+//@version=5
+indicator("Underscore demo")
+
+// We do not need the middle Bollinger Bands value, and do not use it.
+// To make this clear, we assign it to the `_` identifier.
+[_, bbUpper, bbLower] = ta.bb(close, 5, 4)
+
+// We can continue to use `_` in the same code without causing compilation errors:
+[bbMiddleLong, _, _] = ta.bb(close, 20, 2)
+
+plot(bbUpper)

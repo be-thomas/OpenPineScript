@@ -1,0 +1,6 @@
+//@version=5
+indicator("Efficient version", "", true)
+var closeLine = line.new(bar_index - 1, close, bar_index, close, extend = extend.right, width = 3)
+if barstate.islast
+    line.set_xy1(closeLine, bar_index - 1, close)
+    line.set_xy2(closeLine, bar_index, close)

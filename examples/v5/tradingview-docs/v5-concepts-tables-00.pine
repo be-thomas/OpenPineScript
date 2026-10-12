@@ -1,0 +1,9 @@
+//@version=5
+indicator("ATR", "", true)
+// We use `var` to only initialize the table on the first bar.
+var table atrDisplay = table.new(position.top_right, 1, 1)
+// We call `ta.atr()` outside the `if` block so it executes on each bar.
+myAtr = ta.atr(14)
+if barstate.islast
+    // We only populate the table on the last bar.
+    table.cell(atrDisplay, 0, 0, str.tostring(myAtr))

@@ -1,0 +1,8 @@
+//@version=5
+indicator("Name conflict demo")
+
+enum syminfo
+    abcd
+    tickerid // This matches the built-in `syminfo.tickerid` variable, causing a compilation error.
+
+log.info(str.tostring(syminfo.tickerid))

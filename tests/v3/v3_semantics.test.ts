@@ -9,9 +9,9 @@
  * guide's own fix for self-reference (`s = 0.0` then `s := ...`) requires it.
  */
 import { describe, it, expect } from "vitest";
-import { transpile } from "../../transpiler";
+import { transpile } from "../../transpiler/common";
 import { compile, Context } from "../../runtime/v1";
-import { profileFor } from "../../transpiler/profiles";
+import { profileFor } from "../../transpiler/common/profiles";
 import { PREFIX } from "../../utils/v2/common";
 
 const v3 = (src: string) => transpile(src, { version: 3 });

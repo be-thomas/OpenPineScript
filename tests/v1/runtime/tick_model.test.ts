@@ -8,7 +8,7 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
 
 function build(pine: string) {
@@ -83,5 +83,60 @@ describe("live-tick model — rollback & commit", () => {
         ctx.commitBar();
         ctx.applyTick(2, 20, 20, 20, 20, 1); exec();
         assert.strictEqual(vv(ctx, "d"), 2);  // 20 - 18 (committed)
+    });
+});
+
+describe("live-tick model — the broker survives a rollback", () => {
+    /**
+     * Entry on bar 0 (fills at bar 1's open), bracket registered on bar 1
+     * (live from bar 2), and bar 2 is driven by ticks.
+     */
+    const strat = [
+        'if n == 0',
+        '    strategy.entry("L", strategy.long, 1)',
+        'if n == 1',
+        '    strategy.exit("tp", "L", limit = 110)',
+        'sz = strategy.position_size',
+    ].join('\n');
+
+    it("a pending exit still fills on the second and third tick of a bar", () => {
+        const { ctx, exec } = build(strat);
+        ctx.setBar(0, 100, 105, 95, 100, 1); exec(); ctx.finalizeBar();
+        ctx.setBar(1, 100, 105, 95, 100, 1); exec(); ctx.finalizeBar();
+
+        // Tick 1: the bar has already traded through 110, so the bracket fills
+        // and the script sees a flat position.
+        ctx.applyTick(2, 105, 115, 100, 112, 1); exec();
+        assert.strictEqual(vv(ctx, "sz"), 0, "tick 1 fills the bracket");
+
+        // Tick 2 rolls the bar back to its committed baseline and re-runs it.
+        // The rollback restores the open position and the unfilled bracket —
+        // but it used to leave the per-bar "orders already matched" guards set,
+        // so the re-run skipped matching entirely and the script saw the
+        // position still open. The fill has to happen again.
+        ctx.applyTick(2, 105, 118, 100, 116, 1); exec();
+        assert.strictEqual(vv(ctx, "sz"), 0, "tick 2 fills it again after the rollback");
+
+        ctx.applyTick(2, 105, 120, 100, 118, 1); exec();
+        assert.strictEqual(vv(ctx, "sz"), 0, "and tick 3");
+
+        // One fill, not three: each tick rolled the previous one back.
+        ctx.commitBar();
+        assert.strictEqual(ctx.trades.length, 1, "the bar books one exit, not one per tick");
+    });
+
+    it("a tick whose range no longer reaches the level leaves the position open", () => {
+        const { ctx, exec } = build(strat);
+        ctx.setBar(0, 100, 105, 95, 100, 1); exec(); ctx.finalizeBar();
+        ctx.setBar(1, 100, 105, 95, 100, 1); exec(); ctx.finalizeBar();
+
+        ctx.applyTick(2, 105, 115, 100, 112, 1); exec();
+        assert.strictEqual(vv(ctx, "sz"), 0, "filled while the tick's high reached 110");
+
+        // A later tick is an ABSOLUTE snapshot, and this one never traded up to
+        // the limit. Rolling back means the fill is undone, not merely hidden.
+        ctx.applyTick(2, 105, 108, 100, 106, 1); exec();
+        assert.strictEqual(vv(ctx, "sz"), 1, "the fill is undone, not kept");
+        assert.strictEqual(ctx.trades.length, 0);
     });
 });

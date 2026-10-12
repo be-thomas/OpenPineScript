@@ -1,0 +1,7 @@
+//@version=5
+indicator("Shadowing demo")
+
+enum syminfo
+    abcd
+
+log.info(str.tostring(syminfo.abcd))

@@ -1,4 +1,5 @@
 import { Context } from "../context";
+import { opensDay } from "../sessions";
 
 /**
  * ta.ts - Production Grade (Fully Dynamic & Safe)
@@ -36,7 +37,18 @@ interface BarsSinceState { counter: number; }
 interface ValueWhenState { history: number[]; }
 interface AtrState { prevClose: number; }
 interface VwapState { sumVol: number; sumSrcVol: number; }
-interface SarState { isLong: boolean; af: number; ep: number; sar: number; initialized: boolean; }
+interface SarState {
+    /** Bars this call site has seen, so the seed lands on `bar_index == 1`. */
+    bars: number;
+    result: number;
+    maxMin: number;
+    acceleration: number;
+    /** True while the stop sits BELOW price, i.e. the trend is up. */
+    isBelow: boolean;
+    prevHigh: number; prevHigh2: number;
+    prevLow: number; prevLow2: number;
+    prevClose: number;
+}
 
 // --- Moving Averages ---
 
@@ -201,7 +213,23 @@ export function wma(ctx: Context, sourceInput: any, lengthInput: any): number {
 
     state.buffer.push(source);
 
-    if (length !== state.prevLength || state.buffer.length <= length) {
+    // A NaN anywhere in the running totals POISONS them: the incremental update
+    // below is arithmetic on `state.sum`, and NaN propagates through it forever.
+    // The periodic heal did eventually clear it, 200 bars later.
+    //
+    // That is not a corner case — it is every composed indicator's warm-up.
+    // `ta.hma` feeds this the difference of two WMAs, which is `na` until both
+    // have filled, so `hma(close, 9)` was `na` for 200 bars instead of 12.
+    // Rebuilding from the buffer whenever the totals are not finite costs one
+    // pass over `length` values, and only on the bars that are poisoned.
+    const exiting = state.buffer.length > length
+        ? state.buffer[state.buffer.length - 1 - length]
+        : 0;
+    const poisoned = !Number.isFinite(state.sum)
+        || !Number.isFinite(state.numerator)
+        || !Number.isFinite(exiting);
+
+    if (length !== state.prevLength || state.buffer.length <= length || poisoned) {
         state.sum = 0;
         state.numerator = 0;
         const start = Math.max(0, state.buffer.length - length);
@@ -293,7 +321,12 @@ export function trix(ctx: Context, sourceInput: any, lengthInput: any): number {
     const state = ctx.getPersistentState<{ prevE3: number | undefined }>(() => ({ prevE3: undefined }));
     // Same rule as ema — do not latch a NaN as the comparison point.
     if (isNaN(e3)) return NaN;
-    if (state.prevE3 === undefined || isNaN(state.prevE3)) { state.prevE3 = e3; return 0; }
+    // na, not 0. trix is a CHANGE, and a change with no predecessor is
+    // undefined — `ta.change` reports na there. Returning 0 put a real value on
+    // the chart one bar before TradingView has one, and 0 is a meaningful
+    // reading for an oscillator that crosses zero. rsi and tsi were corrected
+    // for this above; trix was missed.
+    if (state.prevE3 === undefined || isNaN(state.prevE3)) { state.prevE3 = e3; return NaN; }
     const result = 100 * (e3 - state.prevE3) / state.prevE3;
     state.prevE3 = e3;
     return result;
@@ -544,6 +577,38 @@ function updateMonotonicDeque(state: DequeState, sourceInput: any, lengthInput: 
     }
 }
 
+
+/**
+ * Has the rolling window seen `length` bars yet?
+ *
+ * SOURCING. TradingView's own output, collected with the golden harness on
+ * BINANCE:BTCUSDT 1D over full history: `ta.highest(high, 20)` is `na` for bars
+ * 0–18 and first carries a value on bar 19. The same holds for `lowest`,
+ * `highestbars`, `lowestbars`, and therefore for `ta.stoch`, which is built on
+ * two of them.
+ *
+ * ── The failure this closes ─────────────────────────────────────────────────
+ *
+ * The deque returned the running extreme from bar 0, so every one of these
+ * produced a number through the whole warm-up where TradingView produces
+ * nothing. The VALUES agreed — once both sides were warm, every bar matched —
+ * which is exactly why this survived: a comparison that skips the bars
+ * TradingView left blank can never see it. It took the golden suite's "agrees
+ * on WHERE the values start" assertion, against real TradingView data, to
+ * surface it.
+ *
+ * It is not cosmetic. `na` is false in a condition and poisons the arithmetic
+ * it reaches, so a script gated on `close > ta.highest(high, 20)[1]` takes a
+ * branch during warm-up here that it would not take on TradingView.
+ *
+ * `globalIdx` counts bars and is incremented by `updateMonotonicDeque`, so it
+ * equals the number seen once that has run. `buffer.length` would not do:
+ * it is trimmed once it passes MAX_BUFFER_SIZE.
+ */
+function windowIsWarm(state: DequeState, lengthInput: any): boolean {
+    return state.globalIdx >= Math.floor(val(lengthInput));
+}
+
 /**
  * Highest value in window.
  *
@@ -558,7 +623,7 @@ export function highest(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get("opsv2_high"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false); 
-    return state.dequeVals[0];
+    return windowIsWarm(state, length) ? state.dequeVals[0] : NaN;
 }
 
 /**
@@ -573,7 +638,7 @@ export function lowest(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get("opsv2_low"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true); 
-    return state.dequeVals[0];
+    return windowIsWarm(state, length) ? state.dequeVals[0] : NaN;
 }
 
 /**
@@ -585,7 +650,7 @@ export function highestbars(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get("opsv2_high"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false);
-    return state.dequeIdxs[0] - (state.globalIdx - 1);
+    return windowIsWarm(state, length) ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
 }
 
 /**
@@ -597,7 +662,7 @@ export function lowestbars(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get("opsv2_low"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true);
-    return state.dequeIdxs[0] - (state.globalIdx - 1);
+    return windowIsWarm(state, length) ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
 }
 
 /**
@@ -689,18 +754,35 @@ export function atr(ctx: Context, lengthInput: any): number {
 }
 
 /**
- * vwap: Cumulative Volume Weighted Average Price (Sessionless)
+ * `ta.vwap(source)` — Volume Weighted Average Price.
+ *
+ * The accumulation restarts at the beginning of every SESSION; it is not
+ * cumulative over the chart. That is the whole character of the indicator, and
+ * getting it wrong is invisible on a short export and badly wrong on a long
+ * one — the old sessionless version drifted further from TradingView the more
+ * history it was given.
+ *
+ * On a daily or higher timeframe every bar is its own session, so this returns
+ * `source` unchanged. That is not a degenerate case to work around: TradingView
+ * does the same, exactly, on all 2,475 daily bars of
+ * conformance/v5/golden/harness_state.BTCUSDT.1D.log. VWAP is an intraday
+ * indicator, and on a daily chart there is nothing for it to average.
+ *
+ * ../sessions.ts owns the boundary, shared with `session.isfirstbar`.
+ *
  * @returns series float
  */
 export function vwap(ctx: Context, sourceInput: any): number {
     const source = val(sourceInput);
     const volume = (ctx as any).volume !== undefined ? val((ctx as any).volume) : 0;
-    
+
     const state = ctx.getPersistentState<VwapState>(() => ({ sumVol: 0, sumSrcVol: 0 }));
-    
+
+    if (opensDay(ctx)) { state.sumVol = 0; state.sumSrcVol = 0; }
+
     state.sumVol += volume;
     state.sumSrcVol += source * volume;
-    
+
     if (state.sumVol === 0) return NaN;
     return state.sumSrcVol / state.sumVol;
 }
@@ -743,7 +825,30 @@ export function linreg(ctx: Context, sourceInput: any, lengthInput: any, offsetI
 }
 
 /**
- * sar: Parabolic SAR (Simplified mathematical emulator)
+ * `ta.sar(start, inc, max)` — Parabolic SAR.
+ *
+ * This follows the `pine_sar` reference implementation published alongside
+ * `ta.sar` in TradingView's Pine Script reference manual, step for step. It is
+ * not the textbook Wilder algorithm, and the differences are not cosmetic —
+ * each of the four below moved the output on real data, and all four together
+ * reproduce TradingView's own values on 2,475 BTCUSDT daily bars to 1e-6 with
+ * no exceptions (conformance/v5/golden/harness_state.BTCUSDT.1D.log):
+ *
+ *   - It returns `na` on bar 0 and SEEDS on bar 1, using `close > close[1]` to
+ *     pick the initial direction. A bar-0 seed puts every later value one bar
+ *     early for the whole chart.
+ *   - The parabola advances BEFORE the stop is tested, so the reversal test
+ *     sees this bar's advanced stop rather than the previous bar's.
+ *   - On reversal the new stop is `max(high, maxMin)` (or `min(low, maxMin)`),
+ *     which can pick the CURRENT bar's extreme rather than the trend's.
+ *   - The acceleration factor and extreme point are frozen on the bar a trend
+ *     begins — `isFirstTrendBar` — so a reversal bar never also bumps `af`.
+ *
+ * The closing clamp keeps the stop out of the previous two bars' range. Note
+ * it is `low[1]`/`low[2]`, NOT Wilder's `low`/`low[1]`: clamping against the
+ * current bar suppresses reversals TradingView takes (it first diverged at bar
+ * 263 of that export).
+ *
  * @returns series float
  */
 export function sar(ctx: Context, startInput: any, incInput: any, maxInput: any): number {
@@ -751,50 +856,83 @@ export function sar(ctx: Context, startInput: any, incInput: any, maxInput: any)
     const inc = val(incInput);
     const max = val(maxInput);
 
-    const high = (ctx as any).high !== undefined ? val((ctx as any).high) : 0;
-    const low = (ctx as any).low !== undefined ? val((ctx as any).low) : 0;
+    const high = (ctx as any).high !== undefined ? val((ctx as any).high) : NaN;
+    const low = (ctx as any).low !== undefined ? val((ctx as any).low) : NaN;
+    const close = (ctx as any).close !== undefined ? val((ctx as any).close) : NaN;
 
     const state = ctx.getPersistentState<SarState>(() => ({
-        isLong: true, af: start, ep: 0, sar: 0, initialized: false
+        bars: 0, result: NaN, maxMin: NaN, acceleration: NaN, isBelow: false,
+        prevHigh: NaN, prevHigh2: NaN, prevLow: NaN, prevLow2: NaN, prevClose: NaN,
     }));
 
-    if (!state.initialized) {
-        state.sar = low;
-        state.ep = high;
-        state.initialized = true;
-        return state.sar;
+    const bar = state.bars;
+    // Shifting the history here rather than at every `return` is what keeps
+    // `low[1]` meaning the same thing on the seed bar and on a reversal bar.
+    const shift = () => {
+        state.prevHigh2 = state.prevHigh; state.prevHigh = high;
+        state.prevLow2 = state.prevLow; state.prevLow = low;
+        state.prevClose = close;
+        state.bars = bar + 1;
+    };
+
+    let isFirstTrendBar = false;
+
+    if (bar === 1) {
+        if (close > state.prevClose) {
+            state.isBelow = true; state.maxMin = high; state.result = state.prevLow;
+        } else {
+            state.isBelow = false; state.maxMin = low; state.result = state.prevHigh;
+        }
+        isFirstTrendBar = true;
+        state.acceleration = start;
     }
 
-    let nextSar = state.sar + state.af * (state.ep - state.sar);
+    if (bar < 1) { shift(); return NaN; }
 
-    if (state.isLong) {
-        if (low < nextSar) {
-            state.isLong = false;
-            nextSar = Math.max(state.ep, high); // Switch to short
-            state.ep = low;
-            state.af = start;
-        } else {
-            if (high > state.ep) {
-                state.ep = high;
-                state.af = Math.min(state.af + inc, max);
-            }
+    state.result += state.acceleration * (state.maxMin - state.result);
+
+    if (state.isBelow) {
+        if (state.result > low) {
+            isFirstTrendBar = true;
+            state.isBelow = false;
+            state.result = Math.max(high, state.maxMin);
+            state.maxMin = low;
+            state.acceleration = start;
         }
     } else {
-        if (high > nextSar) {
-            state.isLong = true;
-            nextSar = Math.min(state.ep, low); // Switch to long
-            state.ep = high;
-            state.af = start;
+        if (state.result < high) {
+            isFirstTrendBar = true;
+            state.isBelow = true;
+            state.result = Math.min(low, state.maxMin);
+            state.maxMin = high;
+            state.acceleration = start;
+        }
+    }
+
+    if (!isFirstTrendBar) {
+        if (state.isBelow) {
+            if (high > state.maxMin) {
+                state.maxMin = high;
+                state.acceleration = Math.min(state.acceleration + inc, max);
+            }
         } else {
-            if (low < state.ep) {
-                state.ep = low;
-                state.af = Math.min(state.af + inc, max);
+            if (low < state.maxMin) {
+                state.maxMin = low;
+                state.acceleration = Math.min(state.acceleration + inc, max);
             }
         }
     }
-    
-    state.sar = nextSar;
-    return state.sar;
+
+    if (state.isBelow) {
+        state.result = Math.min(state.result, state.prevLow);
+        if (bar > 1) state.result = Math.min(state.result, state.prevLow2);
+    } else {
+        state.result = Math.max(state.result, state.prevHigh);
+        if (bar > 1) state.result = Math.max(state.result, state.prevHigh2);
+    }
+
+    shift();
+    return state.result;
 }
 
 // --- Quick-win TA indicators ---
@@ -1179,14 +1317,32 @@ export function tsi(ctx: Context, sourceInput: any, longLenInput: any, shortLenI
 }
 
 /**
+ * Pine gives both pivot functions two overloads:
+ *
+ *   ta.pivothigh(source, leftbars, rightbars)
+ *   ta.pivothigh(leftbars, rightbars)            // source defaults to `high`
+ *
+ * The registry cannot express an overload, so the shorter form arrives here as
+ * (5, 5, undefined) and every downstream length is NaN — the function returned
+ * `na` on every bar rather than failing, which is the worst way to be wrong.
+ * Normalise the arguments first; `defaultSource` is `high` for pivothigh and
+ * `low` for pivotlow, per the reference.
+ */
+const pivotArgs = (
+    a: any, b: any, c: any, defaultSource: number,
+): [number, number, number] =>
+    c === undefined || c === null
+        ? [defaultSource, Math.floor(val(a)), Math.floor(val(b))]
+        : [val(a), Math.floor(val(b)), Math.floor(val(c))];
+
+/**
  * pivothigh: Pivot High. Returns the value of the pivot high point, NaN otherwise.
  * Looks for a high that is higher than `leftbars` bars to the left and `rightbars` bars to the right.
  * @returns series float
  */
 export function pivothigh(ctx: Context, sourceInput: any, leftbarsInput: any, rightbarsInput: any): number {
-    const source = val(sourceInput);
-    const leftbars = Math.floor(val(leftbarsInput));
-    const rightbars = Math.floor(val(rightbarsInput));
+    const [source, leftbars, rightbars] =
+        pivotArgs(sourceInput, leftbarsInput, rightbarsInput, ctx.high);
     const totalLen = leftbars + rightbars + 1;
     const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
     state.buffer.push(source);
@@ -1211,9 +1367,8 @@ export function pivothigh(ctx: Context, sourceInput: any, leftbarsInput: any, ri
  * @returns series float
  */
 export function pivotlow(ctx: Context, sourceInput: any, leftbarsInput: any, rightbarsInput: any): number {
-    const source = val(sourceInput);
-    const leftbars = Math.floor(val(leftbarsInput));
-    const rightbars = Math.floor(val(rightbarsInput));
+    const [source, leftbars, rightbars] =
+        pivotArgs(sourceInput, leftbarsInput, rightbarsInput, ctx.low);
     const totalLen = leftbars + rightbars + 1;
     const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
     state.buffer.push(source);
@@ -1234,8 +1389,24 @@ export function pivotlow(ctx: Context, sourceInput: any, leftbarsInput: any, rig
 }
 
 /**
- * tr: True Range (standalone, not wrapped in RMA like atr)
- * @returns series float
+ * `tr` / `ta.tr` — True Range, as a VARIABLE.
+ *
+ * A getter, because a script reads it by name:
+ *
+ *     trBalance := trBalance + sign(tr - tr[_i])
+ *
+ * is TradingView's own `v4-debugging-11`, and `tr` there is a series, not a
+ * function. Registered without `@getter` it emitted the FUNCTION OBJECT, so
+ * `tr - tr[5]` was arithmetic on a function and every bar of the plot was na —
+ * with no diagnostic, because a built-in that exists is not an undeclared read.
+ *
+ * The one-argument call form `ta.tr(handle_na)` is a separate question. Nothing
+ * in the manual or the release notes states what `handle_na` does, and no
+ * script in the corpus passes it, so no parameter is offered rather than one
+ * that guesses.
+ *
+ * @getter
+ * @returns {series float} The bar's true range.
  */
 export function tr(ctx: Context): number {
     const state = ctx.getPersistentState<{ prevClose: number }>(() => ({ prevClose: NaN }));
@@ -1359,4 +1530,300 @@ export function percentile_linear_interpolation(
     const hi = Math.ceil(pos);
     if (lo === hi) return window[lo];
     return window[lo] + (window[hi] - window[lo]) * (pos - lo);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// The March 2020 batch — v4 and later only
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// TradingView added these in March 2020, which makes them v4+ (see
+// stdlib/renames.ts, V4_ONLY_NAMES). At v5 they are spelled `ta.*`, aliased in
+// stdlib/renames5.ts like the rest of the library.
+//
+// Every one is COMPOSED from the smoothers above rather than reimplemented, so
+// there is one `ema`, one `rma` and one `stdev` in this engine and their
+// warm-up behaviour — the part that is hardest to get right and the part the
+// golden data actually pins down — cannot drift between them.
+//
+// ── The callStack frames are load-bearing ─────────────────────────────────
+//
+// `getPersistentState` keys on the call stack, so two `ema` calls inside one
+// function share a state object unless they are pushed under different frames.
+// `macd` above does this and says why; everything here follows it.
+
+/** Runs `fn` under its own state frame, so composed smoothers stay separate. */
+function sub<T>(ctx: Context, tag: string, fn: () => T): T {
+    (ctx as any).callStack.push(tag);
+    try { return fn(); }
+    finally { (ctx as any).callStack.pop(); }
+}
+
+/**
+ * bbw: Bollinger Bands Width — the bands' span as a fraction of the basis.
+ *
+ *   (basis + mult*stdev - (basis - mult*stdev)) / basis  =  2*mult*stdev / sma
+ *
+ * @returns series float
+ */
+export function bbw(ctx: Context, sourceInput: any, lengthInput: any, multInput: any): number {
+    const source = val(sourceInput);
+    const length = val(lengthInput);
+    const basis = sub(ctx, "bbw_basis", () => sma(ctx, source, length));
+    const dev = sub(ctx, "bbw_dev", () => stdev(ctx, source, length));
+    return (2 * val(multInput) * dev) / basis;
+}
+
+/**
+ * kc: Keltner Channels — [basis, upper, lower].
+ *
+ * The basis is an EMA of the source; the band width is an EMA of the bar's
+ * range. `useTrueRange` chooses which range: the true range (the default, and
+ * what makes the channel gap-aware) or the plain high-low span.
+ *
+ * @returns [float, float, float]
+ */
+export function kc(
+    ctx: Context,
+    sourceInput: any,
+    lengthInput: any,
+    multInput: any,
+    useTrueRangeInput: any = true,
+): [number, number, number] {
+    const source = val(sourceInput);
+    const length = val(lengthInput);
+    const mult = val(multInput);
+
+    const basis = sub(ctx, "kc_basis", () => ema(ctx, source, length));
+    // `tr` keeps its own previous close, so it must run every bar regardless of
+    // which branch is taken — reading it conditionally would leave its history
+    // with holes on the bars the other branch was chosen.
+    const trueRange = sub(ctx, "kc_tr", () => tr(ctx));
+    const span = useTrueRangeInput === false ? ctx.high - ctx.low : trueRange;
+    const width = sub(ctx, "kc_span", () => ema(ctx, span, length));
+
+    return [basis, basis + width * mult, basis - width * mult];
+}
+
+/**
+ * kcw: Keltner Channels Width — the channel span over its basis.
+ * @returns series float
+ */
+export function kcw(
+    ctx: Context,
+    sourceInput: any,
+    lengthInput: any,
+    multInput: any,
+    useTrueRangeInput: any = true,
+): number {
+    const [basis, upper, lower] = kc(ctx, sourceInput, lengthInput, multInput, useTrueRangeInput);
+    return (upper - lower) / basis;
+}
+
+/**
+ * hma: Hull Moving Average.
+ *
+ *   wma(2 * wma(src, len/2) - wma(src, len), round(sqrt(len)))
+ *
+ * The doubled short WMA minus the long one is what removes the lag; the final
+ * smoothing over sqrt(len) is what removes the noise that leaves behind.
+ *
+ * @returns series float
+ */
+export function hma(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = Math.floor(val(lengthInput));
+
+    const half = sub(ctx, "hma_half", () => wma(ctx, source, Math.floor(length / 2)));
+    const full = sub(ctx, "hma_full", () => wma(ctx, source, length));
+    return sub(ctx, "hma_smooth", () =>
+        wma(ctx, 2 * half - full, Math.round(Math.sqrt(length))));
+}
+
+/**
+ * cmo: Chande Momentum Oscillator.
+ *
+ *   100 * (sum(gains) - sum(losses)) / (sum(gains) + sum(losses))
+ *
+ * Unlike RSI, the sums are plain rolling sums rather than Wilder-smoothed, so
+ * the result reacts faster and swings the full -100..100.
+ *
+ * @returns series float
+ */
+export function cmo(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = val(lengthInput);
+
+    const state = ctx.getPersistentState<{ prev: number }>(() => ({ prev: NaN }));
+    const previous = state.prev;
+    state.prev = source;
+
+    const delta = isNaN(previous) ? NaN : source - previous;
+    const gain = isNaN(delta) ? 0 : Math.max(delta, 0);
+    const loss = isNaN(delta) ? 0 : -Math.min(delta, 0);
+
+    const gains = sub(ctx, "cmo_up", () => sum(ctx, gain, length));
+    const losses = sub(ctx, "cmo_down", () => sum(ctx, loss, length));
+    const total = gains + losses;
+    return total === 0 ? 0 : (100 * (gains - losses)) / total;
+}
+
+/**
+ * dmi: Directional Movement Index — [+DI, -DI, ADX].
+ *
+ * Transcribed from the reference implementation in TradingView's v5 manual
+ * rather than from a textbook: the +DM/-DM tie-breaks ("strictly greater than
+ * the other AND positive") and the zero-sum guard in ADX are exactly where
+ * published variants disagree with each other.
+ *
+ * @returns [float, float, float]
+ */
+export function dmi(ctx: Context, diLengthInput: any, adxSmoothingInput: any): [number, number, number] {
+    const diLength = val(diLengthInput);
+    const adxSmoothing = val(adxSmoothingInput);
+
+    const state = ctx.getPersistentState<{ prevHigh: number; prevLow: number }>(
+        () => ({ prevHigh: NaN, prevLow: NaN }),
+    );
+    const up = ctx.high - state.prevHigh;
+    const down = state.prevLow - ctx.low;
+    state.prevHigh = ctx.high;
+    state.prevLow = ctx.low;
+
+    const plusDM = isNaN(up) ? 0 : (up > down && up > 0 ? up : 0);
+    const minusDM = isNaN(down) ? 0 : (down > up && down > 0 ? down : 0);
+
+    const trueRange = sub(ctx, "dmi_tr", () => tr(ctx));
+    const trur = sub(ctx, "dmi_trur", () => rma(ctx, trueRange, diLength));
+
+    const plus = trur === 0 ? 0 : (100 * sub(ctx, "dmi_plus", () => rma(ctx, plusDM, diLength))) / trur;
+    const minus = trur === 0 ? 0 : (100 * sub(ctx, "dmi_minus", () => rma(ctx, minusDM, diLength))) / trur;
+
+    const total = plus + minus;
+    const dx = Math.abs(plus - minus) / (total === 0 ? 1 : total);
+    const adx = 100 * sub(ctx, "dmi_adx", () => rma(ctx, dx, adxSmoothing));
+
+    return [plus, minus, adx];
+}
+
+/**
+ * supertrend: [supertrend, direction].
+ *
+ * `direction` is -1 while the trend is up (the line sits below price) and 1
+ * while it is down. That sign convention is TradingView's and reads backwards
+ * to most people, so it is worth stating: a script testing `direction < 0` is
+ * testing for an UPTREND.
+ *
+ * The bands RATCHET — each one may only tighten toward price until price
+ * crosses it — which is the whole behaviour of the indicator and the reason it
+ * cannot be composed from the smoothers alone.
+ *
+ * @returns [float, float]
+ */
+export function supertrend(ctx: Context, factorInput: any, atrPeriodInput: any): [number, number] {
+    const factor = val(factorInput);
+    const source = (ctx.high + ctx.low) / 2;
+    const atrValue = sub(ctx, "st_atr", () => atr(ctx, val(atrPeriodInput)));
+
+    const state = ctx.getPersistentState<{
+        upper: number; lower: number; trend: number; prevClose: number; started: boolean;
+    }>(() => ({ upper: NaN, lower: NaN, trend: 1, prevClose: NaN, started: false }));
+
+    let upper = source + factor * atrValue;
+    let lower = source - factor * atrValue;
+
+    if (state.started) {
+        // The reference implementation reads the previous bands through `nz`,
+        // and that is not decoration: on the first comparable bar the previous
+        // band is `na`, every comparison against it is false, and the ratchet
+        // would latch onto `na` and hold it for the rest of the chart. Zero is
+        // what `nz` supplies, and it lets the first real band through.
+        const prevUpper = Number.isFinite(state.upper) ? state.upper : 0;
+        const prevLower = Number.isFinite(state.lower) ? state.lower : 0;
+        const prevClose = Number.isFinite(state.prevClose) ? state.prevClose : 0;
+
+        lower = lower > prevLower || prevClose < prevLower ? lower : prevLower;
+        upper = upper < prevUpper || prevClose > prevUpper ? upper : prevUpper;
+
+        // The previous bar's line tells us which band was live, and therefore
+        // which one a cross has to breach.
+        const wasUpper = state.trend === 1;
+        state.trend = wasUpper
+            ? (ctx.close > upper ? -1 : 1)
+            : (ctx.close < lower ? 1 : -1);
+    } else {
+        state.trend = 1;
+        state.started = true;
+    }
+
+    state.upper = upper;
+    state.lower = lower;
+    state.prevClose = ctx.close;
+
+    return [state.trend === -1 ? lower : upper, state.trend];
+}
+
+/**
+ * range: the span of `source` over `length` bars — highest minus lowest.
+ * @returns series float
+ */
+export function range(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const source = val(sourceInput);
+    const length = val(lengthInput);
+    const hi = sub(ctx, "range_hi", () => highest(ctx, source, length));
+    const lo = sub(ctx, "range_lo", () => lowest(ctx, source, length));
+    return hi - lo;
+}
+
+/** The last `length` samples of `source`, oldest first. Shared by median/mode. */
+function window(ctx: Context, source: number, length: number): number[] {
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
+    state.buffer.push(source);
+    if (state.buffer.length > MAX_BUFFER_SIZE) state.buffer.shift();
+    return state.buffer.slice(-length);
+}
+
+/**
+ * median: the middle value of the last `length` samples.
+ *
+ * `na` until the window is full, matching every other windowed function here —
+ * a median over three of the twenty bars requested is not a median over twenty.
+ *
+ * @returns series float
+ */
+export function median(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const length = Math.floor(val(lengthInput));
+    const w = window(ctx, val(sourceInput), length);
+    if (w.length < length) return NaN;
+
+    const sorted = [...w].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+/**
+ * mode: the most frequent value of the last `length` samples.
+ *
+ * Ties go to the SMALLEST value, which is what TradingView documents. Without
+ * that rule the answer would depend on iteration order, and two runs of the
+ * same script could differ.
+ *
+ * @returns series float
+ */
+export function mode(ctx: Context, sourceInput: any, lengthInput: any): number {
+    const length = Math.floor(val(lengthInput));
+    const w = window(ctx, val(sourceInput), length);
+    if (w.length < length) return NaN;
+
+    const counts = new Map<number, number>();
+    for (const v of w) counts.set(v, (counts.get(v) ?? 0) + 1);
+
+    let best = NaN;
+    let bestCount = -1;
+    for (const [value, count] of counts) {
+        if (count > bestCount || (count === bestCount && value < best)) {
+            best = value;
+            bestCount = count;
+        }
+    }
+    return best;
 }

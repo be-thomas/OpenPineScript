@@ -1,0 +1,9 @@
+//@version=2
+study("Example of alertcondition")
+src = input(close)
+ma_1 = sma(src, 20)
+ma_2 = sma(src, 10)
+c = cross(ma_1, ma_2)
+alertcondition(c, title='Red crosses blue', message='Red and blue have crossed!')
+plot(ma_1, color=red)
+plot(ma_2, color=blue)

@@ -1,0 +1,47 @@
+//@version=5
+indicator("Reading box values demo", "Nested boxes", overlay = true, max_boxes_count = 500)
+
+//@variable The number of bars in the range calculation.
+int length = input.int(10, "Length", 2, 500)
+//@variable The number of nested boxes drawn on each period.
+int numberOfBoxes = input.int(5, "Nested box count", 1)
+//@variable The scale factor applied to each box.
+float scaleFactor = input.float(1.6, "Scale factor", 1)
+
+//@variable The initial box range.
+float initialRange = scaleFactor * ta.sma(high - low, length)
+
+if bar_index % length == 0
+    //@variable The top-left `chart.point` for the initial box. Does not contain `time` information.
+    topLeft = chart.point.from_index(bar_index, hl2 + initialRange / 2)
+    //@variable The bottom-right `chart.point` for the initial box. Does not contain `time` information.
+    bottomRight = chart.point.from_index(bar_index + length, hl2 - initialRange / 2)
+
+    // Calculate border and fill colors of the boxes.
+    borderColor = color.rgb(math.random(100, 255), math.random(0, 100), math.random(100, 255))
+    bgColor = color.new(borderColor, math.max(100 * (1 - 1/numberOfBoxes), 90))
+
+    // Draw a new box using the `topLeft` and `bottomRight` points. Uses their `index` fields as x-coordinates.
+    box.new(topLeft, bottomRight, borderColor, 2, bgcolor = bgColor)
+
+    if numberOfBoxes > 1
+        // Loop to create additional boxes.
+        for i = 1 to numberOfBoxes - 1
+            //@variable The last box drawn by the script.
+            box lastBoxDrawn = box.all.last()
+
+            //@variable The top price of the last box.
+            float top = box.get_top(lastBoxDrawn)
+            //@variable The bottom price of the last box.
+            float bottom = box.get_bottom(lastBoxDrawn)
+
+            //@variable The scaled range of the new box.
+            float newRange = scaleFactor * (top - bottom) * 0.5
+
+            // Update the `price` fields of the `topLeft` and `bottomRight` points.
+            // This does not affect the coordinates of previous boxes.
+            topLeft.price     := hl2 + newRange
+            bottomRight.price := hl2 - newRange
+
+            // Draw a new box using the updated `topLeft` and `bottomRight` points.
+            box.new(topLeft, bottomRight, borderColor, 2, bgcolor = bgColor)

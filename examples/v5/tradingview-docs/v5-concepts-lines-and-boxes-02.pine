@@ -1,0 +1,45 @@
+//@version=5
+indicator("Modifying lines demo", overlay = true)
+
+//@variable The size of each period.
+string timeframe = input.timeframe("D", "Timeframe")
+
+//@variable A line connecting the period's opening and closing prices.
+var line periodLine = na
+
+//@variable The first point of the line. Contains `time` and `index` information.
+var chart.point openPoint = chart.point.now(open)
+//@variable The closing point of the line. Contains `time` and `index` information.
+var chart.point closePoint = chart.point.now(close)
+
+if timeframe.change(timeframe)
+    //@variable The final color of the `periodLine`.
+    color finalColor = switch
+        closePoint.price > openPoint.price => color.green
+        closePoint.price < openPoint.price => color.red
+        =>                                    color.gray
+
+    // Update the color of the current `periodLine` to the `finalColor`.
+    line.set_color(periodLine, finalColor)
+
+    // Assign new points to the `openPoint` and `closePoint`.
+    openPoint  := chart.point.now(open)
+    closePoint := chart.point.now(close)
+    // Assign a new line to the `periodLine`. Uses `time` fields from the `openPoint` and `closePoint` as x-coordinates.
+    periodLine := line.new(openPoint, closePoint, xloc.bar_time, style = line.style_arrow_right, width = 3)
+
+else if not na(periodLine)
+    // Assign a new point to the `closePoint`.
+    closePoint := chart.point.now(close)
+
+    //@variable The color of the developing `periodLine`.
+    color developingColor = switch
+        closePoint.price > openPoint.price => color.aqua
+        closePoint.price < openPoint.price => color.fuchsia
+        =>                                    color.gray
+
+    // Update the coordinates of the line's second point using the new `closePoint`.
+    // It uses the `time` field from the point for its new x-coordinate.
+    periodLine.set_second_point(closePoint)
+    // Update the color of the line using the `developingColor`.
+    periodLine.set_color(developingColor)

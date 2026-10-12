@@ -1,0 +1,10 @@
+//@version=5
+indicator("CCI levels with `plot()`")
+plot(ta.cci(close, 20))
+plot(0,  "Zero", color.gray, 1, plot.style_circles)
+plot(bar_index % 2 == 0 ?  100 : na,  "100", color.lime, 1, plot.style_linebr)
+plot(bar_index % 2 == 0 ? -100 : na, "-100", color.fuchsia, 1, plot.style_linebr)
+plot( 200,  "200", color.green, 2, trackprice = true, show_last = 1, offset = -99999)
+plot(-200, "-200", color.red,   2, trackprice = true, show_last = 1, offset = -99999)
+plot( 300,  "300", color.new(color.green, 50), 1)
+plot(-300, "-300", color.new(color.red, 50),   1)

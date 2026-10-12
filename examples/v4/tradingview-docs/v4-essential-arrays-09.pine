@@ -1,0 +1,11 @@
+//@version=4
+study("History referencing")
+// Re-declare the array on each bar.
+a = array.new_float(1)
+// Set the value of its only element to `close`.
+array.set(a, 0, close)
+
+previousClose1 = array.get(a, 0)[1]
+previousClose2 = close[1]
+plot(previousClose1, "previousClose1", color.gray, 6)
+plot(previousClose2, "previousClose2", color.white, 2)

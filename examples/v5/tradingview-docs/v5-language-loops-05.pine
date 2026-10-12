@@ -1,0 +1,24 @@
+//@version=5
+indicator("Loop keywords and variable assignment demo")
+
+//@variable An `array` of arbitrary "int" values to selectively convert to "string" and display in a `label`.
+var array<int> randomArray = array.from(1, 5, 2, -3, 14, 7, 9, 8, 15, 12)
+
+// Label creation logic.
+if barstate.islastconfirmedhistory
+    //@variable A "string" containing representations of selected values from the `randomArray`.
+    string tempString = ""
+    //@variable The final text to display in the `label`. The `for..in` loop returns the result after it terminates.
+    string finalLabelText = for number in randomArray
+        // Stop the current iteration and exit the loop if the `number` from the `randomArray` is 8.
+        if number == 8             
+            break 
+        // Skip the rest of the current iteration and proceed to the next iteration if the `number` is even.   
+        else if number % 2 == 0   
+            continue
+        // Convert the `number` to a "string", append ", ", and concatenate the result with the current `tempString`.
+        // This code represents the loop's return expression. 
+        tempString += str.tostring(number) + ", "
+    
+    // Display the value of the `finalLabelText` within a `label` on the current bar.
+    label.new(bar_index, 0, finalLabelText, color = color.blue, textcolor = color.white, size = size.huge)

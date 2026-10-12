@@ -1,0 +1,37 @@
+//@version=5
+indicator("Visible bar times demo", overlay = true)
+
+// Create strings on the first chart bar that contain the first and last visible bars' UNIX timestamps.
+var string leftTimestampText  = str.format("UNIX timestamp: {0,number,#}", chart.left_visible_bar_time)
+var string rightTimestampText = str.format("UNIX timestamp: {0,number,#}", chart.right_visible_bar_time)
+// Create strings on the first bar that contain the exchange date and time of the visible bars in ISO 8601 format.
+var string leftDateTimeText  = "Date and time: " + str.format_time(chart.left_visible_bar_time)
+var string rightDateTimeText = "Date and time: " + str.format_time(chart.right_visible_bar_time)
+
+//@variable A `label` object anchored to the first visible bar's time. Shows the `leftTimestampText`.
+var label leftTimeLabel = label.new(
+     chart.left_visible_bar_time, 0, leftTimestampText, xloc.bar_time, yloc.abovebar, color.purple, 
+     label.style_label_lower_left, color.white, size.large
+ )
+//@variable A `label` object anchored to the last visible bar's time. Shows the `rightTimestampText`.
+var label rightTimeLabel = label.new(
+     chart.right_visible_bar_time, 0, rightTimestampText, xloc.bar_time, yloc.abovebar, color.teal, 
+     label.style_label_lower_right, color.white, size.large
+ )
+
+//@variable A single-cell `table` object showing the `leftDateTimeText`.
+var table leftTimeTable = table.new(position.middle_left, 1, 1, color.purple)
+//@variable A single-cell `table` object showing the `rightDateTimeText`.
+var table rightTimeTable = table.new(position.middle_right, 1, 1, color.teal)
+// On the first bar, initialize the `leftTimeTable` and `rightTimeTable` with the corresponding date-time text.
+if barstate.isfirst
+    leftTimeTable.cell(0, 0, leftDateTimeText, text_color = color.white, text_size = size.large)
+    rightTimeTable.cell(0, 0, rightDateTimeText, text_color = color.white, text_size = size.large)
+
+//@variable Is purple at the left visible bar's opening time, teal at the right bar's opening time, `na` otherwise. 
+color barColor = switch time
+    chart.left_visible_bar_time  => color.purple
+    chart.right_visible_bar_time => color.teal
+
+// Color the leftmost and rightmost visible bars using the `barColor`.
+barcolor(barColor, title = "Leftmost and rightmost visible bar color")

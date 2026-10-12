@@ -1,0 +1,16 @@
+//@version=5
+indicator("MA", "", true)
+maLengthInput = input.int(10,           "MA length", inline = "01", minval = 1)
+maColorInput  = input.color(color.aqua, "",          inline = "01")
+bbFactorInput = input.float(1.5,        "BB factor", inline = "02", minval = 0, step = 0.5)
+bbColorInput  = input.color(color.gray, "",          inline = "02")
+showBBInput   = input.bool(true,        "Show BB",   inline = "02")
+ma      = ta.sma(close, maLengthInput)
+bbWidth = ta.stdev(ma, maLengthInput) * bbFactorInput
+bbHi    = ma + bbWidth
+bbLo    = ma - bbWidth
+bbHiColor = color.new(bbColorInput, high > bbHi ? 60 : 0)
+bbLoColor = color.new(bbColorInput, low  < bbLo ? 60 : 0)
+plot(ma, "MA", maColorInput)
+plot(showBBInput ? bbHi : na, "BB Hi", bbHiColor, 2)
+plot(showBBInput ? bbLo : na, "BB Lo", bbLoColor, 2)

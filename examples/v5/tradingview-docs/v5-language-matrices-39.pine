@@ -1,0 +1,12 @@
+//@version=5
+indicator("Matrix too large demo") 
+
+var matrix<float> m = matrix.new<float>()
+
+if bar_index == 0
+    for i = 1 to 1000
+        // This raises an error because the script adds 101 elements on each iteration.
+        // 1000 rows * 101 elements per row = 101000 total elements. This is too large.
+        m.add_row(m.rows(), array.new<float>(101, i))
+
+plot(m.get(0, 0))

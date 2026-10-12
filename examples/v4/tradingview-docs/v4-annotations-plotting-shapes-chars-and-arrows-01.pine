@@ -1,0 +1,7 @@
+//@version=4
+study('plotshape example 2', overlay=true)
+data = close >= open
+plotshape(data, style=shape.triangleup,
+                 location=location.abovebar, color=color.green)
+plotshape(not data, style=shape.triangledown,
+                 location=location.belowbar, color=color.red)

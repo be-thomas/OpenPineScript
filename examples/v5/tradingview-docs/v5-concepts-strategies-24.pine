@@ -1,0 +1,20 @@
+//@version=5
+strategy("Cancel demo", "test", overlay = true)
+
+//@variable Draws a horizontal line at the `limit` price of the "buy" order.
+var line limitLine = na
+
+//@variable Is `color.green` when the strategy places the "buy" order, `color.orange` when it cancels the order.
+color bgColor = na
+
+if last_bar_index - bar_index == 100
+    float limitPrice = close - syminfo.mintick * 500
+    strategy.entry("buy", strategy.long, limit = limitPrice)
+    limitLine := line.new(bar_index, limitPrice, bar_index + 1, limitPrice, extend = extend.right)
+    bgColor := color.new(color.green, 50)
+
+if last_bar_index - bar_index == 99
+    strategy.cancel("buy")
+    bgColor := color.new(color.orange, 50)
+
+bgcolor(bgColor)

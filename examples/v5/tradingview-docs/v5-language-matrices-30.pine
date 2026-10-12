@@ -1,0 +1,45 @@
+//@version=5
+indicator("Element-wise calculations example", "Developing values", overlay = true)
+
+//@variable The number of data points in the averages.
+int length = input.int(3, "Length", 1)
+//@variable The timeframe of each reset period.
+string timeframe = input.timeframe("D", "Reset Timeframe")
+
+//@variable A 4x`length` matrix of OHLC values.
+var matrix<float> ohlcData = matrix.new<float>(4, length)
+
+//@variable Is `true` at the start of a new bar at the `timeframe`.
+bool queueColumn = timeframe.change(timeframe)
+
+if queueColumn
+    // Add new values to the end column of `ohlcData`.
+    ohlcData.add_col(length, array.from(open, high, low, close))
+    // Remove the oldest column from `ohlcData`.
+    ohlcData.remove_col(0)
+else
+    // Adjust the last element of column 1 for new highs.
+    if high > ohlcData.get(1, length - 1)
+        ohlcData.set(1, length - 1, high)
+    // Adjust the last element of column 2 for new lows.
+    if low < ohlcData.get(2, length - 1)
+        ohlcData.set(2, length - 1, low)
+    // Adjust the last element of column 3 for the new closing price.
+    ohlcData.set(3, length - 1, close)
+
+//@variable The `matrix.avg()` of all elements in `ohlcData`.
+avgOHLC4 = ohlcData.avg()
+//@variable The `matrix.avg()` of all elements in rows 1 and 2, i.e., the average of all `high` and `low` values.
+avgHL2   = ohlcData.submatrix(from_row = 1, to_row = 3).avg()
+//@variable The `matrix.max()` of all values in `ohlcData`. Equivalent to `ohlcData.row(1).max()`.
+maxHigh = ohlcData.max()
+//@variable The `array.min()` of all `low` values in `ohlcData`. Equivalent to `ohlcData.min()`.
+minLow = ohlcData.row(2).min()
+//@variable The `array.avg()` of the last column in `ohlcData`, i.e., the current OHLC4.
+ohlc4Value = ohlcData.col(length - 1).avg()
+
+plot(avgOHLC4, "Average OHLC4", color.purple, 2)
+plot(avgHL2, "Average HL2", color.navy, 2)
+plot(maxHigh, "Max High", color.green)
+plot(minLow, "Min Low", color.red)
+plot(ohlc4Value, "Current OHLC4", color.blue)

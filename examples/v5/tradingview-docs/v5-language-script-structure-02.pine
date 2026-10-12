@@ -1,0 +1,13 @@
+//@version=5
+
+indicator("", "", true)    // Declaration statement (global scope)
+
+barIsUp() =>    // Function declaration (global scope)
+    close > open    // Local block (local scope)
+
+plotColor = if barIsUp()  // Variable declaration (global scope)
+    color.green     // Local block (local scope)
+else
+    color.red       // Local block (local scope)
+
+bgcolor(color.new(plotColor, 70))   // Call to a built-in function  (global scope)

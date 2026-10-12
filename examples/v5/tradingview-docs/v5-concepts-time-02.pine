@@ -1,0 +1,20 @@
+//@version=5
+indicator("Time zone strings in calendar functions demo")
+
+//@variable An "int" representing the user-specified hourly offset from UTC. 
+int utcOffsetInput = input.int(defval = 4, title ="Timezone offset UTC (+/-)", minval = -12, maxval = 14)
+
+//@variable A valid time zone string based on the `utcOffsetInput`, in UTC offset notation (e.g., "UTC-4").
+string customOffset = "UTC" + (utcOffsetInput > 0 ? "+" : "") + str.tostring(utcOffsetInput)
+
+//@variable The bar's opening hour in the exchange time zone (default). Equivalent to the `hour` variable.
+int exchangeHour = hour(time)
+//@variable The bar's opening hour in the "UTC-0" time zone. 
+int utcHour = hour(time, "UTC-0")
+//@variable The bar's opening hour in the `customOffset` time zone.
+int customOffsetHour = hour(time, customOffset)
+
+// Plot the `exchangeHour`, `utcHour`, and `customOffsetHour` for comparison.
+plot(exchangeHour,     "Exchange hour",      #E100FF5B,    8)
+plot(utcHour,          "UTC-0 hour",         color.blue,   3)
+plot(customOffsetHour, "Custom offset hour", color.orange, 3)

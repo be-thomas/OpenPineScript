@@ -1,0 +1,13 @@
+//@version=5
+indicator("`array.concat()`")
+a = array.new<float>(0)
+b = array.new<float>(0)
+array.push(a, 0)
+array.push(a, 1)
+array.push(b, 2)
+array.push(b, 3)
+if barstate.islast
+    label.new(bar_index, 0, "BEFORE\na: " + str.tostring(a) + "\nb: " + str.tostring(b), size = size.large)
+    c = array.concat(a, b)
+    array.push(c, 4)
+    label.new(bar_index, 0, "AFTER\na: " + str.tostring(a) + "\nb: " + str.tostring(b) + "\nc: " + str.tostring(c), style = label.style_label_up, size = size.large)

@@ -1,0 +1,7 @@
+//@version=4
+study("Green Candle Close")
+// We expect `src` to hold float values, so we declare in with the `float` keyword
+float src = na
+if close > open
+    src := close
+plot(src)

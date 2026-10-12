@@ -1,0 +1,39 @@
+//@version=5
+indicator("Reshaping example")
+
+//@function Displays the rows of a matrix in a label with a note.
+//@param    this The matrix to display.
+//@param    barIndex The `bar_index` to display the label at.
+//@param    bgColor The background color of the label.
+//@param    textColor The color of the label's text.
+//@param    note The text to display above the rows.
+method debugLabel(
+     matrix<float> this, int barIndex = bar_index, color bgColor = color.blue,
+     color textColor = color.white, string note = ""
+ ) =>
+    labelText = note + "\n" + str.tostring(this)
+    if barstate.ishistory
+        label.new(
+             barIndex, 0, labelText, color = bgColor, style = label.style_label_center,
+             textcolor = textColor, size = size.huge
+         )
+
+//@variable A matrix containing the values 1-8.
+matrix<int> m = matrix.new<int>()
+
+if bar_index == last_bar_index - 1
+    // Add the initial vector of values.
+    m.add_row(0, array.from(1, 2, 3, 4, 5, 6, 7, 8))
+    m.debugLabel(note = "Initial 1x8 matrix")
+
+    // Reshape. `m` now has 2 rows and 4 columns.
+    m.reshape(2, 4)
+    m.debugLabel(bar_index + 10, note = "Reshaped to 2x4")
+
+    // Reshape. `m` now has 4 rows and 2 columns.
+    m.reshape(4, 2)
+    m.debugLabel(bar_index + 20, note = "Reshaped to 4x2")
+
+    // Reshape. `m` now has 8 rows and 1 column.
+    m.reshape(8, 1)
+    m.debugLabel(bar_index + 30, note = "Reshaped to 8x1")

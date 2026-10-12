@@ -1,0 +1,9 @@
+//@version=5
+indicator("Heikin-Ashi candles")
+CANDLE_GREEN = #26A69A
+CANDLE_RED   = #EF5350
+
+haTicker = ticker.heikinashi(syminfo.tickerid)
+[haO, haH, haL, haC] = request.security(haTicker, timeframe.period, [open, high, low, close])
+candleColor = haC >= haO ? CANDLE_GREEN : CANDLE_RED
+plotcandle(haO, haH, haL, haC, color = candleColor)

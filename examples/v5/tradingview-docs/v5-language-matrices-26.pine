@@ -1,0 +1,35 @@
+//@version=5
+indicator("Transpose example")
+
+//@function Displays the rows of a matrix in a label with a note.
+//@param    this The matrix to display.
+//@param    barIndex The `bar_index` to display the label at.
+//@param    bgColor The background color of the label.
+//@param    textColor The color of the label's text.
+//@param    note The text to display above the rows.
+method debugLabel(
+     matrix<float> this, int barIndex = bar_index, color bgColor = color.blue,
+     color textColor = color.white, string note = ""
+ ) =>
+    labelText = note + "\n" + str.tostring(this)
+    if barstate.ishistory
+        label.new(
+             barIndex, 0, labelText, color = bgColor, style = label.style_label_center,
+             textcolor = textColor, size = size.huge
+         )
+
+//@variable A 2x4 matrix.
+matrix<int> m = matrix.new<int>()
+
+// Add columns to `m`.
+m.add_col(0, array.from(1, 5))
+m.add_col(1, array.from(2, 6))
+m.add_col(2, array.from(3, 7))
+m.add_col(3, array.from(4, 8))
+
+//@variable The transpose of `m`. Has a 4x2 shape.
+matrix<int> mt = m.transpose()
+
+if bar_index == last_bar_index - 1
+    m.debugLabel(note = "Original")
+    mt.debugLabel(bar_index + 10, note = "Transpose")

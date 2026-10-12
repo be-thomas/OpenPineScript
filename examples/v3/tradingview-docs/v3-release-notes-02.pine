@@ -1,0 +1,4 @@
+//@version=3
+study("Input with Options")
+s = input(title="Session", defval="24x7", options=["24x7", "0900-1300", "1300-1700", "1700-2100"])
+plot(time(period, s))

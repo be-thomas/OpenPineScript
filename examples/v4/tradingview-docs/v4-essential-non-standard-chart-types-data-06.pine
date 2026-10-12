@@ -1,0 +1,7 @@
+//@version=4
+study("Example 10", overlay=true)
+pnf_t = pointfigure(syminfo.tickerid, "hl", "ATR", 14, 3)
+pnf_open = security(pnf_t, timeframe.period, open, true)
+pnf_close = security(pnf_t, timeframe.period, close, true)
+plot(pnf_open, color=color.green, style=plot.style_linebr, linewidth=4)
+plot(pnf_close, color=color.red, style=plot.style_linebr, linewidth=4)

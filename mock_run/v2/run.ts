@@ -30,9 +30,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { Context } from "../../runtime/v1/context";
 import { compile } from "../../runtime/v1";
-import { compileScript } from "../../transpiler";
-import type { PineVersion } from "../../transpiler/version";
-import { DEFAULT_PROFILE } from "../../transpiler/profiles";
+import { compileScript } from "../../transpiler/common";
+import type { PineVersion } from "../../transpiler/common/version";
+import { DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 import { runComparison } from "../../utils/v2/comparison_engine";
 
 // --- Terminal Colors ---
@@ -462,6 +462,13 @@ async function main() {
         const numVal = parseFloat(rawVal);
         ctx.userInputs[key] = isNaN(numVal) ? rawVal : numVal;
     }
+
+    // `last_bar_index` / `last_bar_time` must be answerable on bar 1, and the
+    // CSV is the only thing that knows how far the run goes.
+    ctx.provideDatasetExtent(bars.length, bars[bars.length - 1].time);
+    // The loop below runs the final bar as REALTIME, so the last SETTLED bar is
+    // the one before it — which is what `barstate.islastconfirmedhistory` asks for.
+    ctx.realtimeBars = 1;
 
     const sandbox = { ctx };
     const executeBar = compile(jsCode, ctx, sandbox);

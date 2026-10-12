@@ -1,0 +1,16 @@
+//@version=5
+indicator("History referencing")
+
+//@variable A single-value array declared on each bar.
+a = array.new<float>(1)
+// Set the value of the only element in `a` to `close`.
+array.set(a, 0, close)
+
+//@variable The array instance assigned to `a` on the previous bar.
+previous = a[1]
+
+previousClose1 = na(previous) ? na : previous.get(0)
+previousClose2 = close[1]
+
+plot(previousClose1, "previousClose1", color.gray, 6)
+plot(previousClose2, "previousClose2", color.white, 2)

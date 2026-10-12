@@ -1,0 +1,23 @@
+//@version=5
+indicator("Retrieving rows and columns demo")
+
+//@variable A 3x2 rectangular matrix.
+var matrix<float> m = matrix.new<float>(3, 2)
+
+if bar_index == 0
+    m.set(0, 0, 1.0) // Set row 0, column 0 value to 1.
+    m.set(0, 1, 2.0) // Set row 0, column 1 value to 2.
+    m.set(1, 0, 3.0) // Set row 1, column 0 value to 3.
+    m.set(1, 1, 4.0) // Set row 1, column 1 value to 4.
+    m.set(2, 0, 5.0) // Set row 1, column 0 value to 5.
+    m.set(2, 1, 6.0) // Set row 1, column 1 value to 6.
+
+//@variable The first row of the matrix.
+array<float> row0 = m.row(0)
+//@variable The first column of the matrix.
+array<float> column0 = m.col(0)
+
+//@variable Displays the first row and column of the matrix and their sizes in a label.
+var label debugLabel = label.new(0, 0, color = color.blue, textcolor = color.white, size = size.huge)
+debugLabel.set_x(bar_index)
+debugLabel.set_text(str.format("Row 0: {0}, Size: {1}\nCol 0: {2}, Size: {3}", row0, m.columns(), column0, m.rows()))

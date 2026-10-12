@@ -1,0 +1,7 @@
+//@version=5
+indicator("Non-square demo") 
+
+//@variable A 3x5 matrix. 
+matrix<float> m = matrix.new<float>(3, 5, 1)
+
+plot(m.det()) // Raises a runtime error. You can't calculate the determinant of a 3x5 matrix.

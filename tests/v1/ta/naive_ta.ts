@@ -8,15 +8,28 @@ export class NaiveTA {
     private volume: number[] = [];
     private highs: number[] = [];
     private lows: number[] = [];
+    /** Bar timestamps, for the one indicator that needs session boundaries. */
+    private times: number[] = [];
 
     // State Map for recursive functions (EMA, RMA)
     private state: Map<string, number> = new Map();
 
-    add(price: number, vol: number, high: number = price, low: number = price) {
+    /**
+     * Samples collected while a recursive smoother is still warming up.
+     *
+     * Kept apart from `state` because "no value yet" and "the value is a
+     * number" are different states, and a single map cannot hold both without
+     * the caller guessing which it got.
+     */
+    private seeds: Map<string, number[]> = new Map();
+
+    add(price: number, vol: number, high: number = price, low: number = price,
+        time: number = NaN) {
         this.history.push(price);
         this.volume.push(vol);
         this.highs.push(high);
         this.lows.push(low);
+        this.times.push(time);
     }
 
     private getSlice(length: number, offset: number = 0): number[] {
@@ -28,25 +41,55 @@ export class NaiveTA {
     // --- RECURSIVE FIXES ---
 
     /**
-     * Pure recursive RMA. No SMA warmup. 
-     * Matches Production Engine's greedy initialization.
+     * ── The warm-up rule, and why this file gets it wrong so easily ─────────
+     *
+     * A Pine recursive smoother does NOT start from its first sample. It
+     * returns `na` until `length` samples have arrived, and its first value is
+     * their arithmetic mean; only from there does the recurrence run.
+     *
+     * The previous version of this oracle seeded from the first sample and
+     * returned it immediately — its own comment said "No SMA warmup. Matches
+     * Production Engine's greedy initialization." The engine was later
+     * corrected to TradingView's rule and this file was not, so every
+     * differential built on `rma` (atr, rsi, macd, trix, tsi) failed from that
+     * point on, and the failures looked like engine bugs.
+     *
+     * The difference is a pure SEED difference: it decays by (1 - alpha) every
+     * bar and never quite reaches zero. At length 14 it is still ~1e-4 at bar
+     * 100 — a hundred times the 1e-6 tolerance — which is why the tests'
+     * WARMUP window did not hide it.
+     *
+     * Derived from TradingView's documented behaviour rather than from the
+     * engine's source: an oracle that copies the implementation it checks
+     * cannot catch it being wrong. dev-docs/PROGRESS.md records the same trap
+     * springing once already, on `NaiveTA.wma()`.
      */
-    rma(id: string, source: number, length: number): number {
-        const key = `rma_${id}`;
-        let prev = this.state.get(key); // Use this.state
-        
+    private smooth(key: string, source: number, length: number, alpha: number): number {
+        // A leading `na` DELAYS the average rather than killing it: it is not a
+        // sample, so it is not counted, and the smoother simply starts later.
         if (Number.isNaN(source)) return NaN;
-    
-        if (prev === undefined || Number.isNaN(prev)) {
-            this.state.set(key, source); // Save seed
-            return source;
+
+        const prev = this.state.get(key);
+        if (prev === undefined) {
+            const collected = this.seeds.get(key) ?? [];
+            collected.push(source);
+            this.seeds.set(key, collected);
+            if (collected.length < length) return NaN;
+
+            const mean = collected.reduce((a, b) => a + b, 0) / length;
+            this.state.set(key, mean);
+            this.seeds.delete(key);
+            return mean;
         }
-    
-        const alpha = 1 / length;
-        const val = (source * alpha) + (prev * (1 - alpha));
-        
-        this.state.set(key, val); // SAVE THE UPDATED STATE FOR THE NEXT BAR
-        return val;
+
+        const next = source * alpha + prev * (1 - alpha);
+        this.state.set(key, next);
+        return next;
+    }
+
+    /** Wilder's smoothing — alpha = 1 / length. Feeds atr, rsi and adx. */
+    rma(id: string, source: number, length: number): number {
+        return this.smooth(`rma_${id}`, source, length, 1 / length);
     }
 
     /**
@@ -95,14 +138,9 @@ export class NaiveTA {
         return slice.length < length ? NaN : slice.reduce((a, b) => a + b, 0) / length;
     }
 
+    /** Exponential smoothing — alpha = 2 / (length + 1). Same warm-up as rma. */
     ema(id: string, source: number, length: number): number {
-        const alpha = 2 / (length + 1);
-        const key = `ema_${id}`;
-        let prev = this.state.get(key);
-        if (prev === undefined) { this.state.set(key, source); return source; }
-        const val = (source * alpha) + (prev * (1 - alpha));
-        this.state.set(key, val);
-        return val;
+        return this.smooth(`ema_${id}`, source, length, 2 / (length + 1));
     }
 
     bb(length: number, mult: number): [number, number, number] {
@@ -158,9 +196,28 @@ export class NaiveTA {
         return NaN;
     }
 
+    /**
+     * VWAP, accumulated from the start of the current SESSION — not from the
+     * start of the chart. A caller that supplies no timestamps gets one
+     * session covering everything, which is how this oracle used to behave
+     * unconditionally and why it agreed with an engine that was also wrong.
+     */
     vwap(): number {
+        const day = (t: number): number | null =>
+            !Number.isFinite(t) || t === 0 ? null
+                : Date.UTC(new Date(t).getUTCFullYear(), new Date(t).getUTCMonth(),
+                           new Date(t).getUTCDate());
+
+        let from = 0;
+        for (let i = 1; i < this.times.length; i++) {
+            const today = day(this.times[i]);
+            if (today === null) continue;
+            const previous = day(this.times[i - 1]);
+            if (previous === null || previous !== today) from = i;
+        }
+
         let sVol = 0; let sSrcVol = 0;
-        for (let i = 0; i < this.history.length; i++) {
+        for (let i = from; i < this.history.length; i++) {
             sVol += this.volume[i];
             sSrcVol += this.history[i] * this.volume[i];
         }
@@ -180,22 +237,68 @@ export class NaiveTA {
         return intercept + slope * (length - 1 - offset);
     }
 
+    /**
+     * Parabolic SAR, re-derived from the `pine_sar` reference implementation
+     * TradingView publishes beside `ta.sar` in the Pine reference manual.
+     *
+     * The earlier version of this oracle was the textbook Wilder algorithm,
+     * seeded on bar 0, with no out-of-range clamp. It agreed with the engine
+     * because the engine had the same three mistakes. TradingView's own output
+     * over 2,475 BTCUSDT daily bars disagrees with both, and settles it.
+     *
+     * `history` stands in for `close`, which is what the differential feeds it.
+     */
     sar(start: number, inc: number, max: number): number {
-        if (this.highs.length === 0) return NaN;
-        let long = true; let af = start; let ep = this.highs[0]; let v = this.lows[0];
-        for (let i = 1; i < this.history.length; i++) {
+        const n = this.history.length;
+        if (n < 2) return NaN;
+
+        let result = NaN, maxMin = NaN, acceleration = NaN, isBelow = false;
+
+        for (let i = 1; i < n; i++) {
             const h = this.highs[i], l = this.lows[i];
-            let next = v + af * (ep - v);
-            if (long) {
-                if (l < next) { long = false; next = Math.max(ep, h); ep = l; af = start; }
-                else if (h > ep) { ep = h; af = Math.min(af + inc, max); }
-            } else {
-                if (h > next) { long = true; next = Math.min(ep, l); ep = h; af = start; }
-                else if (l < ep) { ep = l; af = Math.min(af + inc, max); }
+            let isFirstTrendBar = false;
+
+            if (i === 1) {
+                if (this.history[i] > this.history[i - 1]) {
+                    isBelow = true; maxMin = h; result = this.lows[i - 1];
+                } else {
+                    isBelow = false; maxMin = l; result = this.highs[i - 1];
+                }
+                isFirstTrendBar = true;
+                acceleration = start;
             }
-            v = next;
+
+            result += acceleration * (maxMin - result);
+
+            if (isBelow) {
+                if (result > l) {
+                    isFirstTrendBar = true; isBelow = false;
+                    result = Math.max(h, maxMin); maxMin = l; acceleration = start;
+                }
+            } else {
+                if (result < h) {
+                    isFirstTrendBar = true; isBelow = true;
+                    result = Math.min(l, maxMin); maxMin = h; acceleration = start;
+                }
+            }
+
+            if (!isFirstTrendBar) {
+                if (isBelow) {
+                    if (h > maxMin) { maxMin = h; acceleration = Math.min(acceleration + inc, max); }
+                } else {
+                    if (l < maxMin) { maxMin = l; acceleration = Math.min(acceleration + inc, max); }
+                }
+            }
+
+            if (isBelow) {
+                result = Math.min(result, this.lows[i - 1]);
+                if (i > 1) result = Math.min(result, this.lows[i - 2]);
+            } else {
+                result = Math.max(result, this.highs[i - 1]);
+                if (i > 1) result = Math.max(result, this.highs[i - 2]);
+            }
         }
-        return v;
+        return result;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -426,8 +529,17 @@ export class NaiveTA {
         const e1 = this.ema("trix_e1", close, length);
         const e2 = this.ema("trix_e2", e1, length);
         const e3 = this.ema("trix_e3", e2, length);
+        // The triple ema is na for the whole warm-up, and storing that na as
+        // the comparison point latched it forever: every later bar computed
+        // `e3 - NaN` and trix was na for the rest of the run. Treat a na
+        // comparison point as "not set yet", exactly as a na source is treated.
+        if (Number.isNaN(e3)) return NaN;
+
         const prev = this.state.get("trix_prevE3");
-        if (prev === undefined) { this.state.set("trix_prevE3", e3); return 0; }
+        if (prev === undefined || Number.isNaN(prev)) {
+            this.state.set("trix_prevE3", e3);
+            return NaN;   // ta.change with no predecessor is na, not zero
+        }
         const result = (100 * (e3 - prev)) / prev;
         this.state.set("trix_prevE3", e3);
         return result;
@@ -438,9 +550,14 @@ export class NaiveTA {
         const close = this.history[this.history.length - 1];
         const prev = this.state.get("rsi_prevSrc");
         if (prev === undefined) {
+            // The first sample establishes the comparison point and NOTHING
+            // else. Feeding a synthetic 0 into the two internal rmas "to keep
+            // them aligned" was harmless while they seeded from their first
+            // sample and overwrote it immediately; with a real warm-up that 0
+            // counts as one of the `length` seed samples, so the mean is wrong
+            // and rsi starts a bar early. Pine's `ta.change` is na here, and
+            // an rma of na consumes nothing.
             this.state.set("rsi_prevSrc", close);
-            this.rma("rsi_gain", 0, length);
-            this.rma("rsi_loss", 0, length);
             return NaN;
         }
         const change = close - prev;
@@ -459,15 +576,22 @@ export class NaiveTA {
 
         const prev = this.state.get("tsi_prevSrc");
         if (prev === undefined) {
+            // na, and primes nothing — see the note in rsi() above. Returning a
+            // literal 0 also made tsi finite from the very first bar, where
+            // TradingView reports na until both smoothers have warmed up.
             this.state.set("tsi_prevSrc", close);
-            dbl("tsi_pc_inner", "tsi_pc_outer", 0);
-            dbl("tsi_apc_inner", "tsi_apc_outer", 0);
-            return 0;
+            return NaN;
         }
         const pc = close - prev;
         this.state.set("tsi_prevSrc", close);
         const pcSmooth = dbl("tsi_pc_inner", "tsi_pc_outer", pc);
         const apcSmooth = dbl("tsi_apc_inner", "tsi_apc_outer", Math.abs(pc));
-        return apcSmooth === 0 ? 0 : (100 * pcSmooth) / apcSmooth;
+
+        // NO ×100. Pine's `ta.tsi` returns the ratio itself, in [-1, 1]; the
+        // familiar [-100, 100] scale is something the CALLER applies, which is
+        // why TradingView's own examples read `100 * ta.tsi(close, 25, 13)`.
+        // This oracle scaled by 100 internally and was out by exactly that
+        // factor — 0.3476 against 34.76.
+        return apcSmooth === 0 ? 0 : pcSmooth / apcSmooth;
     }
 }

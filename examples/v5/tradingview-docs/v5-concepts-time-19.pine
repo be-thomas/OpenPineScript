@@ -1,0 +1,48 @@
+//@version=5
+indicator("Calendar changes demo", overlay = true, max_labels_count = 500)
+
+// Calculate the year, month, week of year, and day of week corresponding to the `time_close` UNIX timestamp.
+// All values are expressed in the exchange time zone. 
+int closeYear       = year(time_close)
+int closeMonth      = month(time_close)
+int closeWeekOfYear = weekofyear(time_close)
+int closeDayOfWeek  = dayofweek(time_close)
+
+//@variable Is `true` when the change in `closeYear` exceeds 0, marking the first bar that closes in a new year.  
+bool closeInNewYear = ta.change(closeYear) > 0
+//@variable Is `true` when the difference in `closeMonth` is not 0, marking the first bar that closes in a new month. 
+bool closeInNewMonth = closeMonth - closeMonth[1] != 0
+//@variable Is `true` when `closeMonth - 1` becomes divisible by 3, marking the first bar that closes in a new quarter. 
+bool closeInNewQuarter = (closeMonth[1] - 1) % 3 != 0 and (closeMonth - 1) % 3 == 0
+//@variable Is `true` when the change in `closeWeekOfYear` is not 0, marking the first bar that closes in a new week.
+bool closeInNewWeek = ta.change(closeWeekOfYear) != 0
+//@variable Is `true` when the `closeDayOfWeek` changes, marking the first bar that closes in the new day.
+bool closeInNewDay = closeDayOfWeek != closeDayOfWeek[1]
+
+//@variable Switches between `true` and `false` after every `closeInNewDay` occurrence for background color calculation.
+var bool alternateDay = true
+if closeInNewDay
+    alternateDay := not alternateDay
+
+// Draw a label above the bar to display the `closeWeekOfYear` when `closeInNewWeek` is `true`. 
+if closeInNewWeek
+    label.new(
+         time, 0, "W" + str.tostring(closeWeekOfYear), xloc.bar_time, yloc.abovebar, color.purple, 
+         textcolor = color.white, size = size.normal
+     )
+// Plot label shapes at the bottom and top of the chart for the `closeInNewYear` and `closeInNewMonth` conditions. 
+plotshape(
+     closeInNewYear, "Close in new year", shape.labelup, location.bottom, color.teal, text = "New year", 
+     textcolor = color.white, size = size.huge
+ )
+plotshape(
+     closeInNewMonth, "Close in new month", shape.labeldown, location.top, text = "New month", 
+     textcolor = color.white, size = size.large
+ )
+// Plot a triangle below the chart bar when `closeInNewQuarter` occurs. 
+plotshape(
+     closeInNewQuarter, "Close in new quarter", shape.triangleup, location.belowbar, color.maroon, 
+     text = "New quarter", textcolor = color.maroon, size = size.large
+ )
+// Highlight the background in alternating colors based on occurrences of `closeInNewDay`.
+bgcolor(alternateDay ? color.new(color.aqua, 80) : color.new(color.fuchsia, 80), title = "Closing day change")

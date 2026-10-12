@@ -1,0 +1,62 @@
+//@version=5
+strategy(
+     "Using strategy information demo", default_qty_type = strategy.percent_of_equity, default_qty_value = 5, 
+     margin_long = 100, margin_short = 100
+ )
+
+//@variable The number of bars in the `rank` calculation.
+int lengthInput = input.int(50, "Length", 1)
+//@variable The stop-loss percentage.
+float slPercentInput = input.float(4.0, "SL %", 0.0, 100.0) / 100.0
+
+//@variable The percent rank of `close` prices over `lengthInput` bars.
+float rank = ta.percentrank(close, lengthInput)
+// Entry and exit signals.  
+bool entrySignal = ta.crossover(rank, 10) and strategy.opentrades == 0
+bool exitSignal  = ta.crossover(rank, 80) and strategy.opentrades == 1
+
+// Place orders based on the `entrySignal` and `exitSignal` occurrences. 
+switch
+    entrySignal    => strategy.entry("Buy", strategy.long)
+    entrySignal[1] => strategy.exit("SL", "Buy", stop = strategy.position_avg_price * (1.0 - slPercentInput))
+    exitSignal     => strategy.close("Buy")
+
+if barstate.islastconfirmedhistory or barstate.isrealtime
+    //@variable A table displaying strategy information on the main chart pane. 
+    var table dashboard = table.new(
+         position.top_right, 2, 10, border_color = chart.fg_color, border_width = 1, force_overlay = true
+     )
+    //@variable The strategy's currency.
+    string currency = strategy.account_currency
+    // Display the net profit as a currency amount and percentage.
+    dashboard.cell(0, 1, "Net P/L")
+    dashboard.cell(
+         1, 1, str.format("{0, number, 0.00} {1} ({2}%)", strategy.netprofit, currency, strategy.netprofit_percent), 
+         text_color = chart.fg_color, bgcolor = strategy.netprofit > 0 ? color.lime : color.red
+     )
+    // Display the number of winning trades as an absolute value and percentage of all completed trades. 
+    dashboard.cell(0, 2, "Winning trades")
+    dashboard.cell(
+         1, 2, str.format("{0} ({1, number, #.##%})", strategy.wintrades, strategy.wintrades / strategy.closedtrades), 
+         text_color = chart.fg_color, bgcolor = strategy.wintrades > strategy.losstrades ? color.lime : color.red
+     )
+    // Display the ratio of average trade profit to average trade loss. 
+    dashboard.cell(0, 3, "Avg. win / Avg. loss")
+    dashboard.cell(
+         1, 3, str.format("{0, number, #.###}", strategy.avg_winning_trade / strategy.avg_losing_trade), 
+         text_color = chart.fg_color, 
+         bgcolor = strategy.avg_winning_trade > strategy.avg_losing_trade ? color.lime : color.red
+     )
+    // Display the profit factor, i.e., the ratio of gross profit to gross loss. 
+    dashboard.cell(0, 4, "Profit factor")
+    dashboard.cell(
+         1, 4, str.format("{0, number, #.###}", strategy.grossprofit / strategy.grossloss), text_color = chart.fg_color, 
+         bgcolor = strategy.grossprofit > strategy.grossloss ? color.lime : color.red
+     )
+
+// Plot the current equity in a separate pane and highlight the pane's background while there is an open position.
+plot(strategy.equity, "Total equity", strategy.equity > strategy.initial_capital ? color.teal : color.maroon, 3)
+bgcolor(
+     strategy.openprofit > 0 ? color.new(color.teal, 80) : strategy.openprofit < 0 ? color.new(color.maroon, 80) : na, 
+     title = "Open position highlight"
+ )

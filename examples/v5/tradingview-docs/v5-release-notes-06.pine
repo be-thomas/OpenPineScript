@@ -1,0 +1,8 @@
+//@version=5
+indicator("array.new<float> example")
+length = 5
+var a = array.new<float>(length, close)
+if array.size(a) == length
+    array.remove(a, 0)
+    array.push(a, close)
+plot(array.sum(a) / length, "SMA")

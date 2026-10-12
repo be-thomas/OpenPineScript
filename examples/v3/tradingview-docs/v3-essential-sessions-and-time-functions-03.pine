@@ -1,0 +1,18 @@
+//@version=3
+study("Opening high/low", overlay=true)
+
+highTimeFrame = input("D", type=resolution)
+sessSpec = input("0930-1600", type=session)
+
+is_newbar(res, sess) =>
+    t = time(res, sess)
+    na(t[1]) and not na(t) or t[1] < t
+
+newbar = is_newbar("1440", sessSpec)
+s1 = na
+s1 := newbar ? low : nz(s1[1])
+s2 = na
+s2 := newbar ? high : nz(s2[1])
+
+plot(s1, style=circles, linewidth=3, color=red)
+plot(s2, style=circles, linewidth=3, color=lime)

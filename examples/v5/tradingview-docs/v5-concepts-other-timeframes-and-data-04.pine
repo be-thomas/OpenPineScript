@@ -1,0 +1,24 @@
+//@version=5
+indicator("`lookahead` demo", overlay = true)
+
+//@variable The timeframe to request the data from.
+string timeframe = input.timeframe("30", "Timeframe")
+
+//@variable The requested `high` price from the current symbol on the `timeframe` without lookahead bias.
+//          On realtime bars, it returns the current `high` of the `timeframe`.
+float lookaheadOff = request.security(syminfo.tickerid, timeframe, high, lookahead = barmerge.lookahead_off)
+
+//@variable The requested `high` price from the current symbol on the `timeframe` with lookahead bias.
+//          Returns values that should NOT be accessible yet on historical bars.
+float lookaheadOn = request.security(syminfo.tickerid, timeframe, high, lookahead = barmerge.lookahead_on)
+
+//@variable The requested `high` price from the current symbol on the `timeframe` without lookahead bias or repainting.
+//          Behaves the same on historical and realtime bars.
+float lookaheadOnOffset = request.security(syminfo.tickerid, timeframe, high[1], lookahead = barmerge.lookahead_on)
+
+// Plot the values.
+plot(lookaheadOff, "High, no lookahead bias", color.new(color.blue, 40), 5)
+plot(lookaheadOn, "High with lookahead bias", color.fuchsia, 3)
+plot(lookaheadOnOffset, "High, no lookahead bias or repaint", color.aqua, 3)
+// Highlight the background on realtime bars.
+bgcolor(barstate.isrealtime ? color.new(color.orange, 60) : na, title = "Realtime bar highlight")

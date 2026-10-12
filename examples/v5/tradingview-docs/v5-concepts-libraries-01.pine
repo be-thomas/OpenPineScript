@@ -1,0 +1,21 @@
+//@version=5
+
+// @description Provides functions calculating the all-time high/low of values.
+library("AllTimeHighLow", true)
+
+// @function Calculates the all-time high of a series.
+// @param val Series to use (`high` is used if no argument is supplied).
+// @returns The all-time high for the series.
+export hi(float val = high) =>
+    var float ath = val
+    ath := math.max(ath, val)
+
+// @function Calculates the all-time low of a series.
+// @param val Series to use (`low` is used if no argument is supplied).
+// @returns The all-time low for the series.
+export lo(float val = low) =>
+    var float atl = val
+    atl := math.min(atl, val)
+
+plot(hi())
+plot(lo())

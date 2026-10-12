@@ -1,0 +1,14 @@
+//@version=5
+indicator("var matrix demo")
+
+//@variable A 1x2 rectangular matrix declared only at `bar_index == 0`, i.e., the first bar.
+var m = matrix.new<int>(1, 2, 0)
+
+//@variable Is `true` on every 20th bar.
+bool update = bar_index % 20 == 0
+
+if update
+    int currentValue = m.get(0, 0) // Get the current value of the first row and column.
+    m.set(0, 0, currentValue + 1)  // Set the first row and column element value to `currentValue + 1`.
+
+plot(m.get(0, 0), linewidth = 3) // Plot the value from the first row and column.

@@ -1,0 +1,9 @@
+//@version=5
+indicator("")
+varip int updateNo = na
+if barstate.isnew
+    updateNo := 1
+else
+    updateNo := updateNo + 1
+
+plot(updateNo, style = plot.style_circles)

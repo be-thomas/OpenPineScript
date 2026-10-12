@@ -1,0 +1,20 @@
+//@version=5
+strategy("Order execution demo", "My strategy", true, margin_long = 100, margin_short = 100)
+
+//@function Displays the specified `txt` in a label at the `high` of the current bar. 
+debugLabel(string txt) => 
+    label.new(
+         bar_index, high, text = txt, color=color.lime, style = label.style_label_lower_right, 
+         textcolor = color.black, size = size.large
+     )
+
+//@variable Is `true` on every 20th bar, `false` otherwise.
+bool longCondition = bar_index % 20 == 0
+
+// Draw a label and place a long market order when `longCondition` occurs.
+if longCondition
+    debugLabel("Long entry order created")
+    strategy.entry("My Long Entry Id", strategy.long)
+
+// Place a closing market order whenever there is an open position.
+strategy.close_all()

@@ -1,0 +1,20 @@
+//@version=4
+study("Opening high/low", overlay=true)
+
+highTimeFrame = input("D", type=input.resolution)
+sessSpec = input("0930-1600", type=input.session)
+
+is_newbar(res, sess) =>
+    t = time(res, sess)
+    na(t[1]) and not na(t) or t[1] < t
+
+newbar = is_newbar("1440", sessSpec)
+
+var float s1 = na
+var float s2 = na
+if newbar
+    s1 := low
+    s2 := high
+
+plot(s1, style=plot.style_circles, linewidth=3, color=color.red)
+plot(s2, style=plot.style_circles, linewidth=3, color=color.lime)

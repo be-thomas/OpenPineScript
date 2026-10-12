@@ -1,0 +1,21 @@
+//@version=5
+indicator("`for [index, item] in array` demo", "Array numerated output")
+
+//@variable An array of "string" values to display as a numerated list.
+var array<string> stringArray = array.from("First", "Second", "Third", "Before Last", "Last")
+
+if barstate.islastconfirmedhistory
+    //@variable A "string" modified within a loop to display within the `label`.
+    string labelText = "Array values: \n"
+    // Loop through the `stringArray`, accessing each `index` and corresponding `element`. 
+    for [index, element] in stringArray
+        // Skip the third `element` (at `index == 2`) in the `labelText`. Include an "ELEMENT SKIPPED" message instead. 
+        if index == 2
+            labelText += "-- ELEMENT SKIPPED -- \n"
+            continue
+        labelText += str.tostring(index + 1) + ": " + element + "\n"
+    // Display the `labelText` within a `label`.
+    label.new(
+         bar_index, 0, labelText, textcolor = color.white, size = size.huge, 
+         style = label.style_label_center, textalign = text.align_left
+     )

@@ -1,0 +1,5 @@
+//@version=4
+study("My Script")
+len = 10.0
+s = sma(close, len) // Compilation error!
+plot(s)

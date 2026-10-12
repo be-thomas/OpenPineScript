@@ -1,0 +1,29 @@
+//@version=5
+strategy("Take-profit and stop-loss demo", overlay = true)
+
+//@variable Is `true` on every 100th bar.
+bool buyCondition = bar_index % 100 == 0
+
+//@variable The current take-profit order price. 
+var float takeProfit = na
+//@variable The current stop-loss order price.
+var float stopLoss = na
+
+if buyCondition
+    // Update the `takeProfit` and `stopLoss` values.
+    if strategy.opentrades == 0
+        takeProfit := close * 1.01
+        stopLoss   := close * 0.99
+    // Place a long market order. 
+    strategy.entry("buy", strategy.long)
+    // Place a take-profit order at the `takeProfit` price and a stop-loss order at the `stopLoss` price.
+    strategy.exit("exit", "buy", limit = takeProfit, stop = stopLoss)
+
+// Set `takeProfit` and `stopLoss` to `na` when the position closes.
+if ta.change(strategy.closedtrades) > 0
+    takeProfit := na
+    stopLoss   := na
+
+// Plot the `takeProfit` and `stopLoss` values.
+plot(takeProfit, "TP", color.green, style = plot.style_circles)
+plot(stopLoss, "SL", color.red, style = plot.style_circles)

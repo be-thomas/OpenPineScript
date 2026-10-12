@@ -1,0 +1,31 @@
+//@version=5
+indicator("`time_tradingday` demo", overlay = true)
+
+//@variable A concatenated "string" containing the `time_tradingday` timestamp and a formatted representation in UTC.
+string tradingDayText = "`time_tradingday`: " + str.tostring(time_tradingday) + "\n"
+     + "Date and time: " + str.format_time(time_tradingday, "dd MMM yyyy, HH:mm (z)", "UTC+0")
+//@variable A concatenated "string" containing the `time` timestamp and a formatted representation in UTC.
+string barOpenText = "`time`: " + str.tostring(time) + "\n"
+     + "Date and time: " + str.format_time(time, "dd MMM yyyy, HH:mm (z)", "UTC+0")
+
+//@variable Is `true` on every even bar, `false` otherwise. This condition determines the appearance of the labels. 
+bool isEven = bar_index % 2 == 0
+
+// The `yloc` and `style` properties of the labels. They alternate on every other bar for visibility. 
+labelYloc  = isEven ? yloc.abovebar : yloc.belowbar
+labelStyle = isEven ? label.style_label_down : label.style_label_up
+// Draw alternating labels anchored to the bar's `time` to display the `tradingDayText` and `barOpenText`.
+if isEven
+    label.new(time, 0, tradingDayText + "\n\n\n", xloc.bar_time, labelYloc, color.teal, labelStyle, color.white)
+    label.new(time, 0, barOpenText, xloc.bar_time, labelYloc, color.maroon, labelStyle, color.white)
+else
+    label.new(time, 0, "\n\n\n" + barOpenText, xloc.bar_time, labelYloc, color.maroon, labelStyle, color.white)
+    label.new(time, 0, tradingDayText, xloc.bar_time, labelYloc, color.teal, labelStyle, color.white)
+
+//@variable The day of the month, in UTC, that the `time_tradingday` timestamp corresponds to. 
+int tradingDayOfMonth = dayofmonth(time_tradingday, "UTC+0")
+//@variable The day of the month, in UTC, that the `time` timestamp corresponds to. 
+int openingDayOfMonth = dayofmonth(time, "UTC+0")
+
+// Highlight the background when the `tradingDayOfMonth` does not equal the `openingDayOfMonth`. 
+bgcolor(tradingDayOfMonth != openingDayOfMonth ? color.rgb(174, 89, 243, 85) : na, title = "Different day highlight")

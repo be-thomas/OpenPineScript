@@ -1,0 +1,5 @@
+//@version=5
+indicator("Modulo function")
+modulo(series int a, series int b) =>
+    a - b * math.floor(nz(a/b))
+plot(modulo(-1, 100))

@@ -1,0 +1,10 @@
+//@version=5
+indicator("na matrix methods demo") 
+
+//@variable A `matrix` variable assigned to `na`.
+matrix<float> m = na
+
+mCopy = m.copy() // Raises a runtime error. You can't copy a matrix that doesn't exist.
+
+if bar_index == last_bar_index - 1
+    label.new(bar_index, 0, str.tostring(mCopy), color = color.navy, textcolor = color.white, size = size.huge)

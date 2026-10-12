@@ -1,0 +1,10 @@
+//@version=5
+MAX_LABELS = 500
+indicator("", max_labels_count = MAX_LABELS)
+qtyLabelsInput = input.int(5, "Labels to keep", minval = 0, maxval = MAX_LABELS)
+myRSI = ta.rsi(close, 20)
+if myRSI > ta.highest(myRSI, 20)[1]
+    label.new(bar_index, myRSI, str.tostring(myRSI, "#.00"), style = label.style_none)
+    if array.size(label.all) > qtyLabelsInput
+        label.delete(array.get(label.all, 0))
+plot(myRSI)

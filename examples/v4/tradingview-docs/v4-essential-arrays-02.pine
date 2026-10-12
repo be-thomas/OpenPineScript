@@ -1,0 +1,6 @@
+//@version=4
+study("Using `var`")
+var a = array.new_float(0)
+array.push(a, close)
+if barstate.islast
+    label.new(bar_index, 0, "Array size: " + tostring(array.size(a)) + "\nbar_index: " + tostring(bar_index), size = size.large)

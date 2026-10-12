@@ -7,7 +7,7 @@
  * `label.new` tells you nothing about whether its arithmetic is right.
  */
 import { describe, it, expect } from "vitest";
-import { compileScript } from "../../../transpiler";
+import { compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v4";
 
 const HEAD = "//@version=4\nstudy(\"t\")\n";

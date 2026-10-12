@@ -1,0 +1,10 @@
+//@version=3
+strategy(title = "My Strategy")
+long() =>
+    strategy.entry("long", true, 1, when = open > high[1])
+    1
+c = 0
+c := true ? 1 : long()
+plot(c)
+
+Pine Script v4 contains built-in functions with side effects ( ``line.new`` and ``label.new`` ). If calls to these functions are present in both branches of a ternary operator, both function calls would be executed following v3 conventions. Thus, in Pine Script v4, only the branch corresponding to the evaluated condition is calculated. While this provides a viable solution in some cases, it will modify the behavior of scripts which depended on the fact that both branches of a ternary were evaluated. The solution is to pre-evaluate expressions prior to the ternary operator. The conversion utility takes this requirement into account when converting scripts from v3 to v4, so that script behavior will be identical in v3 and v4.

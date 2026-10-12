@@ -1,0 +1,21 @@
+//@version=5
+strategy("Simple strategy demo", overlay = true, margin_long = 100, margin_short = 100)
+
+//@variable The length of the `fastMA` and half the length of the `slowMA`.
+int lengthInput = input.int(14, "Base length", 2)
+
+// Calculate two moving averages with different lengths.
+float fastMA = ta.sma(close, lengthInput)
+float slowMA = ta.sma(close, lengthInput * 2)
+
+// Place an order to enter a long position when `fastMA` crosses over `slowMA`.
+if ta.crossover(fastMA, slowMA)
+    strategy.entry("buy", strategy.long)
+
+// Place an order to enter a short position when `fastMA` crosses under `slowMA`.
+if ta.crossunder(fastMA, slowMA)
+    strategy.entry("sell", strategy.short)
+
+// Plot the moving averages.
+plot(fastMA, "Fast MA", color.aqua)
+plot(slowMA, "Slow MA", color.orange)

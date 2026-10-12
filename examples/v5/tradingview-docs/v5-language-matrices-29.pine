@@ -1,0 +1,40 @@
+//@version=5
+indicator("Concatenation demo")
+
+//@function Displays the rows of a matrix in a label with a note.
+//@param    this The matrix to display.
+//@param    barIndex The `bar_index` to display the label at.
+//@param    bgColor The background color of the label.
+//@param    textColor The color of the label's text.
+//@param    note The text to display above the rows.
+method debugLabel(
+     matrix<float> this, int barIndex = bar_index, color bgColor = color.blue,
+     color textColor = color.white, string note = ""
+ ) =>
+    labelText = note + "\n" + str.tostring(this)
+    if barstate.ishistory
+        label.new(
+             barIndex, 0, labelText, color = bgColor, style = label.style_label_center,
+             textcolor = textColor, size = size.huge
+         )
+
+//@variable A 2x3 matrix filled with 1s.
+matrix<int> m1 = matrix.new<int>(2, 3, 1)
+//@variable A 2x3 matrix filled with 2s.
+matrix<int> m2 = matrix.new<int>(2, 3, 2)
+
+//@variable The transpose of `m1`.
+t1 = m1.transpose()
+//@variable The transpose of `m2`.
+t2 = m2.transpose()
+
+if bar_index == last_bar_index - 1
+    // Display the original matrices.
+    m1.debugLabel(note = "Matrix 1")
+    m2.debugLabel(bar_index + 10, note = "Matrix 2")
+    // Append the rows of `m2` to the end of `m1` and display `m1`.
+    m1.concat(m2)
+    m1.debugLabel(bar_index + 20, color.blue, note = "Appended rows")
+    // Append the rows of `t2` to the end of `t1`, then display the transpose of `t1.
+    t1.concat(t2)
+    t1.transpose().debugLabel(bar_index + 30, color.purple, note = "Appended columns")

@@ -1,0 +1,5 @@
+//@version=5
+indicator("HA Close", "", true)
+haTicker = ticker.heikinashi(syminfo.tickerid)
+haClose = request.security(haTicker, timeframe.period, close)
+plot(haClose, "HA Close", color.black, 3)

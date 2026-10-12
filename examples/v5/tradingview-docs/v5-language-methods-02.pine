@@ -1,0 +1,28 @@
+//@version=5
+indicator("Custom Sample BB", overlay = true)
+
+float sourceInput  = input.source(close, "Source")
+int   samplesInput = input.int(20, "Samples")
+int   n            = input.int(10, "Bars")
+float multiplier   = input.float(2.0, "StdDev")
+
+var array<float> sourceArray = array.new<float>(samplesInput)
+var float        sampleMean  = na
+var float        sampleDev   = na
+
+// Identify if `n` bars have passed.
+if bar_index % n == 0
+    // Update the queue.
+    array.push(sourceArray, sourceInput)
+    array.shift(sourceArray)
+    // Update the mean and standard deviaiton values.
+    sampleMean := array.avg(sourceArray)
+    sampleDev  := array.stdev(sourceArray) * multiplier
+
+// Calculate bands.
+float highBand = sampleMean + sampleDev
+float lowBand  = sampleMean - sampleDev
+
+plot(sampleMean, "Basis", color.orange)
+plot(highBand, "Upper", color.lime)
+plot(lowBand, "Lower", color.red)

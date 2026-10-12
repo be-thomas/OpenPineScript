@@ -1,0 +1,6 @@
+//@version=5
+indicator("Daily financial data demo")
+
+//@variable The daily Premium/Discount to Net Asset Value for "AMEX:SPY"
+float f1 = request.financial("AMEX:SPY", "NAV", "D")
+plot(f1)

@@ -1,0 +1,17 @@
+//@version=5
+strategy("`strategy.order()` demo", overlay = true)
+
+//@variable Is `true` on every 100th bar, `false` otherwise.
+bool buyCondition = bar_index % 100 == 0
+//@variable Is `true` on every 25th bar, `false` otherwise.
+bool sellCondition = bar_index % 25 == 0
+
+if buyCondition
+    // Place a "buy" market order to trade 15 units in the long direction. 
+    strategy.order("buy", strategy.long, qty = 15)
+else if sellCondition
+    // Place a "sell" market order to trade 5 units in the short direction.
+    strategy.order("sell", strategy.short, qty = 5)
+
+// Highlight the background when the `buyCondition` or `sellCondition` occurs.
+bgcolor(buyCondition ? color.new(color.blue, 90) : sellCondition ? color.new(color.red, 90) : na)

@@ -1,0 +1,28 @@
+//@version=4
+study("Pivot Points High Low", shorttitle="Pivots HL", overlay=true)
+
+lenH = input(title="Length High", type=input.integer, defval=10, minval=1)
+lenL = input(title="Length Low", type=input.integer, defval=10, minval=1)
+
+fun(src, len, isHigh, _style, _yloc, _color) =>
+    p = nz(src[len])
+    isFound = true
+    for i = 0 to len - 1
+        if isHigh and src[i] > p
+            isFound := false
+
+        if not isHigh and src[i] < p
+            isFound := false
+
+    for i = len + 1 to 2 * len
+        if isHigh and src[i] >= p
+            isFound := false
+
+        if not isHigh and src[i] <= p
+            isFound := false
+
+    if isFound
+        label.new(bar_index[len], p, tostring(p), style=_style, yloc=_yloc, color=_color)
+
+fun(high, lenH, true, label.style_label_down, yloc.abovebar, color.lime)
+fun(low, lenL, false, label.style_label_up, yloc.belowbar, color.red)

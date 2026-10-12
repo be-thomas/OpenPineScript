@@ -1,0 +1,269 @@
+import { Project, Node, SyntaxKind } from "ts-morph";
+import * as fs from "fs";
+import * as path from "path";
+
+/**
+ * Helper: Parses the @returns JSDoc string into a structured PineType object.
+ */
+function parseReturnType(raw: string): any {
+    const text = raw.trim();
+    // Handle Tuples: [float, float]
+    if (text.startsWith("[") && text.endsWith("]")) {
+        const inner = text.slice(1, -1);
+        const parts = inner.split(",").map(p => p.trim());
+        return {
+            kind: "tuple",
+            itemTypes: parts.map(p => ({ kind: "series", type: p }))
+        };
+    }
+    // Handle Series
+    if (text.startsWith("series")) {
+        return { kind: "series", type: text.replace("series", "").trim() || "any" };
+    }
+    // Default to Scalar
+    return { kind: "scalar", type: text || "any" };
+}
+
+/**
+ * The name a Pine author writes for a parameter, derived from the TypeScript one.
+ *
+ * `Context.call` matches keyword arguments by looking the written name up in
+ * `entry.args`, and an unmatched key is DROPPED — no error. So every place the
+ * TypeScript signature spells a parameter differently from Pine, the keyword
+ * form of that argument silently did nothing:
+ *
+ *     security(tickerid, "D", close, lookahead=barmerge.lookahead_off)
+ *         → `lookaheadInput` in the registry, `lookahead` written; dropped, and
+ *           the call fell back to the version default
+ *     sma(close, length=10)
+ *         → `lengthInput` in the registry; dropped, and length became undefined
+ *
+ * 44 registry entries carried an `Input`-suffixed parameter, so this was not a
+ * corner case. Two conventions are normalised: the `Input` suffix used to keep
+ * a parameter distinct from a local of the same name, and the leading
+ * underscore that marks a parameter as unused (`_gaps` → `gaps`).
+ */
+function pineParamName(tsName: string): string {
+    return tsName.replace(/^_+/, "").replace(/Input$/, "");
+}
+
+function generateConfig(stdlibPath: string) {
+    const project = new Project({ compilerOptions: { allowJs: true } });
+    const absolutePath = path.resolve(stdlibPath);
+    
+    const files = fs.readdirSync(absolutePath).filter(file => {
+        const ext = path.extname(file);
+        const name = path.basename(file, ext);
+        // `renames`/`renames5` are rename TABLES, not stdlib members. Scanning
+        // them put V4_RENAMES, V4_REMOVED and V4_ONLY_NAMESPACES into the
+        // registry as though a script could spell them.
+        return [".ts", ".js"].includes(ext)
+            && !["index", "metadata", "registry", "renames", "renames5"].includes(name);
+    });
+
+    project.addSourceFilesAtPaths(files.map(f => path.join(absolutePath, f)));
+
+    const imports: string[] = [];
+    const registryEntries: string[] = [];
+
+    files.forEach(file => {
+        const sourceFile = project.getSourceFile(file);
+        if (!sourceFile) return;
+
+        const ext = path.extname(file);
+        const moduleName = path.basename(file, ext);
+        imports.push(`import * as ${moduleName} from "./${moduleName}";`);
+        
+        const hasNamespaceFlag = sourceFile.getVariableDeclaration("__IS_NAMESPACE__")?.isExported();
+        const prefix = hasNamespaceFlag ? `${moduleName}.` : "";
+
+        // --- PHASE 1: Standard Functions ---
+        sourceFile.getFunctions().forEach(fn => {
+            if (!fn.isExported()) return;
+
+            const funcName = fn.getName()!;
+            const params = fn.getParameters().map(p => p.getName());
+            const fullKey = `${prefix}${funcName}`;
+
+            const isContextAware = params[0] === "ctx";
+            const args = (isContextAware ? params.slice(1) : params).map(pineParamName);
+            
+            const jsDocs = fn.getJsDocs();
+            const isGetter = jsDocs.some(doc => 
+                doc.getTags().some(tag => tag.getTagName() === "getter")
+            );
+
+            // Extract @returns
+            const returnsTag = jsDocs.flatMap(d => d.getTags()).find(t => t.getTagName() === "returns");
+            const returnsObj = parseReturnType(returnsTag ? returnsTag.getCommentText()?.trim() || "any" : "any");
+
+            registryEntries.push(`      "${fullKey}": {`);
+            registryEntries.push(`          uses_context: ${isContextAware},`);
+            registryEntries.push(`          args: ${JSON.stringify(args)},`);
+            registryEntries.push(`          is_getter: ${isGetter},`);
+            registryEntries.push(`          returns: ${JSON.stringify(returnsObj)},`);
+            registryEntries.push(`          is_value: false,`);
+            registryEntries.push(`          ref: ${moduleName}.${funcName}`);
+            registryEntries.push(`      },`);
+        });
+
+        // --- PHASE 2: Object Literals (e.g., strategy.risk.max_intraday_loss) ---
+        sourceFile.getVariableDeclarations().forEach(varDecl => {
+            const init = varDecl.getInitializer();
+            if (init && Node.isObjectLiteralExpression(init)) {
+                const varName = varDecl.getName();
+                
+                // Skip the internal namespace flag itself
+                if (varName === "__IS_NAMESPACE__") return;
+
+                const isDefault = sourceFile.getStatementByKind(SyntaxKind.ExportAssignment)?.getExpression().getText() === varName;
+                const isExported = varDecl.isExported() || isDefault;
+                if (!isExported) return;
+
+                // If the file is a namespace (e.g. strategy.), and we found an object (e.g. risk)
+                // The new prefix for properties inside should be "strategy.risk."
+                const nestedPrefix = `${prefix}${varName}.`;
+                const accessorBase = isDefault ? `(${moduleName}.default || ${moduleName})` : `${moduleName}.${varName}`;
+
+                const walkObject = (
+                    literal: import("ts-morph").ObjectLiteralExpression,
+                    nestedPrefix: string,
+                    accessorBase: string,
+                ) => {
+                literal.getProperties().forEach(prop => {
+                    if (Node.isPropertyAssignment(prop)) {
+                        const propName = prop.getName().replace(/['"]/g, '');
+                        if (propName === "__IS_NAMESPACE__") return; 
+
+                        // FIXED: Use nestedPrefix instead of prefix
+                        const fullKey = `${nestedPrefix}${propName}`;
+                        const initializer = prop.getInitializer();
+
+                        let isContextAware = false;
+                        let args: string[] = [];
+                        let isGetter = false;
+                        let isValue = true; 
+
+                        if (initializer && (Node.isArrowFunction(initializer) || Node.isFunctionExpression(initializer))) {
+                            isValue = false; 
+                            const params = initializer.getParameters().map(p => p.getName());
+                            isContextAware = params[0] === "ctx";
+                            args = (isContextAware ? params.slice(1) : params).map(pineParamName);
+
+                            // `@getter` on a property, exactly as on an exported
+                            // function. Some namespace members are VARIABLES that
+                            // still need the Context to answer — `chart.fg_color`
+                            // is a colour the host supplies, `session.ismarket` is
+                            // a per-bar boolean — so they must be written as
+                            // functions and READ as values.
+                            //
+                            // Without this, the emitter treats them as callables:
+                            // `chart.fg_color` emits the function object itself,
+                            // which is truthy, is not a colour, and produces no
+                            // error anywhere.
+                            //
+                            // Read from the leading COMMENT rather than
+                            // `getJsDocs()`: ts-morph does not type a
+                            // PropertyAssignment as JSDocable, so the typed
+                            // accessor is unavailable here even though the
+                            // comment is a perfectly ordinary JSDoc block.
+                            isGetter = prop.getLeadingCommentRanges()
+                                .some(range => /@getter\b/.test(range.getText()));
+                        }
+
+                        // A property that is ITSELF an object literal is a
+                        // nested namespace, not a value.
+                        //
+                        // `chart.point` is the case: `chart.point.new(...)`,
+                        // `.now(...)`, `.from_index(...)`. Without recursing,
+                        // the whole object was recorded as one `chart.point`
+                        // entry with `is_value: true`, so every constructor
+                        // under it was absent from the registry and
+                        // `chart.point.new(...)` emitted a call to nothing.
+                        if (initializer && Node.isObjectLiteralExpression(initializer)) {
+                            walkObject(
+                                initializer,
+                                `${fullKey}.`,
+                                `${accessorBase}[${JSON.stringify(propName)}]`,
+                            );
+                            return;
+                        }
+
+                        // Determine return type logic
+                        const type = moduleName === 'color' ? 'color' : 'any';
+                        const returnsObj = { kind: "scalar", type };
+
+                        registryEntries.push(`      "${fullKey}": {`);
+                        registryEntries.push(`          uses_context: ${isContextAware},`);
+                        registryEntries.push(`          args: ${JSON.stringify(args)},`);
+                        registryEntries.push(`          is_getter: ${isGetter},`); 
+                        registryEntries.push(`          returns: ${JSON.stringify(returnsObj)},`);
+                        registryEntries.push(`          is_value: ${isValue},`);
+                        registryEntries.push(`          ref: ${accessorBase}["${propName}"]`);
+                        registryEntries.push(`      },`);
+                    }
+                });
+                };
+
+                walkObject(init, nestedPrefix, accessorBase);
+            }
+        });
+
+        // --- PHASE 3: Flat Exported Constants (e.g., export const red = "#FF5252") ---
+        sourceFile.getVariableDeclarations().forEach(varDecl => {
+            if (!varDecl.isExported()) return;
+
+            const init = varDecl.getInitializer();
+            if (init && (Node.isObjectLiteralExpression(init) || Node.isArrowFunction(init) || Node.isFunctionExpression(init))) {
+                return; 
+            }
+
+            const varName = varDecl.getName();
+            if (varName === "__IS_NAMESPACE__") return; 
+
+            const fullKey = `${prefix}${varName}`;
+            const type = moduleName === 'color' ? 'color' : 'any';
+            const returnsObj = { kind: "scalar", type };
+
+            registryEntries.push(`      "${fullKey}": {`);
+            registryEntries.push(`          uses_context: false,`);
+            registryEntries.push(`          args: [],`);
+            registryEntries.push(`          is_getter: false,`); 
+            registryEntries.push(`          returns: ${JSON.stringify(returnsObj)},`);
+            registryEntries.push(`          is_value: true,`); 
+            registryEntries.push(`          ref: ${moduleName}.${varName}`);
+            registryEntries.push(`      },`);
+        });
+    });
+
+    const content = `// This file is AUTO-GENERATED. Do not edit manually.
+${imports.join("\n")}
+
+export interface PineType {
+    kind: "scalar" | "series" | "tuple";
+    type?: string;
+    itemTypes?: PineType[];
+}
+
+export interface StdlibEntry {
+    uses_context: boolean;
+    args: string[];
+    is_getter: boolean;
+    returns: PineType;
+    is_value: boolean;
+    ref: any;
+}
+
+export function getGeneratedRegistry(): Record<string, StdlibEntry> {
+    return {
+${registryEntries.join("\n")}
+    };
+}
+`;
+
+    const outputFile = path.join(absolutePath, "metadata.ts");
+    fs.writeFileSync(outputFile, content);
+    console.log(`✅ Registry generated with structured types at: ${outputFile}`);
+}
+
+generateConfig("./runtime/v1/stdlib");

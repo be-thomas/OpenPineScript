@@ -1,0 +1,9 @@
+//@version=4
+study("Example 6.1")
+ha_t = heikinashi(syminfo.tickerid)
+ha_open = security(ha_t, timeframe.period, open)
+ha_high = security(ha_t, timeframe.period, high)
+ha_low = security(ha_t, timeframe.period, low)
+ha_close = security(ha_t, timeframe.period, close)
+palette = ha_close >= ha_open ? color.green : color.red
+plotcandle(ha_open, ha_high, ha_low, ha_close, color=palette)

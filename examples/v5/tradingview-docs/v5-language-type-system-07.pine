@@ -1,0 +1,26 @@
+//@version=5
+indicator("Types demo", overlay = true)
+
+//@variable A value of the "const string" type for the `ma` plot's title.
+string MA_TITLE = "MA"
+
+//@variable A value of the "input int" type. Controls the length of the average.
+int lengthInput = input.int(100, "Length", minval = 2)
+
+//@variable A "series float" value representing the last `close` that crossed over the `ma`.
+var float crossValue = na
+
+//@variable A "series float" value representing the moving average of `close`.
+float ma = ta.sma(close, lengthInput)
+//@variable A "series bool" value that's `true` when the `close` crosses over the `ma`.
+bool crossUp = ta.crossover(close, ma)
+//@variable A "series color" value based on whether `close` is above or below its `ma`.
+color maColor = close > ma ? color.lime : color.fuchsia
+
+// Update the `crossValue`.
+if crossUp
+    crossValue := close
+
+plot(ma, MA_TITLE, maColor)
+plot(crossValue, "Cross value", style = plot.style_circles)
+plotchar(crossUp, "Cross Up", "▲", location.belowbar, size = size.small)

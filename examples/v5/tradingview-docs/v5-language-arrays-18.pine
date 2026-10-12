@@ -1,0 +1,9 @@
+//@version=5
+indicator("`array.insert()`")
+a = array.new<float>(5, 0)
+for i = 0 to 4
+    array.set(a, i, i + 1)
+if barstate.islast
+    label.new(bar_index, 0, "BEFORE\na: " + str.tostring(a), size = size.large)
+    array.insert(a, 2, 999)    
+    label.new(bar_index, 0, "AFTER\na: " + str.tostring(a), style = label.style_label_up, size = size.large)

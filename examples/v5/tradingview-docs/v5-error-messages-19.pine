@@ -1,0 +1,36 @@
+//@version=5
+indicator("Return BOP results only", "Memory limit demo")
+
+//@variable User-input length for calculating average of BOP values. 
+int avgLength = input.int(5, "Average BOP Length", minval = 1)
+
+// Returns the calculated `bop` and `avgBOP` values directly.
+dataFunction() => 
+    //@variable Persistent array containing the "balance of power" (BOP) values for all higher timeframe bars.
+    var array<float> dataArray = array.new_float(0)
+
+    //@variable The "balance of power" percentage calculated for the current higher timeframe bar.
+    float bop = (close - open) / (high - low) * 100
+    dataArray.push(bop)
+
+    // Calculate the average BOP for the `avgLength` most-recent values.
+    //@variable Size of the `dataArray`.
+    int dataSize = dataArray.size()
+    //@variable A subset of the latest values from the `dataArray`. Its size is determined by the `avgLength` set.
+    array<float> lastValues = dataSize >= avgLength ? dataArray.slice(dataSize - avgLength, dataSize): dataArray
+    //@variable The average of the last `avgLength` BOP values.
+    float avgBOP = lastValues.avg()
+
+    //Return the calculated results.
+    [bop, avgBOP]
+
+// Request BOP and average BOP values from the higher timeframe.
+[reqValue, reqAverage] = request.security(syminfo.tickerid, "1D", dataFunction())
+
+// Plot zero line.
+hline(0, "Zero line", color.gray, hline.style_dotted)
+
+// Plot the BOP value and average line.
+color plotColor = reqValue >= 0 ? color.aqua : color.orange
+plot(reqValue, "BOP", plotColor, style = plot.style_columns)
+plot(reqAverage, "Avg", color.purple, linewidth = 3)

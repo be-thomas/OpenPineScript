@@ -1,0 +1,10 @@
+//@version=5
+indicator("MACD #1")
+fast = 12
+slow = 26
+fastMA = ta.ema(close, fast)
+slowMA = ta.ema(close, slow)
+macd = fastMA - slowMA
+signal = ta.ema(macd, 9)
+plot(macd, color = color.blue)
+plot(signal, color = color.orange)

@@ -1,0 +1,15 @@
+//@version=5
+indicator("Qualified types in tuples demo")
+
+makeTicker(simple string prefix, simple string ticker) =>
+    tId = prefix + ":" + ticker // simple string
+    source = close  // series float
+    [tId, source]
+
+// Both variables are series now. 
+[tId, source] = makeTicker("BATS", "AAPL") 
+
+// Error cannot call 'request.security' with 'series string' tId.
+r = request.security(tId, "", source)
+
+plot(r)

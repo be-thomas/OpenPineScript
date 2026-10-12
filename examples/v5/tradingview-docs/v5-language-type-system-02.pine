@@ -1,0 +1,9 @@
+//@version=5
+indicator("Cannot reassign const demo")
+
+//@variable A "float" variable declared as `const`, preventing reassignment. 
+const float myVar = 0.0
+
+myVar += 1.0 // Causes an error. Reassignment and compound assignments are not allowed on `const` variables.
+
+plot(myVar)

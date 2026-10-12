@@ -1,0 +1,14 @@
+//@version=5
+strategy("Exit Demo", pyramiding = 2)
+
+float positionSize = strategy.position_size
+
+if positionSize == 0 and last_bar_index - bar_index <= 100
+    strategy.entry("Buy1", strategy.long, 5)
+else if positionSize == 5
+    strategy.entry("Buy2", strategy.long, 10)
+else if positionSize == 15
+    strategy.close("Buy2")
+    strategy.exit("bracket", "Buy1", loss = 10, profit = 10)
+
+plot(positionSize == 0 ? na : positionSize, "Position Size", color.lime, 4, plot.style_histogram)

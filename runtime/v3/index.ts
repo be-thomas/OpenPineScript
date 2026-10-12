@@ -3,7 +3,7 @@
  *
  * v3's one run-time change from v2 is `security()`'s `lookahead` default
  * flipping from `barmerge.lookahead_on` to `barmerge.lookahead_off`. That is
- * carried as DATA on the v3 LanguageProfile (transpiler/profiles/index.ts) and
+ * carried as DATA on the v3 LanguageProfile (transpiler/common/profiles/index.ts) and
  * read by runtime/v1/stdlib/mtf.ts via `ctx.profile`, because it is a per-run
  * default with no parse tree to hang off — not a difference in the runtime code.
  *

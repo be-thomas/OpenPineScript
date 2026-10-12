@@ -1,0 +1,37 @@
+//@version=5
+indicator("Requesting user-defined functions demo", "Weighted Bollinger Bands", true)
+
+//@variable The timeframe of the request.
+string timeframe = input.timeframe("480", "Timeframe")
+
+//@function     Calculates Bollinger Bands with a custom weighted basis.
+//@param source The series of values to process.
+//@param length The number of bars in the calculation.
+//@param mult   The standard deviation multiplier.
+//@param weight The series of weights corresponding to each `source` value.
+//@returns      A tuple containing the basis, upper band, and lower band respectively.
+weightedBB(float source, int length, float mult = 2.0, float weight = 1.0) =>
+    //@variable The basis of the bands.
+    float ma = math.sum(source * weight, length) / math.sum(weight, length)
+    //@variable The standard deviation from the `ma`.
+    float dev = 0.0
+    // Loop to accumulate squared error.
+    for i = 0 to length - 1
+        difference = source[i] - ma
+        dev += difference * difference
+    // Divide `dev` by the `length`, take the square root, and multiply by the `mult`.
+    dev := math.sqrt(dev / length) * mult
+    // Return the bands.
+    [ma, ma + dev, ma - dev]
+
+// Request weighted bands calculated on the chart symbol's prices over 20 bars from the
+// last confirmed bar on the `timeframe`.
+[basis, highBand, lowBand] = request.security(
+     syminfo.tickerid, timeframe, weightedBB(close[1], 20, 2.0, (high - low)[1]), lookahead = barmerge.lookahead_on
+ )
+
+// Plot the values.
+basisPlot = plot(basis, "Basis", color.orange, 2)
+upperPlot = plot(highBand, "Upper", color.teal, 2)
+lowerPlot = plot(lowBand, "Lower", color.maroon, 2)
+fill(upperPlot, lowerPlot, color.new(color.gray, 90), "Background")

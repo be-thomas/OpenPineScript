@@ -1,0 +1,10 @@
+//@version=2
+study(title="Shading the chart's background", overlay=true)
+c = navy
+bgColor = (dayofweek == monday) ? color(c, 50) :
+    (dayofweek == tuesday) ? color(c, 60) :
+    (dayofweek == wednesday) ? color(c, 70) :
+    (dayofweek == thursday) ? color(c, 80) :
+    (dayofweek == friday) ? color(c, 90) :
+    color(blue, 80)
+bgcolor(color=bgColor)

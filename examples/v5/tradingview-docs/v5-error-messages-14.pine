@@ -1,0 +1,7 @@
+//@version=5
+indicator("My Script")
+test = 0.0
+roc20 = ta.roc(close, 20)
+if bar_index > 1000
+    test := roc20
+plot(test)

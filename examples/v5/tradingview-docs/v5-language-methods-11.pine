@@ -1,0 +1,36 @@
+//@version=5
+indicator("Type Inspection")
+
+// @function   Identifies an object's type.
+// @param this Object to inspect.
+// @returns    (string) A string representation of the type.
+method getType(int this) =>
+    na(this) ? "int(na)" : "int"
+
+method getType(float this) =>
+    na(this) ? "float(na)" : "float"
+
+method getType(bool this) =>
+    na(this) ? "bool(na)" : "bool"
+
+method getType(color this) =>
+    na(this) ? "color(na)" : "color"
+
+method getType(string this) =>
+    na(this) ? "string(na)" : "string"
+
+a = 1
+b = 1.0
+c = true
+d = color.white
+e = "1"
+
+// Inspect variables and format results.
+results = str.format(
+ "a: {0}\nb: {1}\nc: {2}\nd: {3}\ne: {4}", 
+ a.getType(), b.getType(), c.getType(), d.getType(), e.getType()
+ )
+
+var label lbl = label.new(0, 0)
+lbl.set_x(bar_index)
+lbl.set_text(results)

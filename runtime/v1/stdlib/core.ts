@@ -55,12 +55,67 @@ export function iff(cond: any, t: any, f: any): any {
 
 const asNumber = (x: any): number => Number(val(x));
 
-export function safe_add(a: any, b: any): number {
-    return asNumber(a) + asNumber(b);
+/**
+ * `+` — numeric addition, or STRING CONCATENATION when either side is a string.
+ *
+ * Pine overloads `+` exactly as JavaScript does, and this used to coerce
+ * unconditionally: `"a" + "b"` came out as `NaN`, because `Number("a")` is NaN.
+ * Nothing caught it, because v1–v4 have almost no reason to build a string —
+ * `tostring` exists and is rarely used, and a plot cannot show one.
+ *
+ * v5 makes it central. Pine Logs are how this project collects golden data
+ * without a paid TradingView plan (see runtime/v1/stdlib/logging.ts), every
+ * generated harness builds its CSV row with `str.tostring(x) + "," + …`, and
+ * all seven of them logged the single string "NaN".
+ */
+export function safe_add(a: any, b: any): number | string {
+    const x = val(a);
+    const y = val(b);
+    if (typeof x === "string" || typeof y === "string") return String(x) + String(y);
+    return Number(x) + Number(y);
 }
 
 export function safe_sub(a: any, b: any): number {
     return asNumber(a) - asNumber(b);
+}
+
+/**
+ * `a == b` and `a != b`, with both sides UNWRAPPED first.
+ *
+ * ── The bug this fixes ──────────────────────────────────────────────────────
+ *
+ * Every script variable is a Series OBJECT, and JavaScript compares two objects
+ * with `==` by REFERENCE. So
+ *
+ *     x = 1.0
+ *     y = 1.0
+ *     equal = x == y      // false
+ *
+ * Two variables holding the same number were never equal, at any version. It
+ * survived because the common shapes hide it: `x == 0` compares an object to a
+ * primitive, which coerces through `valueOf`, and `<`, `>`, `<=`, `>=` coerce
+ * unconditionally. Only `==` and `!=` between two variables reach the reference
+ * comparison, and then they are silently, permanently false.
+ *
+ * ── Why `==` and not `===` after unwrapping ─────────────────────────────────
+ *
+ * Because objects must still compare by reference once unwrapped. An ENUM
+ * member is a plain object with no `valueOf` of its own — deliberately, so that
+ * two enums with identically named and titled fields are not equal, which is
+ * the rule the manual states: "Scripts cannot compare members of different
+ * enums ... even if the fields have identical names and titles." Unwrapping
+ * leaves those objects alone, and `==` then does exactly the right thing for
+ * both cases.
+ *
+ * `na` needs no special handling: it is NaN, and NaN equals nothing including
+ * itself, which is what Pine reports for a comparison involving `na`.
+ */
+export function safe_eq(a: any, b: any): boolean {
+    return val(a) == val(b);
+}
+
+export function safe_ne(a: any, b: any): boolean {
+    return val(a) != val(b);
 }
 
 // --- Type Conversion (v2 Only) ---
@@ -171,3 +226,54 @@ export const fuchsia = "#E040FB";
 export const olive = "#808000";
 export const maroon = "#800000";
 export const silver = "#C0C0C0";
+
+/**
+ * `int(x)` — explicit cast from float to int.
+ *
+ * Pine v4 added "functions for explicit type casting" (June 2019) because it
+ * has no implicit float → integer conversion. The v4 manual's own example is
+ * the reason this matters:
+ *
+ *     len = 10.0
+ *     s = sma(close, int(len))
+ *
+ * without which `sma` rejects `const float` where it wants `integer`.
+ *
+ * Truncates toward zero rather than rounding — `int(-1.7)` is `-1`, not `-2` —
+ * and propagates `na`, since a cast cannot invent a value.
+ *
+ * Source: https://www.tradingview.com/pine-script-docs/v4/language/type-system/
+ *
+ * @returns {series int} `x` truncated toward zero, or na.
+ */
+export function int(x: any): number {
+    const n = Number(x != null && typeof x.valueOf === "function" ? x.valueOf() : x);
+    return Number.isFinite(n) ? Math.trunc(n) : NaN;
+}
+
+/**
+ * `max_bars_back(var, num)` — request a deeper history buffer for one series.
+ *
+ * ── Deliberately a no-op ────────────────────────────────────────────────────
+ *
+ * On TradingView this raises the internal lookback buffer for `var`, and exists
+ * because that buffer is capped: a script that indexes further back than the
+ * engine guessed fails with "Pine cannot determine the referencing length of
+ * series".
+ *
+ * This engine has no such cap. Lookback depth is bounded by available memory,
+ * which is one of the limits skipped on purpose — see the "Deliberate
+ * deviations" section of the README and dev-docs/04-skipped-restrictions.md.
+ * Every buffer is therefore already at least as large as any `max_bars_back`
+ * call could ask for, and honouring the request would mean SHRINKING history
+ * to match a restriction that is not being modelled.
+ *
+ * Accepting and ignoring it is what keeps scripts that call it runnable. The
+ * alternative — leaving the name unbound — is what made four of TradingView's
+ * own documentation examples die with a ReferenceError.
+ *
+ * @returns {void}
+ */
+export function max_bars_back(_series: any, _num: any): void {
+    /* no cap to raise — see above */
+}

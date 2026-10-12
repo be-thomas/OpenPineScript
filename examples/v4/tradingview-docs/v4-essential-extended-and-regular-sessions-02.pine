@@ -1,0 +1,5 @@
+//@version=4
+study("Example 4: Same as Main Symbol Session Type Data")
+t = tickerid("BATS", "AAPL", syminfo.session)
+cc = security(t, timeframe.period, close, true)
+plot(cc, style=plot.style_linebr)

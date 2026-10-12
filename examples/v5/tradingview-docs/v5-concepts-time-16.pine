@@ -1,0 +1,32 @@
+//@version=5
+indicator("Detecting changes in higher timeframes demo", overlay = true)
+
+//@variable The opening UNIX timestamp of the current bar on the "1M" timeframe.
+int currMonthlyOpenTime = time("1M")
+//@variable The closing timestamp on the "1M" timeframe as of the previous chart bar. 
+int prevMonthlyCloseTime = time_close("1M")[1]
+
+//@variable Is `true` when the opening time on the "1M" timeframe changes, indicating a new monthly bar. 
+bool isNewTf = ta.change(currMonthlyOpenTime) > 0
+
+if isNewTf
+    // Initialize variables for the `text` and `color` properties of the label drawing.
+    string lblText  = "New '1M' opening time:\n" + str.format_time(currMonthlyOpenTime)
+    color  lblColor = color.blue
+
+    //@variable Is `true` when the `currMonthlyOpenTime` exceeds the `prevMonthlyCloseTime`, indicating a time gap.
+    bool hasGap = currMonthlyOpenTime > prevMonthlyCloseTime
+    
+    // Modify the `lblText` and `lblColor` based on the `hasGap` value.
+    if hasGap
+        lblText := "Gap from previous '1M' close.\n\n" + lblText
+        lblColor := color.red
+    // Include the formatted `time` value if the `currMonthlyOpenTime` is before the first available chart bar's `time`.
+    if time > currMonthlyOpenTime
+        lblText += "\nFirst chart bar has a later time:\n" + str.format_time(time)
+    
+    // Draw a `lblColor` label anchored to the `time` to display the `lblText`. 
+    label.new(
+         time, high, lblText, xloc.bar_time, color = lblColor, style = label.style_label_lower_right, 
+         textcolor = color.white, size = size.large
+     )

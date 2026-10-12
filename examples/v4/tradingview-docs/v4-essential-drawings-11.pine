@@ -1,0 +1,10 @@
+//@version=4
+study("Last Bar Close 3", overlay=true)
+
+var label l = label.new(bar_index, na,
+    style=label.style_label_down, yloc=yloc.abovebar)
+
+c = close >= open ? color.lime : color.red
+label.set_color(l, c)
+label.set_text(l, tostring(close))
+label.set_x(l, bar_index)

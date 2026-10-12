@@ -1,0 +1,41 @@
+//@version=4
+study("Price vs MA", "", true)
+
+var string GP1 = "Moving averages"
+int     i_masQty    = input(20, "Quantity", minval = 1, maxval = 40, group = GP1, tooltip = "1-40")
+int     i_masStart  = input(20, "Periods begin at", minval = 2, maxval = 200, group = GP1, tooltip = "2-200")
+int     i_masStep   = input(20, "Periods increase by", minval = 1, maxval = 100, group = GP1, tooltip = "1-100")
+
+var string GP2 = "Display"
+string  i_tableYpos = input("top", "Panel position", inline = "11", options = ["top", "middle", "bottom"], group = GP2)
+string  i_tableXpos = input("right", "", inline = "11", options = ["left", "center", "right"], group = GP2)
+color   i_c_bull    = input(color.new(color.green, 30), "Bull", inline = "12", group = GP2)
+color   i_c_bear    = input(color.new(color.red, 30), "Bear", inline = "12", group = GP2)
+color   i_c_neutral = input(color.new(color.gray, 30), "Neutral", inline = "12", group = GP2)
+
+// ————— Produces a string format usable with `tostring()` to restrict precision to ticks.
+f_tickFormat() =>
+    string _s = tostring(syminfo.mintick)
+    _s := str.replace_all(_s, "25", "00")
+    _s := str.replace_all(_s, "5",  "0")
+    _s := str.replace_all(_s, "1",  "0")
+
+var table panel = table.new(i_tableYpos + "_" + i_tableXpos, 2, i_masQty + 1)
+if barstate.islast
+    // Table header.
+    table.cell(panel, 0, 0, "MA", bgcolor = i_c_neutral)
+    table.cell(panel, 1, 0, "Value", bgcolor = i_c_neutral)
+
+int period = i_masStart
+for _i = 1 to i_masQty
+    // ————— Call MAs on each bar.
+    float _ma = sma(close, period)
+    // ————— Only execute table code on last bar.
+    if barstate.islast
+        // Period in left column.
+        table.cell(panel, 0, _i, tostring(period), bgcolor = i_c_neutral)
+        // If MA is between the open and close, use neutral color. If close is lower/higher than MA, use bull/bear color.
+        _c_bg = close > _ma ? open < _ma ? i_c_neutral : i_c_bull : open > _ma ? i_c_neutral : i_c_bear
+        // MA value in right column.
+        table.cell(panel, 1, _i, tostring(_ma, f_tickFormat()), text_color = color.black, bgcolor = _c_bg)
+    period += i_masStep

@@ -1,0 +1,17 @@
+//@version=4
+study("Volume")
+// We name our color constants to make them more readable.
+var color C_GOLD   = #CCCC00ff
+var color C_VIOLET = #AA00FFff
+color i_c_bull = input(C_GOLD,   "Bull")
+color i_c_bear = input(C_VIOLET, "Bear")
+int i_levels = input(10, "Gradient levels", minval = 1)
+// We initialize only once on bar zero with `var`, otherwise the count would reset to zero on each bar.
+var float riseFallCnt = 0
+// Count the rises/falls, clamping the range to: 1 to `i_levels`.
+riseFallCnt := max(1, min(i_levels, riseFallCnt + sign(volume - nz(volume[1]))))
+// Rescale the count on a scale of 80, reverse it and cap transparency to <80 so that colors remains visible.
+float transparency = 80 - abs(80 * riseFallCnt / i_levels)
+// Build the correct transparency of either the bull or bear color.
+color c_volume = color.new(close > open ? i_c_bull : i_c_bear, transparency)
+plot(volume, "Volume", c_volume, 1, plot.style_columns)

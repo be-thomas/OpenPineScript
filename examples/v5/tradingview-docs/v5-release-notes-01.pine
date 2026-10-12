@@ -1,0 +1,5 @@
+//@version=5
+indicator("My script", format = format.percent, precision = 4)
+
+plot(close, format = format.price)           // Price format with 4-digit precision.
+plot(100 * bar_index / close, precision = 2) // Percent format with 2-digit precision. 

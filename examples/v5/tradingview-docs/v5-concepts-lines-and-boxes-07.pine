@@ -1,0 +1,13 @@
+//@version=5
+indicator("Creating boxes demo", overlay = true)
+
+//@variable The `chart.point` for the top-left corner of the box. Contains `index` and `time` information.
+topLeft = chart.point.now(high)
+//@variable The `chart.point` for the bottom-right corner of the box. Does not contain `time` information.
+bottomRight = chart.point.from_index(bar_index + 1, low)
+
+// Draw a box using the `topLeft` and `bottomRight` corner points. Uses the `index` fields as x-coordinates.
+box.new(topLeft, bottomRight, color.purple, 2, bgcolor = color.new(color.gray, 70))
+
+// Color the background on the unconfirmed bar.
+bgcolor(barstate.isconfirmed ? na : color.new(color.orange, 70), title = "Unconfirmed bar highlight")

@@ -1,0 +1,28 @@
+//@version=5
+strategy("Reserved exit demo", "test", overlay = true)
+
+//@variable The price of the "limit" exit order.
+var float limitPrice = na
+//@variable The price of the "stop" exit order.
+var float stopPrice = na
+//@variable Is `true` 100 bars before the last chart bar. 
+bool longCondition = last_bar_index - bar_index == 100
+
+if longCondition
+    // Update the `limitPrice` and `stopPrice`. 
+    limitPrice := close * 1.01
+    stopPrice  := close * 0.99
+    // Place a long market order for 20 shares.
+    strategy.entry("buy", strategy.long, 20)
+    // Create a take-profit order for 19 shares at the `limitPrice`.
+    strategy.exit("limit", limit = limitPrice, qty = 19)
+    // Create a stop-loss order at the `stopPrice`. Although this call specifies a `qty` of 20, the previous 
+    // `strategy.exit()` call reserved 19, meaning this call creates an exit order for only 1 share. 
+    strategy.exit("stop", stop = stopPrice, qty = 20)
+
+//@variable Is `true` when the strategy has an open position, `false` otherwise.
+bool showPlot = strategy.opentrades == 1
+
+// Plot the `limitPrice` and `stopPrice` when `showPlot` is `true`.
+plot(showPlot ? limitPrice : na, "Limit (take-profit) price", color.green, 2, plot.style_linebr)
+plot(showPlot ? stopPrice : na, "Stop (stop-loss) price", color.red, 2, plot.style_linebr)

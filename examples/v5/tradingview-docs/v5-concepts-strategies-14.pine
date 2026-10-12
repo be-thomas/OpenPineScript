@@ -1,0 +1,44 @@
+//@version=5
+strategy("Multi-level exit demo", "test", overlay = true)
+
+//@variable Is `true` on every 100th bar.
+bool buyCondition = bar_index % 100 == 0
+
+//@variable The take-profit price for "exit1" orders.
+var float takeProfit1 = na
+//@variable The take-profit price for "exit2" orders.
+var float takeProfit2 = na
+//@variable The stop-loss price for "exit1" orders.
+var float stopLoss1 = na
+//@variable The stop-loss price for "exit2" orders.
+var float stopLoss2 = na
+
+if buyCondition
+    // Update the `takeProfit*` and `stopLoss*` values before entering the trade.
+    if strategy.opentrades == 0
+        takeProfit1 := close * 1.01
+        takeProfit2 := close * 1.02
+        stopLoss1   := close * 0.99
+        stopLoss2   := close * 0.98
+    // Place a long market order with a `qty` of 2.
+    strategy.entry("buy", strategy.long, qty = 2)
+    // Place an "exit1" bracket with a `qty` of 1 at the `takeProfit1` and `stopLoss1` prices.
+    strategy.exit("exit1", "buy", limit = takeProfit1, stop = stopLoss1, qty = 1)
+    // Place an "exit2" bracket with a `qty` of 3 at the `takeProfit1` and `stopLoss1` prices.
+    // The size of the resulting orders decreases to match the open position. 
+    strategy.exit("exit2", "buy", limit = takeProfit2, stop = stopLoss2, qty = 3)
+
+// Set `takeProfit1` and `stopLoss1` to `na` when the price touches either value. 
+if high >= takeProfit1 or low <= stopLoss1
+    takeProfit1 := na
+    stopLoss1   := na
+// Set `takeProfit2` and `stopLoss2` to `na` when the price touches either value. 
+if high >= takeProfit2 or low <= stopLoss2
+    takeProfit2 := na
+    stopLoss2   := na
+
+// Plot the `takeProfit*` and `stopLoss*` values.
+plot(takeProfit1, "TP1", color.green, style = plot.style_circles)
+plot(takeProfit2, "TP2", color.green, style = plot.style_circles)
+plot(stopLoss1, "SL1", color.red, style = plot.style_circles)
+plot(stopLoss2, "SL2", color.red, style = plot.style_circles)

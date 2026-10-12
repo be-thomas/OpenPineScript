@@ -1,0 +1,47 @@
+//@version=5
+indicator("Requesting user-defined types demo", "Ticker info")
+
+//@variable The symbol to request information from.
+string symbol = input.symbol("NASDAQ:AAPL", "Symbol")
+
+//@type               A custom type containing information about a ticker.
+//@field description  The symbol's description.
+//@field tickerType   The type of ticker.
+//@field currency     The symbol's currency.
+//@field prices       An array of the symbol's current prices.
+//@field barIndex     The ticker's `bar_index`.
+type TickerInfo
+    string       description
+    string       tickerType
+    string       currency
+    array<float> prices
+    int          barIndex
+
+//@variable A `TickerInfo` object containing current data.
+info = TickerInfo.new(
+     syminfo.description, syminfo.type, syminfo.currency, array.from(open, high, low, close), bar_index
+ )
+//@variable The `info` requested from the specified `symbol`.
+TickerInfo requestedInfo = request.security(symbol, timeframe.period, info)
+// Assign a new `TickerInfo` instance to `requestedInfo` if one wasn't retrieved.
+if na(requestedInfo)
+    requestedInfo := TickerInfo.new(prices = array.new<float>(4))
+
+//@variable A label displaying information from the `requestedInfo` object.
+var infoLabel = label.new(
+     na, na, "", color = color.purple, style = label.style_label_left, textcolor = color.white, size = size.large
+ )
+//@variable The text to display inside the `infoLabel`.
+string infoText = na(requestedInfo) ? "" : str.format(
+     "{0}\nType: {1}\nCurrency: {2}\nBar Index: {3}",
+     requestedInfo.description, requestedInfo.tickerType, requestedInfo.currency, requestedInfo.barIndex
+ )
+
+// Set the `point` and `text` of the `infoLabel`.
+label.set_point(infoLabel, chart.point.now(array.last(requestedInfo.prices)))
+label.set_text(infoLabel, infoText)
+// Plot candles using the values from the `prices` array of the `requestedInfo`.
+plotcandle(
+     requestedInfo.prices.get(0), requestedInfo.prices.get(1), requestedInfo.prices.get(2), requestedInfo.prices.get(3),
+     "Requested Prices"
+ )

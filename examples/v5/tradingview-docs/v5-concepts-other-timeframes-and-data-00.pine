@@ -1,0 +1,11 @@
+//@version=5
+indicator("Behavior of `request.security()` demo")
+
+//@variable The 20-bar linear regression slope of `hl2` prices from the "AMEX:SPY" symbol on the "1D" timeframe.
+float requestedSlope = request.security("AMEX:SPY", "1D", ta.linreg(hl2, 20, 0) - ta.linreg(hl2, 20, 1))
+
+//@variable Is `color.teal` when the `requestedSlope` is positive, and `color.maroon` otherwise.
+color plotColor = requestedSlope > 0 ? color.teal : color.maroon
+
+// Plot the `requestedSlope` with the `plotColor`.
+plot(requestedSlope, "Requested slope", plotColor, 1, plot.style_area)

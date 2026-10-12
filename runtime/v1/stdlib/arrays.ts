@@ -29,15 +29,30 @@ import { val } from "../../../utils/v2/common";
 function arr(id: any, fn: string): any[] {
     const a = val(id);
     if (!Array.isArray(a)) {
-        throw new Error(`array.${fn}: expected an array, got ${a === undefined ? "na" : typeof a}`);
+        // `na` unwraps to NaN, which is a number, and reporting it as one named
+        // the wrong thing: `array<int> a = na` then `array.push(a, 111)` — which
+        // is TradingView's own "Out of bounds index" demo — read as
+        // "expected an array, got number".
+        const what = a === undefined || a === null
+            || (typeof a === "number" && Number.isNaN(a)) ? "na" : typeof a;
+        throw new Error(`array.${fn}: expected an array, got ${what}`);
     }
     return a;
 }
 
-/** Pine reports an out-of-range index rather than returning na. */
+/**
+ * Pine reports an out-of-range index rather than returning na.
+ *
+ * A FRACTIONAL index is floored rather than refused. TradingView's own
+ * `v5-language-arrays-06` states the rule in a comment on the line that needs
+ * it — "The index used by `array.get()` will be the equivalent of
+ * `floor(fillNo)`" — and computes that index as
+ * `math.min(lastHiBar / (lookbackInput / 5), 4)`, an ordinary float. Requiring
+ * an integer rejected the script at its first bar.
+ */
 function bounds(a: any[], index: any, fn: string): number {
-    const i = Number(val(index));
-    if (!Number.isInteger(i) || i < 0 || i >= a.length) {
+    const i = Math.floor(Number(val(index)));
+    if (!Number.isFinite(i) || i < 0 || i >= a.length) {
         throw new Error(`array.${fn}: index ${i} is out of bounds (size ${a.length})`);
     }
     return i;
@@ -83,6 +98,51 @@ export const array = {
     },
     size: (id: any) => arr(id, "size").length,
 
+    /**
+     * `array.first(id)` and `array.last(id)` — January 2023.
+     *
+     * "Returns the array's first element" / "Returns the array's last element."
+     *
+     * An EMPTY array is an error rather than `na`, which is the same rule
+     * `array.get` follows for an out-of-range index: the two are the same
+     * mistake, and answering `na` would let a script average nothing and plot
+     * it.
+     */
+    first: (id: any) => {
+        const a = arr(id, "first");
+        if (!a.length) throw new Error("array.first: array is empty");
+        return a[0];
+    },
+    last: (id: any) => {
+        const a = arr(id, "last");
+        if (!a.length) throw new Error("array.last: array is empty");
+        return a[a.length - 1];
+    },
+
+    /**
+     * `array.binary_search(id, val)` — the index of `val`, or -1.
+     *
+     * Requires the array to be sorted ASCENDING, which is the contract of every
+     * binary search and is why the three `binary_search*` functions exist
+     * alongside `array.indexof`: on a sorted array they are the fast answer, and
+     * on an unsorted one they are a wrong one. This engine does not verify the
+     * ordering — checking it would cost the very thing the function is for.
+     */
+    binary_search: (id: any, value: any) => {
+        const a = arr(id, "binary_search");
+        const target = val(value);
+        let lo = 0;
+        let hi = a.length - 1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            const here = val(a[mid]);
+            if (here === target) return mid;
+            if (here < target) lo = mid + 1;
+            else hi = mid - 1;
+        }
+        return -1;
+    },
+
     // --- Mutation ----------------------------------------------------------
     push: (id: any, value: any) => { arr(id, "push").push(val(value)); },
     pop: (id: any) => {
@@ -109,12 +169,31 @@ export const array = {
         return a.splice(bounds(a, index, "remove"), 1)[0];
     },
     clear: (id: any) => { arr(id, "clear").length = 0; },
+    /**
+     * Fills a contiguous range, and RETURNS THE ARRAY.
+     *
+     * The reference gives `array.fill(id, value, index_from, index_to) → void`,
+     * and the manual's Methods page gives this example
+     *
+     *     srcArray.copy().fill(1.0, 0.0, min, val).avg()
+     *
+     * with the explanation: "We are able to call `copy()`, `fill()`, and
+     * `avg()` successively on the same line of code because the first two
+     * methods return an `array<float>` instance."
+     *
+     * The two statements disagree. The example is the one a script can depend
+     * on — it is TradingView's own published code, and returning the receiver
+     * is a strict superset of returning nothing: a caller that ignores the
+     * result cannot tell the difference. So the receiver is returned, and the
+     * conflict is recorded here rather than resolved silently.
+     */
     fill: (id: any, value: any, index_from: any = 0, index_to: any = undefined) => {
         const a = arr(id, "fill");
         const from = Number(val(index_from)) || 0;
         const to = index_to === undefined || val(index_to) === undefined
             ? a.length : Number(val(index_to));
         a.fill(val(value), from, to);
+        return a;
     },
 
     // --- Whole-array operations -------------------------------------------

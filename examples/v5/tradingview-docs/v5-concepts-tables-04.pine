@@ -1,0 +1,28 @@
+//@version=5
+indicator("Price vs Past", "", true)
+
+var int MAX_LOOKBACK = 300
+
+int     lookBackInput  = input.int(150, minval = 1, maxval = MAX_LOOKBACK, step = 10)
+color   bullColorInput = input.color(#00FF00ff, "Bull", inline = "11")
+color   bearColorInput = input.color(#FF0080ff, "Bear", inline = "11")
+
+// ————— Function draws a heatmap showing the position of the current `_src` relative to its past `_lookBack` values.
+drawHeatmap(src, lookBack) =>
+    // float src     : evaluated price series.
+    // int   lookBack: number of past bars evaluated.
+    // Dependency: MAX_LOOKBACK
+
+    // Force historical buffer to a sufficient size.
+    max_bars_back(src, MAX_LOOKBACK)
+    // Only run table code on last bar.
+    if barstate.islast
+        var heatmap = table.new(position.bottom_center, lookBack, 1)
+        for i = 1 to lookBackInput
+            float transp = 100. * i / lookBack
+            if src > src[i]
+                table.cell(heatmap, lookBack - i, 0, bgcolor = color.new(bullColorInput, transp))
+            else
+                table.cell(heatmap, lookBack - i, 0, bgcolor = color.new(bearColorInput, transp))
+
+drawHeatmap(high, lookBackInput)

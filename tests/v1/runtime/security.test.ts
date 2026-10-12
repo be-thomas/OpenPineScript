@@ -16,10 +16,10 @@
  */
 import { describe, it } from "vitest";
 import assert from "node:assert";
-import { transpile } from "../../../transpiler";
+import { transpile } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v1";
-import { profileFor } from "../../../transpiler/profiles";
-import type { PineVersion } from "../../../transpiler/version";
+import { profileFor } from "../../../transpiler/common/profiles";
+import type { PineVersion } from "../../../transpiler/common/version";
 
 function build(pine: string, version: PineVersion = 1) {
     const js = transpile(pine, { version }).replace(/\blet\b/g, "var ");

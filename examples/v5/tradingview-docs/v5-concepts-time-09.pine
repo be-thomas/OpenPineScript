@@ -1,0 +1,5 @@
+//@version=5
+indicator("`year` demo", overlay = true)
+
+// Plot the `close` price on bars that open in the `year` 2022 onward. Otherwise, plot `na` to display nothing.
+plot(year >= 2022 ? close : na, "`close` price (year 2022 and later)", linewidth = 3)

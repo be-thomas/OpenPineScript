@@ -1,0 +1,12 @@
+//@version=5
+indicator("Bollinger Bands", overlay = true)
+[middle, upper, lower] = ta.bb(close, 5, 4)
+plot(middle, color=color.blue)
+p1PlotID = plot(upper, color=color.green)
+p2PlotID = plot(lower, color=color.green)
+crossUp = ta.crossover(high, upper)
+crossDn = ta.crossunder(low, lower)
+var TRANSP = 90
+// We use `color.new()` to explicitly pass transparency to both functions
+fill(p1PlotID, p2PlotID, color = color.new(color.green, TRANSP))
+bgcolor(crossUp ? color.new(color.green, TRANSP) : crossDn ? color.new(color.red, TRANSP) : na)

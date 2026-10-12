@@ -1,0 +1,68 @@
+//@version=5
+strategy("Exit persist demo", overlay = true, margin_long = 100, margin_short = 100, pyramiding = 100)
+
+//@variable The time when order creation starts. 
+int entryStartTime = input.time(0, "Start time for entries", confirm = true)
+//@variable The time when the `strategy.exit()` call occurs.
+int exitCallTime = input.time(0, "Exit call time", confirm = true)
+//@variable The time when order creation stops.
+int entryEndTime = input.time(0, "End time for entries", confirm = true)
+
+// Raise a runtime error if incorrect timestamps are chosen.
+if exitCallTime <= entryStartTime or entryEndTime <= exitCallTime or entryEndTime <= entryStartTime
+    runtime.error("The input timestamps must follow this condition: entryStartTime < exitCallTime < entryEndTime.")
+
+// Create variables to track entry and exit conditions. 
+bool entriesStart = time == entryStartTime
+bool callExit     = time == exitCallTime
+bool entriesEnd   = time == entryEndTime
+bool callEntry    = time >= entryStartTime and time < entryEndTime
+
+// Place a long entry order when `callEntry` is `true`.
+if callEntry
+    strategy.entry("Entry", strategy.long)
+
+// Call `strategy.exit()` when `callExit` is `true`, which occurs only once.
+// This single call only places exit orders for all entries with the "Entry" ID created before or on the bar where 
+// `callExit` occurs. It DOES NOT affect any subsequent entries created after that bar.
+if callExit
+    strategy.exit("Exit", from_entry = "Entry", loss = 0)
+
+// Draw labels to signify when entries start, when the `strategy.exit()` call occurs, and when order placement stops.
+switch 
+    entriesStart => label.new(
+         bar_index, high, "Start placing entry orders.", color = color.green, textcolor = color.white, 
+         style = label.style_label_lower_right, size = size.large
+     )
+    callExit => label.new(
+         bar_index, high, "Call `strategy.exit()` once.", color = color.blue, textcolor = color.white, 
+         style = label.style_label_lower_right, size = size.large
+     )
+    entriesEnd => label.new(
+         bar_index, high, "Stop placing orders.", color = color.red, textcolor = color.white, 
+         style = label.style_label_lower_left, size = size.large
+     )
+
+// Create a line and label to visualize the lowest entry price, i.e., the price required to close the position.
+var line lowestLine = line.new(
+     entryStartTime + 1000, na, entryEndTime, na, xloc.bar_time, extend.right, color.orange, width = 2
+ )
+var lowestLabel = label.new(
+     entryStartTime + 1000, na, "Lowest entry price", color = color.orange, 
+     style = label.style_label_upper_right, xloc = xloc.bar_time
+ )
+
+// Update the price values of the `lowestLine` and `lowestLabel` after each new entry.
+if callEntry[1]
+    var float lowestPrice = strategy.opentrades.entry_price(0)
+    float entryPrice = strategy.opentrades.entry_price(strategy.opentrades - 1)
+    if not na(entryPrice)
+        lowestPrice := math.min(lowestPrice, entryPrice)
+        lowestLine.set_y1(lowestPrice)
+        lowestLine.set_y2(lowestPrice)
+        lowestLabel.set_y(lowestPrice)
+
+// Highlight the background when `entriesStart`, `callExit`, and `entriesEnd` occurs.
+bgcolor(entriesStart ? color.new(color.green, 80) : na, title = "Entries start highlight")
+bgcolor(callExit ? color.new(color.blue, 80) : na, title = "Exit call highlight")
+bgcolor(entriesEnd ? color.new(color.red, 80) : na, title = "Entries end highlight")

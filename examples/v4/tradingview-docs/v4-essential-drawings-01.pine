@@ -1,0 +1,4 @@
+//@version=4
+study("My Script", overlay=true)
+label.new(bar_index, high, style=label.style_none,
+            text="x=" + tostring(bar_index) + "\ny=" + tostring(high))

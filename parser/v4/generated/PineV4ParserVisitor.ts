@@ -1,5 +1,5 @@
 
-import { AbstractParseTreeVisitor } from "antlr4ng";
+import { ParseTreeVisitor } from "antlr4ng";
 
 
 import { Decl_modContext } from "./PineV4Parser.js";
@@ -9,7 +9,11 @@ import { Id_partContext } from "./PineV4Parser.js";
 import { IdContext } from "./PineV4Parser.js";
 import { Var_defContext } from "./PineV4Parser.js";
 import { Var_defsContext } from "./PineV4Parser.js";
+import { Compound_assign_opContext } from "./PineV4Parser.js";
 import { Var_assignContext } from "./PineV4Parser.js";
+import { If_exprContext } from "./PineV4Parser.js";
+import { Pos_argContext } from "./PineV4Parser.js";
+import { Pos_argsContext } from "./PineV4Parser.js";
 import { Global_stmt_contentContext } from "./PineV4Parser.js";
 import { Local_stmt_contentContext } from "./PineV4Parser.js";
 import { Pine_scriptContext } from "./PineV4Parser.js";
@@ -30,7 +34,6 @@ import { Local_stmt_multilineContext } from "./PineV4Parser.js";
 import { Ids_arrayContext } from "./PineV4Parser.js";
 import { Arith_exprsContext } from "./PineV4Parser.js";
 import { Arith_exprContext } from "./PineV4Parser.js";
-import { If_exprContext } from "./PineV4Parser.js";
 import { For_exprContext } from "./PineV4Parser.js";
 import { Stmts_blockContext } from "./PineV4Parser.js";
 import { Ternary_exprContext } from "./PineV4Parser.js";
@@ -45,7 +48,6 @@ import { Sqbr_exprContext } from "./PineV4Parser.js";
 import { AtomContext } from "./PineV4Parser.js";
 import { Fun_callContext } from "./PineV4Parser.js";
 import { Fun_actual_argsContext } from "./PineV4Parser.js";
-import { Pos_argsContext } from "./PineV4Parser.js";
 import { Kw_argsContext } from "./PineV4Parser.js";
 import { Kw_argContext } from "./PineV4Parser.js";
 import { LiteralContext } from "./PineV4Parser.js";
@@ -60,7 +62,7 @@ import { Other_literalContext } from "./PineV4Parser.js";
  * @param <Result> The return type of the visit operation. Use `void` for
  * operations with no return type.
  */
-export class PineV4ParserVisitor<Result> extends AbstractParseTreeVisitor<Result> {
+export class PineV4ParserVisitor<Result> extends ParseTreeVisitor<Result> {
     /**
      * Visit a parse tree produced by `PineV4Parser.decl_mod`.
      * @param ctx the parse tree
@@ -104,11 +106,35 @@ export class PineV4ParserVisitor<Result> extends AbstractParseTreeVisitor<Result
      */
     visitVar_defs?: (ctx: Var_defsContext) => Result;
     /**
+     * Visit a parse tree produced by `PineV4Parser.compound_assign_op`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitCompound_assign_op?: (ctx: Compound_assign_opContext) => Result;
+    /**
      * Visit a parse tree produced by `PineV4Parser.var_assign`.
      * @param ctx the parse tree
      * @return the visitor result
      */
     visitVar_assign?: (ctx: Var_assignContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV4Parser.if_expr`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitIf_expr?: (ctx: If_exprContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV4Parser.pos_arg`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitPos_arg?: (ctx: Pos_argContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV4Parser.pos_args`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitPos_args?: (ctx: Pos_argsContext) => Result;
     /**
      * Visit a parse tree produced by `PineV4Parser.global_stmt_content`.
      * @param ctx the parse tree
@@ -230,12 +256,6 @@ export class PineV4ParserVisitor<Result> extends AbstractParseTreeVisitor<Result
      */
     visitArith_expr?: (ctx: Arith_exprContext) => Result;
     /**
-     * Visit a parse tree produced by `PineV4Parser.if_expr`.
-     * @param ctx the parse tree
-     * @return the visitor result
-     */
-    visitIf_expr?: (ctx: If_exprContext) => Result;
-    /**
      * Visit a parse tree produced by `PineV4Parser.for_expr`.
      * @param ctx the parse tree
      * @return the visitor result
@@ -319,12 +339,6 @@ export class PineV4ParserVisitor<Result> extends AbstractParseTreeVisitor<Result
      * @return the visitor result
      */
     visitFun_actual_args?: (ctx: Fun_actual_argsContext) => Result;
-    /**
-     * Visit a parse tree produced by `PineV4Parser.pos_args`.
-     * @param ctx the parse tree
-     * @return the visitor result
-     */
-    visitPos_args?: (ctx: Pos_argsContext) => Result;
     /**
      * Visit a parse tree produced by `PineV4Parser.kw_args`.
      * @param ctx the parse tree

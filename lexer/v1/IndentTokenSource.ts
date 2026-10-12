@@ -77,15 +77,34 @@ const CONTINUATION_TOKEN_NAMES = [
   "EQ", "NEQ", "GT", "GE", "LT", "LE",
 ];
 
+/**
+ * Tokens that OPEN A BLOCK when the next line is indented.
+ *
+ * A line containing one of these is followed by a body, never by a
+ * continuation, and that is the fact that makes the leading-operator rule below
+ * safe. `x = if cond` and `if cond` both end on a complete expression, so
+ * end-of-line inspection cannot tell either from `x = a`; the presence of the
+ * keyword can.
+ *
+ * ARROW is here for `f(x) =>`, which is the same shape.
+ */
+const BLOCK_OPENER_NAMES = [
+  "IF_COND", "IF_COND_ELSE", "FOR_STMT", "WHILE", "SWITCH", "ARROW",
+];
+
 export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase) {
   // Resolved once per version, from that version's own generated lexer.
   const T = Base as unknown as IndentTokenIds;
 
-  const CONTINUATION_IDS = new Set<number>(
-    CONTINUATION_TOKEN_NAMES
+  const idsOf = (names: readonly string[]) => new Set<number>(
+    names
       .map(n => (Base as unknown as Record<string, number>)[n])
       .filter((id): id is number => typeof id === "number"),
   );
+
+  const CONTINUATION_IDS = idsOf(CONTINUATION_TOKEN_NAMES);
+  // A version that lacks one of these — v4 has no WHILE — simply skips it.
+  const BLOCK_OPENER_IDS = idsOf(BLOCK_OPENER_NAMES);
 
   return class IndentAwareTokenSource extends Base {
     private pendingTokens: Token[] = [];
@@ -97,6 +116,15 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
     private parenLevel: number = 0;
     /** Type of the last real (non-virtual) token, for continuation detection. */
     private lastRealToken: number = -1;
+
+    /**
+     * Has the logical line being read contained a block-opening token?
+     *
+     * If it has, the next indented line is that block's BODY and cannot be a
+     * continuation of this one. Reset when a new logical line begins — not when
+     * a continuation is absorbed, because that is still the same line.
+     */
+    private lineOpensBlock: boolean = false;
 
     /**
      * Structural indentation errors, drained by createParser.
@@ -134,6 +162,7 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
       // continuation from a new statement. LBEG itself is not a real token.
       if (t.type !== T.LBEG && t.type !== Token.EOF) {
         this.lastRealToken = t.type;
+        if (BLOCK_OPENER_IDS.has(t.type)) this.lineOpensBlock = true;
       }
 
       // 2. Track Parentheses/Brackets (Ignore indentation inside parens)
@@ -236,6 +265,25 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
         // Tab Expansion: 1 Tab = 4 Spaces (Standardize width)
         const indentLength = indentStr.replace(/\t/g, "    ").length;
 
+        // An INDENTED line beginning with a binary operator continues the
+        // previous one — unless the previous one opened a block, in which case
+        // the indent is that block's body.
+        //
+        //     _row = str.tostring(time, "#")
+        //           + "," + str.tostring(open, "#.#")     <- continuation
+        //
+        //     f() =>
+        //           -x                                    <- a function BODY
+        //
+        // Both are an indent after a line ending in a complete expression, so
+        // nothing about the previous line's LAST token separates them. Whether
+        // the line contained `if`, `for`, `while`, `switch` or `=>` does.
+        const indented = indentLength > this.indentStack[this.indentStack.length - 1];
+        if (indented && !this.lineOpensBlock && this.nextLineStartsWithArithmetic()) {
+          return this.nextToken();
+        }
+
+        this.lineOpensBlock = false;
         return this.handleIndentation(indentLength, t);
       }
 
@@ -381,6 +429,25 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
       if (/^and[\s(]/.test(word)) return true;
       if (/^or[\s(]/.test(word)) return true;
       return false;
+    }
+
+    /**
+     * Does the line about to start begin with a BINARY ARITHMETIC operator?
+     *
+     * Kept apart from `nextLineStartsWithOperator` because it is only safe
+     * under two extra conditions the caller checks: the line must be INDENTED,
+     * and the previous line must not have opened a block. `?`, `:`, `and` and
+     * `or` need neither — none of them can begin a statement — which is why
+     * they are recognised unconditionally.
+     *
+     * A '/' is deliberately absent: a line starting with one is `//`, a
+     * comment, which the blank-and-comment branch above has already handled.
+     */
+    private nextLineStartsWithArithmetic(): boolean {
+      const s = this.inputStream;
+      if (!s) return false;
+      const c = String.fromCharCode(s.LA(1));
+      return c === "+" || c === "-" || c === "*" || c === "%";
     }
 
     private createVirtualToken(type: number, text: string, original: Token): Token {

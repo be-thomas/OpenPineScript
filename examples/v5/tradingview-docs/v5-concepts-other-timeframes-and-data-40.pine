@@ -1,0 +1,19 @@
+//@version=5
+indicator("Requesting currency rates demo")
+
+//@variable The currency to convert.
+simple string fromCurrency = currency.TRY
+//@variable The resulting currency.
+simple string toCurrency = currency.KRW
+
+//@variable The spread symbol to request. Required in `request.security()` because no direct symbol exists.
+simple string spreadSymbol = str.format("{0}{2} * {2}{1}", fromCurrency, toCurrency, currency.USD)
+
+//@variable The non-repainting conversion rate from `request.security()` using the `spreadSymbol`.
+float securityRequestedRate = request.security(spreadSymbol, "1D", close[1], lookahead = barmerge.lookahead_on)
+//@variable The non-repainting conversion rate from `request.currency_rate()`.
+float nonSecurityRequestedRate = request.currency_rate(fromCurrency, toCurrency)
+
+// Plot the requested rates. We can multiply TRY values by these rates to convert them to KRW.
+plot(securityRequestedRate, "`request.security()` value", color.purple, 5)
+plot(nonSecurityRequestedRate, "`request.currency_rate()` value", color.yellow, 2)

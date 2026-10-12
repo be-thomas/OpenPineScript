@@ -1,0 +1,13 @@
+//@version=5
+indicator("`dayofmonth()` demo", overlay = false)
+
+//@variable An "int" representing the current bar's opening calendar day in the exchange time zone. 
+//          Equivalent to the `dayofmonth` variable. 
+int openingDay = dayofmonth(time)
+
+//@variable An "int" representing the current bar's opening calendar day in the "Australia/Sydney" time zone.
+int openingDaySydney = dayofmonth(time, "Australia/Sydney")
+
+// Plot the calendar day values.
+plot(openingDay,       "Day of Month (Exchange)", linewidth = 6, color = color.blue)
+plot(openingDaySydney, "Day of Month (Sydney)",   linewidth = 3, color = color.orange)

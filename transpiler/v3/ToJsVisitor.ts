@@ -26,10 +26,10 @@
  * rejects it as a syntax error because PineV1Lexer.g4 has no such token.
  */
 import type { ParseTree, ParserRuleContext } from "antlr4ng";
-import type { PineVersion } from "../version";
+import type { PineVersion } from "../common/version";
 import { V2ToJsVisitor } from "../v2/ToJsVisitor";
 import { isRule } from "../v1/ToJsVisitor";
-import { isStaticallyBool } from "../passes/ScopeAnalysis";
+import { isStaticallyBool } from "../common/passes/ScopeAnalysis";
 import {
   Var_defContext,
   Add_exprContext,
@@ -211,8 +211,20 @@ export class V3ToJsVisitor extends V2ToJsVisitor {
     }
   }
 
+  /**
+   * Does this security-family call carry the mutable-argument restriction?
+   *
+   * A seam, because v5 splits the family: `request.security_lower_tf` keeps the
+   * rule and `request.security` loses it. Answering here rather than in
+   * `emitSecurity` keeps the walk in one place.
+   */
+  protected securityRestrictsMutableArgs(_ctx: Fun_callContext): boolean {
+    return true;
+  }
+
   protected override emitSecurity(ctx: Fun_callContext): string {
-    this.enforceNoMutableSecurityArg(ctx.fun_actual_args(), ctx);
+    if (this.securityRestrictsMutableArgs(ctx))
+      this.enforceNoMutableSecurityArg(ctx.fun_actual_args(), ctx);
     return super.emitSecurity(ctx as any);
   }
 }

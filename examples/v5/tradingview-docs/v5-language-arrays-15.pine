@@ -1,0 +1,11 @@
+//@version=5
+indicator("`while` loop", overlay = true)
+array<float> a = request.security_lower_tf(syminfo.tickerid, "1", close)
+
+string labelText = ""
+int i = 0
+while i < array.size(a)
+    labelText += str.tostring(array.get(a, i)) + "\n"
+    i += 1
+
+label.new(bar_index, high, text = labelText)

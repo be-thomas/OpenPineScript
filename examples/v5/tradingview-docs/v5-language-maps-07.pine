@@ -1,0 +1,31 @@
+//@version=5
+indicator("Inspecting keys demo")
+
+//@variable A map containing `string` keys and `string` values.
+m = map.new<string, string>()
+
+// Put key-value pairs into the map.
+m.put("A", "B")
+m.put("C", "D")
+m.put("E", "F")
+
+//@variable An array of keys to check for in `m`.
+array<string> testKeys = array.from("A", "B", "C", "D", "E", "F")
+
+//@variable An array containing all elements from `testKeys` found in the keys of `m`.
+array<string> mappedKeys = array.new<string>()
+
+for key in testKeys
+    // Add the `key` to `mappedKeys` if `m` contains it.
+    if m.contains(key)
+        mappedKeys.push(key)
+
+//@variable A string representing the `testKeys` array and the elements found within the keys of `m`.
+string testText = str.format("Tested keys: {0}\nKeys found: {1}", testKeys, mappedKeys)
+
+if bar_index == last_bar_index - 1
+    //@variable Displays the `testText` in a label at the `bar_index` before the last.
+    label debugLabel = label.new(
+         bar_index, 0, testText, style = label.style_label_center, 
+         textcolor = color.white, size = size.huge
+     )

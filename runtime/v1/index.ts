@@ -7,6 +7,7 @@
 import { createStdlib } from "./stdlib";
 import { Context } from "./context";
 import { PREFIX } from "../../utils/v2/common";
+import { UNIMPLEMENTED_BUILTINS } from "./stdlib/renames";
 export { Context };
 
 /**
@@ -22,6 +23,17 @@ function injectStdlib(target: any, lib: any, prefix: string) {
             const namespaceObj: any = {};
             // 3. RECURSE: Dig deeper into the object to prefix its children
             injectStdlib(namespaceObj, val, prefix);
+
+            // 3b. A namespace root may ALSO be a value. `session` is v1–v3's
+            // input-type constant and v5's `session.*` namespace at the same
+            // time, so createStdlib gives it a non-enumerable `valueOf`. The
+            // fresh object built at (2) would drop it, and `input(1, type =
+            // session)` would then record `[object Object]` as the input type.
+            for (const key of ["valueOf", "toString"]) {
+                const own = Object.getOwnPropertyDescriptor(val, key);
+                if (own) Object.defineProperty(namespaceObj, key, own);
+            }
+
             target[prefixedKey] = namespaceObj;
         } else {
             // 4. It's a function or primitive, just assign it
@@ -90,7 +102,49 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         sandbox[`${PREFIX}n`] = barCounter;
         sandbox[`${PREFIX}bar_index`] = barCounter;
 
-        // POISON PILLS: identifiers that exist in the engine but are not spellable
+        // POISON PILLS, part 1: Pine names this engine knowingly does not
+        // implement. The volume family — accdist, obv, pvt and the rest — has
+        // published variants that disagree on the seed value, so no
+        // implementation is offered rather than a plausible wrong one.
+        //
+        // They are BOUND rather than left absent so that the emitter can tell
+        // "real Pine, not implemented here" from "not a Pine name at all" and
+        // report each correctly. Throwing on READ rather than at compile time
+        // is what keeps a script runnable when it only mentions one in a branch
+        // the user's inputs never select — which is exactly what
+        // conformance/v3/corpus/cci_commodity_channel_index.pine does.
+        //
+        // A DOTTED name is poisoned on its namespace OBJECT, not on the sandbox.
+        // `ta.accdist` is what v5 writes and the emitter renders it
+        // `opsv2_ta.opsv2_accdist`; defining a sandbox property whose NAME
+        // contains a dot creates something no identifier can reach, so the v5
+        // spelling read `undefined` and every bar of
+        //
+        //     osc = ta.ema(ta.accdist, fast) - ta.ema(ta.accdist, slow)
+        //
+        // — TradingView's own Chaikin oscillator example — was NaN, with no
+        // diagnostic, while the v4 script one page over correctly refused. The
+        // whole point of the register is that the two cases differ.
+        for (const name of UNIMPLEMENTED_BUILTINS) {
+            const dot = name.indexOf(".");
+            const target = dot < 0 ? sandbox : sandbox[`${PREFIX}${name.slice(0, dot)}`];
+            const key = `${PREFIX}${dot < 0 ? name : name.slice(dot + 1)}`;
+            if (!target || typeof target !== "object") continue;
+            Object.defineProperty(target, key, {
+                get() {
+                    throw new Error(
+                        `'${name}' is a Pine built-in that OpenPineScript does not ` +
+                        `implement. Its published definitions disagree on the seed ` +
+                        `value, and a wrong seed produces a series that is the right ` +
+                        `shape and the wrong number forever. See ` +
+                        `runtime/v1/stdlib/renames.ts.`,
+                    );
+                },
+                configurable: true, enumerable: false,
+            });
+        }
+
+        // POISON PILLS, part 2: identifiers that exist in the engine but are not spellable
         // at this language version — v1–v3 mandate 'n' and ban 'bar_index'; v4+
         // invert that. As own getters they resolve through `with(sandbox)` and are
         // hit before the outer scope, so the throw happens on read.

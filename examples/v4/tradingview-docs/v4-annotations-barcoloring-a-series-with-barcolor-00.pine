@@ -1,0 +1,8 @@
+//@version=4
+study("barcolor example", overlay=true)
+isUp() => close > open
+isDown() => close <= open
+isOutsideUp() => high > high[1] and low < low[1] and isUp()
+isOutsideDown() => high > high[1] and low < low[1] and isDown()
+isInside() => high < high[1] and low > low[1]
+barcolor(isInside() ? color.yellow : isOutsideUp() ? color.aqua : isOutsideDown() ? color.purple : na)

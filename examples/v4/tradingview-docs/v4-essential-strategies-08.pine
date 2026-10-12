@@ -1,0 +1,9 @@
+//@version=4
+strategy("exit Demo", pyramiding=2, overlay=true)
+strategy.entry("Buy1", strategy.long, 5,
+                when = strategy.position_size == 0 and year > 2014)
+strategy.entry("Buy2", strategy.long,
+                10, stop = strategy.position_avg_price +
+                strategy.position_avg_price*0.1,
+                when = strategy.position_size == 5)
+strategy.exit("bracket", loss=10, profit=10, when=strategy.position_size == 15)

@@ -36,14 +36,12 @@
  *
  * v3 inherits this guard unchanged. ':=' scope was never a v1→v2→v3 delta.
  *
- * ⚠ See the sourcing note in grammar/PineV2Lexer.g4 on why ':=' is placed at v2
+ * ⚠ See the sourcing note in grammar/v2/PineV2Lexer.g4 on why ':=' is placed at v2
  * rather than v1. If that turns out to be wrong, this class moves to v1 wholesale.
  */
-import type { PineVersion } from "../version";
+import type { PineVersion } from "../common/version";
 import { V1ToJsVisitor } from "../v1/ToJsVisitor";
-import { ScopeInfo, analyseScopes } from "../passes/ScopeAnalysis";
 import {
-  Pine_scriptContext,
   Var_assignContext,
   Global_stmt_contentContext,
   Local_stmt_contentContext,
@@ -58,24 +56,12 @@ interface SourceLocated {
 export class V2ToJsVisitor extends V1ToJsVisitor {
   protected override readonly version: PineVersion = 2;
 
-  /**
-   * Whole-script facts the single-pass emitter cannot derive on its own.
-   *
-   * ':=' needs to know whether a name is bound ANYWHERE, including further down
-   * the file: v2 still permits forward references (v3 is the version that
-   * removes them), so a lexical "seen so far" set would reject valid v2 code.
-   *
-   * v1 never runs this pass — it has no ':=' to check.
-   */
-  protected scopes: ScopeInfo = {
-    declared: new Map(), mutated: new Set(), booleans: new Set(),
-    functions: new Set(), bound: new Set(), functionScoped: new Set(),
-  };
+  // `scopes` and the pass that fills it moved to v1 when `Undeclared
+  // identifier` did: the check has to behave identically at both versions. v2's
+  // own use of it is ':=', which needs to know whether a name is bound ANYWHERE
+  // — forward references are still legal here, so a "seen so far" set would
+  // reject valid code.
 
-  override visitPine_script(ctx: Pine_scriptContext): string {
-    this.scopes = analyseScopes(ctx);
-    return super.visitPine_script(ctx as any);
-  }
 
   /**
    * ':=' assigns to a variable "that has already been defined". Assigning to a
@@ -107,9 +93,14 @@ export class V2ToJsVisitor extends V1ToJsVisitor {
       : this.scopes.declared.has(name);
     if (known) return;
 
+    // Name the operator the script actually used. v4 admits `+=` and its four
+    // siblings through this same rule, and reporting ':=' for a `+=` sends the
+    // reader looking for a line that is not there.
+    const operator = (ctx as any).getChild(1)?.getText() ?? ":=";
+
     throw this.err(
       ctx,
-      `'${name}' is not declared, so it cannot be assigned with ':='. ` +
+      `'${name}' is not declared, so it cannot be assigned with '${operator}'. ` +
       `Declare it first (e.g. '${name} = 0.0').`
     );
   }
@@ -122,7 +113,7 @@ export class V2ToJsVisitor extends V1ToJsVisitor {
     // No 'let' — this updates the existing binding in the enclosing scope.
     // ctx.new_var() overwrites the current bar's slot and returns the Series, so
     // repeated assignment within one bar still yields exactly one history entry.
-    return `${name} = ctx.new_var("${name}", ${value})`;
+    return `${name} = ctx.new_var("${this.seriesKey(name)}", ${value})`;
   }
 
   /**

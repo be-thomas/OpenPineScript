@@ -1,0 +1,30 @@
+//@version=5
+indicator("Drawing numbers from local scopes demo", "Periodic changes", max_boxes_count = 500)
+
+//@variable The number of chart bars in each period.
+int lengthInput = input.int(20, "Period length", 1)
+
+//@variable The maximum `close` change over each `lengthInput` period on the chart.
+var float maxChange = na
+//@variable The minimum `close` change over each `lengthInput` period on the chart.
+var float minChange = na
+
+//@variable Is `true` once every `lengthInput` bars.
+bool periodClose = bar_index % lengthInput == 0
+
+if periodClose
+    //@variable The change in `close` prices over `lengthInput` bars.
+    float change = close - close[lengthInput]
+    // Update the global `maxChange` and `minChange`.
+    maxChange := math.max(nz(maxChange, change), change)
+    minChange := math.min(nz(minChange, change), change)
+    //@variable Draws a box on the chart to visualize the `change` value.
+    box debugBox = box.new(
+         bar_index - lengthInput, math.max(change, 0.0), bar_index, math.min(change, 0.0),
+         color.purple, bgcolor = color.new(color.purple, 80), text = str.tostring(change)
+     )
+
+// Plot the `maxChange` and `minChange`.
+plot(maxChange, "Max periodic change", color.teal, 3)
+plot(minChange, "Min periodic change", color.maroon, 3)
+hline(0.0, color = color.gray, linestyle = hline.style_solid)

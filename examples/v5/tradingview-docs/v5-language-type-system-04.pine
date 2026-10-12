@@ -1,0 +1,14 @@
+//@version=5
+indicator("input demo", overlay = true)
+
+//@variable The symbol to request data from. Qualified as "input string".
+symbolInput = input.symbol("AAPL", "Symbol")
+//@variable The timeframe of the data request. Qualified as "input string".
+timeframeInput = input.timeframe("D", "Timeframe")
+//@variable The source of the calculation. Qualified as "series float".
+sourceInput = input.source(close, "Source")
+
+//@variable The `sourceInput` value from the requested context. Qualified as "series float".
+requestedSource = request.security(symbolInput, timeframeInput, sourceInput)
+
+plot(requestedSource)

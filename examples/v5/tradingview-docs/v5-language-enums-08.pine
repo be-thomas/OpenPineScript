@@ -1,0 +1,50 @@
+//@version=5
+indicator("Collecting enum members demo", overlay = true)
+
+//@enum An enumeration of named signal states. 
+enum Signal
+    strongBuy  = "Strong buy"
+    buy        = "Buy"
+    neutral    = "Neutral"
+    sell       = "Sell"
+    strongSell = "Strong sell"
+
+//@variable The number of bars in the signal calculation.
+int lengthInput = input.int(50, "Length", 2)
+
+//@variable A map of `Signal.*` keys and "int" values counting the number of bars with each signal state. 
+//          Allowed keys: `Signal.strongBuy`, `Signal.buy`, `Signal.neutral`, `Signal.sell`, `Signal.strongSell`, `na`.
+var map<Signal, float> signalCounters = map.new<Signal, float>()
+
+//@variable A single-cell table displaying the key-value pairs of the `signalCounters` map.
+var table infoTable = table.new(position.top_right, 1, 1, chart.fg_color)
+
+if barstate.isfirst
+    // Put `Signal.*`-"int" pairs into the `signalCounters` map to establish insertion order.
+    signalCounters.put(Signal.strongBuy, 0)
+    signalCounters.put(Signal.buy, 0)
+    signalCounters.put(Signal.neutral, 0)
+    signalCounters.put(Signal.sell, 0)
+    signalCounters.put(Signal.strongSell, 0)
+    // Initialize the `infoTable` cell.
+    infoTable.cell(0, 0, text_color = chart.bg_color, text_halign = text.align_left, text_size = size.large)
+
+// Calculate the EMA and Percent rank of `source` data over `length` bars.
+float ema  = ta.ema(close, lengthInput)
+float rank = ta.percentrank(close, lengthInput)
+
+//@variable A `Signal` member representing the current signal state based on `ema` and `rank` values. 
+Signal signalState = switch
+    close > ema => rank > 70 ? Signal.strongBuy  : rank > 50 ? Signal.buy  : Signal.neutral
+    close < ema => rank < 30 ? Signal.strongSell : rank < 50 ? Signal.sell : Signal.neutral
+    => Signal.neutral
+
+// Add 1 to the value in the `signalCounters` map associated with the `signalState` key.
+signalCounters.put(signalState, signalCounters.get(signalState) + 1)
+
+// Update the `infoTable` cell's text using the keys and values from the `signalCounters` map on the last bar.
+if barstate.islast
+    string tableText = ""
+    for [state, count] in signalCounters
+        tableText += str.tostring(state) + ": " + str.tostring(count) + "\n"
+    infoTable.cell_set_text(0, 0, str.trim(tableText))

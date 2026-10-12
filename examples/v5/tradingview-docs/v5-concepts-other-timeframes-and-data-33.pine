@@ -1,0 +1,25 @@
+//@version=5
+indicator("Custom contexts demo 2", "Inherited adjustment")
+
+//@variable The symbol to request data from.
+string symbolInput = input.symbol("NYSE:PFE", "Symbol")
+
+//@variable A custom ticker ID representing the chart's symbol with the dividend adjustment modifier.
+string adjustedTickerID = ticker.modify(syminfo.tickerid, adjustment = adjustment.dividends)
+//@variable A custom ticker ID representing the `symbolInput` with modifiers inherited from the `adjustedTickerID`.
+string inheritedTickerID = ticker.inherit(adjustedTickerID, symbolInput)
+
+// Request prices using the `symbolInput`.
+[o1, h1, l1, c1] = request.security(symbolInput, timeframe.period, [open, high, low, close])
+// Request prices using the `inheritedTickerID`.
+[o2, h2, l2, c2] = request.security(inheritedTickerID, timeframe.period, [open, high, low, close])
+
+//@variable The color of the candles that use the `inheritedTickerID` prices.
+color candleColor = c2 > o2 ? color.teal : color.maroon
+
+// Plot the `symbol` prices.
+plotcandle(o1, h1, l1, c1, "Symbol", color.gray, color.gray, bordercolor = color.gray)
+// Plot the `inheritedTickerID` prices.
+plotcandle(o2, h2, l2, c2, "Symbol With Modifiers", candleColor)
+// Highlight the background when `c1` is different from `c2`.
+bgcolor(c1 != c2 ? color.new(color.orange, 80) : na)

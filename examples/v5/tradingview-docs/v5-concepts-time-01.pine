@@ -1,0 +1,42 @@
+//@version=5
+indicator("Time zone comparison demo", overlay = true) 
+
+//@variable The time zone of the time values in the last table row. 
+//          The "string" can contain either UTC offset notation or an IANA time zone identifier. 
+string timezoneInput = input.string("UTC+4:00", "Time zone")
+
+//@variable A `table` showing strings representing bar times in three preset time zones and a custom time zone. 
+var table displayTable = table.new(
+     position.bottom_right, columns = 3, rows = 5, border_color = chart.fg_color, border_width = 2
+ )
+
+//@function Initializes three `displayTable` cells on the `row` that show the `title`, `text1`, and `text2` strings. 
+tableRow(int row, string title, string text1, string text2, color titleColor = #9b27b066, color infoColor = na) =>
+    displayTable.cell(0, row, title, bgcolor = titleColor, text_color = chart.fg_color)
+    displayTable.cell(1, row, text1, bgcolor = infoColor,  text_color = chart.fg_color)
+    displayTable.cell(2, row, text2, bgcolor = infoColor,  text_color = chart.fg_color)
+
+if barstate.islastconfirmedhistory
+    // Draw an empty label to signify the bar that the displayed time strings represent.
+    label.new(bar_index, high, color = #9b27b066, size = size.huge)
+
+    //@variable The formatting string for all `str.format_time()` calls. Sets the format of the date-time strings. 
+    var string formatString = "yyyy-MM-dd  HH:mm:ss"
+    // Initialize a header row at the top of the `displayTable`.
+    tableRow(0, "", "OPEN time", "CLOSE time", na, #9b27b066)
+    // Initialize a row showing the bar's times in the default time zone (no specified `timezone` arguments).
+    tableRow(1, "Default", str.format_time(time, formatString), str.format_time(time_close, formatString))
+    // Initialize a row showing the bar's times in the exchange time zone (`syminfo.timezone`).
+    tableRow(2, "Exchange: " + syminfo.timezone, 
+         str.format_time(time, formatString, syminfo.timezone),
+         str.format_time(time_close, formatString, syminfo.timezone)
+     )  
+    // Initialize a row showing the bar's times in the UTC-0 time zone (using "UTC" as the `timezone` arguments).
+    tableRow(3, "UTC-0", str.format_time(time, formatString, "UTC"), str.format_time(time_close, formatString, "UTC"))
+    
+    // Initialize a row showing the bar's times in the custom time zone (`timezoneInput`).
+    tableRow(
+         4, "Custom: " + timezoneInput, 
+         str.format_time(time, formatString, timezoneInput), 
+         str.format_time(time_close, formatString, timezoneInput)
+     )

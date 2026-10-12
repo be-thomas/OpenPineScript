@@ -28,7 +28,7 @@
 import { ParseTreeVisitor } from "antlr4ng";
 import type { TerminalNode, ParserRuleContext, ParseTree } from "antlr4ng";
 import * as common from "../../utils/v2/common";
-import type { PineVersion } from "../version";
+import type { PineVersion } from "../common/version";
 import {
   Pine_scriptContext,
   StmtContext,
@@ -76,7 +76,8 @@ import {
   IdContext,
 } from "../../parser/v1/generated/PineV1Parser";
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
-import { BASE_REGISTRY, REGISTRY } from "../../runtime/v1/stdlib";
+import { BASE_REGISTRY, REGISTRY, UNIMPLEMENTED_BUILTINS } from "../../runtime/v1/stdlib";
+import { ScopeInfo, analyseScopes } from "../common/passes/ScopeAnalysis";
 
 /**
  * Anything carrying a source position. Structural rather than
@@ -101,8 +102,43 @@ interface SourceLocated {
  * overridden rules first, so the same rule has a different index per version.
  * The class NAME is the one identifier ANTLR keeps stable across the hierarchy.
  */
+/**
+ * Names the RUNTIME binds into the sandbox directly, outside the registry.
+ *
+ * initializeSandbox() installs the OHLCV series and both spellings of the bar
+ * counter as Series objects. They have no registry entry because they are DATA
+ * rather than functions, so any check asking "does this name exist?" has to
+ * know about them separately or it rejects `close`.
+ *
+ * `n` and `bar_index` are both here on purpose. Exactly one of them is
+ * spellable at any version, and the one that is not is a poison pill installed
+ * by the profile — which throws its own, better message on read. Rejecting it
+ * here instead would replace "renamed in v4" with "undeclared identifier".
+ */
+export const RUNTIME_GLOBALS: ReadonlySet<string> = new Set([
+  "open", "high", "low", "close", "volume", "n", "bar_index",
+]);
+
+
 export function isRule(node: unknown, ruleContextName: string): boolean {
   return (node as any)?.constructor?.name === ruleContextName;
+}
+
+/**
+ * Fold a WRAPPED string literal back onto one line.
+ *
+ * The lexer admits a newline inside a string when the next line is indented,
+ * because TradingView's line-continuation pass runs before its lexer does and
+ * the wrap never reaches the token. This is the other half of that rule: the
+ * manual states the resulting sequence "adds only one space to the start of the
+ * wrapped lines, and it does not automatically add line terminators", so the
+ * newline and the indentation together become exactly one space.
+ *
+ * Without this the literal would reach the emitter with a real newline in it and
+ * produce JavaScript that does not parse.
+ */
+export function unwrapString(text: string): string {
+  return text.replace(/\r?\n[ \t]*|\r[ \t]*/g, " ");
 }
 
 export class V1ToJsVisitor extends ParseTreeVisitor<string> {
@@ -115,6 +151,55 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    * subclass so every version shares one counter.
    */
   protected fnDepth = 0;
+
+  /**
+   * The user function whose body is being emitted, if any.
+   *
+   * ── The bug this exists for ─────────────────────────────────────────────────
+   *
+   * A local's SERIES is registered on the Context under its emitted JavaScript
+   * name, and that name is `opsv2_<pine name>` wherever the local is written.
+   * The JavaScript `let` is per-call and correctly scoped; the SERIES KEY was
+   * global. So two functions that both use the name `result`
+   *
+   *     hex(int value) =>
+   *         string result = ""
+   *         …
+   *     hexMap(array<int> numbers) =>
+   *         result = map.new<int, string>()
+   *         result.put(number, hex(number))
+   *
+   * shared ONE series. `hex()` set it to a string, `hexMap()` read a map back
+   * out of it, and the script died with "'str' has no method 'put'" — a
+   * diagnostic about a name the script never wrote. TradingView's own
+   * `v5-language-maps-09` and `v5-language-maps-18` are both this.
+   *
+   * The same collision applies between a function local and a script-scope
+   * variable of the same name, which is ordinary shadowing and must not alias.
+   *
+   * ── The other half ──────────────────────────────────────────────────────────
+   *
+   * Pine also gives every CALL SITE its own instance of a function's locals.
+   * That is a run-time question — the same declaration is one variable per
+   * frame — so it is answered by `Context.call`, which opens a series namespace
+   * per user-function frame. This half is the compile-time one: two DIFFERENT
+   * functions that happen to use the same word are two variables, whether or
+   * not either is ever called twice.
+   */
+  protected fnScope: string[] = [];
+
+  /**
+   * The key a variable's Series is registered under.
+   *
+   * The emitted JavaScript identifier at script scope, and that identifier
+   * qualified by the enclosing function's emitted name inside a function body.
+   * Every site that writes a series key goes through here so that a declaration,
+   * a `:=`, and a history read can never disagree about which series they mean.
+   */
+  protected seriesKey(jsName: string): string {
+    const fn = this.fnScope[this.fnScope.length - 1];
+    return fn ? `${fn}$${jsName}` : jsName;
+  }
 
   /** Depth of for-loop bodies currently being emitted. */
   protected loopDepth = 0;
@@ -153,8 +238,11 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   // Prefix for all emitted identifiers to avoid sandbox name clashes
   protected readonly PREFIX = common.PREFIX;
   protected anonCounter = 0;
-  // Script kind from the study()/strategy() directive; drives strategy.* enforcement.
-  protected scriptKind: 'study' | 'strategy' | undefined = undefined;
+  // Script kind from the study()/strategy() directive; drives strategy.*
+  // enforcement. 'indicator' and 'library' are v5 directives, admitted here
+  // only so the TYPE is total — v1 has neither, and detectDirective below never
+  // returns either. See transpiler/v5/ToJsVisitor.ts.
+  protected scriptKind: 'study' | 'indicator' | 'strategy' | 'library' | undefined = undefined;
   /** Names of user-defined functions; populated at the entry point. */
   protected userFunctions: ReadonlySet<string> = new Set();
   /**
@@ -175,6 +263,19 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    * v3 rejects forward references outright, so this set is empty there.
    */
   protected hoisted: ReadonlySet<string> = new Set();
+
+  /**
+   * Whole-script scope facts, filled by visitPine_script.
+   *
+   * Lives at v1 rather than v2 because `Undeclared identifier` must behave the
+   * same at both — see conformance/v1_equals_v2.test.ts. v2 additionally uses
+   * it for ':=' , which is why the analysis pass was originally introduced
+   * there.
+   */
+  protected scopes: ScopeInfo = {
+    declared: new Map(), mutated: new Set(), booleans: new Set(),
+    functions: new Set(), bound: new Set(), functionScoped: new Set(),
+  };
 
   /** Prefix every diagnostic with the version that rejected the code. */
   protected err(ctx: SourceLocated, message: string): Error {
@@ -259,6 +360,30 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     }
   }
 
+  /**
+   * The arity of the tuple this call returns BECAUSE ITS ARGUMENT IS ONE, or
+   * null when nothing about the call says it returns a tuple.
+   *
+   * Always null here: tuple expressions are a v4 addition ("the `expression`
+   * parameter can be series or tuple", v4 release notes, May 2020), and before
+   * that a bracketed list is not admitted as an argument at all.
+   */
+  protected tupleArityFromArgument(_call: Fun_callContext): number | null {
+    return null;
+  }
+
+  /**
+   * Whose return type a `[a, b] = <call>` is asking about.
+   *
+   * The call itself here, because before v5 a call is the whole expression.
+   * v5 overrides it: in `arr.maintainQueue(x).calcBB(y)` the value being
+   * unpacked is `calcBB`'s, not `maintainQueue`'s, and reading the base call
+   * asked the wrong function whether it returns a tuple.
+   */
+  protected destructuringCallee(call: Fun_callContext): string {
+    return call.id().getText();
+  }
+
   /** User-defined functions cannot return tuples. */
   protected enforceNoTupleReturn(ctx: SourceLocated, detail = ""): void {
     throw this.err(ctx, `User-defined functions cannot return tuples.${detail}`);
@@ -319,6 +444,11 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // definition. See funcName().
     this.userFunctions = this.collectFunctionNames(ctx);
     this.hoisted = this.collectForwardReferenced(ctx);
+    // Whole-script scope facts. v1 has no ':=' to check, but it does need to
+    // know what the script binds before rejecting a read of something it does
+    // not — and `Undeclared identifier` has to fire identically at v1 and v2,
+    // which TradingView states are the same language.
+    this.scopes = analyseScopes(ctx as any);
 
     const stmts = ctx.stmt().map((s) => this.visit(s)).filter(Boolean);
     const body = stmts.join("\n");
@@ -402,8 +532,15 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return `${this.PREFIX}$fn_${pineName}`;
   }
 
-  /** Find the first study()/strategy() directive call in the script, if any. */
-  protected detectDirective(node: ParseTree): 'study' | 'strategy' | undefined {
+  /**
+   * Find the first study()/strategy() directive call in the script, if any.
+   *
+   * The return type admits 'indicator' so a later version can override this
+   * without widening it; v1 knows only the two spellings it tests for.
+   */
+  protected detectDirective(
+    node: ParseTree,
+  ): 'study' | 'indicator' | 'strategy' | 'library' | undefined {
     if (isRule(node, "Fun_callContext")) {
       const name = node.id().getText();
       if (name === "study" || name === "strategy") return name;
@@ -460,8 +597,31 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return "";
   }
 
+  /**
+   * The JavaScript name a function DEFINITION is emitted under.
+   *
+   * The same as `funcName` here, and a seam because v5's method overloads are
+   * not: a name declared for several receiver types needs one JavaScript
+   * function per type, and definition and call site must agree on how that name
+   * is spelled.
+   */
+  protected definitionFunctionName(pineName: string): string {
+    return this.funcName(pineName);
+  }
+
+  /**
+   * The emitted name a CALL to a user function targets.
+   *
+   * The mirror of `definitionFunctionName`, and a seam for the same reason: v5
+   * lets one name carry several definitions, so the call site has to be able to
+   * choose between them. Identical here, where a name has exactly one body.
+   */
+  protected callFunctionName(pineName: string, _ctx: Fun_callContext): string {
+    return this.funcName(pineName);
+  }
+
   visitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
-    const name = this.funcName(ctx.id().getText());
+    const name = this.definitionFunctionName(ctx.id().getText());
     const params = this.visit(ctx.fun_head());
     this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_singleline(), ctx);
 
@@ -472,14 +632,15 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     }
 
     this.fnDepth++;
+    this.fnScope.push(name);
     let body: string;
-    try { body = this.visit(ctx.fun_body_singleline()); }
-    finally { this.fnDepth--; }   // a guard deeper in the body throws
-    return `function ${name}${params} {\n  return ${body};\n}`;
+    try { body = this.singleLineBody(ctx.fun_body_singleline().local_stmt_singleline()); }
+    finally { this.fnDepth--; this.fnScope.pop(); }   // a guard deeper in the body throws
+    return `function ${name}${params} {\n  ${body};\n}`;
   }
 
   visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
-    const name = this.funcName(ctx.id().getText());
+    const name = this.definitionFunctionName(ctx.id().getText());
     const params = this.visit(ctx.fun_head());
     this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_multiline(), ctx);
 
@@ -491,9 +652,10 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     }
 
     this.fnDepth++;
+    this.fnScope.push(name);
     let body: string;
     try { body = this.visit(ctx.fun_body_multiline()); }
-    finally { this.fnDepth--; }   // a guard deeper in the body throws
+    finally { this.fnDepth--; this.fnScope.pop(); }   // a guard deeper in the body throws
     return `function ${name}${params} ${body}`;
   }
 
@@ -508,9 +670,42 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return this.visit(ctx.local_stmt_singleline());
   }
 
+  /**
+   * A single-line body — `f(x) => a = 1, b = 2, a + b` — as the INSIDE of a
+   * JavaScript block that hands back the body's value.
+   *
+   * SOURCING. From the manual's user-defined functions page: "The body of the
+   * function must separate all individual statements in its body with commas",
+   * and what a call returns is "the final expression, variable, or tuple in the
+   * function's body".
+   *
+   * So a comma list is a list of STATEMENTS. Joining it with `,` into a
+   * JavaScript comma expression works only while every one of them happens to
+   * BE an expression, and Pine's do not have to be. TradingView's own
+   *
+   *     printTable(txt) => var table t = table.new(...), table.cell(t, 0, 0, txt)
+   *
+   * emitted `return let opsv2_t = ...`, which is not JavaScript — so the script
+   * passed compilation and then threw a SyntaxError the moment it was run.
+   */
+  protected singleLineBody(ctx: Local_stmt_singlelineContext): string {
+    const contents = ctx.local_stmt_content();
+    return contents
+      .map((content, i) => {
+        const js = this.visit(content);
+        return i === contents.length - 1 ? this.returnLastStatement(content, js) : js;
+      })
+      .join(";\n");
+  }
+
+  /**
+   * Retained for generic visits only — `singleLineBody` is what the two call
+   * sites for this rule (a single-line function body, and a v5 switch arm) use,
+   * because they need the trailing statement's VALUE and this does not produce
+   * it.
+   */
   visitLocal_stmt_singleline(ctx: Local_stmt_singlelineContext): string {
-    const contents = ctx.local_stmt_content().map((c) => this.visit(c));
-    return contents.join(", "); 
+    return ctx.local_stmt_content().map((c) => this.visit(c)).join(";\n");
   }
 
   visitLocal_stmt_content(ctx: Local_stmt_contentContext): string {
@@ -550,52 +745,67 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return def ? this.visit(def.id()) : null;
   }
 
+  /**
+   * `js`, the emitted form of a block's LAST statement, turned into whatever
+   * hands that statement's value back to the caller.
+   *
+   * Shared with `singleLineBody`, because the rule is the same one either way:
+   * a body evaluates to its final statement.
+   */
+  protected returnLastStatement(content: Local_stmt_contentContext, js: string): string {
+    // A statement-position `if` inside a loop is emitted as a plain `if` block,
+    // not an IIFE, so that break/continue are legal. It is a STATEMENT —
+    // `return <that>` (or the `_res = <that>` that visitFor_expr rewrites it
+    // into) is a syntax error.
+    if (this.loopDepth > 0 && this.statementIf(content)) return js;
+
+    const isExpression =
+      content.arith_expr() ||
+      content.arith_exprs() ||
+      (content as any).fun_call?.() ||
+      (content as any).if_expr?.() ||
+      (content as any).for_expr?.();
+
+    if (isExpression) return "return " + js;
+
+    // A trailing BINDING is still the function's return value.
+    //
+    // Without this the function fell off the end and returned undefined, so
+    // every caller plotted NaN. It is the reason the published v3 indicator
+    // mcginley_dynamic.pine — whose body is `md = 0.0` then `md := ...` —
+    // produced an all-NaN series.
+    const bound = this.trailingValueName(content);
+    if (bound) return `${js};\nreturn ${bound}`;
+
+    // `break` / `continue`, which have no value and must not be returned.
+    return js;
+  }
+
   visitLocal_stmts_list(ctx: Local_stmts_listContext): string {
-    const stmts = ctx.local_stmt_multiline();
+    // FLATTENED, because a comma-separated line is several statements and not
+    // one — the same rule `singleLineBody` quotes. The block's value is its
+    // last CONTENT, which is not the same node as its last LINE:
+    //
+    //     float q1 = ta.percentile(...), map.put(debugData, "q1", q1)
+    //
+    // is two statements, and reading only the first of them emitted
+    // `let opsv2_q1 = ..., ctx.call(...)` — a `let` list whose second binding
+    // is a call, so the SyntaxError landed on the `.` of `ctx.call`.
+    const contents = ctx.local_stmt_multiline().flatMap(stmt => stmt.local_stmt_content());
 
-    const lines = stmts.map((stmt, index) => {
-        let js = this.visit(stmt);
-
-        // Return logic for last statement
-        if (index === stmts.length - 1 && this.suppressBlockReturn === 0) {
-             const content = stmt.local_stmt_content(0);
-
-             // A statement-position `if` inside a loop is emitted as a plain
-             // `if` block, not an IIFE, so that break/continue are legal. It is
-             // a STATEMENT — `return <that>` (or the `_res = <that>` that
-             // visitFor_expr rewrites it into) is a syntax error.
-             if (content && this.loopDepth > 0 && this.statementIf(content)) return js;
-
-             if (content) {
-                 const isExpression =
-                    content.arith_expr() ||
-                    content.arith_exprs() ||
-                    (content as any).fun_call?.() ||
-                    (content as any).if_expr?.() ||
-                    (content as any).for_expr?.();
-
-                 if (isExpression) {
-                     return "return " + js;
-                 }
-
-                 // A trailing BINDING is still the function's return value.
-                 //
-                 // Without this the function fell off the end and returned
-                 // undefined, so every caller plotted NaN. It is the reason the
-                 // published v3 indicator mcginley_dynamic.pine — whose body is
-                 // `md = 0.0` then `md := ...` — produced an all-NaN series.
-                 const bound = this.trailingValueName(content);
-                 if (bound) return `${js};\nreturn ${bound}`;
-             }
-        }
-        return js;
+    const lines = contents.map((content, index) => {
+      const js = this.visit(content);
+      if (index === contents.length - 1 && this.suppressBlockReturn === 0) {
+        return this.returnLastStatement(content, js);
+      }
+      return js;
     });
     return lines.join(";\n") + ";";
   }
 
+  /** @see visitLocal_stmts_list — the flattening there is what this rule needs. */
   visitLocal_stmt_multiline(ctx: Local_stmt_multilineContext): string {
-    const parts = ctx.local_stmt_content().map((c) => this.visit(c));
-    return parts.join(", ");
+    return ctx.local_stmt_content().map((c) => this.visit(c)).join(";\n");
   }
 
   // --- Variables (Series Architecture) ---
@@ -618,16 +828,18 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // for every caller that did not happen to rewrite `let` to `var` first.
     // Already declared by the hoisted prologue — a second `let` would be a
     // redeclaration error.
+    const key = this.seriesKey(name);
+
     if (this.hoisted.has(pineName)) {
-      return `${name} = ctx.new_var("${name}", ${value})`;
+      return `${name} = ctx.new_var("${key}", ${value})`;
     }
 
     if (this.referencesIdentifier(ctx.arith_expr(), pineName)) {
-      return `let ${name};\n${name} = ctx.new_var("${name}", ${value})`;
+      return `let ${name};\n${name} = ctx.new_var("${key}", ${value})`;
     }
 
     // Use 'let' to create a new variable in the current scope (Shadowing allowed)
-    return `let ${name} = ctx.new_var("${name}", ${value})`;
+    return `let ${name} = ctx.new_var("${key}", ${value})`;
   }
 
   // Handle: [a, b] = myFunc()
@@ -635,7 +847,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // Pine allows '_' as a repeated throwaway: `[macdLine, _, _] = macd(...)`.
     // JavaScript does not — `let [a, _, _] = ...` is
     // "SyntaxError: Identifier '_' has already been declared", which took out
-    // the published strategy validation/breakout_crossover_4H_1D.pine.
+    // the published strategy validation/v2/breakout_crossover_4H_1D.pine.
     //
     // Every throwaway gets a script-unique name. The counter is per-visitor
     // rather than per-statement because that file collides ACROSS statements:
@@ -673,11 +885,28 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     const funCall = findFunCall(arith);
     
     if (funCall) {
-        const funcName = funCall.id().getText();
+        const funcName = this.destructuringCallee(funCall);
         const entry = this.registry[funcName];
 
+        // A call can return a tuple because its ARGUMENT is one:
+        //
+        //     [o, h, l, c] = security(sym, "D", [open, high, low, close])
+        //
+        // The arity is the literal's, not the function's, so no registry entry
+        // could state it — `security` returns one value or four depending on
+        // what it was handed. Null before v4, which has no tuple expressions.
+        const argumentArity = this.tupleArityFromArgument(funCall);
+        if (argumentArity !== null) {
+            if (argumentArity !== ids.length) {
+                throw this.err(
+                    ctx,
+                    `'${funcName}' was given a ${argumentArity}-element tuple, but you ` +
+                    `provided ${ids.length} variables.`,
+                );
+            }
+        }
         // If it's a built-in, check the registry for tuple return
-        if (entry) {
+        else if (entry) {
             if (entry.returns.kind !== "tuple") {
                 throw this.err(ctx, `'${funcName}' does not return a tuple. Multi-variable assignment is only allowed for specific built-in functions.`);
             }
@@ -709,13 +938,30 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
                 ctx,
                 ` Multi-variable assignment is only allowed for specific built-in functions.`,
             );
+
+            // Past the guard, so this version DOES admit a tuple-returning
+            // user function. The arity is the definition's; see `tupleArity`.
+            const arity = this.scopes.tupleArity?.get(funcName);
+            if (arity === undefined) {
+                throw this.err(
+                    ctx,
+                    `'${funcName}' does not return a tuple — its last statement is not a ` +
+                    `'[ ... ]' list, so there is nothing to unpack into ${ids.length} variables.`,
+                );
+            }
+            if (arity !== ids.length) {
+                throw this.err(
+                    ctx,
+                    `'${funcName}' returns ${arity} values, but you provided ${ids.length} variables.`,
+                );
+            }
         }
     } else {
         throw this.err(ctx, `Multi-variable assignment must originate directly from a supported built-in function call.`);
     }
 
     const idsArrayJs = `[${ids.join(", ")}]`; 
-    const idsStringsJs = `[${ids.map(id => `"${id}"`).join(", ")}]`;
+    const idsStringsJs = `[${ids.map(id => `"${this.seriesKey(id)}"`).join(", ")}]`;
     const value = this.visit(ctx.arith_expr());
 
     return `let ${idsArrayJs} = ctx.new_vars(${idsStringsJs}, ${value})`;
@@ -811,13 +1057,49 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     try {
       const thenBlock = this.visit(ctx.stmts_block(0));
       let result = `if (ctx.truthy(${cond})) ${thenBlock}`;
-      if (ctx.IF_COND_ELSE()) {
-        result += ` else ${this.visit(ctx.stmts_block(1))}`;
-      }
-      return plain ? result : `(() => { ${result} })()`;
+      const alternative = this.emitElseBranch(ctx);
+      if (alternative !== null) result += ` else ${alternative}`;
+
+      // "The value assigned to the variable is the return value of the
+      // <local_block>, or `na` if no local block is executed."
+      //   — Conditional structures, the Pine Script manual
+      //
+      // Without the trailing return, an `if` whose condition is false and which
+      // has no `else` evaluated to JavaScript `undefined`. That reads as NaN in
+      // arithmetic, so it looked right on a chart — but `na(x)` was false for
+      // it, and it is not what the language says the value is.
+      //
+      // Unreachable whenever the chain ends in an `else`, which is most of them.
+      //
+      // KNOWN GAP: the manual carves out one exception — "if the structure
+      // returns 'bool' values ... `false` is returned instead". Honouring it
+      // needs the branch TYPE, which this emitter does not infer, so a
+      // bool-valued `if` with no `else` yields `na` here and `false` on
+      // TradingView.
+      return plain ? result : `(() => { ${result} return NaN; })()`;
     } finally {
       this.suppressBlockReturn = saved;
     }
+  }
+
+  /**
+   * The `else` branch, already emitted, or null when the `if` has none.
+   *
+   * A seam, not a behaviour: v1 has exactly one shape of else — a block — and
+   * this returns it. v4 adds `else if`, and overrides here rather than
+   * re-implementing `visitIf_expr`, because everything the chain needs is
+   * decided by the code ABOVE this call:
+   *
+   *   - the IIFE wrapper. One `if/else if/else` is ONE expression, so it gets
+   *     one wrapper. A nested `if` visited normally would build its own, and in
+   *     expression position its value would be computed and then dropped.
+   *   - `suppressBlockReturn`. Every block in the chain is at the same depth
+   *     and must make the same return-or-not decision.
+   *
+   * Both are already set when this runs, so an override inherits them for free.
+   */
+  protected emitElseBranch(ctx: If_exprContext): string | null {
+    return ctx.IF_COND_ELSE() ? this.visit(ctx.stmts_block(1)) : null;
   }
 
   visitFor_expr(ctx: For_exprContext): string {
@@ -838,28 +1120,54 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     const id = this.anonCounter++;
     const res = `_res${id}`;
 
-    // Forward lexical scanner to find the loop's OWN trailing 'return'.
+    const safeBody = this.captureLoopResult(rawBody, res);
+
+    const s = `_s${id}`, e = `_e${id}`, st = `_st${id}`, up = `_up${id}`;
+    
+    // Pure primitive loop execution
+    const loopDef = `for (let ${s} = ${startVal}, ${e} = ${endVal}, ${st} = Math.abs(${stepVal}), ${up} = ${s} <= ${e}, ${varName} = ${s}; ${up} ? ${varName} <= ${e} : ${varName} >= ${e}; ${varName} += (${up} ? ${st} : -${st}))`;
+
+    // Wrap it all together. Explicitly ensures `break` and `continue` work natively.
     //
-    // ── Why nesting alone is not enough ─────────────────────────────────────
-    //
-    // The body can contain whole FUNCTIONS — an if-expression emits
-    // `(() => { … })()`, and its returns belong to that function, not to the
-    // loop. Ranking by brace depth and taking the shallowest picked one of them
-    // whenever the loop had no trailing return of its own, which is exactly the
-    // case for a statement-`if` body:
-    //
-    //     v = if high > low
-    //             1
-    //         else
-    //             2
-    //
-    // came out as `if (…) { return 1; } else { _res0 = 2; }`, so the else
-    // branch assigned the LOOP's result variable and the expression evaluated
-    // to undefined. Silent: no error, just an `na` on every bar that took the
-    // else.
-    //
-    // So function bodies are tracked separately from plain blocks, and only a
-    // return at function depth 0 can be the loop's.
+    // `= NaN`, not bare: a loop that never runs its body has no
+    // `return_expression` to evaluate, and Pine's answer for a value that was
+    // never produced is `na`. Left uninitialised this returned JavaScript
+    // `undefined`, which reads as NaN in arithmetic but is not `na` to `na(x)`.
+    const loop = `let ${res} = NaN;\n  ${loopDef} {\n    ${safeBody}\n  }\n  return ${res};`;
+
+    return `(() => {\n  ${loop}\n})()`;
+  }
+
+  /**
+   * Rewrites a loop body's OWN trailing `return X` into `<res> = X`.
+   *
+   * Extracted from `visitFor_expr` so `for … in` (v5) can reuse it verbatim.
+   * Every loop in the language is an EXPRESSION whose value is the last
+   * `return_expression` its body evaluated, and a block emits that value as a
+   * `return` — which inside a real JavaScript `for` would leave the enclosing
+   * function instead.
+   *
+   * ── Why nesting alone is not enough ─────────────────────────────────────
+   *
+   * The body can contain whole FUNCTIONS — an if-expression emits
+   * `(() => { … })()`, and its returns belong to that function, not to the
+   * loop. Ranking by brace depth and taking the shallowest picked one of them
+   * whenever the loop had no trailing return of its own, which is exactly the
+   * case for a statement-`if` body:
+   *
+   *     v = if high > low
+   *             1
+   *         else
+   *             2
+   *
+   * came out as `if (…) { return 1; } else { _res0 = 2; }`, so the else branch
+   * assigned the LOOP's result variable and the expression evaluated to
+   * undefined. Silent: no error, just an `na` on every bar that took the else.
+   *
+   * So function bodies are tracked separately from plain blocks, and only a
+   * return at function depth 0 can be the loop's.
+   */
+  protected captureLoopResult(rawBody: string, res: string): string {
     let inString = false;
     let stringChar = '';
     /** One entry per open '{'; true when it opens a FUNCTION body. */
@@ -919,16 +1227,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
         const target = topLevelReturns[topLevelReturns.length - 1];
         safeBody = rawBody.substring(0, target.index) + `${res} = ` + rawBody.substring(target.index + 7);
     }
-
-    const s = `_s${id}`, e = `_e${id}`, st = `_st${id}`, up = `_up${id}`;
-    
-    // Pure primitive loop execution
-    const loopDef = `for (let ${s} = ${startVal}, ${e} = ${endVal}, ${st} = Math.abs(${stepVal}), ${up} = ${s} <= ${e}, ${varName} = ${s}; ${up} ? ${varName} <= ${e} : ${varName} >= ${e}; ${varName} += (${up} ? ${st} : -${st}))`;
-
-    // Wrap it all together. Explicitly ensures `break` and `continue` work natively.
-    const loop = `let ${res};\n  ${loopDef} {\n    ${safeBody}\n  }\n  return ${res};`;
-
-    return `(() => {\n  ${loop}\n})()`;
+    return safeBody;
   }
 
   visitStmts_block(ctx: Stmts_blockContext): string {
@@ -955,26 +1254,90 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   // `and` / `or` take BOOLEANS, so each operand goes through ctx.truthy for the
   // same reason the ternary condition does. A single operand is passed straight
   // through: it may be a number being used as a value, not a condition.
+  //
+  // ── Why these are function calls and not `&&` / `||` ───────────────────────
+  //
+  // Pine's `and` and `or` do NOT short-circuit: every operand is evaluated,
+  // whatever the ones before it decided. That matters because an operand can
+  // hold a call to a series function, and a series function that is skipped on
+  // some bars develops a hole in its history that never heals.
+  //
+  // TradingView's own output says so. In the golden control export,
+  // `probe_and_shortcircuit` is
+  //
+  //     (close > open and ta.sma(close, 7) > ta.sma(close, 21)) ? 1 : 0
+  //
+  // and it disagreed with us on bars where `close > open` held — which can only
+  // happen if the two averages differ, i.e. if ours had been fed a subset of
+  // the bars. `and_gate` next to it, whose right-hand side is a plain variable,
+  // agreed throughout, which is what isolates the cause to the skipped call.
+  //
+  // Passing the operands as ARGUMENTS is the whole mechanism: JavaScript
+  // evaluates every argument before entering the callee, so there is nothing
+  // left to short-circuit. Note this is NOT the same question as `if` or `?:`,
+  // which really do branch — `probe_call_inside_if` and
+  // `probe_ternary_both_arms` both agree with TradingView while leaving the
+  // untaken call stale, so the engine must keep doing exactly that.
   visitOr_expr(ctx: Or_exprContext): string {
     const parts = ctx.and_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
-    return parts.map(p => `ctx.truthy(${p})`).join(" || ");
+    return `ctx.anyOf(${parts.map(p => `ctx.truthy(${p})`).join(", ")})`;
   }
 
   visitAnd_expr(ctx: And_exprContext): string {
     const parts = ctx.eq_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
-    return parts.map(p => `ctx.truthy(${p})`).join(" && ");
+    return `ctx.allOf(${parts.map(p => `ctx.truthy(${p})`).join(", ")})`;
   }
 
+  /**
+   * The operator BETWEEN operand `i - 1` and operand `i`, in a flat chain.
+   *
+   * ── Why not ctx.MUL(i - 1) ────────────────────────────────────────────────
+   *
+   * Because that indexes the list of MUL tokens, not the position in the
+   * expression. In `a * b / c` there is one DIV and it is `DIV(0)`, so asking
+   * `MUL(1) ? "*" : DIV(1) ? "/" : "%"` for the second operator finds neither
+   * and falls through to MODULO:
+   *
+   *     a * b / c    →    (a * b) % c
+   *
+   * Silent, and wrong for every mixed `*`/`/` chain — which is most of them.
+   * `a > b < c` and `a != b == c` had the same defect for the same reason.
+   *
+   * ANTLR alternates children operand, operator, operand, so operand `i` is
+   * preceded by the operator at `i * 2 - 1`. `visitAdd_expr` below already read
+   * it that way; these did not.
+   */
+  protected operatorBefore(ctx: ParserRuleContext, index: number): string {
+    return (ctx.getChild(index * 2 - 1) as any)?.getText() ?? "";
+  }
+
+  /**
+   * `a == b` / `a != b`.
+   *
+   * Routed through a helper rather than emitted as a bare operator, because
+   * every variable is a Series OBJECT and JavaScript compares two objects by
+   * REFERENCE:
+   *
+   *     x = 1.0
+   *     y = 1.0
+   *     equal = x == y      // false, at every version
+   *
+   * `<`, `>`, `<=` and `>=` coerce through `valueOf` unconditionally, and a
+   * comparison against a literal has only one object in it, so this was the one
+   * shape that reached the reference test — and it was silently, permanently
+   * false. See `safe_eq` for why the helper compares loosely after unwrapping
+   * rather than strictly.
+   */
   visitEq_expr(ctx: Eq_exprContext): string {
     this.enforceNaComparison(ctx);
     const parts = ctx.cmp_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      const op = ctx.EQ(i - 1) ? "==" : "!=";
-      out = `(${out} ${op} ${parts[i]})`;
+      const helper = this.operatorBefore(ctx as any, i) === "==" ? "safe_eq" : "safe_ne";
+      out = `opsv2_${helper}(${out}, ${parts[i]})`;
     }
     return out;
   }
@@ -984,8 +1347,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      const op = ctx.GT(i - 1) ? ">" : ctx.GE(i - 1) ? ">=" : ctx.LT(i - 1) ? "<" : "<=";
-      out = `(${out} ${op} ${parts[i]})`;
+      out = `(${out} ${this.operatorBefore(ctx as any, i)} ${parts[i]})`;
     }
     return out;
   }
@@ -1016,8 +1378,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      const op = ctx.MUL(i - 1) ? "*" : ctx.DIV(i - 1) ? "/" : "%";
-      out = `(${out} ${op} ${parts[i]})`;
+      out = `(${out} ${this.operatorBefore(ctx as any, i)} ${parts[i]})`;
     }
     return out;
   }
@@ -1038,14 +1399,27 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (idxExpr) {
       const index = this.visit(idxExpr);
       
-      // 1. Check if the base is a simple identifier (e.g. 'close', 'myVar')
-      const isSimpleId = ctx.atom().id() != null;
+      // 1. Is the EMITTED base a bare JavaScript identifier?
+      //
+      // The parse tree is not enough to answer this. `hl2` is an `id` atom, but
+      // it is a registry getter, so it emits `ctx.call("hl2@L5:C3", opsv2_hl2)`
+      // — a call, not a name. Deciding on `ctx.atom().id() != null` sent those
+      // down the by-name branch, which interpolated the call into a string
+      // literal WITHOUT escaping it:
+      //
+      //   ctx.get(ctx.call("hl2@L5:C3", opsv2_hl2), 1, "ctx.call("hl2@L5:C3", …)")
+      //                                                             ^ closes early
+      //
+      // — syntactically invalid JavaScript, and the wrong key even if escaped,
+      // since no series is registered under that name. `hl2[1]`, `hlc3[1]` and
+      // `barstate.islast[1]` are ordinary Pine, so this reached real scripts.
+      const isSimpleId = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(base);
 
       if (isSimpleId) {
         // Standard variable history lookup: close[1]
         // We pass the base string as the exact key (e.g., "opsv2_close") 
         // because Context.vars registers them under this exact name.
-        return `ctx.get(${base}, ${index}, "${base}")`;
+        return `ctx.get(${base}, ${index}, "${this.seriesKey(base)}")`;
       } else {
         // Complex expression history lookup: (close > open)[1] or sma(close, 14)[1]
         // We use the Inline Hook strategy to evaluate, store, and fetch in one line!
@@ -1116,17 +1490,38 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
       );
     }
 
-    const transpiledName = this.registry[originalName]
-      ? `ctx.builtin(${JSON.stringify(originalName)})`
-      : this.userFunctions.has(originalName)
-        ? this.funcName(originalName)
+    // A SCRIPT-DEFINED function wins over a registry entry of the same name.
+    //
+    // Pine keeps functions and variables in separate namespaces, so a script
+    // may define `area(x) =>` even though `area` is a built-in plot-style
+    // CONSTANT. Checking the registry first resolved that call to
+    // `ctx.builtin("area")` — the string "area" — and the runtime reported
+    // "The provided reference is not a function", which reads as an engine bug
+    // rather than as the name collision it is.
+    //
+    // Where the registry entry is a FUNCTION rather than a value, TradingView
+    // rejects the definition outright ("cannot use a built-in name"), so no
+    // valid script can reach this ordering and disagree with it.
+    const isUserDefined = this.userFunctions.has(originalName);
+
+    const transpiledName = isUserDefined
+      ? this.callFunctionName(originalName, ctx)
+      : this.registry[originalName]
+        ? `ctx.builtin(${JSON.stringify(originalName)})`
         : this.visit(ctx.id());
 
     // 1. Just parse the arguments normally. NO manual 'ctx' injection!
     const args = ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
-    
-    // 2. Generate Deterministic ID (e.g., "sma@L4:C8")
-    const callId = `"${originalName}${this.getLocId(ctx)}"`;
+
+    // 2. Generate Deterministic ID (e.g., "sma@L4:C8").
+    //
+    // A user function's id carries the `$fn_` marker, because `Context.call`
+    // reads the leading name out of this id to find the call's registry
+    // metadata — and a user function called `area` would otherwise be handed
+    // the built-in constant's entry and rejected as "a value, not a function".
+    // `$` cannot occur in a Pine name, so the marked form matches nothing.
+    const idName = isUserDefined ? this.callFunctionName(originalName, ctx) : originalName;
+    const callId = `"${idName}${this.getLocId(ctx)}"`;
 
     // 3. Construct the ctx.call wrapper
     // We only add the comma after transpiledName if there are actually arguments to pass.
@@ -1155,12 +1550,15 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    * object is appended unchanged and `expression=` is deferred wherever it lands.
    */
   protected emitSecurity(ctx: Fun_callContext): string {
-    const callId = `"security${this.getLocId(ctx)}"`;
+    // The callee's OWN name, so a diagnostic points at the function the script
+    // wrote. v5 routes `request.security_lower_tf` through here as well, and
+    // labelling both "security" made a runtime error name the wrong one.
+    const callId = `"${ctx.id().getText()}${this.getLocId(ctx)}"`;
     const transpiledName = this.visit(ctx.id());
     const aa = ctx.fun_actual_args();
 
     const pos = aa?.pos_args();
-    const exprs = pos ? pos.arith_expr() : [];
+    const exprs = pos ? this.positionalArgs(pos) : [];
     const parts = exprs.map((e, i) => {
       const js = this.visit(e);
       return i === 2 ? `() => (${js})` : js; // positional `expression`
@@ -1206,8 +1604,22 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return "";
   }
 
+  /**
+   * The positional arguments of a call, in order.
+   *
+   * A seam, not a behaviour. v1's `pos_args` is a list of `arith_expr`, and v4
+   * widens it so a BRACKETED LIST can be one — `security(sym, tf,
+   * [close, open])` and `input.string("FQ", "Period", ["FQ", "FH"])`. The
+   * generated context therefore exposes `pos_arg()` at v4 and `arith_expr()`
+   * before it, and every place that walks the argument list has to ask the
+   * same question.
+   */
+  protected positionalArgs(ctx: Pos_argsContext): any[] {
+    return ctx.arith_expr();
+  }
+
   visitPos_args(ctx: Pos_argsContext): string {
-    return ctx.arith_expr().map((e) => this.visit(e)).join(", ");
+    return this.positionalArgs(ctx).map((e) => this.visit(e)).join(", ");
   }
 
   visitKw_args(ctx: Kw_argsContext): string {
@@ -1241,6 +1653,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (!t) return "";
     const text = t.getText();
     if (ctx.COLOR_LITERAL()) return JSON.stringify(text);
+    if (ctx.STR_LITERAL()) return unwrapString(text);
     return text;
   }
 
@@ -1260,6 +1673,147 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
       );
     }
     return this.namespaceRootCache;
+  }
+
+  /**
+   * Is this identifier the NAME of a keyword argument rather than a read?
+   *
+   * `plot(close, title = "x")` reaches visitId twice: once for `close`, which
+   * is a variable read, and once for `title`, which is the callee's parameter
+   * name. Any check hooked on visitId sees both and must not treat the second
+   * as a variable — no script declares `title`.
+   */
+  protected isKeywordArgumentName(ctx: IdContext): boolean {
+    const parent = (ctx as any).parent;
+    return isRule(parent, "Kw_argContext") && parent.id?.() === ctx;
+  }
+
+  /**
+   * Reject a read of a name that nothing declares — the extension point.
+   *
+   * Lives at v1 so that v1 and v2 — which TradingView states are the same
+   * language, and which conformance/v1_equals_v2.test.ts asserts over the whole
+   * corpus — reject the same scripts. `bound` rather than `declared` is the
+   * right question: v1 and v2 both permit forward references.
+   *
+   * ── Why this exists ─────────────────────────────────────────────────────
+   *
+   * visitId's fallback emits `opsv2_<name>` for anything it does not
+   * recognise. Through `with(sandbox)` an unrecognised name is not a Pine
+   * diagnostic but a JavaScript ReferenceError on the first bar:
+   *
+   *     opsv2_last_bar_index is not defined
+   *
+   * which reads as an engine crash. TradingView answers `Undeclared identifier`
+   * at compile time. Dotted names already had a guard here ("'chart' is not a
+   * namespace"); bare ones had none, so every unimplemented built-in surfaced
+   * as a crash. Running TradingView's own documentation corpus turned up 45
+   * scripts failing that way.
+   */
+  /**
+   * Is a binding of `name` in scope at the point it is READ?
+   *
+   * "The global scope is all of the script that is not inside a function, if
+   *  statement, or other conditional structure ... Only code that is in the
+   *  same local scope can access a local variable."
+   *
+   * Answered by token span rather than by nesting depth, because the question
+   * is about two POSITIONS: a name bound inside one `if` is invisible inside
+   * the `if` beside it, and those are at the same depth. See `scopesOf`.
+   *
+   * A name the analysis pass records no scope for is treated as visible. That
+   * is the safe direction — a binding form the pass does not model yet makes
+   * this check silent rather than making it reject working code.
+   */
+  protected visibleAt(name: string, ctx: IdContext): boolean {
+    const scopes = this.scopes.scopesOf?.get(name);
+    if (!scopes?.length) return true;
+    const at = (ctx as any).start?.tokenIndex;
+    if (typeof at !== "number") return true;
+    return scopes.some(s => s === null || (at >= s.start && at <= s.stop));
+  }
+
+  protected checkUndeclaredRead(name: string, ctx: IdContext): void {
+    if (this.registry[name]) return;
+    if (RUNTIME_GLOBALS.has(name)) return;
+    if (UNIMPLEMENTED_BUILTINS.has(name)) return;   // bound as a poison pill
+    if (this.scopes.bound.has(name) || this.scopes.declared.has(name)) {
+      if (this.visibleAt(name, ctx)) return;
+      // Bound, but not HERE — a local read from outside its block. The name is
+      // known, so none of the branches below apply; TradingView reports the
+      // same error it reports for a name that was never written at all.
+      throw this.err(ctx, `Undeclared identifier '${name}'.`);
+    }
+    if (this.namespaceRoots.has(name)) return;
+
+    // In the union registry but not this version's view: a MIGRATION error, not
+    // a typo. Reporting it as undeclared would bury the actual problem.
+    if (name in REGISTRY) {
+      throw this.err(
+        ctx,
+        `'${name}' is not available in Pine Script v${this.version}. ` +
+        `It was added in a later version.`,
+      );
+    }
+
+    throw this.err(ctx, `Undeclared identifier '${name}'.`);
+  }
+
+  /**
+   * A member of a KNOWN namespace that this version does not have.
+   *
+   * The mirror of `checkUndeclaredRead`, and it existed for neither reason nor
+   * design: an unknown BARE name was rejected, while an unknown MEMBER of a
+   * real namespace fell through to `opsv2_syminfo.opsv2_nonesuch` and read as
+   * `undefined` on every bar. Nothing said so. `color.from_gradient` at v2 — a
+   * v4 addition — compiled, and every colour computed from it was `na` forever.
+   *
+   * Split by whether the name exists at ALL, because the two are different
+   * problems: `syminfo.tickerid` at v2 is a MIGRATION question with a version
+   * for an answer, and `syminfo.nonesuch` is a typo.
+   *
+   * Overridable because v5 has dotted names that are not namespace members —
+   * fields, enum members, library calls — and resolves those first.
+   */
+  protected checkNamespaceMember(root: string, text: string, ctx: IdContext): void {
+    if (this.registry[text]) return;
+
+    // A name this engine knows and deliberately does not implement is bound as
+    // a poison pill, which reports its own reason when READ. Saying it does not
+    // exist would be a lie, and would fire on a script that never reaches it.
+    if (UNIMPLEMENTED_BUILTINS.has(text)) return;
+
+    // The namespace itself may be a value as well as a namespace (`line` is a
+    // v1–v3 plot style and a v4 drawing type), and a bare root is not a member.
+    if (text === root) return;
+
+    // ...and neither is an INNER namespace. `strategy.risk` holds
+    // `strategy.risk.max_drawdown` and is not a key of its own, so it is a name
+    // this version knows even though nothing answers to it directly.
+    const prefix = text + ".";
+    if (Object.keys(this.registry).some(key => key.startsWith(prefix))) return;
+
+    if (text in REGISTRY) {
+      throw this.err(
+        ctx,
+        `'${text}' is not available in Pine Script v${this.version}. ` +
+        `It was added in a later version.`,
+      );
+    }
+
+    throw this.err(ctx, `'${root}' has no member '${text.slice(root.length + 1)}'.`);
+  }
+
+  /**
+   * The registry key of the VARIABLE, for a name this version also gives to a
+   * function. `undefined` when the name means only one thing.
+   *
+   * A read resolves to the variable and a call to the function, which is what
+   * Pine's separate namespaces do. Only `tickerid` needs it, and only at v1-v3
+   * — see the comment at the use site.
+   */
+  protected variableSpelling(name: string): string | undefined {
+    return name === "tickerid" ? "syminfo.tickerid" : undefined;
   }
 
   visitId(ctx: IdContext): string {
@@ -1292,6 +1846,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
           `'${text}' cannot be resolved.`,
         );
       }
+      this.checkNamespaceMember(root, text, ctx);
     }
 
     // strategy.* namespace (getters/constants too) requires strategy() context.
@@ -1299,9 +1854,37 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
       this.enforceStrategyContext(text, ctx);
     }
 
+    if (!text.includes(".") && !this.isKeywordArgumentName(ctx)) {
+      this.checkUndeclaredRead(text, ctx);
+    }
+
     // 1. Handle Transpilation (Prefixing)
     let transpiledName = text;
     if (text.includes('.')) {
+        // A namespace whose ROOT the script also binds cannot be read through
+        // the sandbox object, because the script's own binding shadows it.
+        //
+        //     extend = extendLines ? extend.right : extend.none
+        //
+        // is ordinary Pine — TradingView resolves the dotted form against the
+        // namespace and the bare form against the variable — and it emitted
+        //
+        //     let opsv2_extend = ctx.new_var("opsv2_extend",
+        //       … ? opsv2_extend.opsv2_right : opsv2_extend.opsv2_none)
+        //
+        // where `opsv2_extend` on the right is the `let` being declared, not the
+        // namespace: "Cannot access 'opsv2_extend' before initialization" on the
+        // first bar. A parameter default has the same shape —
+        // `string position = position.middle_center` — and neither is exotic:
+        // `extend`, `position`, `order` and `earnings` all read naturally as
+        // variable names.
+        //
+        // `ctx.builtin` reaches the registry directly, so nothing in the
+        // script's scope can stand in front of it.
+        const root = text.slice(0, text.indexOf("."));
+        if (this.scopes.bound.has(root) || this.scopes.declared.has(root)) {
+            return `ctx.builtin(${JSON.stringify(text)})`;
+        }
         transpiledName = text.split('.').map(p => `${this.PREFIX}${p}`).join('.');
     } else {
         transpiledName = `${this.PREFIX}${text}`;
@@ -1310,8 +1893,45 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // 2. THE GETTER CHECK
     // If the standard library registry marks this identifier as a getter,
     // we must transpile it into an execution call instead of a static reference!
+    // A name Pine spells as BOTH a variable and a function.
+    //
+    // "Pine keeps functions and variables in separate namespaces", which is why
+    // `sma = sma(close, 10)` is legal, and v1-v3 spell two different things
+    // `tickerid`: the chart's own ticker id (a VARIABLE) and
+    // `tickerid(prefix, ticker, session)`, which builds one (a FUNCTION). v4
+    // renames only the variable — "The `ticker` and `tickerid` variables are
+    // renamed to `syminfo.ticker` and `syminfo.tickerid` respectively" — so
+    // this collision exists at v1-v3 and nowhere else; v4 and v5 report the
+    // rename before reaching here.
+    //
+    // The registry has one key per name, and the function held it. A bare read
+    // therefore emitted the FUNCTION OBJECT, so TradingView's own
+    //
+    //     l = security(tickerid, r, low)
+    //
+    // requested a symbol named "function tickerid() { … }", got `na` for every
+    // bar, and the strategy gated on `low == l` never entered. `ticker` has the
+    // same shape and is not affected: nothing else claims that key.
+    const asVariable = this.variableSpelling(text);
+    if (asVariable && !this.isKeywordArgumentName(ctx)
+        && !this.scopes.declared.has(text) && !this.scopes.bound.has(text)) {
+        return `ctx.call("${asVariable}${this.getLocId(ctx)}", ` +
+               `ctx.builtin(${JSON.stringify(asVariable)}))`;
+    }
+
+    //
+    // ...unless the SCRIPT binds that name. A getter reads through
+    // `ctx.call(id, opsv2_hour)`, and if `opsv2_hour` is the script's own
+    // `let` the call reaches a number rather than the accessor. Pine keeps the
+    // two apart by resolving a declared name to the declaration; so does this.
+    //
+    // Nor when the id is a keyword argument's NAME. `timestamp(year = 2021)`
+    // spells a PARAMETER that happens to share a built-in's name, and it is
+    // emitted as an object key — `{ ctx.call("year@L3:C10", opsv2_year): 2021 }`
+    // is not JavaScript. The same exemption `checkUndeclaredRead` takes.
     const entry = this.registry[text];
-    if (entry && entry.is_getter) {
+    if (entry && entry.is_getter && !this.isKeywordArgumentName(ctx)
+        && !this.scopes.declared.has(text) && !this.scopes.bound.has(text)) {
         const callId = `"${text}${this.getLocId(ctx)}"`;
         return `ctx.call(${callId}, ${transpiledName})`;
     }

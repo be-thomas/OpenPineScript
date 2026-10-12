@@ -1,0 +1,26 @@
+//@version=5
+indicator("Requesting LTF collections demo", "Intrabar viewer", true)
+
+//@variable The timeframe of the LTF data request.
+string lowerTimeframe = input.timeframe("1", "Timeframe")
+//@variable The index of the intrabar to show on each chart bar. 0 is the first available intrabar.
+int intrabarIndex = input.int(0, "Intrabar to show", 0)
+
+//@variable A custom type to hold an array of price `data`.
+type Prices
+    array<float> data
+
+//@function Returns a new `Prices` instance containing current `open`, `high`, `low`, and `close` prices.
+newPrices() =>
+    Prices.new(array.from(open, high, low, close))
+
+//@variable An array of `Prices` requested from the `lowerTimeframe`.
+array<Prices> requestedPrices = request.security_lower_tf(syminfo.tickerid, lowerTimeframe, newPrices())
+
+//@variable The `Prices` ID from the `requestedPrices` array at the `intrabarIndex`, or `na` if not available.
+Prices intrabarPrices = array.size(requestedPrices) > intrabarIndex ? array.get(requestedPrices, intrabarIndex) : na
+//@variable The `data` array from the `intrabarPrices`, or an array of `na` values if `intrabarPrices` is `na`.
+array<float> intrabarData = na(intrabarPrices) ? array.new<float>(4, na) : intrabarPrices.data
+
+// Plot the `intrabarData` values as candles.
+plotcandle(intrabarData.get(0), intrabarData.get(1), intrabarData.get(2), intrabarData.get(3))

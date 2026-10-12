@@ -1,0 +1,13 @@
+//@version=5
+strategy("Intrabar exit", overlay = true, calc_on_order_fills = true)
+
+float stopSize   = input.float(5.0, "SL %", minval = 0.0) / 100.0
+float profitSize = input.float(5.0, "TP %", minval = 0.0) / 100.0
+
+if strategy.position_size == 0.0
+    strategy.entry("Buy", strategy.long)
+
+float stopLoss   = strategy.position_avg_price * (1.0 - stopSize)
+float takeProfit = strategy.position_avg_price * (1.0 + profitSize)
+
+strategy.exit("Exit", stop = stopLoss, limit = takeProfit)

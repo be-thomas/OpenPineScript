@@ -1,0 +1,38 @@
+//@version=5
+
+//@variable The maximum number of boxes to show on the chart.
+const int MAX_BOXES_COUNT = 500
+
+indicator("Deleting boxes demo", "Cumulative volume boxes", format = format.volume, max_boxes_count = MAX_BOXES_COUNT)
+
+//@variable The number of bars in each period.
+int length = input.int(20, "Length", 1)
+//@variable The maximum number of volume boxes in the calculation.
+int numberOfBoxes = input.int(10, "Number of boxes", 1, MAX_BOXES_COUNT)
+
+//@variable An array containing the ID of each box displayed by the script.
+var boxes = array.new<box>()
+
+if bar_index % length == 0
+    // Push a new box into the `boxes` array. The box has the default `xloc.bar_index` property.
+    boxes.push(box.new(bar_index, 0, bar_index + 1, 0, #000000, 2, text_color = #000000))
+    // Shift the oldest box out of the array and delete it when the array's size exceeds the `numberOfBoxes`.
+    if boxes.size() > numberOfBoxes
+        box.delete(boxes.shift())
+
+//@variable The last box drawn by the script as of the current chart bar.
+box lastBox = boxes.last()
+// Add the current bar's volume to the top of the `lastBox` and update the `right` index.
+lastBox.set_top(lastBox.get_top() + volume)
+lastBox.set_right(bar_index + 1)
+// Display the top of the `lastBox` as volume-formatted text.
+lastBox.set_text(str.tostring(lastBox.get_top(), format.volume))
+
+//@variable The highest `top` of all boxes in the `boxes` array.
+float highestTop = 0.0
+for id in boxes
+    highestTop := math.max(id.get_top(), highestTop)
+
+// Set the `bgcolor` of each `id` in `boxes` with a gradient based on the ratio of its `top` to the `highestTop`.
+for id in boxes
+    id.set_bgcolor(color.from_gradient(id.get_top() / highestTop, 0, 1, color.purple, color.orange))

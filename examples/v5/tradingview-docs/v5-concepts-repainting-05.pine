@@ -1,0 +1,24 @@
+//@version=5
+indicator("Repainting vs non-repainting `request.security()` demo", overlay = true)
+
+//@variable The timeframe to request data from.
+string higherTimeframe = input.timeframe("30", "Timeframe")
+
+if timeframe.in_seconds() > timeframe.in_seconds(higherTimeframe)
+    runtime.error("The 'Timeframe' input is smaller than the chart's timeframe. Choose a higher timeframe.")
+
+//@variable The current `close` requested from the `higherTimeframe`. Fluctuates without confirmation on realtime bars.
+float repaintingClose = request.security(syminfo.tickerid, higherTimeframe, close)
+//@variable The last confirmed `close` requested from the `higherTimeframe`. 
+// Behaves the same on historical and realtime bars.
+float nonRepaintingClose = request.security(
+     syminfo.tickerid, higherTimeframe, close[1], lookahead = barmerge.lookahead_on
+ )
+
+// Plot the values.
+plot(repaintingClose, "Repainting close", color.new(color.purple, 50), 8)
+plot(nonRepaintingClose, "Non-repainting close", color.teal, 3)
+// Plot a shape when a new `higherTimeframe` starts.
+plotshape(timeframe.change(higherTimeframe), "Timeframe change marker", shape.square, location.top, size = size.small)
+// Color the background on realtime bars.
+bgcolor(barstate.isrealtime ? color.new(color.orange, 60) : na, title = "Realtime bar highlight")

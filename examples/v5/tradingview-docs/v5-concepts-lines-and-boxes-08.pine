@@ -1,0 +1,61 @@
+//@version=5
+indicator("Modifying boxes demo", "High volume boxes", true, max_boxes_count = 100)
+
+//@variable The timeframe of the calculation.
+string timeframe = input.timeframe("D", "Timeframe")
+
+//@variable A box projecting the range of the upward bar with the highest `volume` over the `timeframe`.
+var box upBox = na
+//@variable A box projecting the range of the downward bar with the lowest `volume` over the `timeframe`.
+var box downBox = na
+//@variable The highest volume of upward bars over the `timeframe`.
+var float upVolume = na
+//@variable The highest volume of downward bars over the `timeframe`.
+var float downVolume = na
+
+// Color variables.
+var color upBorder   = color.teal
+var color upFill     = color.new(color.teal, 90)
+var color downBorder = color.maroon
+var color downFill   = color.new(color.maroon, 90)
+
+//@variable The closing time of the `timeframe`.
+int closeTime = time_close(timeframe)
+//@variable Is `true` when a new bar starts on the `timeframe`.
+bool changeTF = timeframe.change(timeframe)
+
+//@variable The `chart.point` for the top-left corner of the boxes. Contains `index` and `time` information.
+topLeft = chart.point.now(high)
+//@variable The `chart.point` for the bottom-right corner of the boxes. Does not contain `index` information.
+bottomRight = chart.point.from_time(closeTime, low)
+
+if changeTF and not na(volume)
+    if close > open
+        // Update `upVolume` and `downVolume` values.
+        upVolume   := volume
+        downVolume := 0.0
+        // Draw a new `upBox` using `time` and `price` info from the `topLeft` and `bottomRight` points.
+        upBox := box.new(topLeft, bottomRight, upBorder, 3, xloc = xloc.bar_time, bgcolor = upFill)
+        // Draw a new `downBox` with `na` coordinates.
+        downBox := box.new(na, na, na, na, downBorder, 3, xloc = xloc.bar_time, bgcolor = downFill)
+    else
+        // Update `upVolume` and `downVolume` values.
+        upVolume   := 0.0
+        downVolume := volume
+        // Draw a new `upBox` with `na` coordinates.
+        upBox := box.new(na, na, na, na, upBorder, 3, xloc = xloc.bar_time, bgcolor = upFill)
+        // Draw a new `downBox` using `time` and `price` info from the `topLeft` and `bottomRight` points.
+        downBox := box.new(topLeft, bottomRight, downBorder, 3, xloc = xloc.bar_time, bgcolor = downFill)
+// Update the ``upVolume`` and change the ``upBox`` coordinates when volume increases on an upward bar.
+else if close > open and volume > upVolume
+    upVolume := volume
+    box.set_top_left_point(upBox, topLeft)
+    box.set_bottom_right_point(upBox, bottomRight)
+// Update the ``downVolume`` and change the ``downBox`` coordinates when volume increases on a downward bar.
+else if close <= open and volume > downVolume
+    downVolume := volume
+    box.set_top_left_point(downBox, topLeft)
+    box.set_bottom_right_point(downBox, bottomRight)
+
+// Highlight the background when a new `timeframe` bar starts.
+bgcolor(changeTF ? color.new(color.orange, 70) : na, title = "Timeframe change highlight")

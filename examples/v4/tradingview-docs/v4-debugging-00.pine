@@ -1,0 +1,3 @@
+//@version=4
+study("Plot `bar_index`")
+plot(bar_index, "Bar Index")

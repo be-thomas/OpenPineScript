@@ -1,0 +1,89 @@
+//@version=5
+indicator("Empirical Distribution", overlay = true)
+
+float sourceInput = input.source(close, "Source")
+int length        = input.int(20, "Length")
+int n             = input.int(20, "Steps")
+
+// @function         Maintains a queue of the size of `srcArray`. 
+//                   It appends a `value` to the array and removes its oldest element at position zero.
+// @param srcArray   (array<float>) The array where the queue is maintained.
+// @param value      (float) The new value to be added to the queue. 
+//                   The queue's oldest value is also removed, so its size is constant.
+// @param takeSample (bool) A new `value` is only pushed into the queue if this is true.
+// @returns          (array<float>) `srcArray` object.
+method maintainQueue(array<float> srcArray, float value, bool takeSample = true) =>
+    if takeSample
+        srcArray.push(value)
+        srcArray.shift()
+    srcArray
+
+// @function          Replaces elements in a `srcArray` between `lowerBound` and `upperBound` with an `innerValue`,
+//                    and replaces elements outside the range with an `outerValue`.
+// @param srcArray    (array<float>) Array to modify.
+// @param innerValue  (float) Value to replace elements within the range with.
+// @param outerValue  (float) Value to replace elements outside the range with.
+// @param lowerBound  (float) Lowest value to replace with `innerValue`.
+// @param upperBound  (float) Highest value to replace with `innerValue`.
+// @returns           (array<float>) `srcArray` object.
+method fill(array<float> srcArray, float innerValue, float outerValue, float lowerBound, float upperBound) =>
+    for [i, element] in srcArray
+        if (element >= lowerBound or na(lowerBound)) and (element <= upperBound or na(upperBound))
+            srcArray.set(i, innerValue)
+        else
+            srcArray.set(i, outerValue)
+    srcArray
+
+// @function       Estimates the empirical CDF of a `srcArray`.
+// @param srcArray (array<float>) Array to calculate on.
+// @param steps    (int) Number of steps in the estimation.
+// @returns        (array<float>) Array of estimated CDF ratios.
+method eCDF(array<float> srcArray, int steps) =>
+    float min = srcArray.min()
+    float rng = srcArray.range() / steps
+    array<float> cdfArray = array.new<float>()
+    // Add averages of `srcArray` filtered by value region to the `cdfArray`.
+    float val = min
+    for i = 1 to steps
+        val += rng
+        cdfArray.push(srcArray.copy().fill(1.0, 0.0, min, val).avg())
+    cdfArray
+
+// @function        Rescales the elements within a `srcArray` to the interval [0, 1].
+// @param srcArray  (array<float>) Array to normalize.
+// @returns         (array<float>) Normalized copy of the `srcArray`.
+method featureScale(array<float> srcArray) =>
+    float min = srcArray.min()
+    float rng = srcArray.range()
+    array<float> scaledArray = array.new<float>()
+    // Push normalized `element` values into the `scaledArray`.
+    for element in srcArray
+        scaledArray.push((element - min) / rng)
+    scaledArray
+
+// @function        Draws a label containing eCDF estimates in the format "{price}: {percent}%" 
+// @param srcArray  (array<float>) Array of source values.
+// @param cdfArray  (array<float>) Array of CDF estimates.
+// @returns         (void)
+makeLabel(array<float> srcArray, array<float> cdfArray) =>
+    float max      = srcArray.max()
+    float rng      = srcArray.range() / cdfArray.size()
+    string results = ""
+    var label lbl  = label.new(0, 0, "", style = label.style_label_left, text_font_family = font.family_monospace)
+    // Add percentage strings to `results` starting from the `max`.
+    cdfArray.reverse()
+    for [i, element] in cdfArray
+        results += str.format("{0}: {1}%\n", max - i * rng, element * 100)
+    // Update `lbl` attributes.
+    lbl.set_xy(bar_index + 1, srcArray.avg())
+    lbl.set_text(results)
+
+var array<float> sourceArray = array.new<float>(length)
+
+// Add background color for the last `length` bars.
+bgcolor(bar_index > last_bar_index - length ? color.new(color.orange, 80) : na)
+
+// Queue `sourceArray`, feature scale, then estimate the distribution over `n` steps.
+array<float> distArray = sourceArray.maintainQueue(sourceInput).featureScale().eCDF(n)
+// Draw label.
+makeLabel(sourceArray, distArray)

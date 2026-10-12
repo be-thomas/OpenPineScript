@@ -1,0 +1,4 @@
+//@version=5
+indicator("Color picker showcase")
+plotColor = color.new(close > open ? color.teal : color.red, 50)
+plot(close, color = plotColor)

@@ -1,0 +1,46 @@
+//@version=5
+indicator("Deep copy demo")
+
+//@function Returns a deep copy of `this` map.
+method deepCopy(map<string, label> this) =>
+    //@variable A deep copy of `this` map.
+    result = map.new<string, label>()
+    // Add key-value pairs with copies of each `value` to the `result`.
+    for [key, value] in this
+        result.put(key, value.copy())
+    result //Return the `result`.
+
+//@variable A map containing `string` keys and `label` values.
+var original = map.new<string, label>()
+
+if bar_index == last_bar_index - 1
+    // Put a new key-value pair into the `original` map.
+    map.put(
+         original, "Test",
+         label.new(bar_index, 0, "Original", textcolor = color.white, size = size.huge)
+     )
+
+    //@variable A shallow copy of the `original` map.
+    map<string, label> shallow = original.copy()
+    //@variable A deep copy of the `original` map.
+    map<string, label> deep = original.deepCopy()
+
+    //@variable The "Test" label from the `shallow` copy.
+    label shallowLabel = shallow.get("Test")
+    //@variable The "Test" label from the `deep` copy.
+    label deepLabel = deep.get("Test")
+
+    // Modify the "Test" label's `y` attribute in the `original` map.
+    // This also affects the `shallowLabel`.
+    original.get("Test").set_y(label.all.size())
+
+    // Modify the `shallowLabel`. Also modifies the "Test" label in the `original` map.
+    shallowLabel.set_text("Shallow copy")
+    shallowLabel.set_color(color.red)
+    shallowLabel.set_style(label.style_label_up)
+
+    // Modify the `deepLabel`. Does not modify any other label instance.
+    deepLabel.set_text("Deep copy")
+    deepLabel.set_color(color.navy)
+    deepLabel.set_style(label.style_label_left)
+    deepLabel.set_x(bar_index + 5)

@@ -39,24 +39,38 @@ function resolveLookahead(input: any, ctx: Context): "on" | "off" {
 
 export function security(
     ctx: Context,
-    symbolInput: any,
-    resolutionInput: any,
+    symbol: any,
+    resolution: any,
     expression: () => any,
-    _gaps?: any,
-    lookaheadInput?: any
-): number {
+    gaps?: any,
+    lookahead?: any,
+    ignore_invalid_symbol?: any,
+    currency?: any,
+    calc_bars_count?: any,
+): any {
+    // Named for the published signature, because the registry binds keyword
+    // arguments by PARAMETER NAME and `symbolInput` bound nothing. The second
+    // parameter keeps its v1–v4 name `resolution`; v5 spells the same thing
+    // `timeframe`, and the v5 emitter renames it here rather than the registry
+    // carrying two names for one slot. `gaps`, `currency` and
+    // `calc_bars_count` are recorded by being accepted: this engine returns the
+    // aligned value and does not model gap-filling, conversion or a bar budget.
+    const symbolInput = symbol;
+    const resolutionInput = resolution;
+    const lookaheadInput = lookahead;
+    void gaps; void ignore_invalid_symbol; void currency; void calc_bars_count;
     if (typeof expression !== "function") return NaN; // malformed call
 
     // Explicit argument wins; otherwise the version's default. v1/v2 default to
     // lookahead_on, v3+ to lookahead_off (dev-docs/01-version-delta-spec.md D3.1).
-    const lookahead = resolveLookahead(lookaheadInput, ctx);
+    const mode = resolveLookahead(lookaheadInput, ctx);
 
-    const symbol = String(unwrap(symbolInput));
-    const resolution = String(unwrap(resolutionInput));
+    const symbolName = String(unwrap(symbolInput));
+    const resolutionName = String(unwrap(resolutionInput));
 
-    const data = ctx.getSecurityData(symbol, resolution);
+    const data = ctx.getSecurityData(symbolName, resolutionName);
     if (!data || data.length === 0) {
-        ctx.requestSecurity(symbol, resolution); // session layer will supply it, then re-run
+        ctx.requestSecurity(symbolName, resolutionName); // session layer will supply it, then re-run
         return NaN;
     }
 
@@ -80,9 +94,18 @@ export function security(
     //   on  — also the HTF bar the chart bar is INSIDE (data[j].time <= t),
     //         i.e. its close is visible before it happens. This is the
     //         repainting behaviour that was the default before v3.
+    // A request for the chart's OWN series is not deferred. There is no higher
+    // timeframe bar to wait for: the requested bar and the chart bar are the
+    // same bar, and it closes when the chart bar does. Treating it as "still
+    // forming" made `request.security(syminfo.tickerid, timeframe.period,
+    // close)` return the PREVIOUS bar's close — a one-bar lag in the most basic
+    // call there is. Host-supplied data keeps the closed-bar rule; see
+    // `Context.isOwnChartSeries`.
+    const sameContext = ctx.isOwnChartSeries(symbolName, resolutionName);
+
     while (st.done + 1 < data.length) {
         const j = st.done + 1;
-        const visible = lookahead === "on"
+        const visible = mode === "on" || sameContext
             ? data[j].time <= t
             : j + 1 < data.length && data[j + 1].time <= t;
         if (!visible) break;

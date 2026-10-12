@@ -1,0 +1,8 @@
+//@version=4
+strategy("Priced Entry demo")
+var c = 0
+if year > 2020
+    c := c + 1
+if c == 1
+    strategy.entry("LE1", strategy.long, 2, stop = high + 35 * syminfo.mintick)
+    strategy.entry("LE2", strategy.long, 2, stop = high + 2 * syminfo.mintick)

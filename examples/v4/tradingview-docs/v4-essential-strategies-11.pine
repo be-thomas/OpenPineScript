@@ -1,0 +1,5 @@
+//@version=4
+strategy("oca_cancel demo")
+if year > 2014 and year < 2016
+    strategy.entry("LE", strategy.long, oca_type = strategy.oca.cancel, oca_name="Entry")
+    strategy.entry("SE", strategy.short, oca_type = strategy.oca.cancel, oca_name="Entry")

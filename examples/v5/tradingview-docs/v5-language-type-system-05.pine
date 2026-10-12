@@ -1,0 +1,10 @@
+//@version=5
+indicator("simple demo", overlay = true)
+
+//@variable Is `true` when the current chart is non-standard. Qualified as "simple bool".
+isNonStandard = not chart.is_standard
+//@variable Is orange when the the current chart is non-standard. Qualified as "simple color".
+simple color warningColor = isNonStandard ? color.new(color.orange, 70) : na
+
+// Colors the chart's background to warn that it's a non-standard chart type.
+bgcolor(warningColor, title = "Non-standard chart color")

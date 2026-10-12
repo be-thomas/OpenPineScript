@@ -1,0 +1,8 @@
+//@version=5
+indicator("Holiday candles", "", true)
+float r = math.random(0, 255)
+float g = math.random(0, 255)
+float b = math.random(0, 255)
+float t = math.random(0, 100)
+color holidayColor = color.rgb(r, g, b, t)
+plotcandle(open, high, low, close, color = c_holiday, wickcolor = holidayColor, bordercolor = c_holiday)

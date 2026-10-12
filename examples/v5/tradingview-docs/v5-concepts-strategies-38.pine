@@ -1,0 +1,5 @@
+//@version=5
+strategy("buy on every fill", overlay = true, calc_on_order_fills = true, pyramiding = 100)
+
+if last_bar_index - bar_index <= 25
+    strategy.entry("Buy", strategy.long)

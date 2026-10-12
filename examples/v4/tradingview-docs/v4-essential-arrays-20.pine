@@ -1,0 +1,15 @@
+//@version=4
+study("Searching in arrays")
+_value = input(1)
+a = array.new_float(0)
+array.push(a, 0)
+array.push(a, 1)
+array.push(a, 2)
+array.push(a, 1)
+if barstate.islast
+    _valueFound      = array.includes(a, _value)
+    _firstIndexFound = array.indexof(a, _value)
+    _lastIndexFound  = array.lastindexof(a, _value)
+    label.new(bar_index, 0, "a: " + tostring(a) + 
+        "\nFirst " + tostring(_value) + (_firstIndexFound != -1 ? " value was found at index: " + tostring(_firstIndexFound) : " value was not found.") +
+        "\nLast " + tostring(_value)  + (_lastIndexFound  != -1 ? " value was found at index: " + tostring(_lastIndexFound) : " value was not found."))

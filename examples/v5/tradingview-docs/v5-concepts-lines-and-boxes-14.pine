@@ -1,0 +1,35 @@
+//@version=5
+indicator("Curved drawings demo", "Random oscillating polylines")
+
+//@variable The number of bars between each point in the drawing.
+int length = input.int(20, "Length between points", 2)
+
+//@variable An array of `chart.point` objects to sequentially connect with a polyline.
+var points = array.new<chart.point>()
+
+//@variable The sign of each `price` in the `points`. Alternates between 1 and -1 on each `newPoint`.
+var int yValue = 1
+
+//@variable Is `true` once every `length` bars.
+bool newPoint = bar_index % length == 0
+
+if newPoint
+    // Push a new `chart.point` with a randomized `price` into the `points`.
+    // The new point contains `time` and `index` info.
+    points.push(chart.point.now(yValue * math.random()))
+    // Change the sign of the `yValue`.
+    yValue *= -1
+
+    //@variable The newest `chart.point`.
+    lastPoint = points.last()
+    // Draw a horizontal line at the `lastPoint.price`. This line uses the default `xloc.bar_index`.
+    line.new(lastPoint.index - length, lastPoint.price, lastPoint.index + length, lastPoint.price, color = color.red)
+
+// Draw two `polyline` instances on the last confirmed chart bar.
+// Both polylines use the `time` field from each `chart.point` in the `points` array as x-coordinates.
+if barstate.islastconfirmedhistory
+    polyline.new(points, curved = false, xloc = xloc.bar_time, line_color = #EB8A3B, line_width = 2)
+    polyline.new(points, curved = true, xloc = xloc.bar_time, line_color = #9151A6, line_width = 3)
+
+// Highlight the chart background on every `newPoint` condition.
+bgcolor(newPoint ? color.new(color.gray, 70) : na, title = "New point highlight")

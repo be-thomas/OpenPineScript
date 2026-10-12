@@ -1,0 +1,30 @@
+//@version=5
+indicator("Requesting collections demo", "Bar range ratio")
+
+//@variable The ticker ID to request data from.
+string symbol = input.symbol("", "Symbol")
+//@variable The timeframe of the request.
+string timeframe = input.timeframe("30", "Timeframe")
+
+//@variable A map with "string" keys and "float" values.
+var map<string, float> data = map.new<string, float>()
+
+// Put key-value pairs into the `data` map.
+map.put(data, "High", high)
+map.put(data, "Low", low)
+map.put(data, "Highest", ta.highest(10))
+map.put(data, "Lowest", ta.lowest(10))
+
+//@variable A new `map` whose data is calculated from the last confirmed bar of the requested context.
+map<string, float> otherData = request.security(symbol, timeframe, data[1], lookahead = barmerge.lookahead_on)
+
+//@variable The ratio of the context's bar range to the max range over 10 bars. Returns `na` if no data is available.
+float ratio = na
+if not na(otherData)
+    ratio := (otherData.get("High") - otherData.get("Low")) / (otherData.get("Highest") - otherData.get("Lowest"))
+
+//@variable A gradient color for the plot of the `ratio`.
+color ratioColor = color.from_gradient(ratio, 0, 1, color.purple, color.orange)
+
+// Plot the `ratio`.
+plot(ratio, "Range Ratio", ratioColor, 3, plot.style_area)

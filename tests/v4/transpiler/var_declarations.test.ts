@@ -6,7 +6,7 @@
  * claim about what happens on bar 2, so the tests below run bars.
  */
 import { describe, it, expect } from "vitest";
-import { transpile, compileScript } from "../../../transpiler";
+import { transpile, compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v4";
 
 /**

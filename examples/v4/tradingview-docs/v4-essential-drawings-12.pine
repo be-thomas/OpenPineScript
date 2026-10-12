@@ -1,0 +1,34 @@
+//@version=4
+study("Pivot Points Standard", overlay=true)
+higherTF = input("D", type=input.resolution)
+prevCloseHTF = security(syminfo.tickerid, higherTF, close[1], lookahead=true)
+prevOpenHTF = security(syminfo.tickerid, higherTF, open[1], lookahead=true)
+prevHighHTF = security(syminfo.tickerid, higherTF, high[1], lookahead=true)
+prevLowHTF = security(syminfo.tickerid, higherTF, low[1], lookahead=true)
+
+pLevel = (prevHighHTF + prevLowHTF + prevCloseHTF) / 3
+r1Level = pLevel * 2 - prevLowHTF
+s1Level = pLevel * 2 - prevHighHTF
+
+var line r1Line = na
+var line pLine = na
+var line s1Line = na
+
+if pLevel[1] != pLevel
+    line.set_x2(r1Line, bar_index)
+    line.set_x2(pLine, bar_index)
+    line.set_x2(s1Line, bar_index)
+    line.set_extend(r1Line, extend.none)
+    line.set_extend(pLine, extend.none)
+    line.set_extend(s1Line, extend.none)
+    r1Line := line.new(bar_index, r1Level, bar_index, r1Level, extend=extend.right)
+    pLine := line.new(bar_index, pLevel, bar_index, pLevel, width=3, extend=extend.right)
+    s1Line := line.new(bar_index, s1Level, bar_index, s1Level, extend=extend.right)
+    label.new(bar_index, r1Level, "R1", style=label.style_none)
+    label.new(bar_index, pLevel, "P", style=label.style_none)
+    label.new(bar_index, s1Level, "S1", style=label.style_none)
+
+if not na(pLine) and line.get_x2(pLine) != bar_index
+    line.set_x2(r1Line, bar_index)
+    line.set_x2(pLine, bar_index)
+    line.set_x2(s1Line, bar_index)

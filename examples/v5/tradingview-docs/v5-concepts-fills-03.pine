@@ -1,0 +1,40 @@
+//@version=5
+indicator("Linefill demo", "Channel", true)
+
+//@variable The number bars to the left of a detected pivot.
+int LEFT_BARS = 15
+//@variable The number bars to the right for pivot confirmation. 
+int RIGHT_BARS = 5
+
+//@variable The price of the pivot high point.
+float pivotHigh = ta.pivothigh(LEFT_BARS, RIGHT_BARS)
+//@variable The price of the pivot low point.
+float pivotLow = ta.pivotlow(LEFT_BARS, RIGHT_BARS)
+
+// Initialize the chart points the lines will use.
+var firstHighPoint  = chart.point.new(na, na, na)
+var secondHighPoint = chart.point.new(na, na, na)
+var firstLowPoint   = chart.point.new(na, na, na)
+var secondLowPoint  = chart.point.new(na, na, na)
+
+// Update the `firstHighPoint` and `secondHighPoint` when `pivotHigh` is not `na`.
+if not na(pivotHigh)
+    firstHighPoint  := secondHighPoint
+    secondHighPoint := chart.point.from_index(bar_index - RIGHT_BARS, pivotHigh)
+// Update the `firstLowPoint` and `secondLowPoint` when `pivotlow` is not `na`.
+if not na(pivotLow)
+    firstLowPoint  := secondLowPoint
+    secondLowPoint := chart.point.from_index(bar_index - RIGHT_BARS, pivotLow)
+
+if barstate.islastconfirmedhistory
+    //@variable An extended line that passes through the `firstHighPoint` and `secondHighPoint`.
+    line pivotHighLine = line.new(firstHighPoint, secondHighPoint, extend = extend.right)
+    //@variable An extended line that passes through the `firstLowPoint` and `secondLowPoint`.
+    line pivotLowLine = line.new(firstLowPoint, secondLowPoint, extend = extend.right)
+    //@variable The color of the space between the lines.
+    color fillColor = switch
+        secondHighPoint.price > firstHighPoint.price and secondLowPoint.price > firstLowPoint.price => color.lime
+        secondHighPoint.price < firstHighPoint.price and secondLowPoint.price < firstLowPoint.price => color.red
+        =>                                                                                             color.silver
+    //@variable A linefill that colors the space between the `pivotHighLine` and `pivotLowLine`.
+    linefill channelFill = linefill.new(pivotHighLine, pivotLowLine, color.new(fillColor, 90))

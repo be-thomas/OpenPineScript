@@ -1,0 +1,17 @@
+//@version=5
+indicator("Timeframe in minutes example", "", true)
+string tfInput = input.timeframe(defval = "", title = "Input TF")
+
+float chartTFInMinutes = timeframe.in_seconds() / 60
+float inputTFInMinutes = timeframe.in_seconds(tfInput) / 60
+
+var table t = table.new(position.top_right, 1, 1)
+string txt = "Chart TF: "    + str.tostring(chartTFInMinutes, "#.##### minutes") + 
+"\nInput TF: " + str.tostring(inputTFInMinutes, "#.##### minutes")
+if barstate.isfirst
+    table.cell(t, 0, 0, txt, bgcolor = color.yellow)
+else if barstate.islast
+    table.cell_set_text(t, 0, 0, txt)
+
+if chartTFInMinutes > inputTFInMinutes
+    runtime.error("The chart's timeframe must not be higher than the input's timeframe.")

@@ -1,0 +1,19 @@
+//@version=5
+indicator("Testing session time zones demo", overlay = true)
+
+//@variable The timeframe of the analyzed bars. 
+string timeframeInput = input.timeframe("60", "Timeframe")
+//@variable The session to check. Features four interval options. 
+string sessionInput = input.session("1300-1700", "Session", ["0000-0400", "0930-1400", "1300-1700", "1700-2100"])
+//@variable An IANA identifier representing the time zone of the `sessionInput`. Fetures four preset options. 
+string timezoneInput = input.string("America/New_York", "Time zone", 
+     ["America/Vancouver", "America/New_York", "Asia/Dubai", "Australia/Sydney"]
+ )
+
+//@variable Is `true` if a `timeframeInput` bar opens within the `sessionInput` session in the `timezoneInput` time zone.
+//          The condition detects the session on different bars, depending on the chosesn time zone, because identical 
+//          local times in different time zones refer to different absolute points in UNIX time.  
+bool opensInSession = not na(time(timeframeInput, sessionInput, timezoneInput))
+
+// Highlight the background when `opensInSession` is `true`. 
+bgcolor(opensInSession ? color.rgb(33, 149, 243, 80) : na, title = "Open in session highlight")

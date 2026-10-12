@@ -1,0 +1,19 @@
+//@version=5
+strategy("Limit order demo", overlay = true, margin_long = 100, margin_short = 100)
+
+//@function Displays text passed to `txt` and a horizontal line at `price` when called.
+debugLabel(float price, string txt) =>
+    label.new(
+         bar_index, price, text = txt, color = color.teal, textcolor = color.white, 
+         style = label.style_label_lower_right, size = size.large
+     )
+    line.new(
+         bar_index, price, bar_index + 1, price, color = color.teal, extend = extend.right, 
+         style = line.style_dashed
+     )
+
+// Generate a long limit order with a label and line 100 bars before the `last_bar_index`.
+if last_bar_index - bar_index == 100
+    limitPrice = close - syminfo.mintick * 800
+    debugLabel(limitPrice, "Long Limit order created")
+    strategy.entry("Long", strategy.long, limit = limitPrice)

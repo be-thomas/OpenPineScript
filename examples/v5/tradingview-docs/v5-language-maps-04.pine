@@ -1,0 +1,39 @@
+//@version=5
+indicator("Putting and getting objects demo")
+
+//@type A custom type to hold OHLC data.
+type ChartData
+    float o
+    float h
+    float l
+    float c
+
+//@function Updates the fields of a `ChartData` object.
+method update(ChartData this) =>
+    this.o := open
+    this.h := high
+    this.l := low
+    this.c := close
+
+//@variable A new `ChartData` instance declared on the first bar.
+var myData = ChartData.new()
+//@variable A map associating `string` keys with `ChartData` instances.
+var myMap = map.new<string, ChartData>()
+
+// Put a new pair with the "A" key into `myMap` only on the first bar.
+if bar_index == 0
+    myMap.put("A", myData)
+
+// Put a pair with the "B" key into `myMap` on every bar.
+myMap.put("B", myData)
+
+//@variable The `ChartData` value associated with the "A" key in `myMap`.
+ChartData oldest = myMap.get("A")
+//@variable The `ChartData` value associated with the "B" key in `myMap`.
+ChartData newest = myMap.get("B")
+
+// Update `newest`. Also affects `oldest` and `myData` since they all reference the same `ChartData` object.
+newest.update()
+
+// Plot the fields of `oldest` as candles.
+plotcandle(oldest.o, oldest.h, oldest.l, oldest.c)

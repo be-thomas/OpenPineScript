@@ -1,0 +1,8 @@
+//@version=5
+indicator("Plotting numbers demo", "Time changes")
+
+//@variable The one-bar change in the chart symbol's `time` value, measured in units of the chart timeframe.
+float timeChange = ta.change(time) / (1000.0 * timeframe.in_seconds())
+
+// Display the `timeChange` in all possible locations.
+plot(timeChange, "Time difference (in chart bar units)", color.purple, 3)

@@ -1,0 +1,6 @@
+//@version=4
+study("My Script", overlay = true)
+color c_labelColor = input(color.green, "Main Color", input.color)
+var l = label.new(bar_index, close, yloc = yloc.abovebar, text = "Colored label")
+label.set_x(l, bar_index)
+label.set_color(l, c_labelColor)

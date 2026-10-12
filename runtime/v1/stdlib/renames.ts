@@ -58,10 +58,21 @@ const COLORS = group("color", [
  * v4 — only the type constants move — so `input` is deliberately absent from
  * the removal list at the bottom of this file.
  */
-const INPUT_TYPES = group("input", [
-  "integer", "float", "bool", "string", "resolution", "session", "symbol",
-  "source",
-]);
+const INPUT_TYPES: RenameSpec[] = [
+  ...group("input", [
+    "integer", "float", "bool", "string", "resolution", "session", "symbol",
+    "source",
+  ]),
+  // `input.color` is a v4 ADDITION rather than a rename — v3 has no input type
+  // constant of that name, and flat `color` at v3 is the `color()` function.
+  // The v4 release notes introduce it directly:
+  //
+  //     color c_labelColor = input(color.green, "Main Color", input.color)
+  //
+  // so it is declared by value, the way `plot.style_cross` is. v5 turns the
+  // same spelling into a FUNCTION, which V5_ONLY_NAMES installs over this.
+  { to: "input.color", value: "color" },
+];
 
 /**
  * Plot styles gain a `style_` prefix as well as a namespace:
@@ -122,6 +133,24 @@ const SYMINFO: RenameSpec[] = [
 export const V4_ONLY_NAMESPACES: readonly string[] = [
   "array", "line", "label", "box", "table",
   "xloc", "yloc", "extend", "position", "text", "order",
+  // `session` is v4, not v5. From the v4 release notes, April 2021:
+  //
+  //   "session.ismarket - returns true if the current bar is a part of the
+  //    regular trading hours ... session.ispremarket ... session.ispostmarket"
+  //
+  // and `session.regular` appears in the v4 manual's own extended-session
+  // examples. The four `is*bar*` members ARE v5 and are gated by name in
+  // renames5.ts — a namespace can arrive in one version and grow in another.
+  //
+  // The flat v1–v3 `session` input-type constant is untouched: the gate skips a
+  // key equal to its own root.
+  "session",
+
+  // Not a namespace a script can spell — see the header of ./cast.ts. `cast.*`
+  // is listed here so the three casting functions land in v4's namespace
+  // registry, which is where index.ts picks them up and re-keys them onto the
+  // flat names `float`, `bool` and `string`.
+  "cast",
 ];
 
 /**
@@ -143,11 +172,76 @@ export const V4_ONLY_NAMESPACES: readonly string[] = [
  * golden/v4/harness_builtins.pine unrunnable while v4 had no pipeline. It has
  * one now, so the gate costs nothing.
  *
- * Only the three this engine implements are listed; the other March 2020
- * additions (bbw, kc, kcw, dmi, hma, supertrend, cmo, and the obv/pvt/nvi/pvi
- * family) are absent from the registry entirely, so there is nothing to remove.
+ * The volume family — obv, pvt, nvi, pvi, accdist, iii, wad, wvad — is still
+ * absent from the registry, so there is nothing to gate for those. Each has
+ * published variants that disagree on the SEED value, and a seed guessed wrong
+ * produces a series that is the right shape and the wrong number forever;
+ * an absent name is refused instead.
  */
-export const V4_ONLY_NAMES: readonly string[] = ["bb", "wpr", "mfi"];
+export const V4_ONLY_NAMES: readonly string[] = [
+    "bb", "wpr", "mfi",
+    "bbw", "kc", "kcw", "hma", "cmo", "dmi", "supertrend",
+    "range", "median", "mode",
+
+    // The rest of the March-2020 and 2021 batches, from the v4 release notes:
+    //
+    //   "todegrees(radians) … toradians(degrees) … random(min, max, seed) -
+    //    returns a pseudo-random value."
+    //   "New function was added: round_to_mintick(x)"
+    //   "New variable was added: time_tradingday" (February 2021)
+    //   "New argument for time and time_close functions was added: timezone"
+    //    (July 2021 — so time_close predates it, and it is absent from the v3
+    //    documentation, which places it in v4)
+    //   "max_bars_back function to control series variables internal history
+    //    buffer sizes" and "functions for explicit type casting" (June 2019)
+    "random", "todegrees", "toradians", "round_to_mintick",
+    "time_close", "time_tradingday", "max_bars_back", "int",
+
+    // The May-2021 colour batch. Every other member of it — color.rgb,
+    // color.r/g/b/t — was already implemented and gated; from_gradient was
+    // missed, and a missing MEMBER of a real namespace fails silently.
+    "color.from_gradient",
+
+    // `alert()` and its frequency constants. v3 has `alertcondition()` only —
+    // the v3 documentation has no `alert(` anywhere — so this is v4+.
+    "alert", "alert.freq_once_per_bar", "alert.freq_once_per_bar_close",
+    "alert.freq_all",
+
+    // Seconds-based timeframes, and the `is*` member that reports one. The
+    // other five `timeframe.is*` are v1–v3 flat names the table below renames;
+    // this one never had a flat spelling because seconds postdate them.
+    "timeframe.isseconds",
+
+    // The only two `syminfo.` members that are v4.
+    //
+    // The NAMESPACE is not a v4 addition, which is the opposite of what this
+    // list used to say. The v3-to-v4 migration guide renames exactly two things
+    // into it — "The `ticker` and `tickerid` variables are renamed to
+    // `syminfo.ticker` and `syminfo.tickerid` respectively" — and renames
+    // nothing to `syminfo.mintick`, `syminfo.prefix`, `syminfo.pointvalue`,
+    // `syminfo.currency` or `syminfo.timezone`. A member that v4 did not rename
+    // already had its dotted spelling, and TradingView's v3-archive
+    // documentation confirms it directly: two `//@version=2` examples on the
+    // strategies and how-tos pages read `syminfo.mintick` and `syminfo.prefix`.
+    //
+    // How far back beyond v2 that goes cannot be checked — there is no archived
+    // v1 documentation — so the namespace is treated as always having been
+    // there, and only what the guide names is gated.
+    "syminfo.ticker", "syminfo.tickerid",
+
+    // The one `str.` name that predates the namespace's own version.
+    //
+    // `str.*` is v5 — `tostring` becomes `str.tostring`, and the other twenty
+    // members arrive with it — but `str.replace_all` is on the v4 manual's
+    // TABLES and ARRAYS pages, inside `//@version=4` examples:
+    //
+    //     _s := str.replace_all(_s, "25", "00")
+    //
+    // under "Produces a string format usable with tostring() to restrict
+    // precision to ticks". It is the ONLY `str.` name any v4 example spells,
+    // which is why the namespace stays v5 and this one member is named here.
+    "str.replace_all",
+];
 
 export const V4_RENAMES: readonly RenameSpec[] = [
   ...COLORS,
@@ -178,5 +272,39 @@ export const V4_REMOVED: readonly string[] = (() => {
   // `line` as a drawing type, `area` only ever as a style. Keeping `line`
   // spellable matters; `area` is genuinely gone.
   removed.delete("line");
+
+  // `tickerid` is the same shape, and the migration guide says so in as many
+  // words: "The `ticker` and `tickerid` VARIABLES are renamed to
+  // `syminfo.ticker` and `syminfo.tickerid` respectively." Only the variables.
+  // The FUNCTION `tickerid(prefix, ticker, session)` is still v4 — it appears
+  // in three of TradingView's own v4 examples — and does not become
+  // `ticker.new` until v5.
+  removed.delete("tickerid");
   return [...removed];
 })();
+
+/**
+ * Pine names this engine knows about and deliberately does NOT implement.
+ *
+ * The volume family has published variants that disagree on the SEED value,
+ * and a seed guessed wrong produces a series that is the right shape and the
+ * wrong number forever — so no implementation is offered. See the note in
+ * runtime/v1/stdlib/renames.ts.
+ *
+ * They are listed here because "absent from the registry" and "not a Pine name
+ * at all" must not produce the same diagnostic. `accdist` is real Pine, so
+ * `Undeclared identifier` would be a lie; it also cannot be allowed to compile
+ * into a silent `undefined`. runtime/v1/index.ts binds each one as a poison pill that
+ * throws only when READ, which is what lets
+ * conformance/v3/corpus/cci_commodity_channel_index.pine keep running: it
+ * mentions `accdist` in a branch selected by an input, and every other branch
+ * still works.
+ */
+export const UNIMPLEMENTED_BUILTINS: ReadonlySet<string> = new Set([
+  "accdist", "iii", "nvi", "obv", "pvi", "pvt", "wad", "wvad",
+  // ...and their v5 spellings. The flat name is what v1–v4 write and the
+  // dotted one is what v5 writes; both must reach the poison pill rather than
+  // one of them reading as an absent namespace member.
+  "ta.accdist", "ta.iii", "ta.nvi", "ta.obv", "ta.pvi", "ta.pvt",
+  "ta.wad", "ta.wvad",
+]);
