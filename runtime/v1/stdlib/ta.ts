@@ -36,7 +36,18 @@ interface BarsSinceState { counter: number; }
 interface ValueWhenState { history: number[]; }
 interface AtrState { prevClose: number; }
 interface VwapState { sumVol: number; sumSrcVol: number; }
-interface SarState { isLong: boolean; af: number; ep: number; sar: number; initialized: boolean; }
+interface SarState {
+    /** Bars this call site has seen, so the seed lands on `bar_index == 1`. */
+    bars: number;
+    result: number;
+    maxMin: number;
+    acceleration: number;
+    /** True while the stop sits BELOW price, i.e. the trend is up. */
+    isBelow: boolean;
+    prevHigh: number; prevHigh2: number;
+    prevLow: number; prevLow2: number;
+    prevClose: number;
+}
 
 // --- Moving Averages ---
 
@@ -796,7 +807,30 @@ export function linreg(ctx: Context, sourceInput: any, lengthInput: any, offsetI
 }
 
 /**
- * sar: Parabolic SAR (Simplified mathematical emulator)
+ * `ta.sar(start, inc, max)` — Parabolic SAR.
+ *
+ * This follows the `pine_sar` reference implementation published alongside
+ * `ta.sar` in TradingView's Pine Script reference manual, step for step. It is
+ * not the textbook Wilder algorithm, and the differences are not cosmetic —
+ * each of the four below moved the output on real data, and all four together
+ * reproduce TradingView's own values on 2,475 BTCUSDT daily bars to 1e-6 with
+ * no exceptions (conformance/v5/golden/harness_state.BTCUSDT.1D.log):
+ *
+ *   - It returns `na` on bar 0 and SEEDS on bar 1, using `close > close[1]` to
+ *     pick the initial direction. A bar-0 seed puts every later value one bar
+ *     early for the whole chart.
+ *   - The parabola advances BEFORE the stop is tested, so the reversal test
+ *     sees this bar's advanced stop rather than the previous bar's.
+ *   - On reversal the new stop is `max(high, maxMin)` (or `min(low, maxMin)`),
+ *     which can pick the CURRENT bar's extreme rather than the trend's.
+ *   - The acceleration factor and extreme point are frozen on the bar a trend
+ *     begins — `isFirstTrendBar` — so a reversal bar never also bumps `af`.
+ *
+ * The closing clamp keeps the stop out of the previous two bars' range. Note
+ * it is `low[1]`/`low[2]`, NOT Wilder's `low`/`low[1]`: clamping against the
+ * current bar suppresses reversals TradingView takes (it first diverged at bar
+ * 263 of that export).
+ *
  * @returns series float
  */
 export function sar(ctx: Context, startInput: any, incInput: any, maxInput: any): number {
@@ -804,50 +838,83 @@ export function sar(ctx: Context, startInput: any, incInput: any, maxInput: any)
     const inc = val(incInput);
     const max = val(maxInput);
 
-    const high = (ctx as any).high !== undefined ? val((ctx as any).high) : 0;
-    const low = (ctx as any).low !== undefined ? val((ctx as any).low) : 0;
+    const high = (ctx as any).high !== undefined ? val((ctx as any).high) : NaN;
+    const low = (ctx as any).low !== undefined ? val((ctx as any).low) : NaN;
+    const close = (ctx as any).close !== undefined ? val((ctx as any).close) : NaN;
 
     const state = ctx.getPersistentState<SarState>(() => ({
-        isLong: true, af: start, ep: 0, sar: 0, initialized: false
+        bars: 0, result: NaN, maxMin: NaN, acceleration: NaN, isBelow: false,
+        prevHigh: NaN, prevHigh2: NaN, prevLow: NaN, prevLow2: NaN, prevClose: NaN,
     }));
 
-    if (!state.initialized) {
-        state.sar = low;
-        state.ep = high;
-        state.initialized = true;
-        return state.sar;
+    const bar = state.bars;
+    // Shifting the history here rather than at every `return` is what keeps
+    // `low[1]` meaning the same thing on the seed bar and on a reversal bar.
+    const shift = () => {
+        state.prevHigh2 = state.prevHigh; state.prevHigh = high;
+        state.prevLow2 = state.prevLow; state.prevLow = low;
+        state.prevClose = close;
+        state.bars = bar + 1;
+    };
+
+    let isFirstTrendBar = false;
+
+    if (bar === 1) {
+        if (close > state.prevClose) {
+            state.isBelow = true; state.maxMin = high; state.result = state.prevLow;
+        } else {
+            state.isBelow = false; state.maxMin = low; state.result = state.prevHigh;
+        }
+        isFirstTrendBar = true;
+        state.acceleration = start;
     }
 
-    let nextSar = state.sar + state.af * (state.ep - state.sar);
+    if (bar < 1) { shift(); return NaN; }
 
-    if (state.isLong) {
-        if (low < nextSar) {
-            state.isLong = false;
-            nextSar = Math.max(state.ep, high); // Switch to short
-            state.ep = low;
-            state.af = start;
-        } else {
-            if (high > state.ep) {
-                state.ep = high;
-                state.af = Math.min(state.af + inc, max);
-            }
+    state.result += state.acceleration * (state.maxMin - state.result);
+
+    if (state.isBelow) {
+        if (state.result > low) {
+            isFirstTrendBar = true;
+            state.isBelow = false;
+            state.result = Math.max(high, state.maxMin);
+            state.maxMin = low;
+            state.acceleration = start;
         }
     } else {
-        if (high > nextSar) {
-            state.isLong = true;
-            nextSar = Math.min(state.ep, low); // Switch to long
-            state.ep = high;
-            state.af = start;
+        if (state.result < high) {
+            isFirstTrendBar = true;
+            state.isBelow = true;
+            state.result = Math.min(low, state.maxMin);
+            state.maxMin = high;
+            state.acceleration = start;
+        }
+    }
+
+    if (!isFirstTrendBar) {
+        if (state.isBelow) {
+            if (high > state.maxMin) {
+                state.maxMin = high;
+                state.acceleration = Math.min(state.acceleration + inc, max);
+            }
         } else {
-            if (low < state.ep) {
-                state.ep = low;
-                state.af = Math.min(state.af + inc, max);
+            if (low < state.maxMin) {
+                state.maxMin = low;
+                state.acceleration = Math.min(state.acceleration + inc, max);
             }
         }
     }
-    
-    state.sar = nextSar;
-    return state.sar;
+
+    if (state.isBelow) {
+        state.result = Math.min(state.result, state.prevLow);
+        if (bar > 1) state.result = Math.min(state.result, state.prevLow2);
+    } else {
+        state.result = Math.max(state.result, state.prevHigh);
+        if (bar > 1) state.result = Math.max(state.result, state.prevHigh2);
+    }
+
+    shift();
+    return state.result;
 }
 
 // --- Quick-win TA indicators ---

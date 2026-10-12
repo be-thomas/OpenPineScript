@@ -214,22 +214,68 @@ export class NaiveTA {
         return intercept + slope * (length - 1 - offset);
     }
 
+    /**
+     * Parabolic SAR, re-derived from the `pine_sar` reference implementation
+     * TradingView publishes beside `ta.sar` in the Pine reference manual.
+     *
+     * The earlier version of this oracle was the textbook Wilder algorithm,
+     * seeded on bar 0, with no out-of-range clamp. It agreed with the engine
+     * because the engine had the same three mistakes. TradingView's own output
+     * over 2,475 BTCUSDT daily bars disagrees with both, and settles it.
+     *
+     * `history` stands in for `close`, which is what the differential feeds it.
+     */
     sar(start: number, inc: number, max: number): number {
-        if (this.highs.length === 0) return NaN;
-        let long = true; let af = start; let ep = this.highs[0]; let v = this.lows[0];
-        for (let i = 1; i < this.history.length; i++) {
+        const n = this.history.length;
+        if (n < 2) return NaN;
+
+        let result = NaN, maxMin = NaN, acceleration = NaN, isBelow = false;
+
+        for (let i = 1; i < n; i++) {
             const h = this.highs[i], l = this.lows[i];
-            let next = v + af * (ep - v);
-            if (long) {
-                if (l < next) { long = false; next = Math.max(ep, h); ep = l; af = start; }
-                else if (h > ep) { ep = h; af = Math.min(af + inc, max); }
-            } else {
-                if (h > next) { long = true; next = Math.min(ep, l); ep = h; af = start; }
-                else if (l < ep) { ep = l; af = Math.min(af + inc, max); }
+            let isFirstTrendBar = false;
+
+            if (i === 1) {
+                if (this.history[i] > this.history[i - 1]) {
+                    isBelow = true; maxMin = h; result = this.lows[i - 1];
+                } else {
+                    isBelow = false; maxMin = l; result = this.highs[i - 1];
+                }
+                isFirstTrendBar = true;
+                acceleration = start;
             }
-            v = next;
+
+            result += acceleration * (maxMin - result);
+
+            if (isBelow) {
+                if (result > l) {
+                    isFirstTrendBar = true; isBelow = false;
+                    result = Math.max(h, maxMin); maxMin = l; acceleration = start;
+                }
+            } else {
+                if (result < h) {
+                    isFirstTrendBar = true; isBelow = true;
+                    result = Math.min(l, maxMin); maxMin = h; acceleration = start;
+                }
+            }
+
+            if (!isFirstTrendBar) {
+                if (isBelow) {
+                    if (h > maxMin) { maxMin = h; acceleration = Math.min(acceleration + inc, max); }
+                } else {
+                    if (l < maxMin) { maxMin = l; acceleration = Math.min(acceleration + inc, max); }
+                }
+            }
+
+            if (isBelow) {
+                result = Math.min(result, this.lows[i - 1]);
+                if (i > 1) result = Math.min(result, this.lows[i - 2]);
+            } else {
+                result = Math.max(result, this.highs[i - 1]);
+                if (i > 1) result = Math.max(result, this.highs[i - 2]);
+            }
         }
-        return v;
+        return result;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
