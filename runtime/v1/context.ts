@@ -1029,8 +1029,13 @@ export class Context {
         // 6. Reset Script Metadata (re-declared on the next pass)
         this.scriptMeta = null;
 
-        // 7. Reset live-tick baseline
+        // 7. Reset live-tick baseline, and every per-pass tracker with it.
+        //    `repeatableCalls` goes too: a second pass is a second script run,
+        //    and carrying its snapshots over would restore a site from the
+        //    previous run's inputs.
         this.committedSnapshot = null;
+        this.forgetBarProgress();
+        this.repeatableCalls.clear();
 
         // 8. Reset MTF eval state (keep provided securityData — it's supplied input)
         this.htfStates.clear();
@@ -1386,7 +1391,9 @@ export class Context {
 
     /**
      * Rollback points for the sites in `repeatableCalls`, taken at their first
-     * reach of the bar. Cleared by `setBar`.
+     * reach of the bar, and dropped by `forgetBarProgress` when the bar moves
+     * on or is re-run. The per-entry `bar` is still checked, because a host
+     * may drive the stdlib directly and never call `setBar` at all.
      *
      * ── One slot per BAR, not one per call ─────────────────────────────────
      *
@@ -1429,6 +1436,29 @@ export class Context {
      * repeats on keeps the first reach's value; every bar after it is exact.
      */
     private barStateSnapshot: Map<string, { bar: number; states: Map<string, any> }> = new Map();
+
+    /**
+     * Forgets everything scoped to ONE PASS over the current bar.
+     *
+     * Called at the top of `setBar`, which covers every bar and every re-tick
+     * of a forming one, and again from `restoreSnapshot` so that rolling back
+     * to a baseline restores this too.
+     *
+     * The two order guards are the subtle half. They are NOT part of
+     * `captureSnapshot`, so a rollback restored the broker's position and its
+     * pending orders while leaving the guards saying "already done for this
+     * bar". Tick 2 then skipped both the market fills and the pending-order
+     * matching, and the script saw a position that had already been closed.
+     *
+     * `repeatableCalls` deliberately survives: which sites repeat is learned
+     * about the SCRIPT, not about the bar.
+     */
+    private forgetBarProgress(): void {
+        this.reachedAtBar.clear();
+        this.barStateSnapshot.clear();
+        this._marketOrdersFilledBar = -1;
+        (this as any)._ordersProcessedBar = undefined;
+    }
 
     /** Every state entry belonging to `key` or nested beneath it. */
     private collectCallState(key: string): Map<string, any> {
@@ -1747,6 +1777,9 @@ export class Context {
     }
 
     public setBar(time: number, open: number, high: number, low: number, close: number, volume: number) {
+        // A new bar — or a re-tick of this one — starts with nothing reached.
+        this.forgetBarProgress();
+
         if (this.currentBarIndex === 0) this.firstBarTime = time;
         // Bar timestamps, indexed by bar. `strategy.closedtrades.*` records a
         // trade's entry and exit as TIMES, and the accessors report them as bar
@@ -1959,6 +1992,13 @@ export class Context {
     }
 
     private restoreSnapshot(s: RuntimeSnapshot) {
+        // Part of restoring the baseline: per-bar progress is context state
+        // like any other, and leaving it behind would say the bar had already
+        // been worked on. `applyTick` calls `setBar` straight after this, which
+        // clears it too — this is here so a restore is a complete restore, not
+        // because that one is insufficient.
+        this.forgetBarProgress();
+
         // Re-clone so the baseline stays pristine across repeated ticks.
         this.states = structuredClone(s.states);
 
