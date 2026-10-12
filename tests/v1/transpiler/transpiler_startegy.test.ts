@@ -562,6 +562,9 @@ describe("Broker Emulator: strategy.risk.max_drawdown", () => {
         //   Actually with starting cash 100000 and buying 10 @ 100, let's think bigger.
         // Let me use a simpler scenario: buy 1000 contracts at 100.
         const pine2 = [
+            // The arithmetic below is worked out against a 100,000 account, so it
+            // says so. The engine's default is TradingView's 1,000,000.
+            'strategy("t", initial_capital = 100000)',
             'strategy.risk.max_drawdown(5, "percent")',
             'if n == 0',
             '    strategy.entry("Long", strategy.long, 1000)',
@@ -683,6 +686,9 @@ describe("Broker Emulator: strategy.risk.max_intraday_loss (percent)", () => {
 
     it("should halt when percent-based intraday loss is breached", () => {
         const pine = [
+            // The arithmetic below is worked out against a 100,000 account, so it
+            // says so. The engine's default is TradingView's 1,000,000.
+            'strategy("t", initial_capital = 100000)',
             'strategy.risk.max_intraday_loss(1, "percent")',  // halt at 1% intraday loss
             'if n == 0',
             '    strategy.entry("Long", strategy.long, 100)',

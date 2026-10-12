@@ -116,6 +116,18 @@ export interface InputDef {
  */
 export type ScriptKind = 'study' | 'indicator' | 'strategy' | 'library';
 
+/**
+ * What a strategy starts with when `strategy()` does not say.
+ *
+ * TradingView's own figure, read off its own output: the golden strategy
+ * export passes no `initial_capital` and its `strategy.equity` reads exactly
+ * 1000000 on every bar before the first fill
+ * (conformance/v5/golden/harness_strategy.BTCUSDT.1D.log). The engine used to
+ * start at 100000, which put every equity-derived figure — `netprofit_percent`,
+ * `grossprofit_percent` — out by a factor of ten.
+ */
+export const DEFAULT_INITIAL_CAPITAL = 1_000_000;
+
 export interface ScriptMeta {
     kind: ScriptKind;
     title: string;
@@ -888,7 +900,7 @@ export class Context {
         const at = this.barTimes.indexOf(time);
         return at < 0 ? NaN : at;
     }
-    public cash: number = 100000; 
+    public cash: number = DEFAULT_INITIAL_CAPITAL;
 
     /**
      * The equity the strategy started with, for `strategy.initial_capital`.
@@ -896,8 +908,10 @@ export class Context {
      * Held separately from `cash`, which moves with every fill — the two are
      * equal only until the first trade closes, and the difference between them
      * IS the realised profit.
+     *
+     * Set from `strategy(initial_capital = ...)` by declareScript().
      */
-    public initialCapital: number = 100000;
+    public initialCapital: number = DEFAULT_INITIAL_CAPITAL;
     public trades: Trade[] = [];
     public orders: any[] = [];
 
@@ -997,7 +1011,8 @@ export class Context {
         // 5. Reset Strategy State
         this.position = { size: 0, avgPrice: 0 };
         this.barTimes = [];
-        this.cash = 100000;
+        this.cash = DEFAULT_INITIAL_CAPITAL;
+        this.initialCapital = DEFAULT_INITIAL_CAPITAL;
         this.trades = [];
         this.orders = [];
 
@@ -1059,6 +1074,19 @@ export class Context {
                 calc_on_order_fills: Boolean(arg('calc_on_order_fills')),
                 currency: arg('currency') !== undefined ? String(arg('currency')) : undefined,
             };
+
+            // The broker's starting balance, which until now was read from
+            // `strategy()` and thrown away — a script declaring
+            // `initial_capital = 1000` was still backtested on 1,000,000, and
+            // every percentage it reported was wrong by the ratio.
+            //
+            // `cash` moves with the first fill, so it can only be seeded here,
+            // before the script's first bar.
+            const capital = arg('initial_capital');
+            if (capital !== undefined && Number.isFinite(Number(capital))) {
+                this.initialCapital = Number(capital);
+                this.cash = Number(capital);
+            }
         }
     }
 
