@@ -67,6 +67,22 @@ const ABS_TOL = 1e-9;
 /** A file that compares fewer columns than this has silently stopped testing. */
 const MIN_COLUMNS = 5;
 
+/**
+ * Columns whose value is constant BY CONSTRUCTION, exempt from that guard.
+ *
+ * `nested_loops` counts the pairs of `for i = 0 to 4` / `for j = 0 to 4` where
+ * `close[i] > close[j]`. For distinct closes exactly half of the twenty ordered
+ * off-diagonal pairs satisfy `>`, so the answer is 10 on every bar after the
+ * history fills — and TradingView's export says 10 on every bar too.
+ *
+ * The guard is RIGHT that matching a constant proves nothing; the probe is what
+ * is weak. It is exempted rather than rewritten because rewriting it would
+ * invalidate every export already collected with it, for a column that is
+ * agreeing. Worth strengthening — comparing `close[i] > open[j]`, say — the
+ * next time the harnesses are revised and re-collected.
+ */
+const CONSTANT_BY_CONSTRUCTION = new Set(["nested_loops"]);
+
 /** A column compared at fewer points than this proves nothing. */
 const MIN_POINTS = 50;
 
@@ -478,10 +494,14 @@ function describeComparison(
           `${title}: TradingView reported a value on only ${compared} bars after ` +
           `the ${warmup}-bar warm-up — too few to conclude anything`,
         ).toBeGreaterThanOrEqual(MIN_POINTS);
-        expect(
-          seen.size,
-          `${title}: TradingView's column is constant, so matching it proves nothing`,
-        ).toBeGreaterThan(1);
+        if (!CONSTANT_BY_CONSTRUCTION.has(title)) {
+          expect(
+            seen.size,
+            `${title}: TradingView's column is constant, so matching it proves ` +
+            `nothing. If it is constant BY CONSTRUCTION, add it to ` +
+            `CONSTANT_BY_CONSTRUCTION with the reason.`,
+          ).toBeGreaterThan(1);
+        }
 
         expect(
           diffs.length,
