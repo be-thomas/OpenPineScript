@@ -1035,7 +1035,9 @@ export class Context {
         //    previous run's inputs.
         this.committedSnapshot = null;
         this.forgetBarProgress();
-        this.repeatableCalls.clear();
+        this.everReached.clear();
+        this.statefulSites.clear();
+        this.stateKeysBySite.clear();
 
         // 8. Reset MTF eval state (keep provided securityData — it's supplied input)
         this.htfStates.clear();
@@ -1208,14 +1210,27 @@ export class Context {
         const siteKey = userFrame ? "" : this.callStack.join("/");
         if (siteKey) {
             if (this.reachedAtBar.get(siteKey) === this.currentBarIndex) {
-                this.repeatableCalls.add(siteKey);
                 this.restoreCallState(siteKey);
             } else {
                 this.reachedAtBar.set(siteKey, this.currentBarIndex);
-                // Snapshot only what is worth snapshotting: a site already
-                // known to repeat, or one holding no state yet, where the
-                // rollback point is "absent" and costs nothing to record.
-                if (this.repeatableCalls.has(siteKey) || !this.states.has(siteKey)) {
+                // Every site that owns series state gets a rollback point on
+                // every bar, whether or not it has ever repeated.
+                //
+                // An earlier version took one only after a site had been SEEN
+                // to repeat, to save the clone. That left a site which runs
+                // singly for a while and only later starts repeating — a loop
+                // whose bound grows — with no rollback point on the bar it
+                // first repeats on. For a recursive state (`ema`, `rma`, `cum`,
+                // `sar`) that bar's extra advance never washes out, so the
+                // error was permanent rather than one bar wide.
+                //
+                // A site that has run and never asked for state is skipped,
+                // which is what makes this affordable: the stateless builtins
+                // are the ones called in bulk.
+                if (!this.everReached.has(siteKey)) {
+                    this.everReached.add(siteKey);
+                    this.snapshotCallState(siteKey, id);
+                } else if (this.statefulSites.has(siteKey)) {
                     this.snapshotCallState(siteKey, id);
                 }
             }
@@ -1376,8 +1391,27 @@ export class Context {
         return false;
     }
 
-    /** Call sites seen to run more than once on one bar. */
-    private repeatableCalls: Set<string> = new Set();
+    /** Call sites that have run at least once, ever. */
+    private everReached: Set<string> = new Set();
+
+    /**
+     * Call sites that own series state, learned the first time one asks for it.
+     *
+     * A site that has run and never asked — `hl2`, `math.abs`, `array.get` —
+     * has nothing to roll back, so it is skipped entirely. Without this every
+     * stateless call took the snapshot path on every bar.
+     */
+    private statefulSites: Set<string> = new Set();
+
+    /**
+     * State keys at or beneath each call site, so a rollback does not have to
+     * scan every state in the run to find the handful it owns.
+     *
+     * A built-in may call another through `ctx.call` — `ta.stoch` delegates to
+     * `ta.highest` — and the nested state hangs below the outer site's key, so
+     * rolling the outer one back has to take the inner ones with it.
+     */
+    private stateKeysBySite: Map<string, Set<string>> = new Map();
 
     /**
      * The bar each call site was last reached on.
@@ -1421,19 +1455,8 @@ export class Context {
      * thing from the outside and does not require every stateful built-in to
      * grow a re-entry path of its own.
      *
-     * ── Why this is learned rather than declared ───────────────────────────
-     *
-     * Snapshotting every stateful site on every bar would mean cloning each
-     * one's buffer 2,500 times over a chart, for the sake of the handful that
-     * are ever reached twice. So a site is snapshotted only once it has been
-     * SEEN to repeat — plus the free case where it holds no state yet, which
-     * is how the very first repeat is caught: a loop body runs on the bar it
-     * first executes, and on that bar the state does not exist, so the
-     * rollback point is "absent" and costs nothing.
-     *
-     * The gap that leaves is a site that runs singly for a while and only
-     * later repeats — `for i = 0 to n` where `n` starts at 0. The bar it first
-     * repeats on keeps the first reach's value; every bar after it is exact.
+     * Which sites get one, and why not all of them, is at the call site in
+     * `call()`.
      */
     private barStateSnapshot: Map<string, { bar: number; states: Map<string, any> }> = new Map();
 
@@ -1463,8 +1486,8 @@ export class Context {
     /** Every state entry belonging to `key` or nested beneath it. */
     private collectCallState(key: string): Map<string, any> {
         const out = new Map<string, any>();
-        for (const [k, v] of this.states) {
-            if (k === key || k.startsWith(`${key}/`)) out.set(k, v);
+        for (const k of this.stateKeysBySite.get(key) ?? []) {
+            if (this.states.has(k)) out.set(k, this.states.get(k));
         }
         return out;
     }
@@ -1497,14 +1520,24 @@ export class Context {
         // A rollback point from an earlier bar is not a rollback point for
         // this one: the bar it belonged to has been committed.
         if (!saved || saved.bar !== this.currentBarIndex) return;
-        for (const k of [...this.states.keys()]) {
-            if (k === key || k.startsWith(`${key}/`)) this.states.delete(k);
-        }
+        for (const k of this.stateKeysBySite.get(key) ?? []) this.states.delete(k);
         for (const [k, v] of saved.states) this.states.set(k, structuredClone(v));
     }
 
     public getPersistentState<T>(initFn: () => T): T {
         const key = this.callStack.length > 0 ? this.callStack.join("/") : "global";
+
+        // Index the key under its own site and every site it nests inside, so
+        // `collectCallState` is a lookup rather than a scan.
+        let prefix = "";
+        for (const frame of this.callStack) {
+            prefix = prefix ? `${prefix}/${frame}` : frame;
+            this.statefulSites.add(prefix);
+            let owned = this.stateKeysBySite.get(prefix);
+            if (!owned) { owned = new Set(); this.stateKeysBySite.set(prefix, owned); }
+            owned.add(key);
+        }
+
         if (!this.states.has(key)) {
             this.states.set(key, initFn());
         }
