@@ -8,6 +8,8 @@ export class NaiveTA {
     private volume: number[] = [];
     private highs: number[] = [];
     private lows: number[] = [];
+    /** Bar timestamps, for the one indicator that needs session boundaries. */
+    private times: number[] = [];
 
     // State Map for recursive functions (EMA, RMA)
     private state: Map<string, number> = new Map();
@@ -21,11 +23,13 @@ export class NaiveTA {
      */
     private seeds: Map<string, number[]> = new Map();
 
-    add(price: number, vol: number, high: number = price, low: number = price) {
+    add(price: number, vol: number, high: number = price, low: number = price,
+        time: number = NaN) {
         this.history.push(price);
         this.volume.push(vol);
         this.highs.push(high);
         this.lows.push(low);
+        this.times.push(time);
     }
 
     private getSlice(length: number, offset: number = 0): number[] {
@@ -192,9 +196,28 @@ export class NaiveTA {
         return NaN;
     }
 
+    /**
+     * VWAP, accumulated from the start of the current SESSION — not from the
+     * start of the chart. A caller that supplies no timestamps gets one
+     * session covering everything, which is how this oracle used to behave
+     * unconditionally and why it agreed with an engine that was also wrong.
+     */
     vwap(): number {
+        const day = (t: number): number | null =>
+            !Number.isFinite(t) || t === 0 ? null
+                : Date.UTC(new Date(t).getUTCFullYear(), new Date(t).getUTCMonth(),
+                           new Date(t).getUTCDate());
+
+        let from = 0;
+        for (let i = 1; i < this.times.length; i++) {
+            const today = day(this.times[i]);
+            if (today === null) continue;
+            const previous = day(this.times[i - 1]);
+            if (previous === null || previous !== today) from = i;
+        }
+
         let sVol = 0; let sSrcVol = 0;
-        for (let i = 0; i < this.history.length; i++) {
+        for (let i = from; i < this.history.length; i++) {
             sVol += this.volume[i];
             sSrcVol += this.history[i] * this.volume[i];
         }

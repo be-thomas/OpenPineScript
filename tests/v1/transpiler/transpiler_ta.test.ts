@@ -17,6 +17,18 @@ function setupEngine(pine: string, ctx: Context) {
 }
 
 describe("transpiler ta differential testing", () => {
+    /**
+     * Hourly bars that cross midnight UTC between bar 2 and bar 3.
+     *
+     * `vwap` restarts every session, so a run whose bars all fall on one day
+     * never exercises the restart. These used to be fed `i` as the timestamp,
+     * which put the whole run inside the epoch's first millisecond and made
+     * the comparison vacuous for that indicator.
+     */
+    const T0 = Date.UTC(2021, 0, 1, 21, 0, 0);
+    const HOUR = 60 * 60 * 1000;
+    const timeAt = (i: number) => T0 + i * HOUR;
+
     const data = [
         { o: 10, h: 12, l: 9,  c: 11, v: 100 },
         { o: 11, h: 15, l: 11, c: 14, v: 150 },
@@ -36,9 +48,9 @@ describe("transpiler ta differential testing", () => {
         const naive = new NaiveTA();
 
         data.forEach((d, i) => {
-            ctx.setBar(i, d.o, d.h, d.l, d.c, d.v);
+            ctx.setBar(timeAt(i), d.o, d.h, d.l, d.c, d.v);
             exec();
-            naive.add(d.c, d.v, d.h, d.l);
+            naive.add(d.c, d.v, d.h, d.l, timeAt(i));
             if (i >= len - 1) {
                 assert.strictEqual(fix(ctx.getSeries(`${OPSV2}res`, 0)), fix(naive.sma(len)), `SMA Mismatch at bar ${i}`);
             }
@@ -53,8 +65,8 @@ describe("transpiler ta differential testing", () => {
         const naive = new NaiveTA(); 
 
         data.forEach((d, i) => {
-            ctx.setBar(i, d.o, d.h, d.l, d.c, d.v);
-            naive.add(d.c, d.v, d.h, d.l);
+            ctx.setBar(timeAt(i), d.o, d.h, d.l, d.c, d.v);
+            naive.add(d.c, d.v, d.h, d.l, timeAt(i));
             exec();
             
             // CRITICAL: Calculate naive ATR every bar so the state Map persists
@@ -84,13 +96,13 @@ describe("transpiler ta differential testing", () => {
         const sourceHistory: number[] = [];
 
         data.forEach((d, i) => {
-            ctx.setBar(i, d.o, d.h, d.l, d.c, d.v);
+            ctx.setBar(timeAt(i), d.o, d.h, d.l, d.c, d.v);
             exec();
             
             const cond = d.c > d.o;
             conditionHistory.push(cond);
             sourceHistory.push(d.c);
-            naive.add(d.c, d.v, d.h, d.l);
+            naive.add(d.c, d.v, d.h, d.l, timeAt(i));
 
             assert.strictEqual(fix(ctx.getSeries(`${OPSV2}vw`, 0)), fix(naive.valuewhen(conditionHistory, sourceHistory, 0)), `ValueWhen mismatch at bar ${i}`);
             assert.strictEqual(fix(ctx.getSeries(`${OPSV2}bs`, 0)), fix(naive.barssince(conditionHistory)), `BarsSince mismatch at bar ${i}`);
@@ -111,9 +123,9 @@ describe("transpiler ta differential testing", () => {
         const naive = new NaiveTA();
 
         data.forEach((d, i) => {
-            ctx.setBar(i, d.o, d.h, d.l, d.c, d.v);
+            ctx.setBar(timeAt(i), d.o, d.h, d.l, d.c, d.v);
             exec();
-            naive.add(d.c, d.v, d.h, d.l);
+            naive.add(d.c, d.v, d.h, d.l, timeAt(i));
 
             if (i >= len - 1) {
                 assert.strictEqual(fix(ctx.getSeries(`${OPSV2}lr`, 0)), fix(naive.linreg(len, 0)), `Linreg mismatch at bar ${i}`);
@@ -130,9 +142,9 @@ describe("transpiler ta differential testing", () => {
         const naive = new NaiveTA();
 
         data.forEach((d, i) => {
-            ctx.setBar(i, d.o, d.h, d.l, d.c, d.v);
+            ctx.setBar(timeAt(i), d.o, d.h, d.l, d.c, d.v);
             exec();
-            naive.add(d.c, d.v, d.h, d.l);
+            naive.add(d.c, d.v, d.h, d.l, timeAt(i));
 
             if (i >= len - 1) {
                 assert.strictEqual(fix(ctx.getSeries(`${OPSV2}hib`, 0)), fix(naive.highestbars(len)), `HiBars mismatch at bar ${i}`);

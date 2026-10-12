@@ -1,4 +1,5 @@
 import { Context } from "../context";
+import { opensDay } from "../sessions";
 
 /**
  * ta.ts - Production Grade (Fully Dynamic & Safe)
@@ -753,18 +754,35 @@ export function atr(ctx: Context, lengthInput: any): number {
 }
 
 /**
- * vwap: Cumulative Volume Weighted Average Price (Sessionless)
+ * `ta.vwap(source)` — Volume Weighted Average Price.
+ *
+ * The accumulation restarts at the beginning of every SESSION; it is not
+ * cumulative over the chart. That is the whole character of the indicator, and
+ * getting it wrong is invisible on a short export and badly wrong on a long
+ * one — the old sessionless version drifted further from TradingView the more
+ * history it was given.
+ *
+ * On a daily or higher timeframe every bar is its own session, so this returns
+ * `source` unchanged. That is not a degenerate case to work around: TradingView
+ * does the same, exactly, on all 2,475 daily bars of
+ * conformance/v5/golden/harness_state.BTCUSDT.1D.log. VWAP is an intraday
+ * indicator, and on a daily chart there is nothing for it to average.
+ *
+ * ../sessions.ts owns the boundary, shared with `session.isfirstbar`.
+ *
  * @returns series float
  */
 export function vwap(ctx: Context, sourceInput: any): number {
     const source = val(sourceInput);
     const volume = (ctx as any).volume !== undefined ? val((ctx as any).volume) : 0;
-    
+
     const state = ctx.getPersistentState<VwapState>(() => ({ sumVol: 0, sumSrcVol: 0 }));
-    
+
+    if (opensDay(ctx)) { state.sumVol = 0; state.sumSrcVol = 0; }
+
     state.sumVol += volume;
     state.sumSrcVol += source * volume;
-    
+
     if (state.sumVol === 0) return NaN;
     return state.sumSrcVol / state.sumVol;
 }

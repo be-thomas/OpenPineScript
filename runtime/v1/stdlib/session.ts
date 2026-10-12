@@ -46,26 +46,15 @@
  *
  * ── Day boundaries ──────────────────────────────────────────────────────────
  *
- * "the day's session" is a calendar day in the EXCHANGE's timezone, and this
- * engine has no timezone. It compares UTC dates, matching ./time.ts, whose
- * header states the same convention and the same remedy: a host that supplies
- * bar timestamps already shifted to the exchange timezone gets agreement.
- *
- * On daily and higher timeframes every bar is a session in its own right, so
- * both edge flags are true — which falls out of the date comparison rather than
- * being special-cased.
+ * `opensDay` in ../sessions.ts owns where a day starts, and its header states
+ * the convention. It is shared with `ta.vwap`, which restarts its accumulation
+ * on the same boundary — the two must not drift apart.
  *
  * v5-only: the registry split in ./index.ts keeps the namespace out of the
  * v1–v4 views.
  */
 import { Context } from "../context";
-
-/** The UTC calendar day a timestamp falls on, or null when there is none. */
-function dayOf(time: number): number | null {
-    if (!Number.isFinite(time) || time === 0) return null;
-    const d = new Date(time);
-    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-}
+import { opensDay } from "../sessions";
 
 /**
  * Is the chart's timeframe intraday?
@@ -79,16 +68,6 @@ function isIntraday(ctx: Context): boolean {
     const r = String(ctx.resolution).trim();
     const n = parseInt(r, 10);
     return Number.isFinite(n) && String(n) === r;
-}
-
-/** Is this bar on a different calendar day from the one before it? */
-function opensDay(ctx: Context): boolean {
-    const today = dayOf(ctx.time);
-    if (today === null) return false;
-    // Bar 0 has no predecessor, and it does open the first session on record.
-    if (ctx.currentBarIndex === 0) return true;
-    const previous = dayOf(ctx.getSeries("opsv2_time", 1));
-    return previous === null || previous !== today;
 }
 
 export const session = {
