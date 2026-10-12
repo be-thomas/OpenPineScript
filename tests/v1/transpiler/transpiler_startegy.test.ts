@@ -406,7 +406,10 @@ describe("Broker Emulator: strategy.risk.allow_entry_in", () => {
             '    strategy.entry("Short", strategy.short)',
         ].join('\n');
 
+        // The last entry is placed on n=1 and fills at the OPEN of n=2, so the
+        // run carries a third bar for it to fill on.
         const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 },
             { o: 100, h: 105, l: 95, c: 100 },
             { o: 100, h: 105, l: 95, c: 100 },
         ]);
@@ -431,7 +434,10 @@ describe("Broker Emulator: strategy.risk.max_position_size", () => {
             '    strategy.entry("E2", strategy.long, 5)',  // wants 5 more, only 1 allowed
         ].join('\n');
 
+        // The last entry is placed on n=1 and fills at the OPEN of n=2, so the
+        // run carries a third bar for it to fill on.
         const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 },
             { o: 100, h: 105, l: 95, c: 100 },
             { o: 100, h: 105, l: 95, c: 100 },
         ]);
@@ -448,7 +454,10 @@ describe("Broker Emulator: strategy.risk.max_position_size", () => {
             '    strategy.entry("E2", strategy.long, 1)',  // already at max
         ].join('\n');
 
+        // The last entry is placed on n=1 and fills at the OPEN of n=2, so the
+        // run carries a third bar for it to fill on.
         const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 },
             { o: 100, h: 105, l: 95, c: 100 },
             { o: 100, h: 105, l: 95, c: 100 },
         ]);
@@ -465,7 +474,10 @@ describe("Broker Emulator: strategy.risk.max_position_size", () => {
             '    strategy.entry("Short", strategy.short, 1)',  // reverses: closes long, opens short
         ].join('\n');
 
+        // The reversing entry is placed on n=1 and fills at the OPEN of n=2, so
+        // the run carries a third bar for it to fill on.
         const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95, c: 100 },
             { o: 100, h: 105, l: 95, c: 100 },
             { o: 100, h: 105, l: 95, c: 100 },
         ]);
@@ -657,6 +669,11 @@ describe("Broker Emulator: strategy.risk.max_cons_loss_days", () => {
         // Day 1: loss
         // Day 2: win → resets counter
         // Day 3: loss → counter=1, NOT halted (need 2 consecutive)
+        //
+        // Each order fills at the NEXT bar's open, so the prices below are the
+        // ones the order placed on the bar before them fills at. This data has
+        // every open equal to the previous close, so the three P&Ls are the
+        // same as when the broker filled on the placing bar: -10, +15, -10.
         const day1_open  = Date.UTC(2026, 2, 10, 10, 0);
         const day1_close = Date.UTC(2026, 2, 10, 16, 0);
         const day2_open  = Date.UTC(2026, 2, 11, 10, 0);
@@ -665,12 +682,13 @@ describe("Broker Emulator: strategy.risk.max_cons_loss_days", () => {
         const day3_close = Date.UTC(2026, 2, 12, 16, 0);
 
         const ctx = runStrategy(pine, [
-            { o: 100, h: 105, l: 95,  c: 100, t: day1_open  },  // n=0: enter @ 100
-            { o: 100, h: 100, l: 85,  c: 90,  t: day1_close },  // n=1: close @ 90 (loss)
-            { o: 90,  h: 110, l: 85,  c: 90,  t: day2_open  },  // n=2: enter @ 90
-            { o: 90,  h: 110, l: 85,  c: 105, t: day2_close },  // n=3: close @ 105 (win!)
-            { o: 105, h: 110, l: 95,  c: 105, t: day3_open  },  // n=4: enter @ 105
-            { o: 105, h: 105, l: 90,  c: 95,  t: day3_close },  // n=5: close @ 95 (loss, but only 1 consecutive)
+            { o: 100, h: 105, l: 95,  c: 100, t: day1_open  },  // n=0: places the entry
+            { o: 100, h: 100, l: 85,  c: 90,  t: day1_close },  // n=1: fills it @ 100; places the close
+            { o: 90,  h: 110, l: 85,  c: 90,  t: day2_open  },  // n=2: fills @ 90 (loss); places the entry
+            { o: 90,  h: 110, l: 85,  c: 105, t: day2_close },  // n=3: fills @ 90; places the close
+            { o: 105, h: 110, l: 95,  c: 105, t: day3_open  },  // n=4: fills @ 105 (win!); places the entry
+            { o: 105, h: 105, l: 90,  c: 95,  t: day3_close },  // n=5: fills @ 105; places the close
+            { o: 95,  h: 100, l: 90,  c: 95,  t: day3_close },  // n=6: fills @ 95 (loss, only 1 consecutive)
         ]);
 
         assert.strictEqual(ctx.trades.length, 3, "Three trades total");
@@ -704,5 +722,88 @@ describe("Broker Emulator: strategy.risk.max_intraday_loss (percent)", () => {
 
         assert.strictEqual(ctx.position.size, 0, "Liquidated");
         assert.strictEqual((ctx as any)._riskState.is_halted, true);
+    });
+});
+// ============================================================
+// When a market order fills, and at what price
+// ============================================================
+
+describe("Broker Emulator: market orders fill at the next bar's open", () => {
+
+    it("the placing bar still sees the position it had", () => {
+        const pine = [
+            'if n == 0',
+            '    strategy.entry("L", strategy.long, 1)',
+            'sz = strategy.position_size',
+        ].join('\n');
+
+        const sizes: number[] = [];
+        const bars = [
+            { o: 100, h: 105, l: 95,  c: 100 },
+            { o: 110, h: 115, l: 105, c: 112 },
+            { o: 112, h: 118, l: 110, c: 117 },
+        ];
+        const js = transpile(pine).replace(/\blet\b/g, "var ");
+        const ctx = new Context();
+        const exec = compile(js, ctx, Object.create(null));
+        bars.forEach((b, i) => {
+            ctx.setBar(i * 1000, b.o, b.h, b.l, b.c, 1000);
+            exec();
+            sizes.push(Number(ctx.getSeries("opsv2_sz", 0)));
+            ctx.finalizeBar();
+        });
+
+        // Placed on bar 0, so bar 0 reads 0 and bar 1 reads 1 — not the other
+        // way round, which is what filling on the placing bar gave.
+        assert.deepStrictEqual(sizes, [0, 1, 1]);
+    });
+
+    it("and at that bar's open, not the placing bar's close", () => {
+        const pine = [
+            'if n == 0',
+            '    strategy.entry("L", strategy.long, 1)',
+        ].join('\n');
+
+        // open[1] is 110 and close[0] is 100, so the two candidate fill prices
+        // are far enough apart to tell apart.
+        const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95,  c: 100 },
+            { o: 110, h: 115, l: 105, c: 112 },
+        ]);
+
+        assert.strictEqual(ctx.position.avgPrice, 110);
+    });
+
+    it("a close fills at the next open too, and that sets the trade's P&L", () => {
+        const pine = [
+            'if n == 0',
+            '    strategy.entry("L", strategy.long, 1)',
+            'if n == 1',
+            '    strategy.close("L")',
+        ].join('\n');
+
+        const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95,  c: 100 },   // places the entry
+            { o: 110, h: 115, l: 105, c: 112 },   // fills it @ 110; places the close
+            { o: 120, h: 125, l: 115, c: 122 },   // fills that @ 120
+        ]);
+
+        assert.strictEqual(ctx.position.size, 0);
+        assert.strictEqual(ctx.trades.length, 1);
+        assert.strictEqual(ctx.trades[0].pnl, 10);   // 120 - 110, not 112 - 100
+    });
+
+    it("an order still outstanding when the data ends never fills", () => {
+        const pine = [
+            'if n == 1',
+            '    strategy.entry("L", strategy.long, 1)',
+        ].join('\n');
+
+        const ctx = runStrategy(pine, [
+            { o: 100, h: 105, l: 95,  c: 100 },
+            { o: 110, h: 115, l: 105, c: 112 },
+        ]);
+
+        assert.strictEqual(ctx.position.size, 0, "no bar left to fill it at");
     });
 });

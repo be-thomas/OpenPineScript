@@ -325,6 +325,57 @@ export function order(
 }
 
 /**
+ * A market order the script has placed but the broker has not filled yet.
+ *
+ * ── Why market orders do not fill on the bar that places them ───────────────
+ *
+ * TradingView executes a market order at the OPEN of the bar AFTER the one the
+ * script placed it on, and `strategy.position_size` read on the placing bar
+ * still reports the position as it was. Its own output says so: in
+ * conformance/v5/golden/harness_strategy.BTCUSDT.1D.log the entry signal fires
+ * on bar 400 while `position_size` stays 0, turns 1 on bar 401, and `equity`
+ * moves by exactly `close[401] - open[401]` — the fill is at that bar's open,
+ * to the last decimal.
+ *
+ * The engine used to fill at `close` on the placing bar, which made every
+ * backtest one bar early AND filled it at the wrong price. Both errors
+ * flattered a signal-following strategy, because the bar a crossover fires on
+ * is by construction a bar that already moved.
+ *
+ * Plain data, not a closure: Context snapshots itself with `structuredClone`
+ * for the live-tick baseline, and a queued order has to survive that.
+ */
+export interface MarketOrder {
+    kind: "entry" | "close";
+    id: string;
+    direction?: string;
+    qty?: number;
+    comment?: string;
+}
+
+/**
+ * Fills every market order placed on the previous bar, at this bar's open.
+ *
+ * Called from `Context.setBar`, which is the only moment that is both after
+ * the open is known and before the script runs.
+ */
+export function fillMarketOrders(ctx: Context): void {
+    const queue = ctx.marketOrders;
+    if (queue.length === 0) return;
+    ctx.marketOrders = [];
+
+    const price = ctx.open;
+    for (const o of queue) {
+        if (o.kind === "entry") {
+            entry(ctx, o.id, o.direction!, o.qty, Number.NaN, Number.NaN,
+                  "", oca.none, o.comment ?? "", undefined, "", price);
+        } else {
+            closeAt(ctx, o.comment ?? "", price);
+        }
+    }
+}
+
+/**
  * Enters a position.
  * If we are in the opposite position, it closes it first (reverses).
  */
@@ -357,6 +408,16 @@ export function entry(
 
     const dir = direction;
     void comment; void alert_message; void oca_name; void oca_type;
+
+    // No fill price means this came from the SCRIPT, and a market order waits
+    // for the next bar's open. A price means the broker is filling it now —
+    // `fillMarketOrders` draining this queue, `processPendingOrders` matching a
+    // limit or stop, or a risk rule liquidating — and those execute in place.
+    if (overridePrice === undefined) {
+        ctx.marketOrders.push({ kind: "entry", id, direction: dir, qty: val(qty), comment });
+        return;
+    }
+
     const rs = syncRiskState(ctx);
     if (rs.is_halted) return;
     if (checkRiskHalt(ctx, rs)) return;
@@ -390,7 +451,7 @@ export function entry(
     if (ctx.position.size !== 0) {
         const isCurrentLong = ctx.position.size > 0;
         if (isLong !== isCurrentLong) {
-            close_all(ctx, `Reverse for ${id}`);
+            closeAt(ctx, `Reverse for ${id}`, currentPrice);
         }
     }
 
@@ -438,9 +499,23 @@ export function close_all(
 ) {
     if (!gated(when)) return;
     void alert_message;
+    // Queued, not filled — see MarketOrder. A caller that already knows the
+    // fill price calls `closeAt` instead.
+    ctx.marketOrders.push({ kind: "close", id: comment, comment });
+}
+
+/**
+ * Flattens the position at a KNOWN price, now.
+ *
+ * The execution half of `close_all`, split out so the broker's own paths —
+ * draining the market queue at the open, reversing inside an entry, a risk
+ * rule liquidating at a computed level — are not routed back through the
+ * queue they are supposed to be servicing.
+ */
+export function closeAt(ctx: Context, comment: string, price: number): void {
     if (ctx.position.size === 0) return;
 
-    const currentPrice = ctx.close;
+    const currentPrice = price;
     const qty = Math.abs(ctx.position.size);
     const isLong = ctx.position.size > 0;
 
@@ -638,6 +713,19 @@ function applyExitOCA(exits: Map<string, PendingExit>, filledExit: PendingExit):
 /**
  * Processes pending orders against the current bar's High and Low.
  * Called by the runtime engine after script evaluation on each bar.
+ *
+ * ── A known difference from TradingView, not yet measured ───────────────────
+ *
+ * A limit or stop order placed during bar N is matched here against bar N's
+ * OWN range. TradingView starts matching on bar N+1, the same bar a market
+ * order would fill on — so an order whose level the placing bar happens to
+ * touch fills here and not there.
+ *
+ * Market orders were corrected because TradingView's own output pinned them
+ * (see MarketOrder). This one has no golden data behind it yet: the strategy
+ * harness places market orders only. It is left as it is rather than changed
+ * on reasoning alone, and stays under R-13 in dev-docs/04-skipped-restrictions.md
+ * until a harness that uses `strategy.exit` brackets is collected.
  */
 export function processPendingOrders(ctx: Context, high: number, low: number): void {
     // Once per bar. `Context.finalizeBar` calls this for every run, and the
@@ -671,10 +759,10 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
                 : rs.start_equity - rs.max_intraday_loss;
             const liquidationPrice = ctx.position.avgPrice + (targetEquity - ctx.cash) / ctx.position.size;
 
-            const originalClose = ctx.close;
-            ctx.close = liquidationPrice;
-            close_all(ctx, "Max Intraday Loss Breach");
-            ctx.close = originalClose;
+            // Liquidated AT the level that breaches the limit, not at the
+            // close. This used to be done by assigning over `ctx.close` for
+            // the duration of the call, which `closeAt` makes unnecessary.
+            closeAt(ctx, "Max Intraday Loss Breach", liquidationPrice);
 
             cancel_all(ctx);
             return;
@@ -684,14 +772,14 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
     // Global risk checks
     if (checkRiskHalt(ctx, rs)) {
         cancel_all(ctx);
-        if (ctx.position.size !== 0) close_all(ctx, "Risk Halt");
+        if (ctx.position.size !== 0) closeAt(ctx, "Risk Halt", ctx.close);
         return;
     }
 
     // If halted from previous bar, block everything
     if (rs.is_halted) {
         cancel_all(ctx);
-        if (ctx.position.size !== 0) close_all(ctx, "Risk Halt");
+        if (ctx.position.size !== 0) closeAt(ctx, "Risk Halt", ctx.close);
         return;
     }
 

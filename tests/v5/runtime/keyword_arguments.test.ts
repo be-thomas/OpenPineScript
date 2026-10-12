@@ -59,6 +59,13 @@ describe("nothing is dropped", () => {
   });
 });
 
+/**
+ * A market order fills at the OPEN of the bar after the one that placed it, so
+ * an order placed on every bar of an N-bar run is filled N-1 times — the last
+ * one is still outstanding when the data runs out. These runs carry the extra
+ * bar rather than lowering the expectation, so the assertion still reads as
+ * "one fill per order".
+ */
 describe("`when` gates a strategy order", () => {
   it("false means no order at all", () => {
     const ctx = run(STRAT + 'strategy.entry("L", strategy.long, when = false)\n', 3);
@@ -66,12 +73,12 @@ describe("`when` gates a strategy order", () => {
   });
 
   it("true places it", () => {
-    const ctx = run(STRAT + 'strategy.entry("L", strategy.long, when = true)\n', 3);
+    const ctx = run(STRAT + 'strategy.entry("L", strategy.long, when = true)\n', 4);
     expect(ctx.position.size).toBe(3);
   });
 
   it("absent means true, which is the documented default", () => {
-    const ctx = run(STRAT + 'strategy.entry("L", strategy.long)\n', 3);
+    const ctx = run(STRAT + 'strategy.entry("L", strategy.long)\n', 4);
     expect(ctx.position.size).toBe(3);
   });
 

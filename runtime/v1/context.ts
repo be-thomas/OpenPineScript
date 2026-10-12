@@ -3,7 +3,7 @@ import { Series, SeriesSnapshot } from "./Series";
 import { REGISTRY, viewFor } from "./stdlib";
 import { MATRIX_TAG } from "./stdlib/matrix";
 import { aggregate, periodIndex, specSeconds } from "./timeframes";
-import { processPendingOrders } from "./stdlib/strategy";
+import { processPendingOrders, fillMarketOrders, MarketOrder } from "./stdlib/strategy";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 
 // Define Trade Types
@@ -155,6 +155,7 @@ interface RuntimeSnapshot {
     cash: number;
     trades: Trade[];
     orders: any[];
+    marketOrders: MarketOrder[];
     pendingEntries: Map<string, any>;
     pendingExits: Map<string, any>;
     riskState: any;
@@ -915,6 +916,14 @@ export class Context {
     public trades: Trade[] = [];
     public orders: any[] = [];
 
+    /**
+     * Market orders placed on this bar, waiting for the next bar's open.
+     *
+     * `setBar` drains it; see MarketOrder in ./stdlib/strategy.ts for why a
+     * market order does not fill on the bar that places it.
+     */
+    public marketOrders: MarketOrder[] = [];
+
     // --- INPUT SYSTEM ---
     public inputDefs: InputDef[] = []; 
     public userInputs: Record<string, any> = {}; 
@@ -1015,6 +1024,7 @@ export class Context {
         this.initialCapital = DEFAULT_INITIAL_CAPITAL;
         this.trades = [];
         this.orders = [];
+        this.marketOrders = [];
 
         // 6. Reset Script Metadata (re-declared on the next pass)
         this.scriptMeta = null;
@@ -1620,7 +1630,23 @@ export class Context {
         this.new_var("opsv2_close", close);
         this.new_var("opsv2_volume", volume);
         this.new_var("opsv2_bar_index", this.currentBarIndex);
+
+        // 3. Fill the market orders the previous bar placed.
+        //
+        // This is the only moment that is both AFTER this bar's open is known
+        // and BEFORE the script reads `strategy.position_size`, which is what
+        // makes it the right place — see MarketOrder in ./stdlib/strategy.ts.
+        //
+        // Guarded per bar because a realtime bar is re-ticked: without it the
+        // same order would fill on every tick of the bar it fills on.
+        if (this._marketOrdersFilledBar !== this.currentBarIndex) {
+            this._marketOrdersFilledBar = this.currentBarIndex;
+            fillMarketOrders(this);
+        }
     }
+
+    /** The bar `fillMarketOrders` last ran on, so a re-tick does not refill. */
+    private _marketOrdersFilledBar: number = -1;
 
     // --- Plotting ---
 
@@ -1780,6 +1806,7 @@ export class Context {
             cash: this.cash,
             trades: structuredClone(this.trades),
             orders: structuredClone(this.orders),
+            marketOrders: structuredClone(this.marketOrders),
             pendingEntries: structuredClone((this as any)._pendingEntries ?? new Map()),
             pendingExits: structuredClone((this as any)._pendingExits ?? new Map()),
             riskState: structuredClone((this as any)._riskState ?? null),
@@ -1814,6 +1841,7 @@ export class Context {
         this.cash = s.cash;
         this.trades = structuredClone(s.trades);
         this.orders = structuredClone(s.orders);
+        this.marketOrders = structuredClone(s.marketOrders);
         (this as any)._pendingEntries = structuredClone(s.pendingEntries);
         (this as any)._pendingExits = structuredClone(s.pendingExits);
         (this as any)._riskState = structuredClone(s.riskState);
