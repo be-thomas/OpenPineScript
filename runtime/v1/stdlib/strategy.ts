@@ -81,6 +81,8 @@ export interface PendingExit {
     trail_offset: number;
     /** The best price seen since the trail armed, or NaN while it has not. */
     trail_peak: number;
+    /** The bar this order was first registered on. See `livesYet`. */
+    placedBar: number;
     oca_name: string;
 }
 
@@ -313,12 +315,14 @@ export function order(
     }
 
     const entries = getPendingEntries(ctx);
+    const existing = entries.get(id);
     entries.set(id, {
         id,
         dir,
         qty: val(qty),
         limit: lim,
         stop: stp,
+        placedBar: existing ? existing.placedBar : ctx.currentBarIndex,
         oca_name: oca_name || "",
         oca_type: oca_type || oca.none
     });
@@ -433,7 +437,7 @@ export function entry(
         if (!isLong && rs.allow_entry_in !== DIR.short) return;
     }
 
-    const currentPrice = overridePrice !== undefined ? overridePrice : ctx.close;
+    const currentPrice = toTick(ctx, overridePrice !== undefined ? overridePrice : ctx.close);
     let numQty = val(qty);
 
     // max_position_size clamp
@@ -515,7 +519,7 @@ export function close_all(
 export function closeAt(ctx: Context, comment: string, price: number): void {
     if (ctx.position.size === 0) return;
 
-    const currentPrice = price;
+    const currentPrice = toTick(ctx, price);
     const qty = Math.abs(ctx.position.size);
     const isLong = ctx.position.size > 0;
 
@@ -608,6 +612,11 @@ export function exit(
         // trail's high-water mark has to survive the re-registration or it would
         // reset each time and the stop would never move.
         trail_peak: existing ? existing.trail_peak : Number.NaN,
+        // Set when the order is CREATED and carried across re-registration. A
+        // script re-issues `strategy.exit` every bar, and restamping it here
+        // would hold it one bar behind the market forever — it would never
+        // become live at all.
+        placedBar: existing ? existing.placedBar : ctx.currentBarIndex,
         oca_name: oca_name || ""
     });
 }
@@ -711,21 +720,93 @@ function applyExitOCA(exits: Map<string, PendingExit>, filledExit: PendingExit):
 }
 
 /**
+ * Is this order allowed to fill on the current bar yet?
+ *
+ * No, if it was registered on it. A limit or stop placed during bar N starts
+ * being matched on bar N+1, the same bar a market order would fill on.
+ *
+ * TradingView's own output settles it. In the golden exits export a long is
+ * entered at bar 401's open (39030.91) and its bracket — a 5% target and a 3%
+ * stop — is registered on that same bar. Bar 401's own range (H 39836.03,
+ * L 37151.59) dips through the stop at 37859.98 but never reaches the target
+ * at 40982.46, so matching against it closes the trade at the stop. Bar 402's
+ * range (H 46997.07, L 38034.25) does the opposite: it never touches the stop
+ * and runs well past the target. TradingView reports the exit at 40982.46 —
+ * the target, on bar 402 — so the placing bar is not matched at all.
+ */
+/**
+ * A fill price, snapped to the instrument's minimum tick.
+ *
+ * "the dataset's minimum tick size, i.e., the smallest increment by which the
+ * instrument's recorded prices change" — a fill cannot land between two
+ * tradeable prices, and TradingView's does not. Its golden exits export reports
+ * an entry at 39030.91 where the bar's own open is 39030.9094208, and an exit
+ * at 36056.47 where the open is 36056.4719785.
+ *
+ * Each rounding is far below the comparison tolerance on a price. It is NOT
+ * below it on `strategy.netprofit`, which is a difference of two prices and so
+ * carries the same absolute error against a much smaller number — that column
+ * is where this showed up, at 1.2e-5 relative.
+ *
+ * `ctx.mintick` is host-supplied (R-12) and defaults to 0.01, so this is
+ * parameterised rather than assumed for one symbol.
+ */
+function toTick(ctx: Context, price: number): number {
+    const tick = Number(ctx.mintick);
+    if (!Number.isFinite(tick) || tick <= 0 || !Number.isFinite(price)) return price;
+    return Math.round(price / tick) * tick;
+}
+
+/**
+ * An order's LEVEL, snapped to a tick away from the market.
+ *
+ * A level is a price the order may not do better than, and it has to land on a
+ * tradeable increment. Rounding it to the NEAREST tick can move it closer to
+ * the market, which fills the order at a price it never agreed to.
+ *
+ * TradingView's golden exits export: a long entered at 6985.25 carries a 5%
+ * target of 7334.5125, and TradingView reports the exit at 7334.52 — up, not
+ * at the nearer 7334.51. `above` says which side of the market the level sits
+ * on, so a sell target rounds up and a protective stop rounds down.
+ */
+function levelToTick(ctx: Context, level: number, above: boolean): number {
+    const tick = Number(ctx.mintick);
+    if (!Number.isFinite(tick) || tick <= 0 || !Number.isFinite(level)) return level;
+    const n = level / tick;
+    // Nudge before rounding: 7334.5125/0.01 is 733451.2499999999 in binary
+    // floating point, and a bare Math.ceil would take it to the wrong tick.
+    const eps = 1e-9;
+    return (above ? Math.ceil(n - eps) : Math.floor(n + eps)) * tick;
+}
+
+/**
+ * The price a triggered order actually fills at.
+ *
+ * A limit or stop names the WORST price the order accepts, not the price it
+ * gets. When the bar has already opened past the level, the level never
+ * traded on that bar and the fill happens at the open instead.
+ *
+ * TradingView's own output, from the golden exits export: a long entered at
+ * bar 532's open (38402.15) carries a 3% stop at 37250.08. Bar 533 opens at
+ * 36056.47 — below the stop already — and TradingView reports the exit at
+ * 36056.47, the open. Filling at the stop, as this used to, books a price
+ * that did not trade, and flatters every gap the strategy is caught in.
+ *
+ * `worseIsHigher` is true for an order that fills by price RISING to it — a
+ * sell target or a buy stop — and false for one that fills by price falling.
+ */
+function fillPrice(level: number, open: number, worseIsHigher: boolean): number {
+    if (!Number.isFinite(open)) return level;
+    return worseIsHigher ? Math.max(level, open) : Math.min(level, open);
+}
+
+function livesYet(ctx: Context, placedBar: number): boolean {
+    return placedBar < ctx.currentBarIndex;
+}
+
+/**
  * Processes pending orders against the current bar's High and Low.
  * Called by the runtime engine after script evaluation on each bar.
- *
- * ── A known difference from TradingView, not yet measured ───────────────────
- *
- * A limit or stop order placed during bar N is matched here against bar N's
- * OWN range. TradingView starts matching on bar N+1, the same bar a market
- * order would fill on — so an order whose level the placing bar happens to
- * touch fills here and not there.
- *
- * Market orders were corrected because TradingView's own output pinned them
- * (see MarketOrder). This one has no golden data behind it yet: the strategy
- * harness places market orders only. It is left as it is rather than changed
- * on reasoning alone, and stays under R-13 in dev-docs/04-skipped-restrictions.md
- * until a harness that uses `strategy.exit` brackets is collected.
  */
 export function processPendingOrders(ctx: Context, high: number, low: number): void {
     // Once per bar. `Context.finalizeBar` calls this for every run, and the
@@ -790,14 +871,23 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
     for (const [id, ord] of entries.entries()) {
         // Check intraday filled orders limit
         if (rs.daily_filled_orders >= rs.max_intraday_filled_orders) break;
+        if (!livesYet(ctx, ord.placedBar)) continue;
 
         let price = Number.NaN;
         if (ord.dir === direction.long) {
-            if (!Number.isNaN(ord.limit) && low <= ord.limit) price = ord.limit;
-            else if (!Number.isNaN(ord.stop) && high >= ord.stop) price = ord.stop;
+            // Buying: a limit waits for the price to FALL to it, a stop for it
+            // to rise. Either way the open can have passed it already.
+            if (!Number.isNaN(ord.limit) && low <= ord.limit) {
+                price = fillPrice(ord.limit, ctx.open, false);
+            } else if (!Number.isNaN(ord.stop) && high >= ord.stop) {
+                price = fillPrice(ord.stop, ctx.open, true);
+            }
         } else {
-            if (!Number.isNaN(ord.limit) && high >= ord.limit) price = ord.limit;
-            else if (!Number.isNaN(ord.stop) && low <= ord.stop) price = ord.stop;
+            if (!Number.isNaN(ord.limit) && high >= ord.limit) {
+                price = fillPrice(ord.limit, ctx.open, true);
+            } else if (!Number.isNaN(ord.stop) && low <= ord.stop) {
+                price = fillPrice(ord.stop, ctx.open, false);
+            }
         }
 
         if (!Number.isNaN(price)) {
@@ -821,25 +911,32 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
     const isLong = ctx.position.size > 0;
 
     for (const [exitId, pendingExit] of exits.entries()) {
+        if (!livesYet(ctx, pendingExit.placedBar)) continue;
         let executedPrice = Number.NaN;
 
         const level = exitLevels(ctx, pendingExit, isLong, high, low);
 
+        // Closing a long is a SELL: the target sits above the market and the
+        // stop below it; closing a short is the mirror image.
+        const limitAt = levelToTick(ctx, level.limit, isLong);
+        const stopAt = levelToTick(ctx, level.stop, !isLong);
+
         if (isLong) {
-            if (!Number.isNaN(level.limit) && high >= level.limit) {
-                executedPrice = level.limit;
-            } else if (!Number.isNaN(level.stop) && low <= level.stop) {
-                executedPrice = level.stop;
+            if (!Number.isNaN(limitAt) && high >= limitAt) {
+                executedPrice = fillPrice(limitAt, ctx.open, true);
+            } else if (!Number.isNaN(stopAt) && low <= stopAt) {
+                executedPrice = fillPrice(stopAt, ctx.open, false);
             }
         } else {
-            if (!Number.isNaN(level.limit) && low <= level.limit) {
-                executedPrice = level.limit;
-            } else if (!Number.isNaN(level.stop) && high >= level.stop) {
-                executedPrice = level.stop;
+            if (!Number.isNaN(limitAt) && low <= limitAt) {
+                executedPrice = fillPrice(limitAt, ctx.open, false);
+            } else if (!Number.isNaN(stopAt) && high >= stopAt) {
+                executedPrice = fillPrice(stopAt, ctx.open, true);
             }
         }
 
         if (!Number.isNaN(executedPrice)) {
+            executedPrice = toTick(ctx, executedPrice);
             const held = Math.abs(ctx.position.size);
             // "Ignored if `qty` is not na" — an explicit quantity wins over a
             // percentage, and neither given closes the whole position.

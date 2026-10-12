@@ -100,6 +100,12 @@ function collectDivergences(mode: Mode, seed: number): Divergence[] {
 
     // Mirror what setBar() does, without the Series bookkeeping the naive
     // reference has no equivalent for.
+    // The engine tracks a series function's history by BAR, so a loop that
+    // means "one iteration is one bar" has to say so: reaching the same call
+    // site twice on one bar OVERWRITES that bar's slot rather than appending,
+    // which is what TradingView does and what this loop would otherwise
+    // trigger on every iteration. See Context.barStateSnapshot.
+    ctx.currentBarIndex = i;
     (ctx as any).high = high;
     (ctx as any).low = low;
     ctx.close = close;

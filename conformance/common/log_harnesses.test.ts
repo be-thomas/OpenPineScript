@@ -45,19 +45,14 @@ const BARS = 60;
 /**
  * Harnesses this engine is SUPPOSED to refuse, and the refusal each must give.
  *
- * A harness exists to be pasted into TradingView, and one of them exists
- * precisely because the engine has no answer to give: harness_loopargs.pine
- * asks what a series function does when one call site is reached twice on a
- * bar with different arguments, which nothing measured settles. Running it
- * here would mean the engine had quietly picked a reading.
- *
- * So these are asserted to fail, and to fail for the stated reason — which is
- * a stronger statement than skipping them, and it also means this file stops
- * expecting a refusal the moment the rule is implemented.
+ * Empty, and that is the point of keeping it: harness_loopargs.pine was here
+ * while the engine had no answer for a call site reached twice on one bar with
+ * different arguments. TradingView's export settled it — one slot per bar,
+ * overwritten by each reach — so the harness runs and the entry went. A future
+ * harness written to ask a question rather than to check one belongs here
+ * until its answer lands.
  */
-const REFUSED_BY_DESIGN: Record<string, RegExp> = {
-  "harness_loopargs.pine": /called more than once on the same bar at the same place/,
-};
+const REFUSED_BY_DESIGN: Record<string, RegExp> = {};
 
 /** A deterministic OHLCV walk. The numbers do not matter; finishing does. */
 function feed(ctx: Context, exec: () => any): void {

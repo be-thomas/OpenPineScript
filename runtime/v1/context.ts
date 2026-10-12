@@ -1195,17 +1195,24 @@ export class Context {
             this.seriesScope = `${this.seriesScope}${identity}|`;
         }
 
-        // A stateful BUILT-IN reached twice on one bar does not advance twice —
-        // see `barCallMemo`. User frames are excluded: this is the rule for a
-        // series function's own state, and a user function is an ordinary call
-        // that may legitimately return two different things on one bar.
-        const memoKey = userFrame ? "" : this.callStack.join("/");
-        if (memoKey && this.statefulCalls.has(memoKey)) {
-            const seen = this.barCallMemo.get(memoKey);
-            if (seen) {
-                this.requireSameArguments(id, seen.args, args);
-                this.callStack.pop();
-                return seen.value;
+        // A BUILT-IN reached again on one bar overwrites that bar's slot
+        // rather than appending a second one — see `barStateSnapshot`. User
+        // frames are excluded: that is the rule for a series function's own
+        // history, and a user function is an ordinary call that may
+        // legitimately return two different things on one bar.
+        const siteKey = userFrame ? "" : this.callStack.join("/");
+        if (siteKey) {
+            if (this.reachedAtBar.get(siteKey) === this.currentBarIndex) {
+                this.repeatableCalls.add(siteKey);
+                this.restoreCallState(siteKey);
+            } else {
+                this.reachedAtBar.set(siteKey, this.currentBarIndex);
+                // Snapshot only what is worth snapshotting: a site already
+                // known to repeat, or one holding no state yet, where the
+                // rollback point is "absent" and costs nothing to record.
+                if (this.repeatableCalls.has(siteKey) || !this.states.has(siteKey)) {
+                    this.snapshotCallState(siteKey, id);
+                }
             }
         }
 
@@ -1295,13 +1302,11 @@ export class Context {
             this.keywordArguments = namedHere;
             this.positionalArguments = positionalHere;
             try {
-                const value = entry.uses_context ? fn(this, ...finalArgs) : fn(...finalArgs);
-                // `statefulCalls` only learns about a site once it has run, so
-                // this is the first chance to know whether to remember it.
-                if (memoKey && this.statefulCalls.has(memoKey)) {
-                    this.barCallMemo.set(memoKey, { value, args });
+                if (entry.uses_context) {
+                    return fn(this, ...finalArgs);
+                } else {
+                    return fn(...finalArgs);
                 }
-                return value;
             } finally {
                 this.keywordArguments = outerNamed;
                 this.positionalArguments = outerPositional;
@@ -1366,103 +1371,110 @@ export class Context {
         return false;
     }
 
-    /**
-     * Call sites known to carry series state, i.e. that have asked for
-     * persistent state at least once. Populated by `getPersistentState`.
-     */
-    private statefulCalls: Set<string> = new Set();
+    /** Call sites seen to run more than once on one bar. */
+    private repeatableCalls: Set<string> = new Set();
 
     /**
-     * What each stateful call site returned on THIS bar, and what it was
-     * handed. Cleared by `setBar`.
+     * The bar each call site was last reached on.
      *
-     * ── Why a call site runs at most once a bar ─────────────────────────────
-     *
-     * A series function's state belongs to its CALL SITE, and it advances once
-     * per bar — not once per time the site happens to be reached. Reaching it
-     * three times inside `for i = 0 to 2` does not make three bars go by.
-     *
-     * TradingView's own output pins both halves of that. The golden loops
-     * export computes
-     *
-     *     loopEma = 0.0
-     *     for i = 0 to 2
-     *         loopEma := loopEma + ta.ema(close, 10)
-     *     _v10 = loopEma / 3
-     *     _v11 = ta.ema(close, 10)
-     *
-     * and `_v10` equals `_v11` on all 2,475 bars to the last decimal. That is
-     * only possible if the loop's `ta.ema` advanced once and returned the same
-     * value all three times. Without this, ours advanced three times a bar: it
-     * warmed up three times too fast — first value at bar 3 where TradingView
-     * has bar 9 — and stayed ~3% out forever after.
-     *
-     * The opposite case is NOT symmetric and must stay as it is: a site that is
-     * not reached at all goes STALE rather than advancing. `probe_call_inside_if`
-     * and `probe_ternary_both_arms` in the golden control export both agree
-     * with TradingView while doing exactly that.
+     * Keyed by bar INDEX rather than cleared by `setBar`, so the rule holds
+     * for any host that advances `currentBarIndex` — including the TA
+     * differential suites, which drive the stdlib directly and never call
+     * `setBar` at all.
      */
-    private barCallMemo: Map<string, { value: any; args: any[] }> = new Map();
+    private reachedAtBar: Map<string, number> = new Map();
 
     /**
-     * Refuses a stateful call site reached twice on one bar with DIFFERENT
-     * arguments.
+     * Rollback points for the sites in `repeatableCalls`, taken at their first
+     * reach of the bar. Cleared by `setBar`.
      *
-     * The once-per-bar rule above is established for the case TradingView's
-     * export actually exercises: the same arguments every time. What it does
-     * not establish is which call wins when they differ —
+     * ── One slot per BAR, not one per call ─────────────────────────────────
      *
-     *     for i = 0 to 2
-     *         total := total + ta.sma(close[i], 10)
+     * A series function's history has one slot per bar. Reaching its call site
+     * again on the same bar OVERWRITES that bar's slot rather than appending a
+     * second one, and the value returned is the one including whatever was
+     * just written. Earlier bars keep whatever their LAST reach wrote.
      *
-     * — whether the average is fed `close[0]` and the other two reads come back
-     * identical, or each read advances, or the last one wins. Returning the
-     * first call's value would be a guess that looks like an answer, and this
-     * engine says so instead. A named refusal is also what makes the gap
-     * findable: it names the call site, so a probe harness can be written for
-     * it and the rule settled from TradingView rather than from reasoning.
+     * That one rule accounts for every loop probe TradingView has answered:
      *
-     * Only SCALARS are compared. An argument that survives `valueOf` as an
-     * object is an array, a map or a drawing handle, and two reads of the same
-     * handle are the same argument however they compare.
+     *   - Same arguments every reach (the loops export): each reach writes the
+     *     same value into the same slot, so all three reads agree and
+     *     `loopEma / 3` equals a plain `ta.ema(close, 10)` on all 2,475 bars.
+     *   - Different arguments (the loopargs export): each reach overwrites,
+     *     and the three reads differ. Replaying this rule against that export
+     *     reproduces TradingView on all 2,464 bars it reports, na-parity
+     *     included — where "the first reach wins", "the last reach wins" and
+     *     "each reach keeps its own history" each miss every single bar.
+     *   - Never reached at all: nothing is written, so the history does not
+     *     advance and the site goes STALE. `probe_call_inside_if` and
+     *     `probe_ternary_both_arms` both confirm that, and it is why this is
+     *     not symmetric with the two cases above.
+     *
+     * Overwriting is implemented as rollback-and-rerun, which is the same
+     * thing from the outside and does not require every stateful built-in to
+     * grow a re-entry path of its own.
+     *
+     * ── Why this is learned rather than declared ───────────────────────────
+     *
+     * Snapshotting every stateful site on every bar would mean cloning each
+     * one's buffer 2,500 times over a chart, for the sake of the handful that
+     * are ever reached twice. So a site is snapshotted only once it has been
+     * SEEN to repeat — plus the free case where it holds no state yet, which
+     * is how the very first repeat is caught: a loop body runs on the bar it
+     * first executes, and on that bar the state does not exist, so the
+     * rollback point is "absent" and costs nothing.
+     *
+     * The gap that leaves is a site that runs singly for a while and only
+     * later repeats — `for i = 0 to n` where `n` starts at 0. The bar it first
+     * repeats on keeps the first reach's value; every bar after it is exact.
      */
-    private requireSameArguments(id: string, before: any[], now: any[]): void {
-        const scalar = (x: any): any => {
-            const v = x !== null && x !== undefined && typeof x.valueOf === "function"
-                ? x.valueOf() : x;
-            return v !== null && typeof v === "object" ? undefined : v;
-        };
+    private barStateSnapshot: Map<string, { bar: number; states: Map<string, any> }> = new Map();
 
-        const differs = (a: any, b: any): boolean => {
-            const x = scalar(a), y = scalar(b);
-            if (x === undefined || y === undefined) return false;   // not comparable
-            if (typeof x === "number" && typeof y === "number") {
-                return !(x === y || (Number.isNaN(x) && Number.isNaN(y)));
-            }
-            return x !== y;
-        };
-
-        const n = Math.max(before.length, now.length);
-        for (let i = 0; i < n; i++) {
-            if (!differs(before[i], now[i])) continue;
-            const name = removePrefix(extractFunctionName(id));
-            throw new Error(
-                `'${name}' is called more than once on the same bar at the same ` +
-                `place in the script, with different arguments ` +
-                `(${JSON.stringify(scalar(before[i]))} then ` +
-                `${JSON.stringify(scalar(now[i]))}). A series function keeps one ` +
-                `history per call site and advances it once per bar, so there is ` +
-                `no second history for the second set of arguments. ` +
-                `OpenPineScript has no measurement of what TradingView returns ` +
-                `here and refuses rather than guess — hoist the call out of the ` +
-                `loop, or give each argument its own call site.`,
-            );
+    /** Every state entry belonging to `key` or nested beneath it. */
+    private collectCallState(key: string): Map<string, any> {
+        const out = new Map<string, any>();
+        for (const [k, v] of this.states) {
+            if (k === key || k.startsWith(`${key}/`)) out.set(k, v);
         }
+        return out;
+    }
+
+    /** Remembers `key`'s state so a later reach on this bar can undo its own. */
+    private snapshotCallState(key: string, id: string): void {
+        const live = this.collectCallState(key);
+        const copy = new Map<string, any>();
+        for (const [k, v] of live) {
+            try {
+                copy.set(k, structuredClone(v));
+            } catch {
+                // Refusing beats rolling back half a state. A built-in whose
+                // state holds something uncloneable cannot take part in this,
+                // and silently skipping the rollback would make it wrong only
+                // inside loops, which is the hardest place to notice.
+                throw new Error(
+                    `'${removePrefix(extractFunctionName(id))}' is reached more than ` +
+                    `once on one bar, and its internal state cannot be rolled back ` +
+                    `to the start of the bar. Hoist the call out of the loop.`,
+                );
+            }
+        }
+        this.barStateSnapshot.set(key, { bar: this.currentBarIndex, states: copy });
+    }
+
+    /** Puts `key` back as it was at the start of the bar. */
+    private restoreCallState(key: string): void {
+        const saved = this.barStateSnapshot.get(key);
+        // A rollback point from an earlier bar is not a rollback point for
+        // this one: the bar it belonged to has been committed.
+        if (!saved || saved.bar !== this.currentBarIndex) return;
+        for (const k of [...this.states.keys()]) {
+            if (k === key || k.startsWith(`${key}/`)) this.states.delete(k);
+        }
+        for (const [k, v] of saved.states) this.states.set(k, structuredClone(v));
     }
 
     public getPersistentState<T>(initFn: () => T): T {
         const key = this.callStack.length > 0 ? this.callStack.join("/") : "global";
-        this.statefulCalls.add(key);
         if (!this.states.has(key)) {
             this.states.set(key, initFn());
         }
@@ -1761,9 +1773,6 @@ export class Context {
         this.new_var("opsv2_volume", volume);
         this.new_var("opsv2_bar_index", this.currentBarIndex);
 
-        // 3. A new bar: every stateful call site may advance once again.
-        this.barCallMemo.clear();
-
         // 4. Fill the market orders the previous bar placed.
         //
         // This is the only moment that is both AFTER this bar's open is known
@@ -1775,6 +1784,17 @@ export class Context {
         if (this._marketOrdersFilledBar !== this.currentBarIndex) {
             this._marketOrdersFilledBar = this.currentBarIndex;
             fillMarketOrders(this);
+
+            // 5. Then match the standing limit and stop orders against this
+            //    bar's range.
+            //
+            // BEFORE the script runs, not after. A fill is applied by the time
+            // the script next executes: TradingView's golden exits export
+            // closes a bracket intrabar on bar 402 and the row logged at the
+            // close of 402 already reports `position_size` 0 and
+            // `closedtrades` incremented. Doing this in `finalizeBar` put
+            // every such fill one row late.
+            processPendingOrders(this, this.high, this.low);
         }
     }
 
@@ -1860,21 +1880,13 @@ export class Context {
     }
 
     public finalizeBar() {
-        // The bar has closed, so its range is known and the broker can match the
-        // orders the script left pending against it.
+        // Pending orders are NOT matched here. They are matched in `setBar`,
+        // before the script runs — see the note there. Matching them at the
+        // end of the bar reported every fill one row late, and matched an
+        // order against the very bar that placed it.
         //
-        // ── Why this is here ────────────────────────────────────────────────
-        //
-        // It was called by ONE test harness and by nothing else — not by
-        // `mock_run`, not by the corpus runner, not by the session layer. So
-        // `strategy.exit` registered a bracket that was never matched and
-        // `strategy.order`'s limit and stop entries never filled: a strategy
-        // with a take-profit and a stop-loss produced no exits at all, and its
-        // equity curve was the curve of a position nobody ever closed.
-        //
-        // Idempotent per bar, so a harness that still calls it explicitly does
-        // not fill the same order twice.
-        processPendingOrders(this, this.high, this.low);
+        // `processPendingOrders` is idempotent per bar, so a harness that
+        // still calls it explicitly does not fill the same order twice.
 
         this.plots.forEach((series) => {
             if (series.length <= this.currentBarIndex) {

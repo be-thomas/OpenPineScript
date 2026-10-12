@@ -68,6 +68,12 @@ function genBars(n: number, seed: number): Bar[] {
 
 /** Push one bar's data into a Context (mirrors the engine's setBar effects). */
 function feedCtx(ctx: Context, b: Bar): void {
+    // One call is one bar, and the engine has to be told. A series function's
+    // history is kept per BAR: reaching a call site twice on one bar
+    // OVERWRITES that bar's slot rather than appending a second one, which is
+    // what TradingView does and what every loop below would otherwise trip on
+    // every iteration. Advancing here costs no change at any call site.
+    ctx.currentBarIndex++;
     (ctx as any).high = b.high;
     (ctx as any).low = b.low;
     (ctx as any).open = b.open;
