@@ -123,6 +123,14 @@ const EXPECTED: Record<string, RegExp> = {
   // returning the first reading because it happens to be the one the memo
   // makes cheap. It used to advance the history twice a bar, which is the one
   // reading TradingView's own output has already ruled out.
+  //
+  // ⚠ These two raise at RUN time here; at v5 TradingView does not run this
+  // shape at all. Pasted as v5 it is refused by the compiler — "An argument of
+  // 'series int' type was used but a 'simple int' is expected" — because a
+  // length is `simple int` and `i` is not. These files are v3 and v4, where
+  // that is unmeasured, and this engine has no simple/series qualifier either
+  // way (R-16 in dev-docs/04-skipped-restrictions.md). So both engines refuse
+  // the same script; only the phase and the wording differ.
   "v3/v3-language-expressions-declarations-and-statements-17.pine":
     /called more than once on the same bar at the same place/,
   "v4/v4-language-expressions-declarations-and-statements-14.pine":

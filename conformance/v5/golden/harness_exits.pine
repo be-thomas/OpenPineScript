@@ -1,0 +1,95 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// Hand-written, NOT generated. No v3 source: it asks a question the generated
+// harnesses do not reach.
+//
+//   1. Paste into the Pine editor and add to the chart.
+//   2. Open  More (⋮) → Pine Logs.
+//   3. Select all the log lines and copy them.
+//   4. Save as conformance/v5/golden/harness_exits.BTCUSDT.1D.log
+//
+// ⚠ NEEDS FULL HISTORY. Every column is path-dependent — one mis-filled exit
+// moves the equity curve for the rest of the chart — so scroll to the
+// instrument's first bar before copying. Its warm-up allowance is 0.
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenPineScript golden-data harness — EXIT BRACKETS AND PENDING FILLS.
+//
+// harness_strategy settled MARKET orders: placed on one bar, filled at the next
+// bar's open. It says nothing about orders that wait for a PRICE, because it
+// places none, and the engine's own note above processPendingOrders records the
+// gap this is written to close:
+//
+//   a limit or stop placed during bar N is matched here against bar N's OWN
+//   range, where TradingView starts matching on bar N+1.
+//
+// That difference is invisible unless the placing bar touches the level, which
+// is exactly what a bracket placed at entry does — the entry bar's range very
+// often spans a target set a few percent away. So `tp_only` and `sl_only` below
+// put the bracket on at entry and let the data decide.
+//
+// The columns are the broker's own state, which is the only witness an order
+// has: a bracket that fills a bar early moves `position_size`, `opentrades`,
+// `closedtrades` and `equity` from that point on and never recovers.
+//
+// `strategy.exit` is written with KEYWORDS throughout. Its positional order is
+// (id, from_entry, qty, qty_percent, profit, limit, loss, stop, …) and getting
+// it wrong silently swaps a price for a tick count.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy(title="OPS golden exits", shorttitle="OPS exits", overlay=false)
+
+fast = ta.sma(close, 10)
+slow = ta.sma(close, 30)
+goLong = ta.crossover(fast, slow)
+
+// One entry at a time, so every column below is about ONE trade's exit.
+if goLong and strategy.position_size == 0
+    strategy.entry("L", strategy.long)
+
+// The bracket, in prices rather than ticks so no mintick is involved.
+// Wide enough that it is not hit instantly, narrow enough to be hit often.
+entryPrice = strategy.position_avg_price
+target = entryPrice * 1.05
+stopAt = entryPrice * 0.97
+
+if strategy.position_size > 0
+    strategy.exit("X", from_entry = "L", limit = target, stop = stopAt)
+
+_v0 = strategy.position_size
+_v1 = strategy.opentrades
+_v2 = strategy.closedtrades
+_v3 = strategy.equity
+_v4 = na(entryPrice) ? 0.0 : entryPrice
+
+// The most recent closed trade's exit price. If a bracket fills one bar early
+// this moves, and it moves to a DIFFERENT PRICE rather than merely a different
+// bar — which separates "filled early" from "filled at the wrong level".
+_v5 = strategy.closedtrades > 0
+      ? strategy.closedtrades.exit_price(strategy.closedtrades - 1) : 0.0
+_v6 = strategy.closedtrades > 0
+      ? strategy.closedtrades.entry_price(strategy.closedtrades - 1) : 0.0
+
+// Realised profit so far, which is the running sum the two above feed.
+_v7 = strategy.netprofit
+
+// ── Pine Logs emission ──────────────────────────────────────────────────
+// One row per bar. The OPS| marker lets the loader find the row inside
+// whatever prefix the Pine Logs pane adds when you copy it out.
+if barstate.isfirst
+    log.info("OPSHEAD|time,open,high,low,close,volume,position_size,opentrades,closedtrades,equity,entry_avg_price,last_exit_price,last_entry_price,netprofit")
+
+_row = str.tostring(time, "#") + "," +
+      str.tostring(open, "#.##########") + "," +
+      str.tostring(high, "#.##########") + "," +
+      str.tostring(low, "#.##########") + "," +
+      str.tostring(close, "#.##########") + "," +
+      str.tostring(volume, "#.##########") + "," +
+      str.tostring(_v0, "#.##########") + "," +
+      str.tostring(_v1, "#.##########") + "," +
+      str.tostring(_v2, "#.##########") + "," +
+      str.tostring(_v3, "#.##########") + "," +
+      str.tostring(_v4, "#.##########") + "," +
+      str.tostring(_v5, "#.##########") + "," +
+      str.tostring(_v6, "#.##########") + "," +
+      str.tostring(_v7, "#.##########")
+
+log.info("OPS|" + _row)
