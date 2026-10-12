@@ -92,6 +92,8 @@ export interface PendingEntry {
     qty: number;
     limit: number;
     stop: number;
+    /** The bar this order was first registered on. See `livesYet`. */
+    placedBar: number;
     oca_name: string;
     oca_type: string;
 }
@@ -720,21 +722,6 @@ function applyExitOCA(exits: Map<string, PendingExit>, filledExit: PendingExit):
 }
 
 /**
- * Is this order allowed to fill on the current bar yet?
- *
- * No, if it was registered on it. A limit or stop placed during bar N starts
- * being matched on bar N+1, the same bar a market order would fill on.
- *
- * TradingView's own output settles it. In the golden exits export a long is
- * entered at bar 401's open (39030.91) and its bracket — a 5% target and a 3%
- * stop — is registered on that same bar. Bar 401's own range (H 39836.03,
- * L 37151.59) dips through the stop at 37859.98 but never reaches the target
- * at 40982.46, so matching against it closes the trade at the stop. Bar 402's
- * range (H 46997.07, L 38034.25) does the opposite: it never touches the stop
- * and runs well past the target. TradingView reports the exit at 40982.46 —
- * the target, on bar 402 — so the placing bar is not matched at all.
- */
-/**
  * A fill price, snapped to the instrument's minimum tick.
  *
  * "the dataset's minimum tick size, i.e., the smallest increment by which the
@@ -800,18 +787,35 @@ function fillPrice(level: number, open: number, worseIsHigher: boolean): number 
     return worseIsHigher ? Math.max(level, open) : Math.min(level, open);
 }
 
+/**
+ * Is this order allowed to fill on the current bar yet?
+ *
+ * No, if it was registered on it. A limit or stop placed during bar N starts
+ * being matched on bar N+1, the same bar a market order would fill on.
+ *
+ * TradingView's own output settles it. In the golden exits export a long is
+ * entered at bar 401's open (39030.91) and its bracket — a 5% target and a 3%
+ * stop — is registered on that same bar. Bar 401's own range (H 39836.03,
+ * L 37151.59) dips through the stop at 37859.98 but never reaches the target
+ * at 40982.46, so matching against it closes the trade at the stop. Bar 402's
+ * range (H 46997.07, L 38034.25) does the opposite: it never touches the stop
+ * and runs well past the target. TradingView reports the exit at 40982.46 —
+ * the target, on bar 402 — so the placing bar is not matched at all.
+ */
 function livesYet(ctx: Context, placedBar: number): boolean {
     return placedBar < ctx.currentBarIndex;
 }
 
 /**
- * Processes pending orders against the current bar's High and Low.
- * Called by the runtime engine after script evaluation on each bar.
+ * Matches the standing limit and stop orders against this bar's High and Low.
+ *
+ * Called from `Context.setBar`, BEFORE the script runs on the bar — a fill is
+ * already applied by the time the script next executes. See the note there.
  */
 export function processPendingOrders(ctx: Context, high: number, low: number): void {
-    // Once per bar. `Context.finalizeBar` calls this for every run, and the
-    // strategy test harness calls it directly as well; without a guard the
-    // second call would fill a pending entry that the first one just placed.
+    // Once per bar. `Context.setBar` calls this for every run, and the strategy
+    // test harness calls it directly as well; without a guard the second call
+    // would fill a pending entry that the first one just placed.
     const state = ctx as any;
     if (state._ordersProcessedBar === ctx.currentBarIndex) return;
     state._ordersProcessedBar = ctx.currentBarIndex;
@@ -853,14 +857,14 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
     // Global risk checks
     if (checkRiskHalt(ctx, rs)) {
         cancel_all(ctx);
-        if (ctx.position.size !== 0) closeAt(ctx, "Risk Halt", ctx.close);
+        if (ctx.position.size !== 0) closeAt(ctx, "Risk Halt", ctx.open);
         return;
     }
 
     // If halted from previous bar, block everything
     if (rs.is_halted) {
         cancel_all(ctx);
-        if (ctx.position.size !== 0) closeAt(ctx, "Risk Halt", ctx.close);
+        if (ctx.position.size !== 0) closeAt(ctx, "Risk Halt", ctx.open);
         return;
     }
 
@@ -873,20 +877,28 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
         if (rs.daily_filled_orders >= rs.max_intraday_filled_orders) break;
         if (!livesYet(ctx, ord.placedBar)) continue;
 
+        // Snapped the same way an exit's levels are: a level the caller named
+        // has to land on a tradeable increment, and rounding it toward the
+        // market would fill at a price the order never agreed to. Buying, a
+        // limit sits BELOW the market and a stop above; selling, the reverse.
+        const buying = ord.dir === direction.long;
+        const entryLimit = levelToTick(ctx, ord.limit, !buying);
+        const entryStop = levelToTick(ctx, ord.stop, buying);
+
         let price = Number.NaN;
-        if (ord.dir === direction.long) {
-            // Buying: a limit waits for the price to FALL to it, a stop for it
-            // to rise. Either way the open can have passed it already.
-            if (!Number.isNaN(ord.limit) && low <= ord.limit) {
-                price = fillPrice(ord.limit, ctx.open, false);
-            } else if (!Number.isNaN(ord.stop) && high >= ord.stop) {
-                price = fillPrice(ord.stop, ctx.open, true);
+        if (buying) {
+            // A limit waits for the price to FALL to it, a stop for it to
+            // rise. Either way the open can have passed it already.
+            if (!Number.isNaN(entryLimit) && low <= entryLimit) {
+                price = fillPrice(entryLimit, ctx.open, false);
+            } else if (!Number.isNaN(entryStop) && high >= entryStop) {
+                price = fillPrice(entryStop, ctx.open, true);
             }
         } else {
-            if (!Number.isNaN(ord.limit) && high >= ord.limit) {
-                price = fillPrice(ord.limit, ctx.open, true);
-            } else if (!Number.isNaN(ord.stop) && low <= ord.stop) {
-                price = fillPrice(ord.stop, ctx.open, false);
+            if (!Number.isNaN(entryLimit) && high >= entryLimit) {
+                price = fillPrice(entryLimit, ctx.open, true);
+            } else if (!Number.isNaN(entryStop) && low <= entryStop) {
+                price = fillPrice(entryStop, ctx.open, false);
             }
         }
 
@@ -967,12 +979,30 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
                 applyExitOCA(exits, pendingExit);
             }
 
-            // Close full position
-            ctx.position.size = 0;
-            ctx.position.avgPrice = 0;
+            // A PARTIAL exit leaves a position behind. Booking the P&L on
+            // `qty` and then flattening regardless made the rest of the
+            // position disappear without ever being sold: long 10 at 100 with
+            // `strategy.exit("tp", qty_percent = 50, limit = 110)` recorded a
+            // 5-contract trade and silently dropped the other five.
+            //
+            // The average entry price does NOT move — selling part of a
+            // position does not change what the remainder cost.
+            const remaining = Math.max(0, held - Math.abs(qty));
+            // `0`, never `-0`: a flat position compares equal to zero under
+            // Object.is, which is what the assertions and `== 0` guards use.
+            ctx.position.size = remaining === 0 ? 0 : (isLong ? remaining : -remaining);
 
-            // Remove the filled exit and clear remaining (position is flat)
-            exits.clear();
+            if (remaining === 0) {
+                ctx.position.avgPrice = 0;
+                ctx.position.entryBarIndex = undefined;
+                ctx.position.entryId = undefined;
+                // Nothing left to protect, so the other brackets go with it.
+                exits.clear();
+            } else {
+                // Only the order that filled is spent; the rest still guard
+                // what is left.
+                exits.delete(exitId);
+            }
             break;
         }
     }

@@ -807,3 +807,55 @@ describe("Broker Emulator: market orders fill at the next bar's open", () => {
         assert.strictEqual(ctx.position.size, 0, "no bar left to fill it at");
     });
 });
+
+// ============================================================
+// A partial exit leaves the rest of the position alone
+// ============================================================
+
+describe("Broker Emulator: partial exits", () => {
+
+    /** Long 10 @ 100, with a bracket that sells half at 110. */
+    const halfOut = (bracket: string) => [
+        'if n == 0',
+        '    strategy.entry("L", strategy.long, 10)',
+        'if n == 1',
+        `    strategy.exit("tp", "L", ${bracket})`,
+    ].join('\n');
+
+    const bars = [
+        { o: 100, h: 105, l: 95,  c: 100 },   // places the entry
+        { o: 100, h: 105, l: 95,  c: 100 },   // fills it @ 100; registers the bracket
+        { o: 105, h: 115, l: 100, c: 112 },   // the bracket is live, and 110 trades
+    ];
+
+    it("qty_percent sells its share and keeps the remainder", () => {
+        const ctx = runStrategy(halfOut("qty_percent = 50, limit = 110"), bars);
+
+        // Five sold at 110, five still held. The whole position used to
+        // vanish: the P&L was booked on the partial quantity and the position
+        // was then flattened regardless, so the other five were never sold
+        // and never showed up anywhere.
+        assert.strictEqual(ctx.position.size, 5, "half the position remains");
+        assert.strictEqual(ctx.trades.length, 1);
+        assert.strictEqual(ctx.trades[0].qty, 5);
+        assert.strictEqual(ctx.trades[0].pnl, 50);       // (110 - 100) * 5
+        // Selling part of a position does not change what the rest cost.
+        assert.strictEqual(ctx.position.avgPrice, 100);
+    });
+
+    it("an explicit qty does the same, and wins over a percentage", () => {
+        const ctx = runStrategy(halfOut("qty = 4, qty_percent = 50, limit = 110"), bars);
+
+        assert.strictEqual(ctx.position.size, 6, "qty wins over qty_percent");
+        assert.strictEqual(ctx.trades[0].qty, 4);
+        assert.strictEqual(ctx.trades[0].pnl, 40);
+    });
+
+    it("closing the whole position still flattens it", () => {
+        const ctx = runStrategy(halfOut("limit = 110"), bars);
+
+        assert.strictEqual(ctx.position.size, 0);
+        assert.strictEqual(ctx.trades[0].qty, 10);
+        assert.strictEqual(ctx.position.avgPrice, 0);
+    });
+});
