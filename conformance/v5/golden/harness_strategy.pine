@@ -1,7 +1,7 @@
 //@version=5
 // ─────────────────────────────────────────────────────────────────────────────
 // GENERATED — do not edit. Source: conformance/v3/golden/harness_strategy.pine
-// Regenerate with: npx tsx scripts/make-log-harness.ts
+// Regenerate with: npx tsx scripts/common/make-log-harness.ts
 //
 // The Pine-Logs variant of that harness, for collecting golden data WITHOUT the
 // PRO+/Premium "Export chart data…" feature.
