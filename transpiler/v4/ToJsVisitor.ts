@@ -253,8 +253,10 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
    * assignment the one place in the language where `na` behaved differently.
    *
    * `value` is parenthesised because not every emitted expression is
-   * self-contained: `visitOr_expr` produces `a || b` with no brackets, so
-   * `x *= a or b` would otherwise bind as `(x * a) || b`.
+   * self-contained: a comparison comes out as bare `a > b`, so `x *= a > b`
+   * would otherwise bind as `(x * a) > b`. (`and` and `or` used to be the
+   * example here, back when they emitted `a && b`; they are now a call to
+   * `ctx.allOf`, which brackets itself — see visitAnd_expr.)
    */
   protected compoundValue(op: string, current: string, value: string): string {
     if (op === "+") return `opsv2_safe_add(${current}, (${value}))`;

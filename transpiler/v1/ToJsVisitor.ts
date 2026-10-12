@@ -1254,16 +1254,40 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   // `and` / `or` take BOOLEANS, so each operand goes through ctx.truthy for the
   // same reason the ternary condition does. A single operand is passed straight
   // through: it may be a number being used as a value, not a condition.
+  //
+  // ── Why these are function calls and not `&&` / `||` ───────────────────────
+  //
+  // Pine's `and` and `or` do NOT short-circuit: every operand is evaluated,
+  // whatever the ones before it decided. That matters because an operand can
+  // hold a call to a series function, and a series function that is skipped on
+  // some bars develops a hole in its history that never heals.
+  //
+  // TradingView's own output says so. In the golden control export,
+  // `probe_and_shortcircuit` is
+  //
+  //     (close > open and ta.sma(close, 7) > ta.sma(close, 21)) ? 1 : 0
+  //
+  // and it disagreed with us on bars where `close > open` held — which can only
+  // happen if the two averages differ, i.e. if ours had been fed a subset of
+  // the bars. `and_gate` next to it, whose right-hand side is a plain variable,
+  // agreed throughout, which is what isolates the cause to the skipped call.
+  //
+  // Passing the operands as ARGUMENTS is the whole mechanism: JavaScript
+  // evaluates every argument before entering the callee, so there is nothing
+  // left to short-circuit. Note this is NOT the same question as `if` or `?:`,
+  // which really do branch — `probe_call_inside_if` and
+  // `probe_ternary_both_arms` both agree with TradingView while leaving the
+  // untaken call stale, so the engine must keep doing exactly that.
   visitOr_expr(ctx: Or_exprContext): string {
     const parts = ctx.and_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
-    return parts.map(p => `ctx.truthy(${p})`).join(" || ");
+    return `ctx.anyOf(${parts.map(p => `ctx.truthy(${p})`).join(", ")})`;
   }
 
   visitAnd_expr(ctx: And_exprContext): string {
     const parts = ctx.eq_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
-    return parts.map(p => `ctx.truthy(${p})`).join(" && ");
+    return `ctx.allOf(${parts.map(p => `ctx.truthy(${p})`).join(", ")})`;
   }
 
   /**

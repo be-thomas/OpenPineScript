@@ -183,3 +183,57 @@ describe("market orders fill at the next bar's open at every version", () => {
     });
   }
 });
+
+describe("`and` evaluates its right operand at every version", () => {
+  const probe: Probe = {
+    v1to3: 'study("t")\ng = close > open and sma(close, 3) > 0\nm = sma(close, 3)\n',
+    v4:    'study("t")\ng = close > open and sma(close, 3) > 0\nm = sma(close, 3)\n',
+    v5:    'indicator("t")\ng = close > open and ta.sma(close, 3) > 0\nm = ta.sma(close, 3)\n',
+  };
+  const plain: Probe = {
+    v1to3: 'study("t")\nm = sma(close, 3)\n',
+    v4:    'study("t")\nm = sma(close, 3)\n',
+    v5:    'indicator("t")\nm = ta.sma(close, 3)\n',
+  };
+
+  for (const version of IMPLEMENTED_VERSIONS) {
+    it(`v${version}: the average behind an \`and\` sees every bar`, () => {
+      // `close > open` is false on bars 2 and 3 of BARS. If `and` short-
+      // circuited, the average would be fed only the up bars and would differ
+      // from the same average written on its own.
+      const guarded = runAt(version, sourceFor(probe, version), ["m"]).m;
+      const alone = runAt(version, sourceFor(plain, version), ["m"]).m;
+
+      expect(BARS.some((b, i) => i > 0 && b.c <= b.o)).toBe(true);  // the probe bites
+      guarded.forEach((value, i) => {
+        if (Number.isNaN(value)) return expect(Number.isNaN(alone[i])).toBe(true);
+        expect(value).toBeCloseTo(alone[i], 10);
+      });
+    });
+  }
+});
+
+describe("a call site advances once a bar at every version", () => {
+  const probe: Probe = {
+    // v1 has no `for`, so it is left out below rather than given a source.
+    v1to3: 'study("t")\nt = 0.0\nfor i = 0 to 2\n    t := t + ema(close, 4)\nq = t / 3\ne = ema(close, 4)\n',
+    v4:    'study("t")\nt = 0.0\nfor i = 0 to 2\n    t := t + ema(close, 4)\nq = t / 3\ne = ema(close, 4)\n',
+    v5:    'indicator("t")\nt = 0.0\nfor i = 0 to 2\n    t := t + ta.ema(close, 4)\nq = t / 3\ne = ta.ema(close, 4)\n',
+  };
+
+  // `for` arrives at v2; v1 has no loop to reach a call site twice with.
+  for (const version of IMPLEMENTED_VERSIONS.filter(v => v >= 2)) {
+    it(`v${version}: three reaches sum to three times one advance`, () => {
+      const { q, e } = runAt(version, sourceFor(probe, version), ["q", "e"]);
+
+      // The shape of the TradingView check: `loopEma / 3` equals a plain
+      // `ta.ema(close, 10)` on all 2,475 bars of the golden loops export.
+      q.forEach((value, i) => {
+        if (Number.isNaN(value)) return expect(Number.isNaN(e[i])).toBe(true);
+        expect(value).toBeCloseTo(e[i], 10);
+      });
+      // Not vacuous: the average has to have produced something.
+      expect(q.some(v => !Number.isNaN(v))).toBe(true);
+    });
+  }
+});

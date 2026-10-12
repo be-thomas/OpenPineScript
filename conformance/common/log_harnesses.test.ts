@@ -42,6 +42,23 @@ const HARNESSES = fs.existsSync(DIR)
 
 const BARS = 60;
 
+/**
+ * Harnesses this engine is SUPPOSED to refuse, and the refusal each must give.
+ *
+ * A harness exists to be pasted into TradingView, and one of them exists
+ * precisely because the engine has no answer to give: harness_loopargs.pine
+ * asks what a series function does when one call site is reached twice on a
+ * bar with different arguments, which nothing measured settles. Running it
+ * here would mean the engine had quietly picked a reading.
+ *
+ * So these are asserted to fail, and to fail for the stated reason — which is
+ * a stronger statement than skipping them, and it also means this file stops
+ * expecting a refusal the moment the rule is implemented.
+ */
+const REFUSED_BY_DESIGN: Record<string, RegExp> = {
+  "harness_loopargs.pine": /called more than once on the same bar at the same place/,
+};
+
 /** A deterministic OHLCV walk. The numbers do not matter; finishing does. */
 function feed(ctx: Context, exec: () => any): void {
   let price = 100;
@@ -99,6 +116,14 @@ describe("generated v5 log harnesses", () => {
       it("compiles", () => {
         expect(() => build()).not.toThrow();
       });
+
+      const refusal = REFUSED_BY_DESIGN[file];
+      if (refusal) {
+        it("is refused, for the reason it was written to ask about", () => {
+          expect(() => run()).toThrow(refusal);
+        });
+        return;
+      }
 
       it("runs to completion and logs one row per bar", () => {
         const ctx = run();

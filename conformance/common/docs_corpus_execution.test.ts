@@ -101,6 +101,33 @@ const errors = [...RESULTS].filter(([, e]) => e !== null) as Array<[string, stri
  * reason fails this suite too — the pin is on the cause, not on the count.
  */
 const EXPECTED: Record<string, RegExp> = {
+  // ── Refused because the answer is not known ───────────────────────────────
+  //
+  // Both are the same published example, "RMA in for loop":
+  //
+  //     sum = 0.0
+  //     for i = 1 to 2
+  //         sum := sum + rma(close, i)
+  //
+  // A series function keeps ONE history per call site and advances it once per
+  // bar — TradingView's own output establishes that much, in the golden loops
+  // export, where `ta.ema` reached three times a bar advances once and returns
+  // the same value all three times. These two reach the site twice with
+  // DIFFERENT lengths, and nothing measured says which call feeds the average:
+  // whether both reads come back as `rma(close, 1)`, or the second advances a
+  // second history, or the last one wins.
+  //
+  // The three readings give visibly different plots, so one paste into
+  // TradingView settles it — conformance/v5/golden/harness_loopargs.pine is
+  // that paste. Until then the engine says it does not know, rather than
+  // returning the first reading because it happens to be the one the memo
+  // makes cheap. It used to advance the history twice a bar, which is the one
+  // reading TradingView's own output has already ruled out.
+  "v3/v3-language-expressions-declarations-and-statements-17.pine":
+    /called more than once on the same bar at the same place/,
+  "v4/v4-language-expressions-declarations-and-statements-14.pine":
+    /called more than once on the same bar at the same place/,
+
   // ── The script's own error ────────────────────────────────────────────────
   // Out-of-bounds and shape demos. Each says so in its own source or title.
   "v4/v4-essential-arrays-21.pine": /array\.set: index 3 is out of bounds/,

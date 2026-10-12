@@ -1194,7 +1194,21 @@ export class Context {
             this.seriesScopes.push(this.seriesScope);
             this.seriesScope = `${this.seriesScope}${identity}|`;
         }
-        
+
+        // A stateful BUILT-IN reached twice on one bar does not advance twice —
+        // see `barCallMemo`. User frames are excluded: this is the rule for a
+        // series function's own state, and a user function is an ordinary call
+        // that may legitimately return two different things on one bar.
+        const memoKey = userFrame ? "" : this.callStack.join("/");
+        if (memoKey && this.statefulCalls.has(memoKey)) {
+            const seen = this.barCallMemo.get(memoKey);
+            if (seen) {
+                this.requireSameArguments(id, seen.args, args);
+                this.callStack.pop();
+                return seen.value;
+            }
+        }
+
         try {
             const fname = removePrefix(extractFunctionName(id)); 
             const entry = this.entryFor(fname);
@@ -1281,11 +1295,13 @@ export class Context {
             this.keywordArguments = namedHere;
             this.positionalArguments = positionalHere;
             try {
-                if (entry.uses_context) {
-                    return fn(this, ...finalArgs);
-                } else {
-                    return fn(...finalArgs);
+                const value = entry.uses_context ? fn(this, ...finalArgs) : fn(...finalArgs);
+                // `statefulCalls` only learns about a site once it has run, so
+                // this is the first chance to know whether to remember it.
+                if (memoKey && this.statefulCalls.has(memoKey)) {
+                    this.barCallMemo.set(memoKey, { value, args });
                 }
+                return value;
             } finally {
                 this.keywordArguments = outerNamed;
                 this.positionalArguments = outerPositional;
@@ -1331,8 +1347,122 @@ export class Context {
         return this.entryFor(name)?.ref;
     }
 
+    /**
+     * `and` over operands that have ALREADY been evaluated.
+     *
+     * Pine does not short-circuit, so the emitter passes every operand as an
+     * argument and lets JavaScript's own evaluation order do the work. The
+     * body is trivial on purpose: all the meaning is in the call having
+     * happened at all. See visitAnd_expr in transpiler/v1/ToJsVisitor.ts.
+     */
+    public allOf(...operands: boolean[]): boolean {
+        for (const o of operands) if (!o) return false;
+        return true;
+    }
+
+    /** `or` over operands that have already been evaluated. See `allOf`. */
+    public anyOf(...operands: boolean[]): boolean {
+        for (const o of operands) if (o) return true;
+        return false;
+    }
+
+    /**
+     * Call sites known to carry series state, i.e. that have asked for
+     * persistent state at least once. Populated by `getPersistentState`.
+     */
+    private statefulCalls: Set<string> = new Set();
+
+    /**
+     * What each stateful call site returned on THIS bar, and what it was
+     * handed. Cleared by `setBar`.
+     *
+     * ── Why a call site runs at most once a bar ─────────────────────────────
+     *
+     * A series function's state belongs to its CALL SITE, and it advances once
+     * per bar — not once per time the site happens to be reached. Reaching it
+     * three times inside `for i = 0 to 2` does not make three bars go by.
+     *
+     * TradingView's own output pins both halves of that. The golden loops
+     * export computes
+     *
+     *     loopEma = 0.0
+     *     for i = 0 to 2
+     *         loopEma := loopEma + ta.ema(close, 10)
+     *     _v10 = loopEma / 3
+     *     _v11 = ta.ema(close, 10)
+     *
+     * and `_v10` equals `_v11` on all 2,475 bars to the last decimal. That is
+     * only possible if the loop's `ta.ema` advanced once and returned the same
+     * value all three times. Without this, ours advanced three times a bar: it
+     * warmed up three times too fast — first value at bar 3 where TradingView
+     * has bar 9 — and stayed ~3% out forever after.
+     *
+     * The opposite case is NOT symmetric and must stay as it is: a site that is
+     * not reached at all goes STALE rather than advancing. `probe_call_inside_if`
+     * and `probe_ternary_both_arms` in the golden control export both agree
+     * with TradingView while doing exactly that.
+     */
+    private barCallMemo: Map<string, { value: any; args: any[] }> = new Map();
+
+    /**
+     * Refuses a stateful call site reached twice on one bar with DIFFERENT
+     * arguments.
+     *
+     * The once-per-bar rule above is established for the case TradingView's
+     * export actually exercises: the same arguments every time. What it does
+     * not establish is which call wins when they differ —
+     *
+     *     for i = 0 to 2
+     *         total := total + ta.sma(close[i], 10)
+     *
+     * — whether the average is fed `close[0]` and the other two reads come back
+     * identical, or each read advances, or the last one wins. Returning the
+     * first call's value would be a guess that looks like an answer, and this
+     * engine says so instead. A named refusal is also what makes the gap
+     * findable: it names the call site, so a probe harness can be written for
+     * it and the rule settled from TradingView rather than from reasoning.
+     *
+     * Only SCALARS are compared. An argument that survives `valueOf` as an
+     * object is an array, a map or a drawing handle, and two reads of the same
+     * handle are the same argument however they compare.
+     */
+    private requireSameArguments(id: string, before: any[], now: any[]): void {
+        const scalar = (x: any): any => {
+            const v = x !== null && x !== undefined && typeof x.valueOf === "function"
+                ? x.valueOf() : x;
+            return v !== null && typeof v === "object" ? undefined : v;
+        };
+
+        const differs = (a: any, b: any): boolean => {
+            const x = scalar(a), y = scalar(b);
+            if (x === undefined || y === undefined) return false;   // not comparable
+            if (typeof x === "number" && typeof y === "number") {
+                return !(x === y || (Number.isNaN(x) && Number.isNaN(y)));
+            }
+            return x !== y;
+        };
+
+        const n = Math.max(before.length, now.length);
+        for (let i = 0; i < n; i++) {
+            if (!differs(before[i], now[i])) continue;
+            const name = removePrefix(extractFunctionName(id));
+            throw new Error(
+                `'${name}' is called more than once on the same bar at the same ` +
+                `place in the script, with different arguments ` +
+                `(${JSON.stringify(scalar(before[i]))} then ` +
+                `${JSON.stringify(scalar(now[i]))}). A series function keeps one ` +
+                `history per call site and advances it once per bar, so there is ` +
+                `no second history for the second set of arguments. ` +
+                `OpenPineScript has no measurement of what TradingView returns ` +
+                `here and refuses rather than guess — hoist the call out of the ` +
+                `loop, or give each argument its own call site.`,
+            );
+        }
+    }
+
     public getPersistentState<T>(initFn: () => T): T {
         const key = this.callStack.length > 0 ? this.callStack.join("/") : "global";
+        this.statefulCalls.add(key);
         if (!this.states.has(key)) {
             this.states.set(key, initFn());
         }
@@ -1631,7 +1761,10 @@ export class Context {
         this.new_var("opsv2_volume", volume);
         this.new_var("opsv2_bar_index", this.currentBarIndex);
 
-        // 3. Fill the market orders the previous bar placed.
+        // 3. A new bar: every stateful call site may advance once again.
+        this.barCallMemo.clear();
+
+        // 4. Fill the market orders the previous bar placed.
         //
         // This is the only moment that is both AFTER this bar's open is known
         // and BEFORE the script reads `strategy.position_size`, which is what
