@@ -17,7 +17,7 @@ import { compileScript } from "../../transpiler/common";
 import type { PineVersion } from "../../transpiler/common/version";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 import { compile, Context } from "./index";
-import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle } from "./context";
+import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle, Drawing, LogEntry } from "./context";
 
 // ─── Wire contract (mirrors ui-engine-control-protocol §5) ─────────────────────
 
@@ -65,6 +65,22 @@ export interface SimResult {
     fills: Array<{ plotId1: string; plotId2: string; color: string; title: string }>;
     trades: any[];
     summary: { netProfit: number; closedTrades: number; winRate: number } | null;
+    /**
+     * Every `line`, `box`, `label`, `table`, `polyline` and `linefill` the
+     * script created, in creation order, with the bar each was created on.
+     *
+     * A host draws these itself — they are objects with coordinates, not a
+     * series with one value per bar, so they cannot be expressed as a
+     * `RenderSeries`. `props` carries the drawing's own fields verbatim
+     * (`x1`/`y1`/`x2`/`y2` for a line, `text`/`style`/`color` for a label).
+     */
+    drawings: Drawing[];
+    /**
+     * Everything the script wrote with `log.info` / `log.warning` /
+     * `log.error`, each tagged with the bar and timestamp it was emitted on so
+     * a host can align it to the chart.
+     */
+    logs: LogEntry[];
     alerts: any[];
     errors: EngineError[];
 }
@@ -155,6 +171,10 @@ export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | 
         fills,
         trades: ctx.trades.slice(),
         summary: buildSummary(ctx),
+        // Creation order, which is the order a host should draw them in: a
+        // later drawing overlaps an earlier one on TradingView too.
+        drawings: [...ctx.drawings.values()],
+        logs: ctx.logs.slice(),
         alerts: [], // alertcondition: reserved (P2)
     };
 }
@@ -304,7 +324,8 @@ export function runScript(
     if (compiled.errors.length) {
         return {
             protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: compiled.meta,
-            barsProcessed: 0, series: [], fills: [], trades: [], summary: null, alerts: [], errors: compiled.errors,
+            barsProcessed: 0, series: [], fills: [], trades: [], summary: null,
+            drawings: [], logs: [], alerts: [], errors: compiled.errors,
         };
     }
     if (opts.inputs) s.setInputs(opts.inputs);

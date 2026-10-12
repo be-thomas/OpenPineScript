@@ -120,6 +120,17 @@ export const RUNTIME_GLOBALS: ReadonlySet<string> = new Set([
 ]);
 
 
+/**
+ * Is `node` a parse-tree node of the named rule?
+ *
+ * ⚠ This dispatches on the CLASS NAME, which makes those names part of the
+ * build contract. Each version's generated parser declares its own
+ * `Kw_argContext`, `Fun_callContext` and so on, so any bundler that merges the
+ * five of them has to rename four — and every check here then silently returns
+ * false for v2-v5. scripts/common/build-dist.mjs passes `keepNames` for
+ * exactly this reason, and conformance/common/bundle.test.ts fails if the
+ * published bundle ever loses it again.
+ */
 export function isRule(node: unknown, ruleContextName: string): boolean {
   return (node as any)?.constructor?.name === ruleContextName;
 }

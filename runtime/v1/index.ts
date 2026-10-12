@@ -202,3 +202,4 @@ export function compile(jsCode: string, ctx: Context, sandbox: any) {
 // Embeddable session/render-model API (see session.ts).
 export { Session, runScript, buildRenderModel, PROTOCOL_VERSION, ENGINE_VERSION } from "./session";
 export type { Compiled, SimResult, RenderSeries, RenderDelta, EngineError, InputView, Candle } from "./session";
+export type { Drawing, LogEntry, PlotData, FillData, ScriptMeta, SecurityCandle, InputDef, Trade, Position } from "./context";

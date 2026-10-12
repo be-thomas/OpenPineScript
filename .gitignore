@@ -8,3 +8,6 @@ node_modules/
 
 *.dev.md
 feed.sh
+
+# Build output. Produced by `npm run build`, published to npm, not committed.
+/dist/

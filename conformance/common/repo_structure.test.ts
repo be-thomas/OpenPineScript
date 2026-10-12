@@ -174,11 +174,13 @@ describe("test discovery", () => {
  * `dev-docs` is exempt — it is excluded from git (.git/info/exclude) and is
  * notes rather than source. `results` is exempt because the CLI creates it:
  * `--out-dir ./results` drops loose CSVs there, and a run of the tool must not
- * be able to fail the test suite. `node_modules` is not ours.
+ * be able to fail the test suite. `dist` is exempt for the same reason: it is
+ * what `npm run build` emits for publication, it is gitignored, and its layout
+ * is the package's, not this repository's. `node_modules` is not ours.
  */
 describe("every top-level folder follows the version layout", () => {
   const ALLOWED = new Set(["v1", "v2", "v3", "v4", "v5", "common"]);
-  const EXEMPT = new Set(["node_modules", "dev-docs", "results"]);
+  const EXEMPT = new Set(["node_modules", "dev-docs", "results", "dist"]);
 
   const topLevel = fs.readdirSync(ROOT, { withFileTypes: true })
     .filter(e => e.isDirectory() && !e.name.startsWith(".") && !EXEMPT.has(e.name))

@@ -1,0 +1,29 @@
+{
+  "//": [
+    "Declaration-only build for the published package.",
+    "",
+    "`rootDir: \".\"` with `include: [\"index.ts\"]` makes tsc follow the entry",
+    "point's imports and emit a .d.ts for each file it reaches, laid out under",
+    "dist/types/ exactly as the sources are laid out here — so the relative",
+    "re-exports inside index.d.ts still resolve once published. Emitting only",
+    "index.d.ts produced a file pointing at ./runtime/v1/session, which does",
+    "not exist inside dist/, and the package shipped effectively untyped.",
+    "",
+    "Loose settings on purpose: this emits types, it does not gate on them.",
+    "`npm test` is the gate. See scripts/common/build-dist.mjs."
+  ],
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist/types",
+    "rootDir": ".",
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false
+  },
+  "include": ["index.ts"]
+}

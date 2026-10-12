@@ -1,6 +1,55 @@
 {
   "name": "open-pinescript",
-  "version": "0.0.1",
+  "version": "0.1.0",
+  "description": "Run TradingView Pine Script locally and offline. Compiles Pine Script v1-v5 to JavaScript and executes it against your own OHLCV data, with indicator, plotting and strategy backtesting output verified against TradingView itself.",
+  "keywords": [
+    "pine-script",
+    "pinescript",
+    "tradingview",
+    "pine-script-v5",
+    "trading",
+    "backtesting",
+    "backtest",
+    "technical-analysis",
+    "indicators",
+    "transpiler",
+    "compiler",
+    "charting",
+    "algorithmic-trading",
+    "ohlcv",
+    "antlr"
+  ],
+  "homepage": "https://github.com/be-thomas/OpenPineScript#readme",
+  "bugs": {
+    "url": "https://github.com/be-thomas/OpenPineScript/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/be-thomas/OpenPineScript.git"
+  },
+  "license": "GPL-3.0-or-later",
+  "author": "be-thomas",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "openpinescript": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
   "scripts": {
     "generate:parser": "node scripts/common/build-grammars.mjs && node scripts/common/patch-visitor.js",
     "generate:parser:v1": "node scripts/common/build-grammars.mjs v1",
@@ -8,15 +57,17 @@
     "generate:parser:v3": "node scripts/common/build-grammars.mjs v3",
     "generate:parser:v4": "node scripts/common/build-grammars.mjs v4",
     "generate:parser:v5": "node scripts/common/build-grammars.mjs v5",
-    "postinstall": "npm run generate:parser",
     "prebuild": "ts-node scripts/common/generate-metadata.ts",
-    "build": "npm run generate:parser",
+    "build": "npm run generate:parser && node scripts/common/build-dist.mjs",
     "parse": "tsx parser/v2/run_antlr.ts",
     "replv2": "tsx repl/v2/index.ts",
     "opsv2": "tsx mock_run/v2/run.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:cov": "vitest run --coverage"
+    "test:cov": "vitest run --coverage",
+    "prepare": "npm run generate:parser",
+    "build:dist": "node scripts/common/build-dist.mjs",
+    "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "antlr4ng": "^1.0.0"
@@ -24,12 +75,17 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "antlr-ng": "^1.0.0",
+    "esbuild": "^0.27.0",
     "ts-morph": "^27.0.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
+    "typescript": "^5.6.0",
     "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
