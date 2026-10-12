@@ -3,7 +3,8 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen.svg)](https://nodejs.org)
 [![Pine Script](https://img.shields.io/badge/Pine%20Script-v1%20%E2%80%93%20v5-orange.svg)](#supported-pine-script-versions)
-[![Tests](https://img.shields.io/badge/tests-2049%20passing-success.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-2371%20passing-success.svg)](#testing)
+[![TradingView parity](https://img.shields.io/badge/TradingView%20parity-112%20columns%20%C3%97%202%2C474%20bars-blueviolet.svg)](#verified-against-tradingview-itself)
 
 **OpenPineScript is an open-source Pine Script engine.** It compiles TradingView
 Pine Script source (`.pine`) to JavaScript and executes it against your own OHLCV
@@ -14,12 +15,19 @@ in CI, or transpile Pine Script to JavaScript for embedding elsewhere.
 Pine Script **v1, v2, v3, v4 and v5** are implemented, each with its own grammar
 and its own emitter.
 
+**Its numbers are checked against TradingView's own.** 112 indicator, control-flow
+and broker columns are compared bar for bar against output collected from
+TradingView, over 2,474 daily bars each, at a relative tolerance of 1e-6. Every
+one of them agrees — see [Verified against TradingView
+itself](#verified-against-tradingview-itself).
+
 Requires Node.js 20 or newer.
 
 ## Contents
 
 - [Quick start](#quick-start)
 - [Supported Pine Script versions](#supported-pine-script-versions)
+- [Verified against TradingView itself](#verified-against-tradingview-itself)
 - [Parity: 763 real scripts from TradingView's docs](#parity-763-real-scripts-from-tradingviews-docs)
 - [Command-line interface](#command-line-interface)
 - [Transpile Pine Script to JavaScript](#transpile-pine-script-to-javascript)
@@ -116,6 +124,135 @@ the non-price series behind `request.financial`.
 
 §8 of the version delta spec (`dev-docs/01-version-delta-spec.md`) lists what is
 still missing, and why each item is refused rather than approximated.
+
+## Verified against TradingView itself
+
+Most engines are tested against a specification, against a reference
+implementation, or against numbers someone worked out by hand. None of those
+catch an indicator that is subtly and *consistently* wrong — and this repo has
+the receipts for why that matters: its hand-written `ta.sar` oracle contained
+the same three mistakes as the engine it was checking, so the differential test
+confirmed the bug for as long as it existed.
+
+So the engine is held against TradingView's own output.
+
+### Golden data: 112 columns, bar for bar
+
+[`tradingview_golden.test.ts`](conformance/common/tradingview_golden.test.ts)
+runs nine harness scripts that were pasted into TradingView, whose per-bar
+output was copied back out, and replays them here against the same bars:
+
+| Harness | Columns | What it pins |
+|---|---|---|
+| [`core`](conformance/v5/golden/harness_core.pine) | 28 | moving averages, oscillators, volatility, regression, `stoch`, `alma`, `percentrank` |
+| [`control`](conformance/v5/golden/harness_control.pine) | 15 | `if`/`else`, ternaries, boolean operators, `barssince`, `valuewhen`, state machines |
+| [`state`](conformance/v5/golden/harness_state.pine) | 15 | path-dependent values — `cum`, `sar`, `vwap`, crosses, `rising`/`falling` |
+| [`loops`](conformance/v5/golden/harness_loops.pine) | 13 | `for` with `break`/`continue`, nesting, dynamic bounds, empty ranges |
+| [`bands`](conformance/v5/golden/harness_bands.pine) | 11 | `macd`, Bollinger, `tsi`, and averages composed of other averages |
+| [`builtins`](conformance/v5/golden/harness_builtins.pine) | 8 | built-ins against the same formula written out by hand |
+| [`exits`](conformance/v5/golden/harness_exits.pine) | 8 | limit/stop brackets: when they fill, at what price, and what that leaves |
+| [`strategy`](conformance/v5/golden/harness_strategy.pine) | 7 | order flow — `position_size`, `opentrades`, `equity` |
+| [`loopargs`](conformance/v5/golden/harness_loopargs.pine) | 7 | one call site reached repeatedly on one bar |
+
+**112 columns, ~2,474 daily bars each, relative tolerance 1e-6. All agree.**
+
+The suite refuses to pass vacuously: a column compared on fewer than 50 bars, or
+one that never changes value, fails rather than agreeing. Where TradingView
+reports `na` and the engine reports a number, that is a disagreement too — the
+bar a value *starts* on is asserted, not just the values themselves.
+
+### What it caught
+
+Eleven defects that every other kind of test had missed, each one now pinned to
+the bar that exposed it:
+
+| Defect | Consequence |
+|---|---|
+| `ta.sar` was textbook Wilder, not TradingView's `pine_sar` | every SAR value, on every chart |
+| `ta.vwap` never reset at session boundaries | drifted *further* the more history it was given |
+| market orders filled on the placing bar, at its close | every backtest one bar early **and** at the wrong price |
+| limit/stop orders matched the bar that placed them | brackets closed at a stop the next bar never touched |
+| fills were applied after the script ran | every fill reported a bar late |
+| an order gapped past filled *at its level* | a price that never traded, flattering every gap |
+| fills ignored `syminfo.mintick` | sub-tick drift, compounding across trades |
+| `initial_capital` defaulted to 100k and ignored the declaration | every reported percentage |
+| `and`/`or` short-circuited | permanent gaps in any series behind a condition |
+| a call site advanced once per *reach*, not once per *bar* | anything stateful in a loop warmed up N× too fast |
+| rolling windows returned a value at bar 0 | the first N bars of `highest`/`lowest`/`stoch` |
+
+Three of those flattered backtests in the same direction, which is the kind of
+error a backtester is least likely to notice and least able to afford.
+
+### How the data is collected
+
+TradingView has no API for indicator values, so this part is manual and
+deliberately cheap to repeat. Each harness emits one CSV row per bar through
+Pine Logs — free, unlike the PRO+ "Export chart data…" feature, and it runs on
+historical bars:
+
+1. Paste `conformance/v5/golden/harness_<name>.pine` into the Pine editor.
+2. Open **More (⋮) → Pine Logs**, select the lines, copy.
+3. Save as `conformance/v5/golden/harness_<name>.<SYMBOL>.<TF>.log`.
+
+[`log_harnesses.test.ts`](conformance/common/log_harnesses.test.ts) compiles and
+runs every harness on each commit, so a broken one is found in CI rather than in
+a browser after the chart is set up.
+
+A harness is also how an open question gets settled rather than guessed. When
+the engine had no evidence for what a series function does when its call site is
+reached twice on one bar, it *refused* that program — and `harness_loopargs`
+was written to ask TradingView. The answer was none of the three behaviours it
+was written to choose between: the history keeps one slot per **bar**, which
+each reach overwrites. Replaying that rule reproduces TradingView on all 2,464
+bars it reports.
+
+### Scanner anchors: 38 indicators, every commit
+
+The golden suite needs a human. [`scanner_anchors.test.ts`](conformance/common/scanner_anchors.test.ts)
+does not — it compares 38 indicators against values **TradingView computed**, on
+the bar TradingView computed them for, from a frozen fixture:
+
+| | |
+|---|---|
+| moving averages | `SMA`/`EMA` at 5, 10, 20, 30, 50, 100, 200 |
+| oscillators | `RSI` 14 and 7, `MACD` line and signal, `CCI`, `Stoch.RSI` %K/%D, `W%R`, `ROC`, `Mom`, `AO`, `BBPower` |
+| volatility & bands | `ATR`, Bollinger upper/lower, Donchian, Ichimoku base/conversion |
+| trend | `ADX` with +DI and −DI, Parabolic SAR, Hull MA, VWMA |
+
+All 38 agree, 36 of them to 1e-14. The two that do not are understood: `VWMA`
+differs at 5.2e-9 whatever the window length, which is the volume the two sides
+divide by rather than the arithmetic, and `EMA200` carries a seed this fixture's
+window cannot see — 7.6e-6 over 999 bars, 4.3e-15 over the full history.
+
+A comparison is only meaningful if both sides computed from the same bars, and
+TradingView does not publish its history. The fixture sidesteps that by choosing
+a symbol where it does not have to: TradingView's `BINANCE:BTCUSDT` feed is
+Binance's, Binance serves its klines publicly, and
+[the collector](scripts/common/fetch-scanner-anchors.mjs) refuses to write a
+fixture unless the bar TradingView reported matches the bar Binance served to
+the last decimal — so a disagreement is always attributable to the engine.
+
+```bash
+node scripts/common/fetch-scanner-anchors.mjs   # refresh the frozen fixture
+```
+
+It is narrow, and worth saying so: ONE bar rather than a series, over a list of
+indicators chosen by TradingView's screener rather than by this repo. A function
+can agree on the captured bar and be wrong on the one before it. That is what
+the golden harnesses are for — and unlike them, this suite runs unattended.
+
+### What is *not* covered
+
+Roughly a tenth of the ~700-entry standard library has ever been held against
+TradingView's own numbers, concentrated in `ta.*`, `math.*` and `strategy.*`.
+Eleven defects in that tenth is not a rate that suggests the rest is clean.
+`str.*`, `array.*`/`matrix.*`, the drawing namespaces, `request.security` across
+timeframes, and every intraday concern (sessions, `time()`, `timeframe.*`) have
+no TradingView-anchored coverage yet. Every export so far is a daily chart.
+
+Writing a harness is the contribution with the highest value per line in this
+repo. [`conformance/common/golden.md`](conformance/common/golden.md) has the
+recipe.
 
 ## Parity: 763 real scripts from TradingView's docs
 
@@ -269,7 +406,7 @@ Report written: ./results/comparison_report.json
 npm test
 ```
 
-2,191 tests pass across 83 files. None fail.
+2,371 tests pass across 84 files. None fail.
 
 Three patterns carry most of the weight:
 
@@ -287,42 +424,8 @@ Three patterns carry most of the weight:
 
 ### Parity against TradingView
 
-[`conformance/common/scanner_anchors.test.ts`](conformance/common/scanner_anchors.test.ts)
-compares 38 indicators against the values **TradingView computed**, on the bar
-TradingView computed them for:
-
-| | |
-|---|---|
-| moving averages | `SMA`/`EMA` at 5, 10, 20, 30, 50, 100, 200 |
-| oscillators | `RSI` 14 and 7, `MACD` line and signal, `CCI`, `Stoch.RSI` %K/%D, `W%R`, `ROC`, `Mom`, `AO`, `BBPower` |
-| volatility & bands | `ATR`, Bollinger upper/lower, Donchian, Ichimoku base/conversion |
-| trend | `ADX` with +DI and −DI, Parabolic SAR, Hull MA, VWMA |
-
-All 38 agree, 36 of them to 1e-14. The two that do not are understood: `VWMA`
-differs at 5.2e-9 whatever the window length, which is the volume the two sides
-divide by rather than the arithmetic, and `EMA200` carries a seed this fixture's
-window cannot see — 7.6e-6 over 999 bars, 4.3e-15 over the full history.
-
-The comparison is only meaningful if both sides computed from the same bars, and
-TradingView does not publish its history. The fixture sidesteps that by choosing
-a symbol where it does not have to: TradingView's `BINANCE:BTCUSDT` feed is
-Binance's, Binance serves its klines publicly, and
-[the collector](scripts/common/fetch-scanner-anchors.mjs) refuses to write a
-fixture unless the bar TradingView reported matches the bar Binance served to
-the last decimal — so a disagreement is always attributable to the engine.
-
-```bash
-node scripts/common/fetch-scanner-anchors.mjs   # refresh the frozen fixture
-```
-
-It is narrow, and worth saying so: ONE bar rather than a series, over a fixed
-list of indicators chosen by TradingView's screener rather than by this repo. A
-function can agree on the captured bar and be wrong on the one before it. The
-fuller evidence is a chart export, in
-[`tradingview_golden.test.ts`](conformance/common/tradingview_golden.test.ts),
-which carries whole series but needs a human with a TradingView session — six of
-its seven harnesses have not been collected. This suite anchors 38 values that
-were anchored to nothing, and unlike the exports it runs on every commit.
+See [Verified against TradingView itself](#verified-against-tradingview-itself)
+— the golden-data suite and the scanner anchors both live there.
 
 ## Repository layout
 
@@ -388,9 +491,16 @@ error.
 
 ### Will results match TradingView exactly?
 
-For everything the engine implements, that is the goal, and `--compare-dir`
-exists to measure it against a real TradingView export. Known divergences are
-documented rather than hidden — see `dev-docs/01-version-delta-spec.md` §8.
+Where it has been measured, yes. 112 columns are compared bar for bar against
+output collected from TradingView, at a relative tolerance of 1e-6, and all of
+them agree — see [Verified against TradingView
+itself](#verified-against-tradingview-itself). That covers roughly a tenth of
+the standard library, concentrated in `ta.*`, `math.*` and `strategy.*`; the
+same section says plainly what is not covered.
+
+Measuring it on *your* script is what `--compare-dir` is for. Known divergences
+are documented rather than hidden — `dev-docs/01-version-delta-spec.md` §8 for
+semantics, `dev-docs/04-skipped-restrictions.md` for deliberate gaps.
 
 ### Can I use it to backtest a strategy?
 
