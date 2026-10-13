@@ -119,7 +119,20 @@ export interface SimResult {
     meta: ScriptMeta | null;
     barsProcessed: number;
     series: RenderSeries[];
-    fills: Array<{ plotId1: string; plotId2: string; color: string; title: string }>;
+    fills: Array<{
+        plotId1: string; plotId2: string; color: string; title: string;
+        /**
+         * The fill's colour BAR BY BAR, present only when the script gave it
+         * more than one.
+         *
+         * `fill(a, b, color = spanA > spanB ? green : red)` is how every
+         * Ichimoku cloud is written, and a fill carrying one colour cannot
+         * express it — the model reported whichever colour happened to come
+         * first and the cloud drew in that one colour for the whole chart.
+         * `null` at a bar means the fill is not drawn there.
+         */
+        colors?: Array<string | null>;
+    }>;
     trades: any[];
     /**
      * The position still OPEN at the last bar, which `trades` by definition
@@ -457,7 +470,16 @@ export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | 
     const fills: SimResult["fills"] = [];
     for (const [, entries] of ctx.fills) {
         const f = entries.find((d) => d !== null);
-        if (f) fills.push({ plotId1: f.plotId1, plotId2: f.plotId2, color: f.color, title: f.title });
+        if (!f) continue;
+        const colors = entries.map((d) => (d ? d.color : null));
+        const distinct = new Set(colors.filter((c): c is string => c !== null));
+        fills.push({
+            plotId1: f.plotId1, plotId2: f.plotId2, color: f.color, title: f.title,
+            // Carried only when it varies, exactly as a plot's per-point
+            // colour is: one colour on the fill is the common case and the
+            // array is 5,000 strings a host would have no use for.
+            ...(distinct.size > 1 ? { colors } : {}),
+        });
     }
 
     return {
