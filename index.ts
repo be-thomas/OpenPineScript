@@ -39,6 +39,9 @@ export type {
     RenderDelta,
     EngineError,
     InputView,
+    PropertyView,
+    Performance,
+    PerformanceStats,
     Candle,
 } from "./runtime/v1/session";
 
@@ -53,6 +56,7 @@ export type {
     InputDef,
     Trade,
     Position,
+    EquityPoint,
 } from "./runtime/v1/context";
 
 // ── The compiler, for hosts that want the JavaScript rather than the run ───

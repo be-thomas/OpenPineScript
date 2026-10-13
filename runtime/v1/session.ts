@@ -17,7 +17,7 @@ import { compileScript } from "../../transpiler/common";
 import type { PineVersion } from "../../transpiler/common/version";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 import { compile, Context } from "./index";
-import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle, Drawing, LogEntry, Position, InputDef } from "./context";
+import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle, Drawing, LogEntry, Position, InputDef, Trade, EquityPoint } from "./context";
 
 // ─── Wire contract (mirrors ui-engine-control-protocol §5) ─────────────────────
 
@@ -58,9 +58,16 @@ export interface InputView {
 export interface PropertyView {
     key: string;
     title: string;
-    type: "float" | "integer";
-    current: number;
-    declared: number;
+    type: "float" | "integer" | "string";
+    current: number | string;
+    declared: number | string;
+    /** The only values a string property accepts, for a dropdown. */
+    options?: string[];
+    /** A unit to show beside the control — "%", "ticks", "contracts". */
+    unit?: string;
+    minval?: number;
+    /** Which block of TradingView's properties tab the row belongs to. */
+    group?: string;
 }
 
 export interface Compiled {
@@ -122,6 +129,16 @@ export interface SimResult {
      */
     position: Position;
     summary: { netProfit: number; closedTrades: number; winRate: number } | null;
+    /**
+     * The full performance report, split all / long / short — the rows of
+     * TradingView's performance summary tab. Null for a study.
+     */
+    performance: Performance | null;
+    /**
+     * Account value at every bar's close, which is what the overview tab
+     * plots. Empty for a study.
+     */
+    equity: EquityPoint[];
     /**
      * Every `line`, `box`, `label`, `table`, `polyline` and `linefill` the
      * script created, in creation order, with the bar each was created on.
@@ -243,6 +260,195 @@ function buildSummary(ctx: Ctx): SimResult["summary"] {
     return { netProfit: net, closedTrades: trades.length, winRate: (wins / trades.length) * 100 };
 }
 
+// ─── Strategy performance report ───────────────────────────────────────────────
+
+/**
+ * One column of TradingView's performance summary, which reports every figure
+ * three times: over all trades, over the long ones and over the short ones.
+ *
+ * Where TradingView publishes a definition this follows it:
+ *
+ *   Profit factor   gross profit / gross loss
+ *   Max drawdown    the largest peak-to-trough decline
+ *   % profitable    winning trades / total closed trades
+ *   Sharpe          (MR - RFR) / SD, MR the mean return over a monthly
+ *                   trading period and RFR the `risk_free_rate` argument,
+ *                   2% a year by default
+ *
+ * Sortino is the same ratio against downside deviation alone, which is the
+ * only part of it TradingView states. A column's run-up and drawdown are
+ * measured on the cumulative P&L of that column's trades, so the long column
+ * answers "how deep did the long side go" rather than restating the whole
+ * account's worst moment three times.
+ */
+export interface PerformanceStats {
+    netProfit: number; netProfitPercent: number;
+    grossProfit: number; grossLoss: number;
+    maxRunup: number; maxDrawdown: number;
+    maxRunupPercent: number; maxDrawdownPercent: number;
+    profitFactor: number;
+    commissionPaid: number;
+    closedTrades: number;
+    winningTrades: number; losingTrades: number; evenTrades: number;
+    percentProfitable: number;
+    avgTrade: number; avgWinningTrade: number; avgLosingTrade: number;
+    ratioAvgWinAvgLoss: number;
+    largestWinningTrade: number; largestLosingTrade: number;
+    avgBarsInTrades: number; avgBarsInWinningTrades: number; avgBarsInLosingTrades: number;
+}
+
+export interface Performance {
+    all: PerformanceStats;
+    long: PerformanceStats;
+    short: PerformanceStats;
+    /** Figures that belong to the account rather than to a side of it. */
+    initialCapital: number;
+    openPL: number;
+    openTrades: number;
+    maxContractsHeld: number;
+    buyHoldReturn: number;
+    buyHoldReturnPercent: number;
+    sharpeRatio: number;
+    sortinoRatio: number;
+}
+
+/** A ratio whose denominator can legitimately be zero reads as NaN, not Infinity. */
+function ratio(num: number, den: number): number {
+    return den === 0 ? NaN : num / den;
+}
+
+function statsFor(trades: Trade[], capital: number): PerformanceStats {
+    const wins = trades.filter((t) => t.pnl > 0);
+    const losses = trades.filter((t) => t.pnl < 0);
+    const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+    const mean = (xs: number[]) => (xs.length === 0 ? NaN : sum(xs) / xs.length);
+
+    const grossProfit = sum(wins.map((t) => t.pnl));
+    // Negated per element, not as a whole: `-sum([])` is -0, and -0 reads as
+    // zero everywhere except in a division, where it flips the sign of the
+    // profit factor.
+    const grossLoss = sum(losses.map((t) => -t.pnl));
+    const netProfit = grossProfit - grossLoss;
+
+    // Run-up and drawdown of this column, walked over its own cumulative P&L.
+    let cum = 0, peak = 0, trough = 0, maxRunup = 0, maxDrawdown = 0;
+    for (const t of trades) {
+        cum += t.pnl;
+        if (cum > peak) { peak = cum; trough = cum; }
+        if (cum < trough) trough = cum;
+        maxRunup = Math.max(maxRunup, peak);
+        maxDrawdown = Math.max(maxDrawdown, peak - trough);
+    }
+
+    const bars = (xs: Trade[]) => xs
+        .filter((t) => typeof t.entryBarIndex === "number" && typeof t.exitBarIndex === "number")
+        .map((t) => (t.exitBarIndex as number) - (t.entryBarIndex as number));
+
+    const avgWin = mean(wins.map((t) => t.pnl));
+    const avgLoss = mean(losses.map((t) => -t.pnl));
+
+    return {
+        netProfit,
+        netProfitPercent: capital === 0 ? NaN : (netProfit / capital) * 100,
+        grossProfit, grossLoss,
+        maxRunup, maxDrawdown,
+        maxRunupPercent: capital === 0 ? NaN : (maxRunup / capital) * 100,
+        maxDrawdownPercent: capital === 0 ? NaN : (maxDrawdown / capital) * 100,
+        profitFactor: ratio(grossProfit, grossLoss),
+        commissionPaid: sum(trades.map((t) => t.commission ?? 0)),
+        closedTrades: trades.length,
+        winningTrades: wins.length,
+        losingTrades: losses.length,
+        evenTrades: trades.length - wins.length - losses.length,
+        percentProfitable: trades.length === 0 ? NaN : (wins.length / trades.length) * 100,
+        avgTrade: mean(trades.map((t) => t.pnl)),
+        avgWinningTrade: avgWin,
+        avgLosingTrade: avgLoss,
+        ratioAvgWinAvgLoss: ratio(avgWin, avgLoss),
+        largestWinningTrade: wins.length === 0 ? NaN : Math.max(...wins.map((t) => t.pnl)),
+        largestLosingTrade: losses.length === 0 ? NaN : Math.min(...losses.map((t) => t.pnl)),
+        avgBarsInTrades: mean(bars(trades)),
+        avgBarsInWinningTrades: mean(bars(wins)),
+        avgBarsInLosingTrades: mean(bars(losses)),
+    };
+}
+
+/**
+ * Sharpe and Sortino over the equity curve.
+ *
+ * TradingView states the ratio as `(MR - RFR) / SD` with MR "the average
+ * return for a monthly trading period", so the curve is reduced to one
+ * return per calendar month before anything is averaged. `risk_free_rate` is
+ * an ANNUAL percentage — 2 by default — so a month's share of it is
+ * `rate / 100 / 12`.
+ *
+ * Sortino replaces SD with the deviation of the negative months alone.
+ * Fewer than two months of data leaves both undefined rather than zero: a
+ * single return has no deviation to divide by, and reporting 0 there would
+ * read as "no risk".
+ */
+function riskRatios(curve: EquityPoint[], annualRatePercent: number): { sharpeRatio: number; sortinoRatio: number } {
+    const monthly: number[] = [];
+    let monthKey = "";
+    let monthStart = NaN;
+
+    for (const p of curve) {
+        const d = new Date(p.time);
+        const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
+        if (key !== monthKey) {
+            if (monthKey !== "" && monthStart > 0) monthly.push(p.equity / monthStart - 1);
+            monthKey = key;
+            monthStart = p.equity;
+        }
+    }
+    const last = curve[curve.length - 1];
+    if (monthKey !== "" && monthStart > 0 && last) monthly.push(last.equity / monthStart - 1);
+
+    if (monthly.length < 2) return { sharpeRatio: NaN, sortinoRatio: NaN };
+
+    const rf = (Number.isFinite(annualRatePercent) ? annualRatePercent : 2) / 100 / 12;
+    const excess = monthly.map((r) => r - rf);
+    const mean = excess.reduce((a, b) => a + b, 0) / excess.length;
+
+    const deviation = (xs: number[]) =>
+        Math.sqrt(xs.reduce((a, x) => a + x * x, 0) / xs.length);
+
+    const sd = deviation(excess.map((x) => x - mean));
+    const downside = deviation(excess.filter((x) => x < 0));
+
+    return {
+        sharpeRatio: sd === 0 ? NaN : mean / sd,
+        sortinoRatio: downside === 0 ? NaN : mean / downside,
+    };
+}
+
+function buildPerformance(ctx: Ctx): Performance | null {
+    if (ctx.scriptMeta?.kind !== "strategy") return null;
+    const trades = ctx.trades;
+    const capital = ctx.initialCapital;
+
+    const buyHold = Number.isFinite(ctx.firstClose) && ctx.firstClose !== 0
+        ? (ctx.lastClose / ctx.firstClose - 1) * capital
+        : NaN;
+
+    const openPL = ctx.position.size === 0
+        ? 0
+        : (ctx.lastClose - ctx.position.avgPrice) * ctx.position.size;
+
+    return {
+        all: statsFor(trades, capital),
+        long: statsFor(trades.filter((t) => t.direction === "long"), capital),
+        short: statsFor(trades.filter((t) => t.direction === "short"), capital),
+        initialCapital: capital,
+        openPL,
+        openTrades: ctx.position.size === 0 ? 0 : 1,
+        maxContractsHeld: ctx.maxContractsHeld,
+        buyHoldReturn: buyHold,
+        buyHoldReturnPercent: capital === 0 ? NaN : (buyHold / capital) * 100,
+        ...riskRatios(ctx.equityCurve, Number(ctx.scriptMeta.risk_free_rate ?? 2)),
+    };
+}
+
 export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | "engineVersion" | "errors"> {
     const meta = ctx.scriptMeta;
     const series: RenderSeries[] = [];
@@ -262,6 +468,8 @@ export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | 
         trades: ctx.trades.slice(),
         position: { ...ctx.position },
         summary: buildSummary(ctx),
+        performance: buildPerformance(ctx),
+        equity: ctx.equityCurve.slice(),
         // Creation order, which is the order a host should draw them in: a
         // later drawing overlaps an earlier one on TradingView too.
         drawings: [...ctx.drawings.values()],
@@ -305,19 +513,78 @@ function toInputView(d: InputDef, userInputs: Record<string, any>): InputView {
  */
 function propertyViews(ctx: Ctx): PropertyView[] {
     if (ctx.scriptMeta?.kind !== "strategy") return [];
+    const meta = ctx.scriptMeta;
     const declared = ctx.declaredProperties;
-    return [
+
+    /** What the script declared, falling back to the value in force. */
+    const was = (key: string, current: number | string) =>
+        declared[key] !== undefined ? declared[key] : current;
+
+    const rows: PropertyView[] = [
         {
             key: "initial_capital", title: "Initial capital", type: "float",
+            group: "Trading", unit: meta.currency ?? "", minval: 0,
             current: ctx.initialCapital,
             declared: Number(declared.initial_capital ?? ctx.initialCapital),
         },
         {
+            key: "default_qty_type", title: "Order size", type: "string",
+            group: "Trading",
+            options: ["fixed", "cash", "percent_of_equity"],
+            current: String(meta.default_qty_type ?? "fixed"),
+            declared: String(was("default_qty_type", meta.default_qty_type ?? "fixed")),
+        },
+        {
+            key: "default_qty_value", title: "Order size value", type: "float",
+            group: "Trading", minval: 0,
+            current: Number(meta.default_qty_value ?? 1),
+            declared: Number(was("default_qty_value", meta.default_qty_value ?? 1)),
+        },
+        {
             key: "pyramiding", title: "Pyramiding (max entries)", type: "integer",
-            current: ctx.scriptMeta.pyramiding ?? 0,
+            group: "Trading", minval: 0, unit: "orders",
+            current: meta.pyramiding ?? 0,
             declared: Number(declared.pyramiding ?? 0),
         },
+        {
+            key: "commission_type", title: "Commission type", type: "string",
+            group: "Costs",
+            options: ["commission.percent", "commission.cash_per_contract", "commission.cash_per_order"],
+            current: String(meta.commission_type ?? "commission.percent"),
+            declared: String(was("commission_type", meta.commission_type ?? "commission.percent")),
+        },
+        {
+            key: "commission_value", title: "Commission", type: "float",
+            group: "Costs", minval: 0,
+            current: Number(meta.commission_value ?? 0),
+            declared: Number(was("commission_value", meta.commission_value ?? 0)),
+        },
+        {
+            key: "slippage", title: "Slippage", type: "integer",
+            group: "Costs", minval: 0, unit: "ticks",
+            current: Number(meta.slippage ?? 0),
+            declared: Number(was("slippage", meta.slippage ?? 0)),
+        },
+        {
+            key: "margin_long", title: "Margin for long positions", type: "float",
+            group: "Costs", minval: 0, unit: "%",
+            current: Number(meta.margin_long ?? 100),
+            declared: Number(was("margin_long", meta.margin_long ?? 100)),
+        },
+        {
+            key: "margin_short", title: "Margin for short positions", type: "float",
+            group: "Costs", minval: 0, unit: "%",
+            current: Number(meta.margin_short ?? 100),
+            declared: Number(was("margin_short", meta.margin_short ?? 100)),
+        },
+        {
+            key: "risk_free_rate", title: "Risk-free rate", type: "float",
+            group: "Costs", minval: 0, unit: "% a year",
+            current: Number(meta.risk_free_rate ?? 2),
+            declared: Number(was("risk_free_rate", meta.risk_free_rate ?? 2)),
+        },
     ];
+    return rows;
 }
 
 // ─── Session (B3) ───────────────────────────────────────────────────────────────
@@ -482,6 +749,7 @@ export function runScript(
             protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: compiled.meta,
             barsProcessed: 0, series: [], fills: [], trades: [],
             position: { size: 0, avgPrice: 0 }, summary: null,
+            performance: null, equity: [],
             drawings: [], logs: [], alerts: [], errors: compiled.errors,
         };
     }

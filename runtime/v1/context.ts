@@ -16,6 +16,56 @@ export interface Trade {
     qty: number;
     pnl: number;
     direction: "long" | "short";
+    /**
+     * The bars the trade opened and closed on.
+     *
+     * A time alone cannot be aligned to a chart without searching the bar
+     * list for it, and "Avg # Bars in Trades" — a row of TradingView's
+     * performance summary — is `exitBarIndex - entryBarIndex` and nothing
+     * else. Both are recorded at the fill, where they are known for free.
+     */
+    entryBarIndex?: number;
+    exitBarIndex?: number;
+    /**
+     * The order id that OPENED the position, which TradingView's list of
+     * trades calls the trade's signal. `id` names the closing order, so
+     * without this the entry row of every trade reads "Close".
+     */
+    entryId?: string;
+    /**
+     * Favourable and adverse excursion, in currency, over the life of the
+     * trade — how far the position ran in the script's favour before it
+     * closed, and how far against.
+     *
+     *   run-up   = (highest price while open - entry price) * qty   [long]
+     *   drawdown = (entry price - lowest price while open)  * qty   [long]
+     *
+     * mirrored for a short. TradingView states the price form of both and
+     * reports them per trade; the exit price does not enter either one.
+     * Both are >= 0, and both are measured against the position's average
+     * price so a pyramided add moves them the way it moves the P&L.
+     */
+    runup?: number;
+    drawdown?: number;
+    /** Commission charged on the round turn, already deducted from `pnl`. */
+    commission?: number;
+}
+
+/**
+ * One row of the equity curve: what the account was worth at a bar's close.
+ *
+ * Sampled every bar rather than every fill because that is what a chart
+ * plots — TradingView's overview draws equity against time, and a curve
+ * that only moves when a trade closes is a staircase that hides the open
+ * position's swing. `openPL` is the part of `equity` that is not yet
+ * realized, which is what makes the difference visible.
+ */
+export interface EquityPoint {
+    time: number;
+    /** Realized cash plus the open position's mark-to-market. */
+    equity: number;
+    /** Unrealized P&L of the position held at this bar's close; 0 while flat. */
+    openPL: number;
 }
 
 export interface Position {
@@ -138,6 +188,26 @@ export interface ScriptMeta {
     calc_on_every_tick?: boolean; // strategy only
     calc_on_order_fills?: boolean; // strategy only
     currency?: string;           // strategy only
+    /**
+     * The rest of the `strategy()` declaration — the backtest settings a
+     * TradingView user reads off the Properties tab and changes without
+     * touching the script.
+     *
+     * Recorded whether or not the broker acts on each one, because a host
+     * cannot show a properties panel for arguments it was never told about,
+     * and a panel that invents its own defaults will disagree with the
+     * script the moment the script sets one.
+     */
+    initial_capital?: number;
+    default_qty_type?: string;
+    default_qty_value?: number;
+    commission_type?: string;
+    commission_value?: number;
+    slippage?: number;
+    margin_long?: number;
+    margin_short?: number;
+    process_orders_on_close?: boolean;
+    risk_free_rate?: number;
 }
 
 /**
@@ -154,6 +224,11 @@ interface RuntimeSnapshot {
     position: Position;
     cash: number;
     trades: Trade[];
+    equityLen: number;
+    positionRunup: number;
+    positionDrawdown: number;
+    maxContractsHeld: number;
+    commissionPaid: number;
     orders: any[];
     marketOrders: MarketOrder[];
     pendingEntries: Map<string, any>;
@@ -969,6 +1044,40 @@ export class Context {
     public orders: any[] = [];
 
     /**
+     * The equity curve, one point per CLOSED bar, for strategies only.
+     *
+     * A study never opens a position, so sampling one would append a flat
+     * line of `initial_capital` to every indicator's render model.
+     */
+    public equityCurve: EquityPoint[] = [];
+
+    /**
+     * Excursion of the position currently open, in currency, reset when a
+     * position is opened from flat and read when it closes. Both are >= 0.
+     *
+     * Tracked on the Context rather than on the Position because they are
+     * measured across bars and the broker only ever sees one: by the time
+     * `closeAt` runs, the high the trade reached three bars ago is gone.
+     */
+    public positionRunup: number = 0;
+    public positionDrawdown: number = 0;
+
+    /** The largest absolute position size held at any point in the run. */
+    public maxContractsHeld: number = 0;
+
+    /** Commission charged across the whole run, for the performance summary. */
+    public commissionPaid: number = 0;
+
+    /**
+     * The first and last close the strategy saw, for the buy & hold baseline
+     * TradingView draws against the equity curve. Recorded here because the
+     * render model is built from the Context alone and the candles are the
+     * caller's.
+     */
+    public firstClose: number = NaN;
+    public lastClose: number = NaN;
+
+    /**
      * Market orders placed on this bar, waiting for the next bar's open.
      *
      * `setBar` drains it; see MarketOrder in ./stdlib/strategy.ts for why a
@@ -1077,6 +1186,13 @@ export class Context {
         this.trades = [];
         this.orders = [];
         this.marketOrders = [];
+        this.equityCurve = [];
+        this.positionRunup = 0;
+        this.positionDrawdown = 0;
+        this.maxContractsHeld = 0;
+        this.commissionPaid = 0;
+        this.firstClose = NaN;
+        this.lastClose = NaN;
 
         // 6. Reset Script Metadata (re-declared on the next pass)
         this.scriptMeta = null;
@@ -1144,12 +1260,32 @@ export class Context {
                 precision: arg('precision') !== undefined ? Number(arg('precision')) : undefined,
             };
         } else {
+            const num = (name: string, fallback?: number): number | undefined => {
+                const v = arg(name);
+                return v !== undefined && Number.isFinite(Number(v)) ? Number(v) : fallback;
+            };
+            const str = (name: string): string | undefined => {
+                const v = arg(name);
+                return v !== undefined ? String(v) : undefined;
+            };
+
             this.scriptMeta = {
                 kind, title, shorttitle, overlay,
                 pyramiding: arg('pyramiding') !== undefined ? Number(arg('pyramiding')) : 0,
                 calc_on_every_tick: Boolean(arg('calc_on_every_tick')),
                 calc_on_order_fills: Boolean(arg('calc_on_order_fills')),
                 currency: arg('currency') !== undefined ? String(arg('currency')) : undefined,
+                // Defaults are TradingView's own: one contract per order, no
+                // costs, 100% margin, orders filled on the next bar's open.
+                default_qty_type: str('default_qty_type') ?? 'fixed',
+                default_qty_value: num('default_qty_value', 1),
+                commission_type: str('commission_type') ?? 'commission.percent',
+                commission_value: num('commission_value', 0),
+                slippage: num('slippage', 0),
+                margin_long: num('margin_long', 100),
+                margin_short: num('margin_short', 100),
+                process_orders_on_close: Boolean(arg('process_orders_on_close')),
+                risk_free_rate: num('risk_free_rate', 2),
             };
 
             // The broker's starting balance, which until now was read from
@@ -1162,7 +1298,13 @@ export class Context {
             const capital = arg('initial_capital');
             if (capital !== undefined && Number.isFinite(Number(capital))) {
                 this.initialCapital = Number(capital);
-                this.cash = Number(capital);
+                // ONLY on the first bar. `strategy()` is a statement in the
+                // script body, so it runs again on every bar — and re-seeding
+                // `cash` each time handed the balance back to the broker after
+                // every trade, leaving it permanently equal to the starting
+                // capital. Nothing read `cash` closely enough to notice until
+                // the equity curve plotted it.
+                if (this.currentBarIndex === 0) this.cash = Number(capital);
             }
 
             // Recorded before any override so a host can offer the script's
@@ -1174,6 +1316,18 @@ export class Context {
                     : DEFAULT_INITIAL_CAPITAL;
             this.declaredProperties.pyramiding =
                 declared('pyramiding') !== undefined ? Number(declared('pyramiding')) : 0;
+
+            this.scriptMeta.initial_capital = this.initialCapital;
+
+            // Every other overridable declaration argument, recorded before
+            // the override so the properties panel can offer "reset to the
+            // script's value" for each of them too.
+            for (const key of ['commission_type', 'commission_value', 'slippage',
+                               'default_qty_type', 'default_qty_value',
+                               'margin_long', 'margin_short', 'risk_free_rate'] as const) {
+                const v = declared(key);
+                if (v !== undefined) this.declaredProperties[key] = v;
+            }
         }
     }
 
@@ -2136,7 +2290,43 @@ export class Context {
                 series.push(null);
             }
         });
+        this.sampleEquity();
         this.currentBarIndex++;
+    }
+
+    /**
+     * Records one equity point and advances the open position's excursion.
+     *
+     * Run at the END of a bar, after the script and the broker have both had
+     * it: an entry placed on this bar is already in `position`, and the high
+     * and low of the bar it filled on count towards its run-up, which is what
+     * TradingView reports.
+     */
+    private sampleEquity() {
+        if (this.scriptMeta?.kind !== "strategy") return;
+
+        if (Number.isNaN(this.firstClose)) this.firstClose = this.close;
+        this.lastClose = this.close;
+
+        const size = this.position.size;
+        const openPL = size === 0 ? 0 : (this.close - this.position.avgPrice) * size;
+        this.equityCurve.push({ time: this.time, equity: this.cash + openPL, openPL });
+
+        if (size === 0) {
+            this.positionRunup = 0;
+            this.positionDrawdown = 0;
+            return;
+        }
+
+        const qty = Math.abs(size);
+        if (qty > this.maxContractsHeld) this.maxContractsHeld = qty;
+
+        // Excursion is measured in price against the position's average, then
+        // scaled by size - so a pyramided add moves it the way it moves P&L.
+        const best = size > 0 ? this.high - this.position.avgPrice : this.position.avgPrice - this.low;
+        const worst = size > 0 ? this.position.avgPrice - this.low : this.high - this.position.avgPrice;
+        this.positionRunup = Math.max(this.positionRunup, best * qty);
+        this.positionDrawdown = Math.max(this.positionDrawdown, worst * qty);
     }
 
     // --- Live-tick model (P3) ---
@@ -2188,6 +2378,13 @@ export class Context {
             position: structuredClone(this.position),
             cash: this.cash,
             trades: structuredClone(this.trades),
+            // The curve is append-only, so a length is a complete rollback
+            // point for it and clones nothing.
+            equityLen: this.equityCurve.length,
+            positionRunup: this.positionRunup,
+            positionDrawdown: this.positionDrawdown,
+            maxContractsHeld: this.maxContractsHeld,
+            commissionPaid: this.commissionPaid,
             orders: structuredClone(this.orders),
             marketOrders: structuredClone(this.marketOrders),
             pendingEntries: structuredClone((this as any)._pendingEntries ?? new Map()),
@@ -2230,6 +2427,11 @@ export class Context {
         this.position = structuredClone(s.position);
         this.cash = s.cash;
         this.trades = structuredClone(s.trades);
+        this.equityCurve.length = s.equityLen;
+        this.positionRunup = s.positionRunup;
+        this.positionDrawdown = s.positionDrawdown;
+        this.maxContractsHeld = s.maxContractsHeld;
+        this.commissionPaid = s.commissionPaid;
         this.orders = structuredClone(s.orders);
         this.marketOrders = structuredClone(s.marketOrders);
         (this as any)._pendingEntries = structuredClone(s.pendingEntries);
