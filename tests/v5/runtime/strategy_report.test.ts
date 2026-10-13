@@ -133,6 +133,56 @@ describe("the equity curve", () => {
   });
 });
 
+describe("strategy.equity, which the equity curve is sampled from", () => {
+  // `strategy()` is a statement in the script body, so it runs on every bar.
+  // Seeding `cash` there re-handed the balance to the broker after every
+  // trade, which pinned `strategy.equity` to `initial_capital + openProfit`
+  // for the whole run — it ignored every closed trade. The equity curve is
+  // what made it visible; this is the builtin it was wrong in.
+  const source =
+    '//@version=5\n' +
+    'strategy("Equity", initial_capital = 10000)\n' +
+    'fast = ta.sma(close, 5)\n' +
+    'slow = ta.sma(close, 20)\n' +
+    'if ta.crossover(fast, slow)\n' +
+    '    strategy.entry("Long", strategy.long)\n' +
+    'if ta.crossunder(fast, slow)\n' +
+    '    strategy.close("Long")\n' +
+    'plot(strategy.equity, "equity")\n' +
+    'plot(strategy.netprofit, "net")\n';
+
+  const r = runScript(source, { candles: bars(300) });
+  const seriesNamed = (title: string) =>
+    r.series.find(s => s.title === title)!.data.map(p => (p as any)?.value ?? null);
+
+  it("moves with realised profit, not only with the open position", () => {
+    const equity = seriesNamed("equity");
+    const distinct = new Set(equity.filter(v => v !== null).map(v => v!.toFixed(4)));
+    expect(distinct.size).toBeGreaterThan(1);
+    // It ends at capital + everything the strategy realised + whatever the
+    // position still open is worth. The strategy is in the market on the last
+    // bar here, so leaving the open leg out is what the OLD behaviour looked
+    // like from the other direction.
+    const realised = r.trades.reduce((a, t) => a + t.pnl, 0);
+    const open = r.performance!.openPL;
+    expect(open).not.toBe(0);
+    expect(equity[equity.length - 1]!).toBeCloseTo(10000 + realised + open, 6);
+  });
+
+  it("agrees with strategy.netprofit on every flat bar", () => {
+    const equity = seriesNamed("equity");
+    const net = seriesNamed("net");
+    for (let i = 0; i < equity.length; i++) {
+      if (equity[i] === null || net[i] === null) continue;
+      // While flat there is no unrealized component, so the two differ by
+      // exactly the starting capital.
+      if (r.equity[i] && r.equity[i].openPL === 0) {
+        expect(equity[i]!).toBeCloseTo(10000 + net[i]!, 6);
+      }
+    }
+  });
+});
+
 describe("the performance summary", () => {
   const r = runScript(CROSSOVER(), { candles: bars(300) });
   const p = r.performance!;
