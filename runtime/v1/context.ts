@@ -190,6 +190,7 @@ interface RuntimeSnapshot {
  */
 function plainValue(v: any): any {
     if (v instanceof Series) return v.valueOf();
+    if (Array.isArray(v)) return v.map(plainValue);
     if (typeof v === "function") {
         const unwrapped = v.valueOf();
         return typeof unwrapped === "function" ? undefined : unwrapped;
@@ -1196,20 +1197,34 @@ export class Context {
     ): any {
         const currentId = `input_${this.inputCounter++}`;
 
+        // Everything recorded here leaves the engine — a host reads `inputDefs`
+        // to build its settings dialog, across a postMessage. And these values
+        // come straight off the script, so
+        //
+        //     string SIZE_LARGE = "Large"
+        //     input.string(SIZE_NORMAL, "Size", options = [SIZE_LARGE, …])
+        //
+        // hands over an array of `Series`, each holding this Context and through
+        // it the whole sandbox. Unwrapping also makes `constrainInput` work:
+        // `options.includes(value)` compared a Series against a string and was
+        // never true, so every option list silently fell back to its default.
+        const plainMeta: Record<string, any> = {};
+        for (const [k, v] of Object.entries(meta)) plainMeta[k] = plainValue(v);
+
         // If it's the dry run (first time seeing this), save the definition
         if (this.inputDefs.length < this.inputCounter) {
             this.inputDefs.push({
                 id: currentId,
-                defval,
+                defval: plainValue(defval),
                 title: title || currentId,
                 type,
-                ...meta,
+                ...plainMeta,
             });
         }
 
         // Return user override if it exists, otherwise return the default
-        const raw = currentId in this.userInputs ? this.userInputs[currentId] : defval;
-        return Context.constrainInput(raw, meta);
+        const raw = currentId in this.userInputs ? this.userInputs[currentId] : plainValue(defval);
+        return Context.constrainInput(raw, { ...plainMeta, defval: plainValue(defval) });
     }
 
     /** Clamp to `minval`/`maxval` and fall back to the default outside `options`. */

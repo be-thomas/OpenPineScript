@@ -55,6 +55,39 @@ describe("an input's declared constraints", () => {
   });
 });
 
+describe("an option list built from variables", () => {
+  // TradingView's own style guide publishes exactly this shape
+  // (`v5-writing-style-guide-04`): named constants, then an `options` list
+  // referring to them.
+  const source =
+    '//@version=5\nindicator("i")\n' +
+    'A = "alpha"\nB = "beta"\n' +
+    'v = input.string(A, "Pick", options = [A, B])\n' +
+    'plot(v == "beta" ? 1 : 0)\n';
+
+  it("reports the option VALUES, not the variables holding them", () => {
+    // `A` and `B` are `ctx.new_var(...)`, so the list arrives as an array of
+    // Series — each holding the Context and through it the whole sandbox.
+    const inputs = new Session().compile(source).inputs;
+    expect(inputs[0].options).toEqual(["alpha", "beta"]);
+  });
+
+  it("lets a host clone the compile reply", () => {
+    expect(() => structuredClone(new Session().compile(source))).not.toThrow();
+  });
+
+  it("accepts a choice from the list", () => {
+    // `constrainInput` falls back to the default for a value outside
+    // `options`, and `options.includes(aSeries)` is never true — so every
+    // option list rejected every choice and silently reverted.
+    const session = new Session();
+    session.compile(source);
+    session.setInputs({ input_0: "beta" });
+    const point = session.runHistory(bars(5)).series[0].data[4] as any;
+    expect(point.value).toBe(1);
+  });
+});
+
 describe("a strategy's overridable properties", () => {
   const source =
     '//@version=5\nstrategy("P", overlay = true, initial_capital = 10000)\n' +
