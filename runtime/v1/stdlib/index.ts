@@ -423,6 +423,34 @@ export function createStdlib(ctx: Context) {
         }
     }
 
+    // `cross` is BOTH things at v1–v3, and one sandbox slot has to carry both.
+    //
+    //   cross(x, y)                  the crossover test
+    //   plot(x, style = cross)       the plot style v4 renamed to plot.style_cross
+    //
+    // SOURCING. TradingView publishes the SAME how-to at both versions:
+    // `v3-appendix-howtos-09` plots `barssince(is_new_day())` with
+    // `style=cross`, and `v4-appendix-howtos-10` is the identical script with
+    // `style=plot.style_cross`. The bare global is that style's v1–v3 spelling.
+    //
+    // Every other style in that family — line, histogram, columns, circles,
+    // area, areabr, linebr, stepline — is a plain constant in ui.ts. `cross`
+    // alone collides with a function name, so it is the function that carries
+    // the value, through the same non-enumerable `valueOf` device the
+    // value-bearing namespaces use. `cross(a, b)` still calls; reading `cross`
+    // yields "cross".
+    //
+    // Without this the FUNCTION ITSELF was recorded as the plot's style, which
+    // put a live closure in the render model and made the result impossible to
+    // postMessage — the script drew nothing in any worker-backed host.
+    if (ctx.profile.version <= 3) {
+        const crossFn = sandboxStdlib["cross"];
+        if (typeof crossFn === "function" && !Object.prototype.hasOwnProperty.call(crossFn, "valueOf")) {
+            Object.defineProperty(crossFn, "valueOf", { value: () => "cross", enumerable: false });
+            Object.defineProperty(crossFn, "toString", { value: () => "cross", enumerable: false });
+        }
+    }
+
     return sandboxStdlib;
 }
 

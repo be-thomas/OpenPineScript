@@ -168,6 +168,35 @@ interface RuntimeSnapshot {
  * them has ~10 optional style properties, and nothing in this engine reads them
  * — they exist so a host can render, and so a script that draws does not crash.
  */
+/**
+ * Reduce a runtime value to something that can leave this process.
+ *
+ * The render model is a DATA structure: a host reads it across a `postMessage`
+ * or a JSON boundary, so anything in it that is not plain data makes the whole
+ * result unusable, however correct its numbers are.
+ *
+ * Two things arrive here that are not:
+ *
+ *   a `Series`             `f = plot(...)` compiles to `ctx.new_var(...)`, so a
+ *                          plot id handed to `fill()` is a Series — and a
+ *                          Series holds the Context, which holds the sandbox,
+ *                          which holds every stdlib function.
+ *   a value-bearing FN     `cross` is the crossover function AND the v1–v3
+ *                          plot style; `plot(x, style = cross)` records the
+ *                          binding, and the binding is callable.
+ *
+ * A function that carries no value is dropped rather than stringified: the
+ * render model has no reading for one, and a source dump is worse than a gap.
+ */
+function plainValue(v: any): any {
+    if (v instanceof Series) return v.valueOf();
+    if (typeof v === "function") {
+        const unwrapped = v.valueOf();
+        return typeof unwrapped === "function" ? undefined : unwrapped;
+    }
+    return v;
+}
+
 export interface Drawing {
     id: string;
     kind: 'line' | 'label' | 'box' | 'table' | 'polyline' | 'linefill';
@@ -1182,6 +1211,35 @@ export class Context {
     /** How many arguments the caller passed before any keyword. */
     public positionalArguments: number = 0;
 
+    /**
+     * Resolve a trailing keyword bundle against a parameter list.
+     *
+     * The same rule the built-in path applies, over names the emitter supplies
+     * rather than names the registry does. A gap is left `undefined` so the
+     * emitted function's own JavaScript default takes over, which is how a
+     * Pine parameter default is expressed.
+     */
+    private bindKeywordArguments(args: any[], params: string[], fname: string): any[] {
+        const last = args[args.length - 1];
+        const isBundle = last && typeof last === 'object' && !Array.isArray(last)
+            && !(last instanceof Series) && last.constructor === Object
+            && Object.keys(last).length > 0
+            && Object.keys(last).every(k => k.startsWith(PREFIX));
+        if (!isBundle) return args;
+
+        const out = args.slice(0, -1);
+        for (const [key, value] of Object.entries(last)) {
+            const name = removePrefix(key);
+            const index = params.indexOf(name);
+            // Recorded, not guessed at: a keyword the signature does not name
+            // is the same class of silence the built-in path tracks.
+            if (index === -1) { this.droppedArguments.add(`${fname}(${name})`); continue; }
+            while (out.length <= index) out.push(undefined);
+            out[index] = value;
+        }
+        return out;
+    }
+
     public call(id: string, fn: Function, ...args: any[]) {
         // DIAGNOSTIC: If this triggers, the transpiler passed a null function reference
         if (typeof fn !== 'function') {
@@ -1242,6 +1300,22 @@ export class Context {
 
             // 1. Check if the entry exists. If not, we default to standard call (fail-safe)
             if (!entry) {
+                // A USER-DEFINED function. The built-in registry knows nothing
+                // about it, so its parameter names come from the emitter, which
+                // records them on the function as `__params`.
+                //
+                // Without this the keyword bundle was handed to the function as
+                // the next POSITIONAL argument, so
+                //
+                //     averages.toTable(header = headerText, textSize = txtSize)
+                //
+                // — TradingView's own published maps example — put `{header:…}`
+                // into `position` and returned `na`. No error: the script simply
+                // drew nothing, and every value that depended on it was `na`.
+                const params: unknown = (fn as any).__params;
+                if (Array.isArray(params) && params.length > 0) {
+                    return fn(...this.bindKeywordArguments(args, params as string[], fname));
+                }
                 // If we don't have metadata, we assume it's a standard JS function call
                 return fn(...args);
             }
@@ -1904,7 +1978,7 @@ export class Context {
     private plainPlotData<T extends Record<string, any>>(data: T): T {
         const out: Record<string, any> = {};
         for (const [k, v] of Object.entries(data)) {
-            out[k] = v instanceof Series ? v.valueOf() : v;
+            out[k] = plainValue(v);
         }
         return out as T;
     }
@@ -1951,8 +2025,8 @@ export class Context {
         // See `plainPlotData`: a plot id reaches here as a Series whenever the
         // script stored it in a variable, which is the documented way to use
         // `fill()` at all.
-        id1 = id1 instanceof Series ? id1.valueOf() : id1;
-        id2 = id2 instanceof Series ? id2.valueOf() : id2;
+        id1 = plainValue(id1);
+        id2 = plainValue(id2);
         options = this.plainPlotData(options);
         const title = options.title || `Fill_${id1}_${id2}`;
         

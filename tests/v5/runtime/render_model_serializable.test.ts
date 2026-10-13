@@ -78,6 +78,40 @@ describe("a plot whose colour is held in a variable", () => {
   });
 });
 
+describe("a v1–v3 plot style that is also a function", () => {
+  // SOURCING. TradingView publishes the same how-to twice: `style = cross` at
+  // v3 (`v3-appendix-howtos-09`) and `style = plot.style_cross` at v4
+  // (`v4-appendix-howtos-10`), over an otherwise identical script. The bare
+  // global is that style's v1–v3 spelling — and it collides with `cross(x, y)`,
+  // which is why it was the only style in the family with no constant.
+  const source =
+    '//@version=3\nstudy("My Script", overlay=true)\n' +
+    'is_new_day() => \n    d=dayofweek\n    na(d[1]) or d != d[1]\n' +
+    'plot(barssince(is_new_day()), style=cross)\n';
+
+  it("records the style as a string, not as the function", () => {
+    const series = runScript(source, { candles: bars(30) }).series[0];
+    // The FUNCTION was being stored, which put a live closure — and through it
+    // the Context and the whole sandbox — inside the render model.
+    expect(series.style).toBe("cross");
+  });
+
+  it("still calls cross(x, y) as a function", () => {
+    const crossing =
+      '//@version=3\nstudy("c")\n' +
+      'plot(cross(close, open) ? 1 : 0)\n';
+    const result = runScript(crossing, { candles: bars(30) });
+    expect(result.errors).toEqual([]);
+    const values = result.series[0].data.map(d => (d as any)?.value);
+    expect(values.some(v => v === 1)).toBe(true);
+  });
+
+  it("leaves a result with no functions in it", () => {
+    expect(functionsIn(runScript(source, { candles: bars(30) }))).toEqual([]);
+    expect(() => structuredClone(runScript(source, { candles: bars(30) }))).not.toThrow();
+  });
+});
+
 describe("every sample the charting UI ships", () => {
   // These are the scripts the chart's editor offers by default. Each one has
   // to cross the worker boundary, so each one is checked here rather than only
