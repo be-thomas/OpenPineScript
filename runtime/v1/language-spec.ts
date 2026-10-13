@@ -22,6 +22,8 @@
  * `ctx`-first export there into a built-in, and these are plain functions.
  */
 import { viewFor } from "./stdlib";
+import { RUNTIME_GLOBALS } from "../../transpiler/v1/ToJsVisitor";
+import { profileFor } from "../../transpiler/common/profiles";
 import type { PineVersion } from "../../transpiler/common/version";
 
 /**
@@ -71,7 +73,30 @@ export function languageSpec(version: PineVersion): LanguageSpec {
         if (introduced <= version) for (const k of KEYWORDS_BY_VERSION[introduced]) keywords.add(k);
     }
 
-    const builtins = Object.keys(viewFor(version));
+    const profile = profileFor(version);
+
+    const names = new Set(Object.keys(viewFor(version)));
+
+    // The OHLCV series and the bar counter are bound straight into the sandbox
+    // as data, so they have no registry entry — `close` is the most-typed word
+    // in Pine and the registry has never heard of it. The transpiler keeps its
+    // own list for exactly this reason, and this is that list.
+    //
+    // `n` and `bar_index` both appear in it, and only one is spellable at any
+    // version: the profile bans the other, and a banned name is not part of
+    // the language the author is writing.
+    for (const g of RUNTIME_GLOBALS) {
+        if (!profile.banned.has(g)) names.add(g);
+    }
+
+    // The declaration directives are handled by the transpiler rather than the
+    // registry, so they are absent too — leaving the first line of every script
+    // uncoloured. v5 renamed `study` to `indicator`; the profile knows which.
+    names.add(profile.defaults.scriptDirective);
+    names.add("strategy");
+    if (version >= 5) names.add("library");
+
+    const builtins = [...names];
     const namespaces = new Set<string>();
     for (const name of builtins) {
         const dot = name.indexOf(".");

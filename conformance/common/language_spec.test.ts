@@ -33,6 +33,38 @@ describe("the language spec", () => {
     expect(languageSpec(5).keywords).toContain("switch");
   });
 
+  it("includes the series the runtime binds outside the registry", () => {
+    // `close` is the most-typed word in Pine and has no registry entry — the
+    // OHLCV series are bound into the sandbox as data. An editor without them
+    // leaves the body of almost every script uncoloured.
+    for (const v of IMPLEMENTED_VERSIONS) {
+      for (const name of ["open", "high", "low", "close", "volume"]) {
+        expect(languageSpec(v).builtins).toContain(name);
+      }
+    }
+  });
+
+  it("spells the bar counter the way its version does", () => {
+    // Exactly one of `n` / `bar_index` is spellable at a version; the other is
+    // banned by the profile, and a banned name is not part of the language.
+    expect(languageSpec(2).builtins).toContain("n");
+    expect(languageSpec(2).builtins).not.toContain("bar_index");
+    expect(languageSpec(5).builtins).toContain("bar_index");
+    expect(languageSpec(5).builtins).not.toContain("n");
+  });
+
+  it("includes the declaration directive, which the transpiler owns", () => {
+    // Without these the FIRST LINE of every script goes uncoloured.
+    expect(languageSpec(4).builtins).toContain("study");
+    expect(languageSpec(4).builtins).not.toContain("indicator");
+    expect(languageSpec(5).builtins).toContain("indicator");
+    expect(languageSpec(5).builtins).not.toContain("study");
+    expect(languageSpec(5).builtins).toContain("library");
+    for (const v of IMPLEMENTED_VERSIONS) {
+      expect(languageSpec(v).builtins).toContain("strategy");
+    }
+  });
+
   it("grows monotonically across the versions", () => {
     let previous = 0;
     for (const v of IMPLEMENTED_VERSIONS) {
