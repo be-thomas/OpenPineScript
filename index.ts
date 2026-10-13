@@ -65,6 +65,14 @@ export {
 
 export type { PineVersion, TranspileOptions, CompileResult } from "./transpiler/common";
 
+// ── The language itself, for an editor ─────────────────────────────────────
+//
+// The keywords and built-in names a version knows, taken from the grammars and
+// the registry the compiler consults — so a host's syntax highlighting cannot
+// drift from what the engine will actually accept.
+export { languageSpec } from "./runtime/v1/language-spec";
+export type { LanguageSpec } from "./runtime/v1/language-spec";
+
 // ── The low-level engine ───────────────────────────────────────────────────
 //
 // An escape hatch for a host that drives the bar loop itself — a custom
