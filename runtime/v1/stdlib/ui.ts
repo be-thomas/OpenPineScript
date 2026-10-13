@@ -117,7 +117,7 @@ export function plotshape(
     }
 
     ctx.registerPlot({
-        ...shown({ offset, text, textcolor, editable, size, show_last,
+        ...shown({ location, offset, text, textcolor, editable, size, show_last,
                      display, format, precision, force_overlay }),
         type: 'shape',
         value: val,
@@ -146,7 +146,7 @@ export function plotchar(
     }
 
     ctx.registerPlot({
-        ...shown({ offset, text, textcolor, editable, size, show_last,
+        ...shown({ location, offset, text, textcolor, editable, size, show_last,
                      display, format, precision, force_overlay }),
         type: 'char',
         value: val,

@@ -47,13 +47,35 @@ export interface Compiled {
 
 type SeriesType = "line" | "candle" | "marker" | "arrow" | "bgcolor" | "barcolor";
 
+/**
+ * One drawable point. `color` is present only where the script set a DIFFERENT
+ * colour on that bar than the series default — `plot(close, color = close >
+ * open ? green : red)` is ordinary Pine, and a per-series colour cannot express
+ * it. A host that ignores the field still draws the right shape in the series
+ * colour; one that reads it draws what TradingView draws.
+ */
+export type RenderPoint =
+    | { value: number; color?: string }
+    | { open: number; high: number; low: number; close: number; color?: string }
+    | { color: string }
+    | null;
+
 export interface RenderSeries {
     id: string; title: string;
     type: SeriesType;
     pane: "main" | "sub";
     timeframe?: string;
     color?: string; style?: string | number; linewidth?: number;
-    data: Array<{ value: number } | { open: number; high: number; low: number; close: number } | { color: string } | null>;
+    /**
+     * Where a marker sits: `abovebar`, `belowbar`, `top`, `bottom` or
+     * `absolute` — `plotshape`'s own `location` argument. Absent for every
+     * other series type. Without it a host cannot place a shape, because the
+     * `value` of `plotshape(close > open)` is 1, not a price.
+     */
+    location?: string;
+    /** `plotshape`/`plotchar` text, and its size, when the script set them. */
+    text?: string; size?: string;
+    data: RenderPoint[];
 }
 
 export interface SimResult {
@@ -143,12 +165,23 @@ function plotToSeries(id: string, entries: (PlotData | null)[], meta: ScriptMeta
     // representation for "nothing to draw" is the whole point of the model.
     const finite = (x: any): x is number => typeof x === "number" && !Number.isNaN(x);
 
-    const data = entries.map((d) => {
+    const seriesColor = (sample as any)?.color;
+    // Carry a point's colour only where it DIFFERS from the series default, so
+    // the common case stays one string on the series and the override is the
+    // exception, exactly as the script wrote it.
+    const pointColor = (d: PlotData): string | undefined => {
+        const c = (d as any).color;
+        return typeof c === "string" && c !== "" && c !== seriesColor ? c : undefined;
+    };
+
+    const data = entries.map((d): RenderPoint => {
         if (d === null) return null;
         if (d.type === "candle") {
-            return finite(d.open) && finite(d.high) && finite(d.low) && finite(d.close)
+            if (!(finite(d.open) && finite(d.high) && finite(d.low) && finite(d.close))) return null;
+            const c = pointColor(d);
+            return c === undefined
                 ? { open: d.open, high: d.high, low: d.low, close: d.close }
-                : null;
+                : { open: d.open, high: d.high, low: d.low, close: d.close, color: c };
         }
         if (d.type === "bgcolor" || d.type === "barcolor") {
             const c = (d as any).color;
@@ -156,15 +189,20 @@ function plotToSeries(id: string, entries: (PlotData | null)[], meta: ScriptMeta
             return typeof c === "string" && c !== "" ? { color: c } : null;
         }
         const v = (d as any).value;
-        return finite(v) ? { value: v } : null;
+        if (!finite(v)) return null;
+        const c = pointColor(d);
+        return c === undefined ? { value: v } : { value: v, color: c };
     });
 
     return {
         id, title: sample?.title ?? id, type,
         pane: onMain ? "main" : "sub",
-        color: (sample as any)?.color,
+        color: seriesColor,
         style: (sample as any)?.style,
         linewidth: (sample as any)?.linewidth,
+        ...(sample && (sample as any).location !== undefined ? { location: (sample as any).location } : {}),
+        ...(sample && (sample as any).text !== undefined ? { text: String((sample as any).text) } : {}),
+        ...(sample && (sample as any).size !== undefined ? { size: String((sample as any).size) } : {}),
         data,
     };
 }
