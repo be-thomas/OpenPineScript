@@ -518,6 +518,25 @@ export class Context {
     }
 
     /**
+     * Is the script executing on the dataset's final bar — `barstate.islast`?
+     *
+     * Derived, not stored. `is_last` is written only by `applyTick`, which is
+     * the LIVE path, so on a purely historical run nothing ever set it and
+     * `barstate.islast` was false on every bar including the last one. That
+     * silently broke the commonest idiom in Pine — `if barstate.islast` is how
+     * every dashboard table, summary label and end-of-chart drawing is guarded,
+     * and all of them simply never ran.
+     *
+     * The extent is known: `runHistory` declares it before the first bar. So
+     * the answer is the comparison, with the live flag kept as an override for
+     * the realtime bar, which is last by definition however long the dataset is.
+     */
+    public get onLastBar(): boolean {
+        if (this.is_last) return true;
+        return this.datasetSize != null && this.currentBarIndex === this.datasetSize - 1;
+    }
+
+    /**
      * How many bars at the END of the run the host marks REALTIME.
      *
      * ── Why the host has to say ─────────────────────────────────────────────

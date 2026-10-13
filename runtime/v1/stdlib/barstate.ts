@@ -31,7 +31,7 @@ export function isnew(ctx: Context): boolean {
  * @getter
  */
 export function islast(ctx: Context): boolean {
-    return ctx.is_last;
+    return ctx.onLastBar;
 }
 
 /**
@@ -100,7 +100,7 @@ export function islastconfirmedhistory(ctx: Context): boolean {
 
     // No realtime tail — the market is closed, and the dataset's last bar IS
     // the last confirmed one. `is_last` says so on its own.
-    if (ctx.realtimeBars === 0) return ctx.is_last;
+    if (ctx.realtimeBars === 0) return ctx.onLastBar;
 
     // With a realtime tail the answer is due one bar BEFORE `is_last` is ever
     // true, so it cannot come from that flag; it comes from the declared
