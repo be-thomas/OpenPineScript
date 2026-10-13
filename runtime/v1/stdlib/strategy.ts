@@ -490,6 +490,7 @@ export function entry(
     // position began on.
     if (wasFlat) {
         ctx.position.entryBarIndex = ctx.currentBarIndex;
+        ctx.position.entryTime = ctx.time;
         ctx.position.entryId = id;
         // A NEW position measures its excursion from here. Leaving the old
         // figures in place made a reversal inherit them, because a reversal
@@ -591,6 +592,7 @@ export function closeAt(ctx: Context, comment: string, price: number): void {
     ctx.position.size = 0;
     ctx.position.avgPrice = 0;
     ctx.position.entryBarIndex = undefined;
+    ctx.position.entryTime = undefined;
     ctx.position.entryId = undefined;
     getPendingExits(ctx).clear();
 }
@@ -1134,6 +1136,7 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
             if (remaining === 0) {
                 ctx.position.avgPrice = 0;
                 ctx.position.entryBarIndex = undefined;
+                ctx.position.entryTime = undefined;
                 ctx.position.entryId = undefined;
                 // Nothing left to protect, so the other brackets go with it.
                 exits.clear();

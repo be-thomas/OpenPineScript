@@ -365,3 +365,39 @@ describe("the properties panel", () => {
     expect(new Session().compile('//@version=5\nindicator("i")\nplot(close)\n').properties).toEqual([]);
   });
 });
+
+describe("the open position carries the time it opened", () => {
+    // A host has to PLACE the still-open position on a chart, and a bar index
+    // cannot be placed: the chart's bar list grows as older bars page in, so
+    // index 40 names a different bar after a scroll. Without this the only
+    // thing the renderer could do was draw the open entry on the last bar.
+    it("stamps entryTime at the fill, not at the end of the run", () => {
+        const r = runScript(
+            `//@version=5
+strategy("Still in")
+if bar_index == 10
+    strategy.entry("Long", strategy.long)
+`,
+            { candles: bars(40) },
+        );
+        expect(r.position.size).toBeGreaterThan(0);
+        expect(r.position.entryBarIndex).toBe(11); // fills on the next bar's open
+        expect(r.position.entryTime).toBe(Date.UTC(2024, 0, 1) + r.position.entryBarIndex! * 86_400_000);
+        expect(r.position.entryId).toBe("Long");
+    });
+
+    it("clears it when the position closes", () => {
+        const r = runScript(
+            `//@version=5
+strategy("In and out")
+if bar_index == 10
+    strategy.entry("Long", strategy.long)
+if bar_index == 20
+    strategy.close("Long")
+`,
+            { candles: bars(40) },
+        );
+        expect(r.position.size).toBe(0);
+        expect(r.position.entryTime).toBeUndefined();
+    });
+});

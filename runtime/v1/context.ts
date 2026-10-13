@@ -72,13 +72,21 @@ export interface Position {
     size: number;      // + for Long, - for Short
     avgPrice: number;
     /**
-     * The bar the position was OPENED on, and the order id that opened it.
+     * The bar the position was OPENED on, the time of that bar, and the order
+     * id that opened it.
      *
      * Recorded so `strategy.opentrades.entry_bar_index` and `.entry_id` have
      * something to answer with. Undefined while flat, which is the same fact as
      * `size === 0` and reads as `na` either way.
+     *
+     * `entryTime` is here because a host has to PLACE this position on a
+     * chart, and a bar index cannot be placed: the chart's bar list grows as
+     * older bars page in, so index 40 is a different bar after a scroll.
+     * `Trade` carries both for the same reason; leaving it off `Position`
+     * meant the still-open position could only be drawn on the last bar.
      */
     entryBarIndex?: number;
+    entryTime?: number;
     entryId?: string;
 }
 
