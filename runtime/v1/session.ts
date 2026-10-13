@@ -17,7 +17,7 @@ import { compileScript } from "../../transpiler/common";
 import type { PineVersion } from "../../transpiler/common/version";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 import { compile, Context } from "./index";
-import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle, Drawing, LogEntry, Position } from "./context";
+import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle, Drawing, LogEntry, Position, InputDef } from "./context";
 
 // ─── Wire contract (mirrors ui-engine-control-protocol §5) ─────────────────────
 
@@ -35,6 +35,32 @@ export interface EngineError {
 export interface InputView {
     id: string; title: string; type: string;
     default: any; current: any; overridden: boolean;
+    /**
+     * The rest of what `input()` was told, so a host can build the control the
+     * script asked for rather than guessing one from the type.
+     *
+     * `input.int(14, "Length", minval = 2, maxval = 50)` is a bounded spinner;
+     * `input.string(s, options = [...])` is a dropdown and nothing else will
+     * do. The engine has always recorded these — it clamps `minval` and falls
+     * back outside `options` — and simply did not pass them on, so every host
+     * rendered a bare text box and learnt the bounds by having its value
+     * silently changed underneath it.
+     */
+    minval?: number; maxval?: number; step?: number;
+    options?: any[];
+    tooltip?: string;
+    /** `group` and `inline` lay the dialog out; they carry no value. */
+    group?: string; inline?: string;
+    confirm?: boolean;
+}
+
+/** A `strategy()` / `indicator()` argument a host may override. */
+export interface PropertyView {
+    key: string;
+    title: string;
+    type: "float" | "integer";
+    current: number;
+    declared: number;
 }
 
 export interface Compiled {
@@ -42,6 +68,8 @@ export interface Compiled {
     engineVersion: typeof ENGINE_VERSION;
     meta: ScriptMeta | null;
     inputs: InputView[];
+    /** Declaration arguments a host may override; empty for a study. */
+    properties: PropertyView[];
     errors: EngineError[];
 }
 
@@ -242,12 +270,63 @@ export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | 
     };
 }
 
+/**
+ * An `InputDef` as a host sees it.
+ *
+ * `registerInput` spreads every declared argument onto the definition, so the
+ * bounds, the option list and the layout hints are already there. Only the
+ * ones a host can act on are forwarded, and only when the script set them —
+ * an absent key means "no constraint", which is different from `undefined`
+ * meaning "unset".
+ */
+function toInputView(d: InputDef, userInputs: Record<string, any>): InputView {
+    const def = d as InputDef & Record<string, any>;
+    const view: InputView = {
+        id: d.id, title: d.title, type: d.type,
+        default: d.defval,
+        current: userInputs[d.id] ?? d.defval,
+        overridden: d.id in userInputs,
+    };
+    const num = (k: string) => (typeof def[k] === "number" && Number.isFinite(def[k]) ? def[k] : undefined);
+    if (num("minval") !== undefined) view.minval = num("minval");
+    if (num("maxval") !== undefined) view.maxval = num("maxval");
+    if (num("step") !== undefined) view.step = num("step");
+    if (Array.isArray(def.options) && def.options.length > 0) view.options = def.options.slice();
+    if (typeof def.tooltip === "string" && def.tooltip !== "") view.tooltip = def.tooltip;
+    if (typeof def.group === "string" && def.group !== "") view.group = def.group;
+    if (typeof def.inline === "string" && def.inline !== "") view.inline = def.inline;
+    if (def.confirm !== undefined) view.confirm = Boolean(def.confirm);
+    return view;
+}
+
+/**
+ * The declaration arguments a host may override, for a strategy's properties
+ * panel. A study declares nothing a user can usefully change, so it gets none.
+ */
+function propertyViews(ctx: Ctx): PropertyView[] {
+    if (ctx.scriptMeta?.kind !== "strategy") return [];
+    const declared = ctx.declaredProperties;
+    return [
+        {
+            key: "initial_capital", title: "Initial capital", type: "float",
+            current: ctx.initialCapital,
+            declared: Number(declared.initial_capital ?? ctx.initialCapital),
+        },
+        {
+            key: "pyramiding", title: "Pyramiding (max entries)", type: "integer",
+            current: ctx.scriptMeta.pyramiding ?? 0,
+            declared: Number(declared.pyramiding ?? 0),
+        },
+    ];
+}
+
 // ─── Session (B3) ───────────────────────────────────────────────────────────────
 
 export class Session {
     private js: string | null = null;
     private meta: ScriptMeta | null = null;
     private inputValues: Record<string, any> = {};
+    private propertyValues: Record<string, any> = {};
     private securities: Array<{ symbol: string; resolution: string; candles: SecurityCandle[] }> = [];
     // Runtime context for the current run (created by runHistory, continued by tick/commit).
     private ctx: Ctx | null = null;
@@ -274,16 +353,17 @@ export class Session {
             this.profile = compiled.profile;
             this.pineVersion = compiled.version;
         } catch (e) {
-            return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: null, inputs: [], errors: toEngineErrors(e) };
+            return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: null, inputs: [], properties: [], errors: toEngineErrors(e) };
         }
 
         const ctx = new Context(this.profile);
+        Object.assign(ctx.propertyOverrides, this.propertyValues);
         try {
             const exec = compile(js, ctx, Object.create(null));
             ctx.setBar(0, 1, 1, 1, 1, 1); // dry bar: input()/study()/strategy() run here
             exec();
         } catch (e) {
-            return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: null, inputs: [], errors: toEngineErrors(e) };
+            return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: null, inputs: [], properties: [], errors: toEngineErrors(e) };
         }
 
         this.js = js; this.meta = ctx.scriptMeta;
@@ -291,10 +371,8 @@ export class Session {
             protocolVersion: PROTOCOL_VERSION,
             engineVersion: ENGINE_VERSION,
             meta: ctx.scriptMeta,
-            inputs: ctx.inputDefs.map((d) => ({
-                id: d.id, title: d.title, type: d.type,
-                default: d.defval, current: ctx.userInputs[d.id] ?? d.defval, overridden: d.id in ctx.userInputs,
-            })),
+            inputs: ctx.inputDefs.map((d) => toInputView(d, ctx.userInputs)),
+            properties: propertyViews(ctx),
             errors: [],
         };
     }
@@ -302,6 +380,18 @@ export class Session {
     setInputs(values: Record<string, any>): void {
         Object.assign(this.inputValues, values);
         if (this.ctx) Object.assign(this.ctx.userInputs, values);
+    }
+
+    /**
+     * Override `strategy()` declaration arguments — starting capital,
+     * pyramiding — the way TradingView's properties panel does.
+     *
+     * Unlike `setInputs`, this cannot be applied to a run already in progress:
+     * `cash` moves with the first fill, so it is seeded when the script
+     * declares itself and never afterwards. The next `runHistory` picks it up.
+     */
+    setProperties(values: Record<string, any>): void {
+        Object.assign(this.propertyValues, values);
     }
 
     provideData(symbol: string, resolution: string, candles: SecurityCandle[]): void {
@@ -319,6 +409,8 @@ export class Session {
         const ctx = new Context(this.profile);
         const exec = compile(this.js, ctx, Object.create(null));
         Object.assign(ctx.userInputs, this.inputValues);
+        // Before the first bar: `declareScript` reads these, and it runs on it.
+        Object.assign(ctx.propertyOverrides, this.propertyValues);
         for (const s of this.securities) ctx.provideSecurityData(s.symbol, s.resolution, s.candles);
         // `last_bar_index` / `last_bar_time` are documented as known from the
         // first bar, and only the caller knows how long the run is.
@@ -380,9 +472,10 @@ export class Session {
 /** One-shot convenience: compile + runHistory. */
 export function runScript(
     source: string,
-    opts: { candles: Candle[]; inputs?: Record<string, any>; securities?: Array<{ symbol: string; resolution: string; candles: SecurityCandle[] }> } = { candles: [] }
+    opts: { candles: Candle[]; inputs?: Record<string, any>; properties?: Record<string, any>; securities?: Array<{ symbol: string; resolution: string; candles: SecurityCandle[] }> } = { candles: [] }
 ): SimResult {
     const s = new Session();
+    if (opts.properties) s.setProperties(opts.properties);
     const compiled = s.compile(source);
     if (compiled.errors.length) {
         return {

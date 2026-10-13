@@ -933,6 +933,28 @@ export class Context {
     public cash: number = DEFAULT_INITIAL_CAPITAL;
 
     /**
+     * Host overrides for the `strategy()` / `indicator()` declaration.
+     *
+     * TradingView's settings dialog lets a user change a strategy's starting
+     * capital or pyramiding without editing the script, and a host needs the
+     * same. They are consulted by `declareScript`, which is the only moment
+     * they can take effect: `cash` moves with the first fill, so seeding it
+     * afterwards would backdate money the broker has already spent.
+     *
+     * A key absent here means "use whatever the script declared".
+     */
+    public propertyOverrides: Record<string, any> = {};
+
+    /**
+     * What the SCRIPT declared, before any host override.
+     *
+     * Kept apart so a settings panel can offer "reset to the script's value"
+     * — reading it back off the Context afterwards returns the override, which
+     * would make the reset button restore the thing it was resetting from.
+     */
+    public declaredProperties: Record<string, any> = {};
+
+    /**
      * The equity the strategy started with, for `strategy.initial_capital`.
      *
      * Held separately from `cash`, which moves with every fill — the two are
@@ -1093,10 +1115,18 @@ export class Context {
             ? ['title', 'shorttitle', 'overlay', 'pyramiding', 'calc_on_every_tick', 'calc_on_order_fills', 'currency']
             : ['title', 'shorttitle', 'overlay', 'precision'];
 
-        const arg = (name: string): any => {
+        /** What the script itself passed, ignoring any host override. */
+        const declared = (name: string): any => {
             if (named[name] !== undefined) return unwrap(named[name]);
             const idx = order.indexOf(name);
             return idx >= 0 && idx < positional.length ? unwrap(positional[idx]) : undefined;
+        };
+
+        const arg = (name: string): any => {
+            // A host override outranks the script, which is what makes the
+            // settings dialog able to change a backtest without an edit.
+            if (this.propertyOverrides[name] !== undefined) return this.propertyOverrides[name];
+            return declared(name);
         };
 
         const title = arg('title') !== undefined ? String(arg('title')) : '';
@@ -1133,6 +1163,16 @@ export class Context {
                 this.initialCapital = Number(capital);
                 this.cash = Number(capital);
             }
+
+            // Recorded before any override so a host can offer the script's
+            // own value back.
+            const declaredCapital = declared('initial_capital');
+            this.declaredProperties.initial_capital =
+                declaredCapital !== undefined && Number.isFinite(Number(declaredCapital))
+                    ? Number(declaredCapital)
+                    : DEFAULT_INITIAL_CAPITAL;
+            this.declaredProperties.pyramiding =
+                declared('pyramiding') !== undefined ? Number(declared('pyramiding')) : 0;
         }
     }
 
