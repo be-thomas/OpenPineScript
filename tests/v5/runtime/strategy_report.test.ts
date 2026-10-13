@@ -56,6 +56,40 @@ describe("the trade record", () => {
     expect(r.trades.every(t => t.entryId === "Long")).toBe(true);
   });
 
+  it("starts each trade's excursion over, reversals included", () => {
+    // A reversal goes short straight from long without a flat bar in between,
+    // so the position's excursion has to be reset where the position OPENS,
+    // not where it happens to be flat at a bar's close.
+    const reversing = runScript(
+      '//@version=5\n' +
+      'strategy("Reversing", initial_capital = 10000)\n' +
+      'fast = ta.sma(close, 5)\n' +
+      'slow = ta.sma(close, 20)\n' +
+      'if ta.crossover(fast, slow)\n' +
+      '    strategy.entry("Long", strategy.long)\n' +
+      'if ta.crossunder(fast, slow)\n' +
+      '    strategy.entry("Short", strategy.short)\n',
+      { candles: bars(300) },
+    );
+    expect(reversing.trades.length).toBeGreaterThan(3);
+
+    // Bounded by the trade's OWN bars: a run-up larger than anything the
+    // price did while the position was open can only have come from an
+    // earlier trade.
+    const candles = bars(300);
+    for (const t of reversing.trades) {
+      const own = candles.slice(t.entryBarIndex!, t.exitBarIndex! + 1);
+      const best = t.direction === "long"
+        ? Math.max(...own.map(c => c.high)) - t.entryPrice
+        : t.entryPrice - Math.min(...own.map(c => c.low));
+      const worst = t.direction === "long"
+        ? t.entryPrice - Math.min(...own.map(c => c.low))
+        : Math.max(...own.map(c => c.high)) - t.entryPrice;
+      expect(t.runup!).toBeLessThanOrEqual(Math.max(best, 0) * t.qty + 1e-6);
+      expect(t.drawdown!).toBeLessThanOrEqual(Math.max(worst, 0) * t.qty + 1e-6);
+    }
+  });
+
   it("reports excursion that brackets the realised result", () => {
     for (const t of r.trades) {
       expect(t.runup!).toBeGreaterThanOrEqual(0);

@@ -482,6 +482,13 @@ export function entry(
     if (wasFlat) {
         ctx.position.entryBarIndex = ctx.currentBarIndex;
         ctx.position.entryId = id;
+        // A NEW position measures its excursion from here. Leaving the old
+        // figures in place made a reversal inherit them, because a reversal
+        // never passes through flat at a bar boundary and the end-of-bar
+        // reset therefore never fired — so a short that gave back 1.74 was
+        // still reporting 1.74 three long trades later.
+        ctx.positionRunup = 0;
+        ctx.positionDrawdown = 0;
     }
 
     // Track filled orders for intraday limit
