@@ -1885,7 +1885,32 @@ export class Context {
      * Registers a pre-built PlotData object for the current bar.
      * Each ui.ts function constructs the correctly-typed variant.
      */
+    /**
+     * Strip the runtime wrapper off every field of a plot or fill record.
+     *
+     * `f = plot(...)` compiles to `ctx.new_var(...)`, so the plot id a script
+     * hands to `fill()` arrives as a `Series`, not a string — and a `Series`
+     * holds a back-reference to this Context, which holds the sandbox, which
+     * holds every stdlib function. Storing one put the entire runtime inside
+     * the render model: `structuredClone` threw, so `postMessage` threw, so
+     * every script using `fill()` failed in any host that runs the engine in a
+     * Worker or a backend — which is the architecture the integration guide
+     * documents. The values were all correct; the model just could not leave
+     * the process it was built in.
+     *
+     * The same applies to `plot(close, color = myColorVar)`, where the colour
+     * is a declared variable rather than a literal.
+     */
+    private plainPlotData<T extends Record<string, any>>(data: T): T {
+        const out: Record<string, any> = {};
+        for (const [k, v] of Object.entries(data)) {
+            out[k] = v instanceof Series ? v.valueOf() : v;
+        }
+        return out as T;
+    }
+
     public registerPlot(data: PlotData) {
+        data = this.plainPlotData(data);
         // 1. Get the Unique Call ID (Storage Key)
         // This ensures that "plot(close)" and "plot(open)" don't overwrite each other
         // just because they both default to title="Plot".
@@ -1922,7 +1947,13 @@ export class Context {
         }
     }
 
-    public registerFill(id1: string, id2: string, options: { color?: string, title?: string } = {}) {
+    public registerFill(id1: any, id2: any, options: { color?: string, title?: string } = {}) {
+        // See `plainPlotData`: a plot id reaches here as a Series whenever the
+        // script stored it in a variable, which is the documented way to use
+        // `fill()` at all.
+        id1 = id1 instanceof Series ? id1.valueOf() : id1;
+        id2 = id2 instanceof Series ? id2.valueOf() : id2;
+        options = this.plainPlotData(options);
         const title = options.title || `Fill_${id1}_${id2}`;
         
         let series = this.fills.get(title);
