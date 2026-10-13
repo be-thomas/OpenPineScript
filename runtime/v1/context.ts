@@ -1277,7 +1277,9 @@ export class Context {
                 currency: arg('currency') !== undefined ? String(arg('currency')) : undefined,
                 // Defaults are TradingView's own: one contract per order, no
                 // costs, 100% margin, orders filled on the next bar's open.
-                default_qty_type: str('default_qty_type') ?? 'fixed',
+                // The constants' own values, as `strategy.fixed` and friends
+                // evaluate to — so a host comparing against them matches.
+                default_qty_type: str('default_qty_type') ?? 'strategy.fixed',
                 default_qty_value: num('default_qty_value', 1),
                 commission_type: str('commission_type') ?? 'commission.percent',
                 commission_value: num('commission_value', 0),

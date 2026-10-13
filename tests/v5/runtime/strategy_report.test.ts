@@ -269,19 +269,78 @@ describe("costs", () => {
   });
 });
 
+describe("order size", () => {
+  const sized = (declaration: string) => runScript(
+    '//@version=5\n' +
+    `strategy("Sized", initial_capital = 10000${declaration})\n` +
+    'fast = ta.sma(close, 5)\n' +
+    'slow = ta.sma(close, 20)\n' +
+    'if ta.crossover(fast, slow)\n' +
+    '    strategy.entry("Long", strategy.long)\n' +
+    'if ta.crossunder(fast, slow)\n' +
+    '    strategy.close("Long")\n',
+    { candles: bars(300) },
+  );
+
+  it("is one contract when the script declares nothing", () => {
+    expect(sized("").trades.every(t => t.qty === 1)).toBe(true);
+  });
+
+  it("honours a fixed size", () => {
+    const r = sized(', default_qty_type = strategy.fixed, default_qty_value = 7');
+    expect(r.trades.every(t => t.qty === 7)).toBe(true);
+  });
+
+  it("turns a cash amount into contracts at the fill price", () => {
+    const r = sized(', default_qty_type = strategy.cash, default_qty_value = 5000');
+    for (const t of r.trades) expect(t.qty).toBeCloseTo(5000 / t.entryPrice, 6);
+  });
+
+  it("sizes a percentage against the equity at the fill", () => {
+    const r = sized(', default_qty_type = strategy.percent_of_equity, default_qty_value = 50');
+    // Half the account, so the first trade's notional is about half of the
+    // starting capital — and every later one moves with the equity.
+    const first = r.trades[0];
+    expect(first.qty * first.entryPrice).toBeCloseTo(10000 * 0.5, 2);
+    expect(new Set(r.trades.map(t => t.qty.toFixed(6))).size).toBeGreaterThan(1);
+  });
+
+  it("still lets an explicit qty win", () => {
+    const r = runScript(
+      '//@version=5\n' +
+      'strategy("Explicit", initial_capital = 10000, default_qty_value = 7)\n' +
+      'fast = ta.sma(close, 5)\n' +
+      'slow = ta.sma(close, 20)\n' +
+      'if ta.crossover(fast, slow)\n' +
+      '    strategy.entry("Long", strategy.long, qty = 2)\n' +
+      'if ta.crossunder(fast, slow)\n' +
+      '    strategy.close("Long")\n',
+      { candles: bars(300) },
+    );
+    expect(r.trades.every(t => t.qty === 2)).toBe(true);
+  });
+});
+
 describe("the properties panel", () => {
   const s = new Session();
   const compiled = s.compile(CROSSOVER(', commission_value = 0.25, slippage = 3'));
   const by = (k: string) => compiled.properties.find(p => p.key === k)!;
 
-  it("offers every backtest setting TradingView's properties tab does", () => {
+  it("offers every backtest setting the broker acts on", () => {
     for (const key of [
       "initial_capital", "default_qty_type", "default_qty_value", "pyramiding",
-      "commission_type", "commission_value", "slippage",
-      "margin_long", "margin_short", "risk_free_rate",
+      "commission_type", "commission_value", "slippage", "risk_free_rate",
     ]) {
       expect(by(key), key).toBeTruthy();
     }
+  });
+
+  it("offers no control for a setting the broker ignores", () => {
+    // Margin is recorded on the meta, because a host may want to show it —
+    // but nothing enforces it, there are no margin calls, and a slider that
+    // changes no number in the report is worse than no slider.
+    expect(compiled.properties.some(p => p.key.startsWith("margin_"))).toBe(false);
+    expect(compiled.meta!.margin_long).toBe(100);
   });
 
   it("reports what the script declared, so a reset button has something to restore", () => {

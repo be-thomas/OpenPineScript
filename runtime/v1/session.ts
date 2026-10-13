@@ -530,9 +530,9 @@ function propertyViews(ctx: Ctx): PropertyView[] {
         {
             key: "default_qty_type", title: "Order size", type: "string",
             group: "Trading",
-            options: ["fixed", "cash", "percent_of_equity"],
-            current: String(meta.default_qty_type ?? "fixed"),
-            declared: String(was("default_qty_type", meta.default_qty_type ?? "fixed")),
+            options: ["strategy.fixed", "strategy.cash", "strategy.percent_of_equity"],
+            current: String(meta.default_qty_type ?? "strategy.fixed"),
+            declared: String(was("default_qty_type", meta.default_qty_type ?? "strategy.fixed")),
         },
         {
             key: "default_qty_value", title: "Order size value", type: "float",
@@ -565,18 +565,11 @@ function propertyViews(ctx: Ctx): PropertyView[] {
             current: Number(meta.slippage ?? 0),
             declared: Number(was("slippage", meta.slippage ?? 0)),
         },
-        {
-            key: "margin_long", title: "Margin for long positions", type: "float",
-            group: "Costs", minval: 0, unit: "%",
-            current: Number(meta.margin_long ?? 100),
-            declared: Number(was("margin_long", meta.margin_long ?? 100)),
-        },
-        {
-            key: "margin_short", title: "Margin for short positions", type: "float",
-            group: "Costs", minval: 0, unit: "%",
-            current: Number(meta.margin_short ?? 100),
-            declared: Number(was("margin_short", meta.margin_short ?? 100)),
-        },
+        // `margin_long` / `margin_short` are deliberately absent. The engine
+        // records them but the broker does not enforce them — there are no
+        // margin calls and nothing is ever liquidated for insufficient margin
+        // — and a control that changes nothing is worse than no control. They
+        // are still on `ScriptMeta` for a host that wants to display them.
         {
             key: "risk_free_rate", title: "Risk-free rate", type: "float",
             group: "Costs", minval: 0, unit: "% a year",

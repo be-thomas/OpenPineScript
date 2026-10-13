@@ -296,7 +296,7 @@ export function order(
     ctx: Context,
     id: string,
     dir: string,
-    qty: any = 1,
+    qty: any = undefined,
     limit: any = Number.NaN,
     stop: any = Number.NaN,
     oca_name: string = "",
@@ -389,7 +389,9 @@ export function entry(
     ctx: Context,
     id: string,
     direction: string,
-    qty: any = 1,
+    // Absent, not 1: an omitted `qty` is what hands the size over to
+    // `default_qty_type`, and a literal 1 cannot be told from no answer.
+    qty: any = undefined,
     limit: any = Number.NaN,
     stop: any = Number.NaN,
     oca_name: string = "",
@@ -420,7 +422,13 @@ export function entry(
     // `fillMarketOrders` draining this queue, `processPendingOrders` matching a
     // limit or stop, or a risk rule liquidating — and those execute in place.
     if (overridePrice === undefined) {
-        ctx.marketOrders.push({ kind: "entry", id, direction: dir, qty: val(qty), comment });
+        // `undefined` travels with the order: a cash or percent-of-equity
+        // size is resolved at the price it fills at, which is not known yet.
+        ctx.marketOrders.push({
+            kind: "entry", id, direction: dir,
+            qty: qty === undefined ? undefined : val(qty),
+            comment,
+        });
         return;
     }
 
@@ -440,7 +448,8 @@ export function entry(
     }
 
     const currentPrice = toTick(ctx, slip(ctx, overridePrice !== undefined ? overridePrice : ctx.close, isLong));
-    let numQty = val(qty);
+    let numQty = qty === undefined ? defaultQty(ctx, currentPrice) : val(qty);
+    if (!Number.isFinite(numQty) || numQty <= 0) return;
 
     // max_position_size clamp
     if (rs.max_position_size !== Infinity) {
@@ -493,6 +502,37 @@ export function entry(
 
     // Track filled orders for intraday limit
     rs.daily_filled_orders++;
+}
+
+/**
+ * How big an order is when the script did not say.
+ *
+ * `strategy(default_qty_type = ..., default_qty_value = ...)`, which the
+ * engine recognised as constants and then ignored: every entry without an
+ * explicit `qty` was one contract, whatever the strategy had declared. A
+ * strategy sized at 10% of equity was being backtested at one share.
+ *
+ *   strategy.fixed              `value` contracts
+ *   strategy.cash               `value` of currency, at the fill price
+ *   strategy.percent_of_equity  `value`% of equity, at the fill price
+ *
+ * The two price-based forms are sized at the price the order actually fills
+ * at, which is why this is resolved at the fill and not where the order was
+ * placed.
+ */
+function defaultQty(ctx: Context, price: number): number {
+    const meta = ctx.scriptMeta;
+    const value = Number(meta?.default_qty_value ?? 1);
+    if (!Number.isFinite(value) || value <= 0) return 0;
+
+    switch (meta?.default_qty_type) {
+        case cash:
+            return price > 0 ? value / price : 0;
+        case percent_of_equity:
+            return price > 0 ? (equity(ctx) * value / 100) / price : 0;
+        default:
+            return value;
+    }
 }
 
 /**
