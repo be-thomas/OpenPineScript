@@ -46,12 +46,13 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.map",
     "README.md",
     "LICENSE"
   ],
   "sideEffects": false,
   "scripts": {
-    "generate:parser": "node scripts/common/build-grammars.mjs && node scripts/common/patch-visitor.js",
+    "generate:parser": "node scripts/common/build-grammars.mjs && node scripts/common/patch-visitor.cjs",
     "generate:parser:v1": "node scripts/common/build-grammars.mjs v1",
     "generate:parser:v2": "node scripts/common/build-grammars.mjs v2",
     "generate:parser:v3": "node scripts/common/build-grammars.mjs v3",

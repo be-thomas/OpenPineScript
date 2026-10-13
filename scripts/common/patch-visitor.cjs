@@ -1,3 +1,7 @@
+// CommonJS on purpose, hence .cjs: package.json declares "type": "module",
+// which makes every bare .js in this repository an ES module. This script
+// is the one that still uses require(), and renaming it is cheaper than
+// porting it for the sake of a build step that runs before anything else.
 /**
  * antlr4ng exports ParseTreeVisitor, not AbstractParseTreeVisitor.
  * Patch every generated visitor so it extends ParseTreeVisitor.
