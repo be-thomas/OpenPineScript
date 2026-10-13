@@ -229,7 +229,7 @@ this repository's licence.
 npm test
 ```
 
-2,371 tests pass across 84 files. None fail.
+2,396 tests pass across 87 files. None fail.
 
 Three patterns carry most of the weight:
 

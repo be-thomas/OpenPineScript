@@ -534,7 +534,7 @@ export function closeAt(ctx: Context, comment: string, price: number): void {
 
     const trade: Trade = {
         id: comment || "Close",
-        entryTime: 0,
+        entryTime: entryTimeOf(ctx),
         entryPrice: ctx.position.avgPrice,
         exitTime: ctx.time,
         exitPrice: currentPrice,
@@ -719,6 +719,22 @@ function applyExitOCA(exits: Map<string, PendingExit>, filledExit: PendingExit):
         toDelete.push(id);
     }
     for (const id of toDelete) exits.delete(id);
+}
+
+/**
+ * When the open position was entered, as a timestamp.
+ *
+ * A closed `Trade` records `entryTime`, and it used to be written as the
+ * literal `0` at both places a trade is booked. Two things read it and both
+ * were wrong because of it: a host drawing an entry marker had no bar to put
+ * it on, and `strategy.closedtrades.entry_bar_index()` resolves the time back
+ * to an index, so it answered `na` for every trade.
+ */
+function entryTimeOf(ctx: Context): number {
+    const bar = ctx.position.entryBarIndex;
+    if (bar === undefined) return 0;
+    const at = ctx.barTimes[bar];
+    return typeof at === "number" ? at : 0;
 }
 
 /**
@@ -962,7 +978,7 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
 
             ctx.trades.push({
                 id: `Exit ${exitId}`,
-                entryTime: 0,
+                entryTime: entryTimeOf(ctx),
                 entryPrice: ctx.position.avgPrice,
                 exitTime: ctx.time,
                 exitPrice: executedPrice,

@@ -17,7 +17,7 @@ import { compileScript } from "../../transpiler/common";
 import type { PineVersion } from "../../transpiler/common/version";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 import { compile, Context } from "./index";
-import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle, Drawing, LogEntry } from "./context";
+import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle, Drawing, LogEntry, Position } from "./context";
 
 // ─── Wire contract (mirrors ui-engine-control-protocol §5) ─────────────────────
 
@@ -64,6 +64,13 @@ export interface SimResult {
     series: RenderSeries[];
     fills: Array<{ plotId1: string; plotId2: string; color: string; title: string }>;
     trades: any[];
+    /**
+     * The position still OPEN at the last bar, which `trades` by definition
+     * does not contain — it holds closed trades only. A strategy that is in
+     * the market when the data ends has an entry a host should still draw.
+     * `size` is 0 while flat.
+     */
+    position: Position;
     summary: { netProfit: number; closedTrades: number; winRate: number } | null;
     /**
      * Every `line`, `box`, `label`, `table`, `polyline` and `linefill` the
@@ -127,12 +134,29 @@ function plotToSeries(id: string, entries: (PlotData | null)[], meta: ScriptMeta
     // follow the script's overlay flag (default sub-pane for non-overlay studies).
     const onMain = type === "candle" || type === "bgcolor" || type === "barcolor" || meta?.overlay === true;
 
+    // `na` is `null` here, uniformly — including a value that arrives as NaN,
+    // which is what an indicator returns while it is still warming up.
+    //
+    // NaN used to come through as `{ value: NaN }`, so a host checking
+    // `point === null` to find the gaps saw none and drew the warm-up of every
+    // `ta.sma(close, 20)` as a run of zeros climbing off the axis. One
+    // representation for "nothing to draw" is the whole point of the model.
+    const finite = (x: any): x is number => typeof x === "number" && !Number.isNaN(x);
+
     const data = entries.map((d) => {
         if (d === null) return null;
-        if (d.type === "candle") return { open: d.open, high: d.high, low: d.low, close: d.close };
-        if (d.type === "bgcolor" || d.type === "barcolor") return { color: (d as any).color ?? "" };
+        if (d.type === "candle") {
+            return finite(d.open) && finite(d.high) && finite(d.low) && finite(d.close)
+                ? { open: d.open, high: d.high, low: d.low, close: d.close }
+                : null;
+        }
+        if (d.type === "bgcolor" || d.type === "barcolor") {
+            const c = (d as any).color;
+            // `bgcolor(na)` means "leave this bar alone", not "paint it blank".
+            return typeof c === "string" && c !== "" ? { color: c } : null;
+        }
         const v = (d as any).value;
-        return typeof v === "number" ? { value: v } : null;
+        return finite(v) ? { value: v } : null;
     });
 
     return {
@@ -170,6 +194,7 @@ export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | 
         series,
         fills,
         trades: ctx.trades.slice(),
+        position: { ...ctx.position },
         summary: buildSummary(ctx),
         // Creation order, which is the order a host should draw them in: a
         // later drawing overlaps an earlier one on TradingView too.
@@ -324,7 +349,8 @@ export function runScript(
     if (compiled.errors.length) {
         return {
             protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: compiled.meta,
-            barsProcessed: 0, series: [], fills: [], trades: [], summary: null,
+            barsProcessed: 0, series: [], fills: [], trades: [],
+            position: { size: 0, avgPrice: 0 }, summary: null,
             drawings: [], logs: [], alerts: [], errors: compiled.errors,
         };
     }

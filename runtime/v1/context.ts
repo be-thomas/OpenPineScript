@@ -1465,7 +1465,8 @@ export class Context {
      *
      * Called at the top of `setBar`, which covers every bar and every re-tick
      * of a forming one, and again from `restoreSnapshot` so that rolling back
-     * to a baseline restores this too.
+     * to a baseline restores this too. "One pass" includes the script's own
+     * execution-order counters, not just the broker's bookkeeping.
      *
      * The two order guards are the subtle half. They are NOT part of
      * `captureSnapshot`, so a rollback restored the broker's position and its
@@ -1481,6 +1482,17 @@ export class Context {
         this.barStateSnapshot.clear();
         this._marketOrdersFilledBar = -1;
         (this as any)._ordersProcessedBar = undefined;
+
+        // `input()` numbers its calls in execution order, and the script body
+        // runs again on every bar, so the counter has to restart with it.
+        //
+        // It did not, and both consequences were silent. The ids drifted — the
+        // same `input.int` was `input_0` on bar 0, `input_1` on bar 1 — so a
+        // host's override, keyed by the id it was given, applied to the FIRST
+        // BAR ONLY and every later bar silently used the default. And
+        // `inputDefs` gained an entry per bar, so a 2,000-bar run reported
+        // 2,000 inputs for a script with one.
+        this.inputCounter = 0;
     }
 
     /** Every state entry belonging to `key` or nested beneath it. */

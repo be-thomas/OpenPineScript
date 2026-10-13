@@ -8,7 +8,7 @@
 No TradingView account. No cloud. No execution quota. No 500 ms loop timeout.
 
 [![TradingView parity](https://img.shields.io/badge/TradingView_parity-112_columns_×_2%2C474_bars-7B3FE4?style=for-the-badge)](docs/common/CONFORMANCE.md)
-[![Tests](https://img.shields.io/badge/tests-2%2C379_passing-22C55E?style=for-the-badge)](docs/common/CONFORMANCE.md#testing)
+[![Tests](https://img.shields.io/badge/tests-2%2C396_passing-22C55E?style=for-the-badge)](docs/common/CONFORMANCE.md#testing)
 [![Pine Script](https://img.shields.io/badge/Pine_Script-v1_→_v5-F97316?style=for-the-badge)](#-supported-pine-script-versions)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
@@ -82,7 +82,7 @@ npm run replv2
 | 🗂️ **Five language versions** | v1 → v5, each with its own grammar and emitter, so a v2 script is parsed by a parser that has never heard of `var`. |
 | 🔁 **Pine → JavaScript** | Emit readable JS and embed it anywhere — a worker, a server, a browser, a CI job. |
 | 🤖 **Built for automation** | JSON output, exit codes, input overrides, and a comparison mode that diffs your run against a TradingView export. |
-| 🧪 **2,379 tests** | Differential testing against an independent oracle, a full version matrix, 763 real scripts from TradingView's docs, and the parity suites above. |
+| 🧪 **2,396 tests** | Differential testing against an independent oracle, a full version matrix, 763 real scripts from TradingView's docs, and the parity suites above. |
 
 ---
 
@@ -156,6 +156,7 @@ npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results --json
 | **[CLI usage](CLI-Usage.md)** | Every flag, with worked examples |
 | **[Architecture](docs/common/ARCHITECTURE.md)** | The compile pipeline and the repository layout |
 | **[Golden-data recipe](conformance/common/golden.md)** | How to collect a new TradingView export |
+| **[Integration guide](dev-docs/integration/README.md)** | Embedding the engine in a charting UI: plotting, strategies, live ticks |
 | **[Development docs](dev-docs/README.md)** | Version delta spec, roadmap, deliberate omissions |
 
 ---
