@@ -232,10 +232,31 @@ function plotToSeries(id: string, entries: (PlotData | null)[], meta: ScriptMeta
         return typeof c === "string" && c !== "" && c !== seriesColor ? c : undefined;
     };
 
+    /**
+     * Did the script ask for NO colour on this bar?
+     *
+     * `plot(x, color = cond ? color.red : na)` is the ordinary Pine way to
+     * hide a plot on some bars, and TradingView draws nothing there. The
+     * colour was read as "no override given", which means "use the series
+     * default" — so exactly the bars the script wanted hidden came out in the
+     * series colour, which on that example is red: the opposite of the ask.
+     *
+     * Only when the SERIES carries a colour. A series with no colour of its
+     * own leaves every point's colour absent, and that is a plot drawn in the
+     * host's default, not nine hundred hidden bars.
+     */
+    const hiddenPoint = (d: PlotData): boolean => {
+        if (typeof seriesColor !== "string" || seriesColor === "") return false;
+        const c = (d as any).color;
+        if (c === null) return true;
+        return typeof c === "number" && Number.isNaN(c);
+    };
+
     const data = entries.map((d): RenderPoint => {
         if (d === null) return null;
         if (d.type === "candle") {
             if (!(finite(d.open) && finite(d.high) && finite(d.low) && finite(d.close))) return null;
+            if (hiddenPoint(d)) return null;
             const c = pointColor(d);
             return c === undefined
                 ? { open: d.open, high: d.high, low: d.low, close: d.close }
@@ -248,6 +269,9 @@ function plotToSeries(id: string, entries: (PlotData | null)[], meta: ScriptMeta
         }
         const v = (d as any).value;
         if (!finite(v)) return null;
+        // An explicit `na` colour hides the bar. A gap is how the model says
+        // "nothing here", and it is what TradingView draws.
+        if (hiddenPoint(d)) return null;
         const c = pointColor(d);
         return c === undefined ? { value: v } : { value: v, color: c };
     });
@@ -395,12 +419,18 @@ function statsFor(trades: Trade[], capital: number): PerformanceStats {
  * an ANNUAL percentage — 2 by default — so a month's share of it is
  * `rate / 100 / 12`.
  *
- * Sortino replaces SD with the deviation of the negative months alone.
- * Fewer than two months of data leaves both undefined rather than zero: a
- * single return has no deviation to divide by, and reporting 0 there would
- * read as "no risk".
+ * Sortino replaces SD with the DOWNSIDE deviation — the same sum of squares,
+ * but counting only the shortfall below zero, and still divided by every
+ * month rather than by the losing ones. Fewer than two months of data leaves
+ * both undefined rather than zero: a single return has no deviation to
+ * divide by, and reporting 0 there would read as "no risk".
+ *
+ * Exported for its own tests. Reaching it through a strategy means finding a
+ * fixture whose months are a mix of winners and losers, and the two divisors
+ * agree exactly when they are not — so a test driven that way can pass with
+ * either formula in place.
  */
-function riskRatios(curve: EquityPoint[], annualRatePercent: number): { sharpeRatio: number; sortinoRatio: number } {
+export function riskRatios(curve: EquityPoint[], annualRatePercent: number): { sharpeRatio: number; sortinoRatio: number } {
     const monthly: number[] = [];
     let monthKey = "";
     let monthStart = NaN;
@@ -427,7 +457,18 @@ function riskRatios(curve: EquityPoint[], annualRatePercent: number): { sharpeRa
         Math.sqrt(xs.reduce((a, x) => a + x * x, 0) / xs.length);
 
     const sd = deviation(excess.map((x) => x - mean));
-    const downside = deviation(excess.filter((x) => x < 0));
+
+    // Downside deviation is sqrt(sum(min(0, r)^2) / N) with N = EVERY period,
+    // not just the losing ones. Filtering first and dividing by the number of
+    // negative months answers "how bad were the bad months" rather than "how
+    // much downside is there across the record", and the more consistently
+    // profitable a strategy is the more it inflates the divisor's shortfall:
+    // twelve months with one at -2% gave 2.0% where the figure is 0.58%, so
+    // Sortino read about 3.5x too low. The months that did not lose belong in
+    // the average, contributing zero.
+    const downside = Math.sqrt(
+        excess.reduce((a, x) => a + Math.min(0, x) ** 2, 0) / excess.length,
+    );
 
     return {
         sharpeRatio: sd === 0 ? NaN : mean / sd,
@@ -444,9 +485,7 @@ function buildPerformance(ctx: Ctx): Performance | null {
         ? (ctx.lastClose / ctx.firstClose - 1) * capital
         : NaN;
 
-    const openPL = ctx.position.size === 0
-        ? 0
-        : (ctx.lastClose - ctx.position.avgPrice) * ctx.position.size;
+    const openPL = ctx.openProfitAt(ctx.lastClose);
 
     return {
         all: statsFor(trades, capital),
