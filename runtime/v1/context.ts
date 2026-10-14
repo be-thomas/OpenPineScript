@@ -88,6 +88,19 @@ export interface Position {
     entryBarIndex?: number;
     entryTime?: number;
     entryId?: string;
+    /**
+     * Entry-side commission already paid on the position still open, so an
+     * exit can charge its own side and claim a share of this rather than
+     * recomputing a whole round turn.
+     *
+     * `commission.cash_per_order` is a flat fee PER ORDER, and it used to be
+     * charged twice per closed-trade record. Two partial exits of one entry
+     * are three orders and were billed for four; three pyramided entries
+     * closed in one go are four orders and were billed for two. The other two
+     * commission types scale with quantity, so they came out right by
+     * accident and this changes nothing for them.
+     */
+    entryCommission?: number;
 }
 
 /**
@@ -2214,6 +2227,22 @@ export class Context {
      * is a declared variable rather than a literal.
      */
     private plainPlotData<T extends Record<string, any>>(data: T): T {
+        // Copied only when something actually needs unwrapping. `plainValue`
+        // is identity for everything except a Series, an array and a
+        // function, and a plot record is overwhelmingly numbers and strings —
+        // so rebuilding every record, field by field, on every bar, for every
+        // plot, allocated an object per plot per bar to return the same
+        // values. The scan below is a few typeof checks and no allocation.
+        let needsUnwrapping = false;
+        for (const k in data) {
+            const v = data[k];
+            if (v instanceof Series || Array.isArray(v) || typeof v === "function") {
+                needsUnwrapping = true;
+                break;
+            }
+        }
+        if (!needsUnwrapping) return data;
+
         const out: Record<string, any> = {};
         for (const [k, v] of Object.entries(data)) {
             out[k] = plainValue(v);
@@ -2331,6 +2360,24 @@ export class Context {
      * and low of the bar it filled on count towards its run-up, which is what
      * TradingView reports.
      */
+    /**
+     * Mark-to-market on the open position, at a price the caller names.
+     *
+     * One formula, three callers: the equity curve samples it at each bar's
+     * close, `strategy.equity()` answers with it, and the performance report
+     * takes it at the last close. All three had their own copy, so a change
+     * to any of them — deducting the entry commission, say — would have
+     * landed in one place and quietly disagreed with the other two.
+     *
+     * The price is a parameter rather than read from the Context because the
+     * report deliberately uses `lastClose` and the other two use `close`.
+     */
+    openProfitAt(price: number): number {
+        return this.position.size === 0
+            ? 0
+            : (price - this.position.avgPrice) * this.position.size;
+    }
+
     private sampleEquity() {
         if (this.scriptMeta?.kind !== "strategy") return;
 
@@ -2338,7 +2385,7 @@ export class Context {
         this.lastClose = this.close;
 
         const size = this.position.size;
-        const openPL = size === 0 ? 0 : (this.close - this.position.avgPrice) * size;
+        const openPL = this.openProfitAt(this.close);
         this.equityCurve.push({ time: this.time, equity: this.cash + openPL, openPL });
 
         if (size === 0) {
