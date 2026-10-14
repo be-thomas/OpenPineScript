@@ -443,11 +443,24 @@ export function createStdlib(ctx: Context) {
     // Without this the FUNCTION ITSELF was recorded as the plot's style, which
     // put a live closure in the render model and made the result impossible to
     // postMessage — the script drew nothing in any worker-backed host.
+    //
+    // Carried by a WRAPPER, not by the export itself. `sandboxStdlib["cross"]`
+    // is `entry.ref` — the one `ta.cross` the whole module shares, not a
+    // per-Context copy — so defining `valueOf` on it changed that function for
+    // the life of the process. One v1–v3 compile anywhere and every later v4
+    // or v5 session in the same process saw a value-bearing `ta.cross`, where
+    // `val(ta.cross)` and `String(ta.cross)` both answer "cross". The version
+    // guard read as though it scoped this; it only scoped the first time.
+    //
+    // The sandbox object is built fresh on every call and nothing in the
+    // engine reads a builtin's arity, so swapping in a wrapper is free.
     if (ctx.profile.version <= 3) {
         const crossFn = sandboxStdlib["cross"];
-        if (typeof crossFn === "function" && !Object.prototype.hasOwnProperty.call(crossFn, "valueOf")) {
-            Object.defineProperty(crossFn, "valueOf", { value: () => "cross", enumerable: false });
-            Object.defineProperty(crossFn, "toString", { value: () => "cross", enumerable: false });
+        if (typeof crossFn === "function") {
+            const crossStyle = (...args: any[]) => crossFn(...args);
+            Object.defineProperty(crossStyle, "valueOf", { value: () => "cross", enumerable: false });
+            Object.defineProperty(crossStyle, "toString", { value: () => "cross", enumerable: false });
+            sandboxStdlib["cross"] = crossStyle;
         }
     }
 
