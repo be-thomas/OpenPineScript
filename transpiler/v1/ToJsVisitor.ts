@@ -647,7 +647,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     let body: string;
     try { body = this.singleLineBody(ctx.fun_body_singleline().local_stmt_singleline()); }
     finally { this.fnDepth--; this.fnScope.pop(); }   // a guard deeper in the body throws
-    return `function ${name}${params} {\n  ${body};\n}`;
+    return `function ${name}${params} {\n  ${body};\n}${this.paramNamesAssignment(name, ctx.fun_head())}`;
   }
 
   visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
@@ -667,7 +667,36 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     let body: string;
     try { body = this.visit(ctx.fun_body_multiline()); }
     finally { this.fnDepth--; this.fnScope.pop(); }   // a guard deeper in the body throws
-    return `function ${name}${params} ${body}`;
+    return `function ${name}${params} ${body}${this.paramNamesAssignment(name, ctx.fun_head())}`;
+  }
+
+  /**
+   * The PINE names of a function's parameters, in order.
+   *
+   * Emitted onto the function object so `Context.call` can resolve a keyword
+   * argument against it. The built-in registry carries this for every built-in;
+   * a user-defined function has nowhere else to put it, and without it
+   * `f(b = 5)` reaches the function as a positional bundle rather than as `b`.
+   *
+   * A seam because v5's parameters can carry defaults and are a rule of their
+   * own; here a parameter is just an id.
+   */
+  protected paramNames(ctx: Fun_headContext): string[] {
+    const ids = ctx.id();
+    if (!ids) return [];
+    return ids.map((id) => id.getText());
+  }
+
+  /**
+   * `fn.__params = [...]`, appended to a function definition.
+   *
+   * A property rather than a lookup table because the two have to survive
+   * bundling together: the emitter's names are preserved by `keepNames`, and a
+   * property name is not mangled at all.
+   */
+  protected paramNamesAssignment(jsName: string, head: Fun_headContext): string {
+    const names = this.paramNames(head);
+    return names.length > 0 ? `\n${jsName}.__params = ${JSON.stringify(names)};` : "";
   }
 
   visitFun_head(ctx: Fun_headContext): string {

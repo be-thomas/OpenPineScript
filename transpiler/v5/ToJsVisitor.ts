@@ -1808,6 +1808,11 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * straight onto a JavaScript default parameter, which has the semantics Pine
    * describes (evaluated per call, only when the argument is absent).
    */
+  /** v5 parameters are a rule of their own, and may carry a default. */
+  protected override paramNames(ctx: Fun_headContext): string[] {
+    return ctx.fun_param().map((p) => p.id().getText());
+  }
+
   override visitFun_head(ctx: Fun_headContext): string {
     const params = ctx.fun_param();
     if (params.length === 0) return "()";

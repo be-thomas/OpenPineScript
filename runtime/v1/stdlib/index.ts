@@ -423,6 +423,47 @@ export function createStdlib(ctx: Context) {
         }
     }
 
+    // `cross` is BOTH things at v1–v3, and one sandbox slot has to carry both.
+    //
+    //   cross(x, y)                  the crossover test
+    //   plot(x, style = cross)       the plot style v4 renamed to plot.style_cross
+    //
+    // SOURCING. TradingView publishes the SAME how-to at both versions:
+    // `v3-appendix-howtos-09` plots `barssince(is_new_day())` with
+    // `style=cross`, and `v4-appendix-howtos-10` is the identical script with
+    // `style=plot.style_cross`. The bare global is that style's v1–v3 spelling.
+    //
+    // Every other style in that family — line, histogram, columns, circles,
+    // area, areabr, linebr, stepline — is a plain constant in ui.ts. `cross`
+    // alone collides with a function name, so it is the function that carries
+    // the value, through the same non-enumerable `valueOf` device the
+    // value-bearing namespaces use. `cross(a, b)` still calls; reading `cross`
+    // yields "cross".
+    //
+    // Without this the FUNCTION ITSELF was recorded as the plot's style, which
+    // put a live closure in the render model and made the result impossible to
+    // postMessage — the script drew nothing in any worker-backed host.
+    //
+    // Carried by a WRAPPER, not by the export itself. `sandboxStdlib["cross"]`
+    // is `entry.ref` — the one `ta.cross` the whole module shares, not a
+    // per-Context copy — so defining `valueOf` on it changed that function for
+    // the life of the process. One v1–v3 compile anywhere and every later v4
+    // or v5 session in the same process saw a value-bearing `ta.cross`, where
+    // `val(ta.cross)` and `String(ta.cross)` both answer "cross". The version
+    // guard read as though it scoped this; it only scoped the first time.
+    //
+    // The sandbox object is built fresh on every call and nothing in the
+    // engine reads a builtin's arity, so swapping in a wrapper is free.
+    if (ctx.profile.version <= 3) {
+        const crossFn = sandboxStdlib["cross"];
+        if (typeof crossFn === "function") {
+            const crossStyle = (...args: any[]) => crossFn(...args);
+            Object.defineProperty(crossStyle, "valueOf", { value: () => "cross", enumerable: false });
+            Object.defineProperty(crossStyle, "toString", { value: () => "cross", enumerable: false });
+            sandboxStdlib["cross"] = crossStyle;
+        }
+    }
+
     return sandboxStdlib;
 }
 

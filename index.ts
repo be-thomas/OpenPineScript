@@ -39,6 +39,9 @@ export type {
     RenderDelta,
     EngineError,
     InputView,
+    PropertyView,
+    Performance,
+    PerformanceStats,
     Candle,
 } from "./runtime/v1/session";
 
@@ -53,6 +56,7 @@ export type {
     InputDef,
     Trade,
     Position,
+    EquityPoint,
 } from "./runtime/v1/context";
 
 // ── The compiler, for hosts that want the JavaScript rather than the run ───
@@ -64,6 +68,14 @@ export {
 } from "./transpiler/common";
 
 export type { PineVersion, TranspileOptions, CompileResult } from "./transpiler/common";
+
+// ── The language itself, for an editor ─────────────────────────────────────
+//
+// The keywords and built-in names a version knows, taken from the grammars and
+// the registry the compiler consults — so a host's syntax highlighting cannot
+// drift from what the engine will actually accept.
+export { languageSpec } from "./runtime/v1/language-spec";
+export type { LanguageSpec } from "./runtime/v1/language-spec";
 
 // ── The low-level engine ───────────────────────────────────────────────────
 //

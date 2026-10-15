@@ -16,20 +16,91 @@ export interface Trade {
     qty: number;
     pnl: number;
     direction: "long" | "short";
+    /**
+     * The bars the trade opened and closed on.
+     *
+     * A time alone cannot be aligned to a chart without searching the bar
+     * list for it, and "Avg # Bars in Trades" — a row of TradingView's
+     * performance summary — is `exitBarIndex - entryBarIndex` and nothing
+     * else. Both are recorded at the fill, where they are known for free.
+     */
+    entryBarIndex?: number;
+    exitBarIndex?: number;
+    /**
+     * The order id that OPENED the position, which TradingView's list of
+     * trades calls the trade's signal. `id` names the closing order, so
+     * without this the entry row of every trade reads "Close".
+     */
+    entryId?: string;
+    /**
+     * Favourable and adverse excursion, in currency, over the life of the
+     * trade — how far the position ran in the script's favour before it
+     * closed, and how far against.
+     *
+     *   run-up   = (highest price while open - entry price) * qty   [long]
+     *   drawdown = (entry price - lowest price while open)  * qty   [long]
+     *
+     * mirrored for a short. TradingView states the price form of both and
+     * reports them per trade; the exit price does not enter either one.
+     * Both are >= 0, and both are measured against the position's average
+     * price so a pyramided add moves them the way it moves the P&L.
+     */
+    runup?: number;
+    drawdown?: number;
+    /** Commission charged on the round turn, already deducted from `pnl`. */
+    commission?: number;
+}
+
+/**
+ * One row of the equity curve: what the account was worth at a bar's close.
+ *
+ * Sampled every bar rather than every fill because that is what a chart
+ * plots — TradingView's overview draws equity against time, and a curve
+ * that only moves when a trade closes is a staircase that hides the open
+ * position's swing. `openPL` is the part of `equity` that is not yet
+ * realized, which is what makes the difference visible.
+ */
+export interface EquityPoint {
+    time: number;
+    /** Realized cash plus the open position's mark-to-market. */
+    equity: number;
+    /** Unrealized P&L of the position held at this bar's close; 0 while flat. */
+    openPL: number;
 }
 
 export interface Position {
     size: number;      // + for Long, - for Short
     avgPrice: number;
     /**
-     * The bar the position was OPENED on, and the order id that opened it.
+     * The bar the position was OPENED on, the time of that bar, and the order
+     * id that opened it.
      *
      * Recorded so `strategy.opentrades.entry_bar_index` and `.entry_id` have
      * something to answer with. Undefined while flat, which is the same fact as
      * `size === 0` and reads as `na` either way.
+     *
+     * `entryTime` is here because a host has to PLACE this position on a
+     * chart, and a bar index cannot be placed: the chart's bar list grows as
+     * older bars page in, so index 40 is a different bar after a scroll.
+     * `Trade` carries both for the same reason; leaving it off `Position`
+     * meant the still-open position could only be drawn on the last bar.
      */
     entryBarIndex?: number;
+    entryTime?: number;
     entryId?: string;
+    /**
+     * Entry-side commission already paid on the position still open, so an
+     * exit can charge its own side and claim a share of this rather than
+     * recomputing a whole round turn.
+     *
+     * `commission.cash_per_order` is a flat fee PER ORDER, and it used to be
+     * charged twice per closed-trade record. Two partial exits of one entry
+     * are three orders and were billed for four; three pyramided entries
+     * closed in one go are four orders and were billed for two. The other two
+     * commission types scale with quantity, so they came out right by
+     * accident and this changes nothing for them.
+     */
+    entryCommission?: number;
 }
 
 /**
@@ -138,6 +209,26 @@ export interface ScriptMeta {
     calc_on_every_tick?: boolean; // strategy only
     calc_on_order_fills?: boolean; // strategy only
     currency?: string;           // strategy only
+    /**
+     * The rest of the `strategy()` declaration — the backtest settings a
+     * TradingView user reads off the Properties tab and changes without
+     * touching the script.
+     *
+     * Recorded whether or not the broker acts on each one, because a host
+     * cannot show a properties panel for arguments it was never told about,
+     * and a panel that invents its own defaults will disagree with the
+     * script the moment the script sets one.
+     */
+    initial_capital?: number;
+    default_qty_type?: string;
+    default_qty_value?: number;
+    commission_type?: string;
+    commission_value?: number;
+    slippage?: number;
+    margin_long?: number;
+    margin_short?: number;
+    process_orders_on_close?: boolean;
+    risk_free_rate?: number;
 }
 
 /**
@@ -154,6 +245,11 @@ interface RuntimeSnapshot {
     position: Position;
     cash: number;
     trades: Trade[];
+    equityLen: number;
+    positionRunup: number;
+    positionDrawdown: number;
+    maxContractsHeld: number;
+    commissionPaid: number;
     orders: any[];
     marketOrders: MarketOrder[];
     pendingEntries: Map<string, any>;
@@ -168,6 +264,36 @@ interface RuntimeSnapshot {
  * them has ~10 optional style properties, and nothing in this engine reads them
  * — they exist so a host can render, and so a script that draws does not crash.
  */
+/**
+ * Reduce a runtime value to something that can leave this process.
+ *
+ * The render model is a DATA structure: a host reads it across a `postMessage`
+ * or a JSON boundary, so anything in it that is not plain data makes the whole
+ * result unusable, however correct its numbers are.
+ *
+ * Two things arrive here that are not:
+ *
+ *   a `Series`             `f = plot(...)` compiles to `ctx.new_var(...)`, so a
+ *                          plot id handed to `fill()` is a Series — and a
+ *                          Series holds the Context, which holds the sandbox,
+ *                          which holds every stdlib function.
+ *   a value-bearing FN     `cross` is the crossover function AND the v1–v3
+ *                          plot style; `plot(x, style = cross)` records the
+ *                          binding, and the binding is callable.
+ *
+ * A function that carries no value is dropped rather than stringified: the
+ * render model has no reading for one, and a source dump is worse than a gap.
+ */
+function plainValue(v: any): any {
+    if (v instanceof Series) return v.valueOf();
+    if (Array.isArray(v)) return v.map(plainValue);
+    if (typeof v === "function") {
+        const unwrapped = v.valueOf();
+        return typeof unwrapped === "function" ? undefined : unwrapped;
+    }
+    return v;
+}
+
 export interface Drawing {
     id: string;
     kind: 'line' | 'label' | 'box' | 'table' | 'polyline' | 'linefill';
@@ -410,6 +536,25 @@ export class Context {
     /** Bar index of the last bar in the dataset — `last_bar_index`. */
     public get lastBarIndex(): number {
         return this.datasetSize != null ? this.datasetSize - 1 : this.currentBarIndex;
+    }
+
+    /**
+     * Is the script executing on the dataset's final bar — `barstate.islast`?
+     *
+     * Derived, not stored. `is_last` is written only by `applyTick`, which is
+     * the LIVE path, so on a purely historical run nothing ever set it and
+     * `barstate.islast` was false on every bar including the last one. That
+     * silently broke the commonest idiom in Pine — `if barstate.islast` is how
+     * every dashboard table, summary label and end-of-chart drawing is guarded,
+     * and all of them simply never ran.
+     *
+     * The extent is known: `runHistory` declares it before the first bar. So
+     * the answer is the comparison, with the live flag kept as an override for
+     * the realtime bar, which is last by definition however long the dataset is.
+     */
+    public get onLastBar(): boolean {
+        if (this.is_last) return true;
+        return this.datasetSize != null && this.currentBarIndex === this.datasetSize - 1;
     }
 
     /**
@@ -904,6 +1049,28 @@ export class Context {
     public cash: number = DEFAULT_INITIAL_CAPITAL;
 
     /**
+     * Host overrides for the `strategy()` / `indicator()` declaration.
+     *
+     * TradingView's settings dialog lets a user change a strategy's starting
+     * capital or pyramiding without editing the script, and a host needs the
+     * same. They are consulted by `declareScript`, which is the only moment
+     * they can take effect: `cash` moves with the first fill, so seeding it
+     * afterwards would backdate money the broker has already spent.
+     *
+     * A key absent here means "use whatever the script declared".
+     */
+    public propertyOverrides: Record<string, any> = {};
+
+    /**
+     * What the SCRIPT declared, before any host override.
+     *
+     * Kept apart so a settings panel can offer "reset to the script's value"
+     * — reading it back off the Context afterwards returns the override, which
+     * would make the reset button restore the thing it was resetting from.
+     */
+    public declaredProperties: Record<string, any> = {};
+
+    /**
      * The equity the strategy started with, for `strategy.initial_capital`.
      *
      * Held separately from `cash`, which moves with every fill — the two are
@@ -915,6 +1082,40 @@ export class Context {
     public initialCapital: number = DEFAULT_INITIAL_CAPITAL;
     public trades: Trade[] = [];
     public orders: any[] = [];
+
+    /**
+     * The equity curve, one point per CLOSED bar, for strategies only.
+     *
+     * A study never opens a position, so sampling one would append a flat
+     * line of `initial_capital` to every indicator's render model.
+     */
+    public equityCurve: EquityPoint[] = [];
+
+    /**
+     * Excursion of the position currently open, in currency, reset when a
+     * position is opened from flat and read when it closes. Both are >= 0.
+     *
+     * Tracked on the Context rather than on the Position because they are
+     * measured across bars and the broker only ever sees one: by the time
+     * `closeAt` runs, the high the trade reached three bars ago is gone.
+     */
+    public positionRunup: number = 0;
+    public positionDrawdown: number = 0;
+
+    /** The largest absolute position size held at any point in the run. */
+    public maxContractsHeld: number = 0;
+
+    /** Commission charged across the whole run, for the performance summary. */
+    public commissionPaid: number = 0;
+
+    /**
+     * The first and last close the strategy saw, for the buy & hold baseline
+     * TradingView draws against the equity curve. Recorded here because the
+     * render model is built from the Context alone and the candles are the
+     * caller's.
+     */
+    public firstClose: number = NaN;
+    public lastClose: number = NaN;
 
     /**
      * Market orders placed on this bar, waiting for the next bar's open.
@@ -1025,6 +1226,13 @@ export class Context {
         this.trades = [];
         this.orders = [];
         this.marketOrders = [];
+        this.equityCurve = [];
+        this.positionRunup = 0;
+        this.positionDrawdown = 0;
+        this.maxContractsHeld = 0;
+        this.commissionPaid = 0;
+        this.firstClose = NaN;
+        this.lastClose = NaN;
 
         // 6. Reset Script Metadata (re-declared on the next pass)
         this.scriptMeta = null;
@@ -1064,10 +1272,18 @@ export class Context {
             ? ['title', 'shorttitle', 'overlay', 'pyramiding', 'calc_on_every_tick', 'calc_on_order_fills', 'currency']
             : ['title', 'shorttitle', 'overlay', 'precision'];
 
-        const arg = (name: string): any => {
+        /** What the script itself passed, ignoring any host override. */
+        const declared = (name: string): any => {
             if (named[name] !== undefined) return unwrap(named[name]);
             const idx = order.indexOf(name);
             return idx >= 0 && idx < positional.length ? unwrap(positional[idx]) : undefined;
+        };
+
+        const arg = (name: string): any => {
+            // A host override outranks the script, which is what makes the
+            // settings dialog able to change a backtest without an edit.
+            if (this.propertyOverrides[name] !== undefined) return this.propertyOverrides[name];
+            return declared(name);
         };
 
         const title = arg('title') !== undefined ? String(arg('title')) : '';
@@ -1084,12 +1300,34 @@ export class Context {
                 precision: arg('precision') !== undefined ? Number(arg('precision')) : undefined,
             };
         } else {
+            const num = (name: string, fallback?: number): number | undefined => {
+                const v = arg(name);
+                return v !== undefined && Number.isFinite(Number(v)) ? Number(v) : fallback;
+            };
+            const str = (name: string): string | undefined => {
+                const v = arg(name);
+                return v !== undefined ? String(v) : undefined;
+            };
+
             this.scriptMeta = {
                 kind, title, shorttitle, overlay,
                 pyramiding: arg('pyramiding') !== undefined ? Number(arg('pyramiding')) : 0,
                 calc_on_every_tick: Boolean(arg('calc_on_every_tick')),
                 calc_on_order_fills: Boolean(arg('calc_on_order_fills')),
                 currency: arg('currency') !== undefined ? String(arg('currency')) : undefined,
+                // Defaults are TradingView's own: one contract per order, no
+                // costs, 100% margin, orders filled on the next bar's open.
+                // The constants' own values, as `strategy.fixed` and friends
+                // evaluate to — so a host comparing against them matches.
+                default_qty_type: str('default_qty_type') ?? 'strategy.fixed',
+                default_qty_value: num('default_qty_value', 1),
+                commission_type: str('commission_type') ?? 'commission.percent',
+                commission_value: num('commission_value', 0),
+                slippage: num('slippage', 0),
+                margin_long: num('margin_long', 100),
+                margin_short: num('margin_short', 100),
+                process_orders_on_close: Boolean(arg('process_orders_on_close')),
+                risk_free_rate: num('risk_free_rate', 2),
             };
 
             // The broker's starting balance, which until now was read from
@@ -1102,7 +1340,35 @@ export class Context {
             const capital = arg('initial_capital');
             if (capital !== undefined && Number.isFinite(Number(capital))) {
                 this.initialCapital = Number(capital);
-                this.cash = Number(capital);
+                // ONLY on the first bar. `strategy()` is a statement in the
+                // script body, so it runs again on every bar — and re-seeding
+                // `cash` each time handed the balance back to the broker after
+                // every trade, leaving it permanently equal to the starting
+                // capital. Nothing read `cash` closely enough to notice until
+                // the equity curve plotted it.
+                if (this.currentBarIndex === 0) this.cash = Number(capital);
+            }
+
+            // Recorded before any override so a host can offer the script's
+            // own value back.
+            const declaredCapital = declared('initial_capital');
+            this.declaredProperties.initial_capital =
+                declaredCapital !== undefined && Number.isFinite(Number(declaredCapital))
+                    ? Number(declaredCapital)
+                    : DEFAULT_INITIAL_CAPITAL;
+            this.declaredProperties.pyramiding =
+                declared('pyramiding') !== undefined ? Number(declared('pyramiding')) : 0;
+
+            this.scriptMeta.initial_capital = this.initialCapital;
+
+            // Every other overridable declaration argument, recorded before
+            // the override so the properties panel can offer "reset to the
+            // script's value" for each of them too.
+            for (const key of ['commission_type', 'commission_value', 'slippage',
+                               'default_qty_type', 'default_qty_value',
+                               'margin_long', 'margin_short', 'risk_free_rate'] as const) {
+                const v = declared(key);
+                if (v !== undefined) this.declaredProperties[key] = v;
             }
         }
     }
@@ -1127,20 +1393,34 @@ export class Context {
     ): any {
         const currentId = `input_${this.inputCounter++}`;
 
+        // Everything recorded here leaves the engine — a host reads `inputDefs`
+        // to build its settings dialog, across a postMessage. And these values
+        // come straight off the script, so
+        //
+        //     string SIZE_LARGE = "Large"
+        //     input.string(SIZE_NORMAL, "Size", options = [SIZE_LARGE, …])
+        //
+        // hands over an array of `Series`, each holding this Context and through
+        // it the whole sandbox. Unwrapping also makes `constrainInput` work:
+        // `options.includes(value)` compared a Series against a string and was
+        // never true, so every option list silently fell back to its default.
+        const plainMeta: Record<string, any> = {};
+        for (const [k, v] of Object.entries(meta)) plainMeta[k] = plainValue(v);
+
         // If it's the dry run (first time seeing this), save the definition
         if (this.inputDefs.length < this.inputCounter) {
             this.inputDefs.push({
                 id: currentId,
-                defval,
+                defval: plainValue(defval),
                 title: title || currentId,
                 type,
-                ...meta,
+                ...plainMeta,
             });
         }
 
         // Return user override if it exists, otherwise return the default
-        const raw = currentId in this.userInputs ? this.userInputs[currentId] : defval;
-        return Context.constrainInput(raw, meta);
+        const raw = currentId in this.userInputs ? this.userInputs[currentId] : plainValue(defval);
+        return Context.constrainInput(raw, { ...plainMeta, defval: plainValue(defval) });
     }
 
     /** Clamp to `minval`/`maxval` and fall back to the default outside `options`. */
@@ -1181,6 +1461,35 @@ export class Context {
 
     /** How many arguments the caller passed before any keyword. */
     public positionalArguments: number = 0;
+
+    /**
+     * Resolve a trailing keyword bundle against a parameter list.
+     *
+     * The same rule the built-in path applies, over names the emitter supplies
+     * rather than names the registry does. A gap is left `undefined` so the
+     * emitted function's own JavaScript default takes over, which is how a
+     * Pine parameter default is expressed.
+     */
+    private bindKeywordArguments(args: any[], params: string[], fname: string): any[] {
+        const last = args[args.length - 1];
+        const isBundle = last && typeof last === 'object' && !Array.isArray(last)
+            && !(last instanceof Series) && last.constructor === Object
+            && Object.keys(last).length > 0
+            && Object.keys(last).every(k => k.startsWith(PREFIX));
+        if (!isBundle) return args;
+
+        const out = args.slice(0, -1);
+        for (const [key, value] of Object.entries(last)) {
+            const name = removePrefix(key);
+            const index = params.indexOf(name);
+            // Recorded, not guessed at: a keyword the signature does not name
+            // is the same class of silence the built-in path tracks.
+            if (index === -1) { this.droppedArguments.add(`${fname}(${name})`); continue; }
+            while (out.length <= index) out.push(undefined);
+            out[index] = value;
+        }
+        return out;
+    }
 
     public call(id: string, fn: Function, ...args: any[]) {
         // DIAGNOSTIC: If this triggers, the transpiler passed a null function reference
@@ -1242,6 +1551,22 @@ export class Context {
 
             // 1. Check if the entry exists. If not, we default to standard call (fail-safe)
             if (!entry) {
+                // A USER-DEFINED function. The built-in registry knows nothing
+                // about it, so its parameter names come from the emitter, which
+                // records them on the function as `__params`.
+                //
+                // Without this the keyword bundle was handed to the function as
+                // the next POSITIONAL argument, so
+                //
+                //     averages.toTable(header = headerText, textSize = txtSize)
+                //
+                // — TradingView's own published maps example — put `{header:…}`
+                // into `position` and returned `na`. No error: the script simply
+                // drew nothing, and every value that depended on it was `na`.
+                const params: unknown = (fn as any).__params;
+                if (Array.isArray(params) && params.length > 0) {
+                    return fn(...this.bindKeywordArguments(args, params as string[], fname));
+                }
                 // If we don't have metadata, we assume it's a standard JS function call
                 return fn(...args);
             }
@@ -1885,7 +2210,48 @@ export class Context {
      * Registers a pre-built PlotData object for the current bar.
      * Each ui.ts function constructs the correctly-typed variant.
      */
+    /**
+     * Strip the runtime wrapper off every field of a plot or fill record.
+     *
+     * `f = plot(...)` compiles to `ctx.new_var(...)`, so the plot id a script
+     * hands to `fill()` arrives as a `Series`, not a string — and a `Series`
+     * holds a back-reference to this Context, which holds the sandbox, which
+     * holds every stdlib function. Storing one put the entire runtime inside
+     * the render model: `structuredClone` threw, so `postMessage` threw, so
+     * every script using `fill()` failed in any host that runs the engine in a
+     * Worker or a backend — which is the architecture the integration guide
+     * documents. The values were all correct; the model just could not leave
+     * the process it was built in.
+     *
+     * The same applies to `plot(close, color = myColorVar)`, where the colour
+     * is a declared variable rather than a literal.
+     */
+    private plainPlotData<T extends Record<string, any>>(data: T): T {
+        // Copied only when something actually needs unwrapping. `plainValue`
+        // is identity for everything except a Series, an array and a
+        // function, and a plot record is overwhelmingly numbers and strings —
+        // so rebuilding every record, field by field, on every bar, for every
+        // plot, allocated an object per plot per bar to return the same
+        // values. The scan below is a few typeof checks and no allocation.
+        let needsUnwrapping = false;
+        for (const k in data) {
+            const v = data[k];
+            if (v instanceof Series || Array.isArray(v) || typeof v === "function") {
+                needsUnwrapping = true;
+                break;
+            }
+        }
+        if (!needsUnwrapping) return data;
+
+        const out: Record<string, any> = {};
+        for (const [k, v] of Object.entries(data)) {
+            out[k] = plainValue(v);
+        }
+        return out as T;
+    }
+
     public registerPlot(data: PlotData) {
+        data = this.plainPlotData(data);
         // 1. Get the Unique Call ID (Storage Key)
         // This ensures that "plot(close)" and "plot(open)" don't overwrite each other
         // just because they both default to title="Plot".
@@ -1922,7 +2288,13 @@ export class Context {
         }
     }
 
-    public registerFill(id1: string, id2: string, options: { color?: string, title?: string } = {}) {
+    public registerFill(id1: any, id2: any, options: { color?: string, title?: string } = {}) {
+        // See `plainPlotData`: a plot id reaches here as a Series whenever the
+        // script stored it in a variable, which is the documented way to use
+        // `fill()` at all.
+        id1 = plainValue(id1);
+        id2 = plainValue(id2);
+        options = this.plainPlotData(options);
         const title = options.title || `Fill_${id1}_${id2}`;
         
         let series = this.fills.get(title);
@@ -1976,7 +2348,61 @@ export class Context {
                 series.push(null);
             }
         });
+        this.sampleEquity();
         this.currentBarIndex++;
+    }
+
+    /**
+     * Records one equity point and advances the open position's excursion.
+     *
+     * Run at the END of a bar, after the script and the broker have both had
+     * it: an entry placed on this bar is already in `position`, and the high
+     * and low of the bar it filled on count towards its run-up, which is what
+     * TradingView reports.
+     */
+    /**
+     * Mark-to-market on the open position, at a price the caller names.
+     *
+     * One formula, three callers: the equity curve samples it at each bar's
+     * close, `strategy.equity()` answers with it, and the performance report
+     * takes it at the last close. All three had their own copy, so a change
+     * to any of them — deducting the entry commission, say — would have
+     * landed in one place and quietly disagreed with the other two.
+     *
+     * The price is a parameter rather than read from the Context because the
+     * report deliberately uses `lastClose` and the other two use `close`.
+     */
+    openProfitAt(price: number): number {
+        return this.position.size === 0
+            ? 0
+            : (price - this.position.avgPrice) * this.position.size;
+    }
+
+    private sampleEquity() {
+        if (this.scriptMeta?.kind !== "strategy") return;
+
+        if (Number.isNaN(this.firstClose)) this.firstClose = this.close;
+        this.lastClose = this.close;
+
+        const size = this.position.size;
+        const openPL = this.openProfitAt(this.close);
+        this.equityCurve.push({ time: this.time, equity: this.cash + openPL, openPL });
+
+        if (size === 0) {
+            this.positionRunup = 0;
+            this.positionDrawdown = 0;
+            return;
+        }
+
+        const qty = Math.abs(size);
+        if (qty > this.maxContractsHeld) this.maxContractsHeld = qty;
+
+        // Excursion is measured in price against the position's average, then
+        // scaled by size - so a pyramided add moves it the way it moves P&L.
+        const best = size > 0 ? this.high - this.position.avgPrice : this.position.avgPrice - this.low;
+        const worst = size > 0 ? this.position.avgPrice - this.low : this.high - this.position.avgPrice;
+        this.positionRunup = Math.max(this.positionRunup, best * qty);
+        this.positionDrawdown = Math.max(this.positionDrawdown, worst * qty);
     }
 
     // --- Live-tick model (P3) ---
@@ -2028,6 +2454,13 @@ export class Context {
             position: structuredClone(this.position),
             cash: this.cash,
             trades: structuredClone(this.trades),
+            // The curve is append-only, so a length is a complete rollback
+            // point for it and clones nothing.
+            equityLen: this.equityCurve.length,
+            positionRunup: this.positionRunup,
+            positionDrawdown: this.positionDrawdown,
+            maxContractsHeld: this.maxContractsHeld,
+            commissionPaid: this.commissionPaid,
             orders: structuredClone(this.orders),
             marketOrders: structuredClone(this.marketOrders),
             pendingEntries: structuredClone((this as any)._pendingEntries ?? new Map()),
@@ -2070,6 +2503,11 @@ export class Context {
         this.position = structuredClone(s.position);
         this.cash = s.cash;
         this.trades = structuredClone(s.trades);
+        this.equityCurve.length = s.equityLen;
+        this.positionRunup = s.positionRunup;
+        this.positionDrawdown = s.positionDrawdown;
+        this.maxContractsHeld = s.maxContractsHeld;
+        this.commissionPaid = s.commissionPaid;
         this.orders = structuredClone(s.orders);
         this.marketOrders = structuredClone(s.marketOrders);
         (this as any)._pendingEntries = structuredClone(s.pendingEntries);

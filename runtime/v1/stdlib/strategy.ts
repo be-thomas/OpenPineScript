@@ -1,4 +1,4 @@
-import type { Context, Trade } from "../context";
+import type { Context } from "../context";
 
 /**
  * strategy.ts - Backtesting Engine Logic
@@ -296,7 +296,7 @@ export function order(
     ctx: Context,
     id: string,
     dir: string,
-    qty: any = 1,
+    qty: any = undefined,
     limit: any = Number.NaN,
     stop: any = Number.NaN,
     oca_name: string = "",
@@ -321,7 +321,14 @@ export function order(
     entries.set(id, {
         id,
         dir,
-        qty: val(qty),
+        // `undefined` means "the strategy did not say", which `entry` reads as
+        // "use the declared default size". `val(undefined)` is NaN, and NaN is
+        // not `undefined`, so the default was skipped and the finite-quantity
+        // guard then threw the order away: a limit or stop entry written
+        // without an explicit size silently never filled. The market-order
+        // path above passes `qty` through untouched, which is why only the
+        // pending orders were affected.
+        qty: qty === undefined ? undefined : val(qty),
         limit: lim,
         stop: stp,
         placedBar: existing ? existing.placedBar : ctx.currentBarIndex,
@@ -389,7 +396,9 @@ export function entry(
     ctx: Context,
     id: string,
     direction: string,
-    qty: any = 1,
+    // Absent, not 1: an omitted `qty` is what hands the size over to
+    // `default_qty_type`, and a literal 1 cannot be told from no answer.
+    qty: any = undefined,
     limit: any = Number.NaN,
     stop: any = Number.NaN,
     oca_name: string = "",
@@ -400,6 +409,9 @@ export function entry(
     // Not a Pine parameter. `strategy.order` calls back in here once a pending
     // limit or stop has been triggered, and passes the price it filled at.
     overridePrice?: number,
+    // Nor this. True when the fill came from the LIMIT leg, which fills at
+    // its price or better and so takes no slippage.
+    viaLimit: boolean = false,
 ) {
     if (!gated(when)) return;
 
@@ -420,7 +432,13 @@ export function entry(
     // `fillMarketOrders` draining this queue, `processPendingOrders` matching a
     // limit or stop, or a risk rule liquidating — and those execute in place.
     if (overridePrice === undefined) {
-        ctx.marketOrders.push({ kind: "entry", id, direction: dir, qty: val(qty), comment });
+        // `undefined` travels with the order: a cash or percent-of-equity
+        // size is resolved at the price it fills at, which is not known yet.
+        ctx.marketOrders.push({
+            kind: "entry", id, direction: dir,
+            qty: qty === undefined ? undefined : val(qty),
+            comment,
+        });
         return;
     }
 
@@ -439,8 +457,14 @@ export function entry(
         if (!isLong && rs.allow_entry_in !== DIR.short) return;
     }
 
-    const currentPrice = toTick(ctx, overridePrice !== undefined ? overridePrice : ctx.close);
-    let numQty = val(qty);
+    const modelPrice = overridePrice !== undefined ? overridePrice : ctx.close;
+    // A triggered LIMIT order fills at its price or better, so slippage does
+    // not apply to it. Market and stop orders are the ones that slip.
+    const currentPrice = viaLimit
+        ? toTick(ctx, modelPrice)
+        : toTick(ctx, slip(ctx, modelPrice, isLong));
+    let numQty = qty === undefined ? defaultQty(ctx, currentPrice) : val(qty);
+    if (!Number.isFinite(numQty) || numQty <= 0) return;
 
     // max_position_size clamp
     if (rs.max_position_size !== Infinity) {
@@ -457,7 +481,14 @@ export function entry(
     if (ctx.position.size !== 0) {
         const isCurrentLong = ctx.position.size > 0;
         if (isLong !== isCurrentLong) {
-            closeAt(ctx, `Reverse for ${id}`, currentPrice);
+            // The MODEL price, not the slipped one. `closeAt` slips what it
+            // is given, in the direction of the trade that closes the
+            // position — which for a reversal is the same direction as this
+            // entry — so handing it `currentPrice` applied slippage twice.
+            // Reversing a short with `slippage = 2` closed it four ticks
+            // above the open instead of two, and every reversal's P&L was
+            // short by `slippage * mintick * qty`.
+            closeAt(ctx, `Reverse for ${id}`, modelPrice);
         }
     }
 
@@ -481,11 +512,72 @@ export function entry(
     // position began on.
     if (wasFlat) {
         ctx.position.entryBarIndex = ctx.currentBarIndex;
+        ctx.position.entryTime = ctx.time;
         ctx.position.entryId = id;
+        ctx.position.entryCommission = 0;
+        // A NEW position measures its excursion from here. Leaving the old
+        // figures in place made a reversal inherit them, because a reversal
+        // never passes through flat at a bar boundary and the end-of-bar
+        // reset therefore never fired — so a short that gave back 1.74 was
+        // still reporting 1.74 three long trades later.
+        ctx.positionRunup = 0;
+        ctx.positionDrawdown = 0;
+    }
+
+    // Counted at the FILL, not only at the end of the bar. `sampleEquity`
+    // takes its reading after the script and the broker have both had the
+    // bar, so a position opened at the open and stopped out on the same bar
+    // was flat again by the time it looked and never counted at all.
+    const held = Math.abs(ctx.position.size);
+    if (held > ctx.maxContractsHeld) ctx.maxContractsHeld = held;
+
+    // Commission on the ENTRY side is charged here, at the fill, because it is
+    // a fee on an ORDER. `recordTrade` used to compute a whole round turn per
+    // closed-trade record, which is only the same thing when one entry is
+    // closed by one exit. Two partial exits of one entry are three orders and
+    // were billed for four; three pyramided entries closed in one go are four
+    // orders and were billed for two. An exit now charges its own side and
+    // claims its share of what the entries already paid.
+    const entryFee = commissionFor(ctx, currentPrice, numQty);
+    if (entryFee !== 0) {
+        ctx.cash -= entryFee;
+        ctx.commissionPaid += entryFee;
+        ctx.position.entryCommission = (ctx.position.entryCommission ?? 0) + entryFee;
     }
 
     // Track filled orders for intraday limit
     rs.daily_filled_orders++;
+}
+
+/**
+ * How big an order is when the script did not say.
+ *
+ * `strategy(default_qty_type = ..., default_qty_value = ...)`, which the
+ * engine recognised as constants and then ignored: every entry without an
+ * explicit `qty` was one contract, whatever the strategy had declared. A
+ * strategy sized at 10% of equity was being backtested at one share.
+ *
+ *   strategy.fixed              `value` contracts
+ *   strategy.cash               `value` of currency, at the fill price
+ *   strategy.percent_of_equity  `value`% of equity, at the fill price
+ *
+ * The two price-based forms are sized at the price the order actually fills
+ * at, which is why this is resolved at the fill and not where the order was
+ * placed.
+ */
+function defaultQty(ctx: Context, price: number): number {
+    const meta = ctx.scriptMeta;
+    const value = Number(meta?.default_qty_value ?? 1);
+    if (!Number.isFinite(value) || value <= 0) return 0;
+
+    switch (meta?.default_qty_type) {
+        case cash:
+            return price > 0 ? value / price : 0;
+        case percent_of_equity:
+            return price > 0 ? (equity(ctx) * value / 100) / price : 0;
+        default:
+            return value;
+    }
 }
 
 /**
@@ -521,9 +613,9 @@ export function close_all(
 export function closeAt(ctx: Context, comment: string, price: number): void {
     if (ctx.position.size === 0) return;
 
-    const currentPrice = toTick(ctx, price);
-    const qty = Math.abs(ctx.position.size);
     const isLong = ctx.position.size > 0;
+    const currentPrice = toTick(ctx, slip(ctx, price, !isLong));
+    const qty = Math.abs(ctx.position.size);
 
     let pnl = 0;
     if (isLong) {
@@ -532,23 +624,20 @@ export function closeAt(ctx: Context, comment: string, price: number): void {
         pnl = (ctx.position.avgPrice - currentPrice) * qty;
     }
 
-    const trade: Trade = {
+    recordTrade(ctx, {
         id: comment || "Close",
-        entryTime: entryTimeOf(ctx),
         entryPrice: ctx.position.avgPrice,
-        exitTime: ctx.time,
         exitPrice: currentPrice,
         qty: qty,
         pnl: pnl,
-        direction: isLong ? "long" : "short"
-    };
-
-    ctx.trades.push(trade);
-    ctx.cash += pnl;
+        direction: isLong ? "long" : "short",
+    });
 
     ctx.position.size = 0;
     ctx.position.avgPrice = 0;
     ctx.position.entryBarIndex = undefined;
+    ctx.position.entryTime = undefined;
+    ctx.position.entryCommission = 0;
     ctx.position.entryId = undefined;
     getPendingExits(ctx).clear();
 }
@@ -730,7 +819,130 @@ function applyExitOCA(exits: Map<string, PendingExit>, filledExit: PendingExit):
  * it on, and `strategy.closedtrades.entry_bar_index()` resolves the time back
  * to an index, so it answered `na` for every trade.
  */
+/**
+ * The commission on ONE order, in currency.
+ *
+ * `strategy(commission_type = ..., commission_value = ...)`, which until now
+ * the engine only had constants for: the three types were declarable and
+ * nothing was ever charged, so every backtest reported a gross result as
+ * though it were net.
+ *
+ *   commission.percent            value% of the order's cash volume
+ *   commission.cash_per_contract  value per contract
+ *   commission.cash_per_order     value per order
+ *
+ * A round turn is two orders, so a trade pays this twice — once at the entry
+ * price and once at the exit.
+ */
+function commissionFor(ctx: Context, price: number, qty: number): number {
+    const meta = ctx.scriptMeta;
+    const value = Number(meta?.commission_value ?? 0);
+    if (!Number.isFinite(value) || value === 0) return 0;
+    switch (meta?.commission_type) {
+        case commission.cash_per_contract: return value * Math.abs(qty);
+        case commission.cash_per_order: return value;
+        default: return Math.abs(price * qty) * value / 100;
+    }
+}
+
+/**
+ * A fill price moved against the order by `strategy(slippage = n)` ticks.
+ *
+ * Slippage is declared in TICKS, and is always adverse: a buy fills higher
+ * than the model price and a sell lower. Zero by default, so a strategy that
+ * does not declare it is unaffected.
+ */
+function slip(ctx: Context, price: number, buying: boolean): number {
+    const ticks = Number(ctx.scriptMeta?.slippage ?? 0);
+    const tick = Number(ctx.mintick);
+    if (!Number.isFinite(ticks) || ticks === 0) return price;
+    if (!Number.isFinite(tick) || tick <= 0 || !Number.isFinite(price)) return price;
+    return price + (buying ? 1 : -1) * ticks * tick;
+}
+
+/**
+ * Books a closed trade: the one place a Trade is created.
+ *
+ * Both exit paths — a flattening `closeAt` and a bracket order filling —
+ * used to build the record inline, which is why the two disagreed about
+ * what a trade carries. Everything a host needs beyond the P&L is stamped
+ * here, where it is still known: the bar each leg landed on, the id of the
+ * order that OPENED the position (`id` names the one that closed it), and
+ * the excursion the Context has been accumulating since the entry.
+ *
+ * `pnl` arrives GROSS and leaves net: commission is charged on the round
+ * turn and deducted here, so one subtraction serves every exit path.
+ */
+function recordTrade(ctx: Context, t: {
+    id: string; entryPrice: number; exitPrice: number;
+    qty: number; pnl: number; direction: "long" | "short";
+}): void {
+    // The exit's own order fee, plus this trade's share of what the position's
+    // entries already paid — pro rata by quantity, which is exact for the two
+    // per-contract and percentage types and the only sensible split of a flat
+    // per-order fee across a partial exit. The position has not been reduced
+    // yet at this point, so `size` is what was held going in.
+    // The bar this exit filled on has not been through `sampleEquity` yet:
+    // bracket exits fill in `setBar` before the script runs, and a market
+    // close fills at the next open, both ahead of the end-of-bar sample. So
+    // the excursion was read WITHOUT the bar the trade died on — a long at
+    // 100 stopped out at 95 on the next bar reported a drawdown of zero.
+    //
+    // Folding in the exit price is a lower bound, deliberately. Where the
+    // price went between this bar's open and the fill is not knowable from a
+    // candle, and claiming the bar's full high and low would credit the trade
+    // with an extreme it may have been closed before reaching.
+    const travelled = t.direction === "long"
+        ? t.exitPrice - t.entryPrice
+        : t.entryPrice - t.exitPrice;
+    const runup = Math.max(ctx.positionRunup, Math.max(0, travelled) * t.qty);
+    const drawdown = Math.max(ctx.positionDrawdown, Math.max(0, -travelled) * t.qty);
+
+    const exitFee = commissionFor(ctx, t.exitPrice, t.qty);
+    const held = Math.abs(ctx.position.size) || t.qty;
+    const paidOnEntry = ctx.position.entryCommission ?? 0;
+    const entryShare = held > 0 ? paidOnEntry * Math.min(1, t.qty / held) : paidOnEntry;
+    ctx.position.entryCommission = paidOnEntry - entryShare;
+
+    const fee = exitFee + entryShare;
+    const net = t.pnl - fee;
+
+    ctx.trades.push({
+        id: t.id,
+        entryTime: entryTimeOf(ctx),
+        entryPrice: t.entryPrice,
+        exitTime: ctx.time,
+        exitPrice: t.exitPrice,
+        qty: t.qty,
+        pnl: net,
+        direction: t.direction,
+        entryBarIndex: ctx.position.entryBarIndex,
+        exitBarIndex: ctx.currentBarIndex,
+        entryId: ctx.position.entryId,
+        runup,
+        drawdown,
+        commission: fee,
+    });
+
+    // Only the exit side moves cash and the running total here; the entry
+    // side left both at its own fill.
+    ctx.cash += t.pnl - exitFee;
+    ctx.commissionPaid += exitFee;
+}
+
+/**
+ * When the open position opened.
+ *
+ * `position.entryTime` is stamped at the fill and is the answer. Resolving it
+ * back out of `entryBarIndex` was the older way round, from before the
+ * position carried a time at all, and left two routes to one fact that could
+ * disagree — the bar lookup silently answers 0 for an index the bar list no
+ * longer covers. The index lookup remains as a fallback for a position
+ * restored without a time.
+ */
 function entryTimeOf(ctx: Context): number {
+    const stamped = ctx.position.entryTime;
+    if (typeof stamped === "number") return stamped;
     const bar = ctx.position.entryBarIndex;
     if (bar === undefined) return 0;
     const at = ctx.barTimes[bar];
@@ -902,17 +1114,20 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
         const entryStop = levelToTick(ctx, ord.stop, buying);
 
         let price = Number.NaN;
+        let filledOnLimit = false;
         if (buying) {
             // A limit waits for the price to FALL to it, a stop for it to
             // rise. Either way the open can have passed it already.
             if (!Number.isNaN(entryLimit) && low <= entryLimit) {
                 price = fillPrice(entryLimit, ctx.open, false);
+                filledOnLimit = true;
             } else if (!Number.isNaN(entryStop) && high >= entryStop) {
                 price = fillPrice(entryStop, ctx.open, true);
             }
         } else {
             if (!Number.isNaN(entryLimit) && high >= entryLimit) {
                 price = fillPrice(entryLimit, ctx.open, true);
+                filledOnLimit = true;
             } else if (!Number.isNaN(entryStop) && low <= entryStop) {
                 price = fillPrice(entryStop, ctx.open, false);
             }
@@ -923,7 +1138,7 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
             // the five before it (`limit`, `stop`, `oca_name`, `oca_type`,
             // `comment`, `when`, `alert_message`).
             entry(ctx, id, ord.dir, ord.qty, Number.NaN, Number.NaN,
-                  ord.oca_name, ord.oca_type, "", undefined, "", price);
+                  ord.oca_name, ord.oca_type, "", undefined, "", price, filledOnLimit);
             filledEntryIds.push(id);
             applyEntryOCA(entries, ord);
         }
@@ -949,22 +1164,33 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
         const limitAt = levelToTick(ctx, level.limit, isLong);
         const stopAt = levelToTick(ctx, level.stop, !isLong);
 
+        let exitOnLimit = false;
         if (isLong) {
             if (!Number.isNaN(limitAt) && high >= limitAt) {
                 executedPrice = fillPrice(limitAt, ctx.open, true);
+                exitOnLimit = true;
             } else if (!Number.isNaN(stopAt) && low <= stopAt) {
                 executedPrice = fillPrice(stopAt, ctx.open, false);
             }
         } else {
             if (!Number.isNaN(limitAt) && low <= limitAt) {
                 executedPrice = fillPrice(limitAt, ctx.open, false);
+                exitOnLimit = true;
             } else if (!Number.isNaN(stopAt) && high >= stopAt) {
                 executedPrice = fillPrice(stopAt, ctx.open, true);
             }
         }
 
         if (!Number.isNaN(executedPrice)) {
-            executedPrice = toTick(ctx, executedPrice);
+            // Closing a long is a sell, closing a short a buy — slippage is
+            // adverse either way. But only on the STOP leg: a limit order
+            // fills at its price or better, and slipping the take-profit
+            // recorded it filling WORSE than the limit, which is something a
+            // limit order cannot do. Every take-profit trade's P&L was short
+            // by `slippage * mintick * qty`.
+            executedPrice = exitOnLimit
+                ? toTick(ctx, executedPrice)
+                : toTick(ctx, slip(ctx, executedPrice, !isLong));
             const held = Math.abs(ctx.position.size);
             // "Ignored if `qty` is not na" — an explicit quantity wins over a
             // percentage, and neither given closes the whole position.
@@ -976,18 +1202,15 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
                 ? (executedPrice - ctx.position.avgPrice) * qty
                 : (ctx.position.avgPrice - executedPrice) * qty;
 
-            ctx.trades.push({
+            recordTrade(ctx, {
                 id: `Exit ${exitId}`,
-                entryTime: entryTimeOf(ctx),
                 entryPrice: ctx.position.avgPrice,
-                exitTime: ctx.time,
                 exitPrice: executedPrice,
                 qty: qty,
                 pnl: pnl,
-                direction: isLong ? "long" : "short"
+                direction: isLong ? "long" : "short",
             });
 
-            ctx.cash += pnl;
             rs.daily_filled_orders++;
 
             // Apply OCA logic for exits with named groups
@@ -1011,6 +1234,8 @@ export function processPendingOrders(ctx: Context, high: number, low: number): v
             if (remaining === 0) {
                 ctx.position.avgPrice = 0;
                 ctx.position.entryBarIndex = undefined;
+                ctx.position.entryTime = undefined;
+                ctx.position.entryCommission = 0;
                 ctx.position.entryId = undefined;
                 // Nothing left to protect, so the other brackets go with it.
                 exits.clear();
@@ -1038,11 +1263,7 @@ export function opentrades(ctx: Context): number {
 
 /** @getter */
 export function equity(ctx: Context): number {
-    let unrealized = 0;
-    if (ctx.position.size !== 0) {
-        unrealized = (ctx.close - ctx.position.avgPrice) * ctx.position.size;
-    }
-    return ctx.cash + unrealized;
+    return ctx.cash + ctx.openProfitAt(ctx.close);
 }
 
 /**
