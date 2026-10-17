@@ -16,7 +16,9 @@ No TradingView account. No cloud. No execution quota. No 500 ms loop timeout.
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Docs corpus](https://img.shields.io/badge/docs_corpus-741%2F763_compile-0EA5E9.svg?style=flat-square)](docs/common/CONFORMANCE.md#parity-763-real-scripts-from-tradingviews-docs)
 
-[Quick start](#-quick-start) · [Why](#-why-openpinescript) · [Parity](#-verified-against-tradingview-itself) · [Docs](#-documentation) · [FAQ](#-faq)
+### [▶ Try it in your browser at **pinechart.com**](https://pinechart.com) — no install, no CSV
+
+[Try it online](#-try-it-online) · [Quick start](#-quick-start) · [Why](#-why-openpinescript) · [Parity](#-verified-against-tradingview-itself) · [Docs](#-documentation) · [FAQ](#-faq)
 
 </div>
 
@@ -46,6 +48,40 @@ Performance:
 ```
 
 <sub>One of TradingView's own documentation examples, unedited, run locally.</sub>
+
+---
+
+## 🌲 Try it online
+
+Not everyone wants to clone a repository to find out whether an engine handles
+their script. **[Pine Chart](https://pinechart.com)** is a charting workspace
+built on OpenPineScript — this engine, compiled to a Web Worker and running
+inside the browser tab.
+
+[![Pine Chart: a candlestick chart with Bollinger Bands drawn by a Pine Script v5 indicator, beside the Pine editor showing the script that drew them](https://raw.githubusercontent.com/be-thomas/OpenPineScript/main/images/common/pine-chart.png)](https://pinechart.com)
+
+<div align="center">
+
+### **[▶ Open pinechart.com](https://pinechart.com)**
+
+</div>
+
+Paste a script, press apply, and watch it draw. The engine runs on your own
+machine, so there is no compile queue and no round trip to wait for — the same
+properties this repository gives you at the command line, with a chart attached.
+
+| | |
+|---|---|
+| 💻 **Runs in your browser** | This engine in a Web Worker. Execution is local; nothing is queued on a server. |
+| 📈 **A real chart** | Multi-pane indicators, drawings, a strategy tester, execution logs and a dockable layout. |
+| 🧮 **v1 → v5** | The same five grammars and emitters that are in this repository. |
+| 🆓 **Free** | Google sign-in, then the workspace opens. |
+
+Pine Chart is a separate product and its workspace is proprietary; **the engine
+underneath it is this repository, GPL-3 and public**, so the arithmetic behind
+any backtest it shows you can be read here rather than taken on trust.
+
+<sub>Screenshot: Bollinger Bands drawn from the Pine source beside it, on sample data.</sub>
 
 ---
 
@@ -138,6 +174,7 @@ broker emulator, multi-timeframe `security()`, and the real-time tick model.
 - **Convert Pine Script to JavaScript** and embed it in a product
 - **Batch-screen thousands of scripts** in parallel
 - **Diff against TradingView** with `--compare-dir` to measure agreement on your own script
+- **Put it behind a chart** — [pinechart.com](https://pinechart.com) is this engine in a browser tab, if you want to see that shape working before you build it
 
 ```bash
 npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results --json
@@ -162,6 +199,18 @@ npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results --json
 ---
 
 ## ❓ FAQ
+
+<details>
+<summary><b>Is there a chart? Can I see a script actually draw?</b></summary>
+<br>
+
+Yes — at **[pinechart.com](https://pinechart.com)**. Pine Chart is a charting
+workspace that runs this engine in a Web Worker in your browser: paste a script,
+press apply, and it draws. Nothing to install and no CSV to find.
+
+The workspace itself is a separate, proprietary product. The engine underneath
+it is this repository, GPL-3 and public.
+</details>
 
 <details>
 <summary><b>Can I run Pine Script without a TradingView account?</b></summary>
