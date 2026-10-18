@@ -16,7 +16,7 @@ No TradingView account. No cloud. No execution quota. No 500 ms loop timeout.
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Docs corpus](https://img.shields.io/badge/docs_corpus-741%2F763_compile-0EA5E9.svg?style=flat-square)](docs/common/CONFORMANCE.md#parity-763-real-scripts-from-tradingviews-docs)
 
-### [▶ Try it in your browser at **pinechart.com**](https://pinechart.com) — no install, no CSV
+### [▶ Open Beta: try it in your browser at **pinechart.com**](https://pinechart.com) — no install, no CSV
 
 [Try it online](#-try-it-online) · [Quick start](#-quick-start) · [Why](#-why-openpinescript) · [Parity](#-verified-against-tradingview-itself) · [Docs](#-documentation) · [FAQ](#-faq)
 
@@ -62,7 +62,9 @@ inside the browser tab.
 
 <div align="center">
 
-### **[▶ Open pinechart.com](https://pinechart.com)**
+### **[▶ Get Open Beta Access at pinechart.com](https://pinechart.com)**
+
+<sub>Open beta — free, and open to anyone with a Google account.</sub>
 
 </div>
 
@@ -75,7 +77,7 @@ properties this repository gives you at the command line, with a chart attached.
 | 💻 **Runs in your browser** | This engine in a Web Worker. Execution is local; nothing is queued on a server. |
 | 📈 **A real chart** | Multi-pane indicators, drawings, a strategy tester, execution logs and a dockable layout. |
 | 🧮 **v1 → v5** | The same five grammars and emitters that are in this repository. |
-| 🆓 **Free** | Google sign-in, then the workspace opens. |
+| 🆓 **Open Beta, free** | Get Open Beta Access with Google, and the workspace opens. |
 
 Pine Chart is a separate product and its workspace is proprietary; **the engine
 underneath it is this repository, GPL-3 and public**, so the arithmetic behind
@@ -174,7 +176,7 @@ broker emulator, multi-timeframe `security()`, and the real-time tick model.
 - **Convert Pine Script to JavaScript** and embed it in a product
 - **Batch-screen thousands of scripts** in parallel
 - **Diff against TradingView** with `--compare-dir` to measure agreement on your own script
-- **Put it behind a chart** — [pinechart.com](https://pinechart.com) is this engine in a browser tab, if you want to see that shape working before you build it
+- **Put it behind a chart** — [pinechart.com](https://pinechart.com) is this engine in a browser tab, in open beta, if you want to see that shape working before you build it
 
 ```bash
 npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results --json
