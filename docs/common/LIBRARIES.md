@@ -28,7 +28,7 @@ In short: **a script can import libraries of its own Pine version or older, neve
 The host supplies every library's source; the engine never fetches one.
 
 ```ts
-import { Session, requiredLibraries } from "open-pinescript";
+import { Session, requiredLibraries } from "openpinescript";
 
 const libraries: Record<string, string> = {};
 for (let missing = requiredLibraries(source); missing.length; missing = requiredLibraries(source, libraries)) {

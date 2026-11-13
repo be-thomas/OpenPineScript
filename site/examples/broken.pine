@@ -1,0 +1,3 @@
+//@version=5
+indicator("Broken")
+plot(ta.sma(close, 20)

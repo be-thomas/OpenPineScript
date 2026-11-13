@@ -1,0 +1,6 @@
+//@version=5
+indicator("RSI 14")
+r = ta.rsi(close, 14)
+plot(r, title="RSI 14", color=color.purple)
+hline(70)
+hline(30)

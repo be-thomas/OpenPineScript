@@ -6,7 +6,7 @@
  * it. Internal paths are NOT a public API and move between versions; this file
  * is the contract.
  *
- *     import { Session } from "open-pinescript";
+ *     import { Session } from "openpinescript";
  *
  *     const s = new Session();
  *     const compiled = s.compile(pineSource);

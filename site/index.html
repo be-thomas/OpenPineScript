@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OpenPineScript: run Pine Script anywhere</title>
+<meta name="description" content="OpenPineScript compiles TradingView Pine Script to JavaScript and runs it on your own candles, offline. Docs for humans and for AI agents. Try the engine live in your browser.">
+<meta name="theme-color" content="#05060a">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="alternate" type="text/markdown" href="llms.txt" title="llms.txt: CLI usage for AI agents">
+<link rel="alternate" type="text/markdown" href="cli.md" title="cli.md: complete CLI usage guide">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenPineScript">
+<meta property="og:title" content="OpenPineScript: run Pine Script anywhere">
+<meta property="og:description" content="The Pine Script engine, running live in your browser. An interactive tutorial for humans, a verified CLI guide for AI agents.">
+<meta property="og:image" content="assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Candlestick chart with a glowing moving average and the words Run Pine Script anywhere">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="OpenPineScript: run Pine Script anywhere">
+<meta name="twitter:description" content="The Pine Script engine, running live in your browser.">
+<meta name="twitter:image" content="assets/og.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<script src="assets/theme-init.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="gate">
+<a class="skip-link" href="#choices">Skip to the choices</a>
+<div class="gate-fallback" aria-hidden="true"></div>
+<canvas id="scene" aria-hidden="true"></canvas>
+<div class="gate-vignette" aria-hidden="true"></div>
+
+<main class="gate-main">
+  <div class="gate-brand">
+    <img src="assets/logo.svg" width="26" height="26" alt="">
+    <span>OpenPineScript</span>
+  </div>
+
+  <div>
+    <h1>Who's reading?</h1>
+    <p class="sub">A Pine Script engine you can run anywhere. Pick the door that fits.</p>
+  </div>
+
+  <div class="welcome-back" id="welcome-back" role="status">
+    <span>Welcome back.</span>
+    <a id="welcome-link" href="human.html">Continue</a>
+    <button type="button" id="welcome-forget">choose again</button>
+  </div>
+
+  <nav class="choices" id="choices" aria-label="Choose who is reading">
+    <a class="choice human" href="human.html" data-remember="human" data-nav>
+      <svg class="emoji" viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="17" r="9" stroke="#22d3a6" stroke-width="3"/><path d="M7 42c1.5-9 9-14 17-14s15.5 5 17 14" stroke="#22d3a6" stroke-width="3" stroke-linecap="round"/></svg>
+      <span class="name">Human</span>
+      <span class="hint">Try it live in your browser, or run it from your terminal.</span>
+      <span class="key"><kbd>H</kbd> or <kbd>←</kbd></span>
+    </a>
+    <a class="choice ai" href="ai.html" data-remember="ai" data-nav>
+      <svg class="emoji" viewBox="0 0 48 48" fill="none" aria-hidden="true"><rect x="9" y="13" width="30" height="24" rx="6" stroke="#8b6cff" stroke-width="3"/><circle cx="18" cy="25" r="3" fill="#8b6cff"/><circle cx="30" cy="25" r="3" fill="#8b6cff"/><path d="M24 13V6M20 6h8" stroke="#8b6cff" stroke-width="3" stroke-linecap="round"/></svg>
+      <span class="name">AI agent</span>
+      <span class="hint">The complete CLI usage document, written for you to follow.</span>
+      <span class="key"><kbd>A</kbd> or <kbd>→</kbd></span>
+    </a>
+  </nav>
+
+  <p class="gate-foot" id="ai-note">
+    AI agents: read <a href="llms.txt">/llms.txt</a> (CLI usage), or fetch <a href="cli.md">/cli.md</a> directly. No JavaScript needed.
+  </p>
+  <noscript><p class="gate-foot">JavaScript is off: the 3D scene and the interactive tutorial need it. Humans can still open <a href="human.html">the human page</a>; AI agents read <a href="llms.txt">/llms.txt</a>.</p></noscript>
+</main>
+
+<button class="btn icon-btn theme-corner" type="button" data-theme-toggle aria-label="Toggle light and dark theme" title="Toggle theme" style="background:rgba(14,16,28,.6);color:#eef0fb;border-color:rgba(160,170,230,.28)">
+  <svg class="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+  <svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+</button>
+
+<script type="module">
+  import { remember, remembered, store } from "./assets/shared.js";
+
+  const pages = { human: "human.html", ai: "ai.html" };
+
+  // Remembered choice: offer it, never force it. A shared link should always land on the question.
+  const prev = remembered();
+  const banner = document.getElementById("welcome-back");
+  if (prev) {
+    const a = document.getElementById("welcome-link");
+    a.href = pages[prev];
+    a.textContent = prev === "ai" ? "Continue as AI agent" : "Continue as human";
+    banner.classList.add("show");
+  }
+  document.getElementById("welcome-forget").addEventListener("click", () => {
+    store.remove("ops-reader");
+    banner.classList.remove("show");
+    document.querySelector(".choice.human").focus();
+  });
+
+  function go(choice) {
+    remember(choice);
+    document.body.classList.add("leaving");
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setTimeout(() => { location.href = pages[choice]; }, reduce ? 0 : 280);
+  }
+  for (const a of document.querySelectorAll("[data-nav]")) {
+    a.addEventListener("click", (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      go(a.dataset.remember);
+    });
+  }
+  window.addEventListener("keydown", (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const k = e.key.toLowerCase();
+    if (k === "h" || k === "arrowleft") go("human");
+    else if (k === "a" || k === "arrowright") go("ai");
+  });
+  document.querySelector(".choice.human").focus({ preventScroll: true });
+</script>
+<script type="module" src="assets/scene.js"></script>
+</body>
+</html>

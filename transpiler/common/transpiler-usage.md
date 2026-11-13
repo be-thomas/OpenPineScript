@@ -43,7 +43,7 @@ Use a sandbox object as the global; top-level bindings will appear as properties
 ```ts
 import * as vm from "node:vm";
 import { transpile } from "./transpiler/v2";
-import { letToVar } from "open-pinescript";
+import { letToVar } from "openpinescript";
 
 const pine = "a = 1\nb = 2\nc = a + b\n";
 const js = letToVar(transpile(pine));
