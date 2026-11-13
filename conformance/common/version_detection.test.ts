@@ -68,8 +68,8 @@ describe("detectVersion", () => {
   });
 
   it("rejects a version outside the known range", () => {
-    expect(() => detectVersion("//@version=6\nplot(close)")).toThrow(UnsupportedVersionError);
-    expect(() => detectVersion("//@version=6\nplot(close)")).toThrow(/Unknown Pine Script version 6/);
+    expect(() => detectVersion("//@version=7\nplot(close)")).toThrow(UnsupportedVersionError);
+    expect(() => detectVersion("//@version=7\nplot(close)")).toThrow(/Unknown Pine Script version 7/);
     expect(() => detectVersion("//@version=0\nplot(close)")).toThrow(UnsupportedVersionError);
   });
 
@@ -77,7 +77,7 @@ describe("detectVersion", () => {
     // Saying "supports 1, 2, 3, 4, 5" would be misleading when three of those
     // are refused a moment later.
     let message = "";
-    try { detectVersion("//@version=6\nplot(close)"); } catch (e: any) { message = e.message; }
+    try { detectVersion("//@version=7\nplot(close)"); } catch (e: any) { message = e.message; }
     expect(message).toMatch(/currently runs 1, 2/);
   });
 

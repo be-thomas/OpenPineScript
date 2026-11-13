@@ -80,7 +80,7 @@ describe("timeframe.in_seconds and from_seconds", () => {
   const CASES: Array<[string, number]> = [
     ["1", 60], ["5", 300], ["60", 3600],
     ["30S", 30], ["D", 86400], ["2D", 172800],
-    ["W", 604800], ["M", 2592000],
+    ["W", 604800], ["M", 2628003],
   ];
 
   for (const [spec, seconds] of CASES) {
@@ -257,7 +257,7 @@ describe("the chart.point endpoint setters", () => {
 
   it("line.set_second_point moves the second endpoint", () => {
     const ctx = run(
-      "l = line.new(0, 0.0, 1, 1.0)\nline.set_second_point(l, chart.point.new(5, 0, 9.0))",
+      "l = line.new(0, 0.0, 1, 1.0)\nline.set_second_point(l, chart.point.new(0, 5, 9.0))",
     );
     const p = drawings(ctx, "line")[0].props;
     expect([p.x2, p.y2]).toEqual([5, 9]);
@@ -266,14 +266,14 @@ describe("the chart.point endpoint setters", () => {
 
   it("box.set_bottom_right_point moves the corner", () => {
     const ctx = run(
-      "b = box.new(0, 5.0, 1, 1.0)\nbox.set_bottom_right_point(b, chart.point.new(7, 0, 2.0))",
+      "b = box.new(0, 5.0, 1, 1.0)\nbox.set_bottom_right_point(b, chart.point.new(0, 7, 2.0))",
     );
     const p = drawings(ctx, "box")[0].props;
     expect([p.right, p.bottom]).toEqual([7, 2]);
   });
 
   it("label.set_point moves the label", () => {
-    const ctx = run("l = label.new(0, 0)\nlabel.set_point(l, chart.point.new(4, 0, 3.0))");
+    const ctx = run("l = label.new(0, 0)\nlabel.set_point(l, chart.point.new(0, 4, 3.0))");
     const p = drawings(ctx, "label")[0].props;
     expect([p.x, p.y]).toEqual([4, 3]);
   });

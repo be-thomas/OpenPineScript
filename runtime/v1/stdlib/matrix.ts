@@ -32,6 +32,8 @@
  */
 
 import { val } from "../../../utils/v2/common";
+import type { Context } from "../context";
+import { byField, sortKey, compareKeys } from "./sort_field";
 
 type Matrix = any[][];
 
@@ -475,6 +477,95 @@ export const matrix = {
     },
 
     /**
+     * `matrix.pow(id, power)` — a square matrix multiplied by itself `power`
+     * times; the identity at 0. By repeated squaring.
+     */
+    pow: (id: any, power: any): Matrix => {
+        const a = mx(id, "pow");
+        const size = rowsOf(a);
+        if (colsOf(a) !== size) throw new Error(`matrix.pow: the matrix must be square, it is ${size}x${colsOf(a)}`);
+        let p = Math.trunc(num(power));
+        if (!(p >= 0)) throw new Error(`matrix.pow: the power must be a non-negative int, got ${val(power)}`);
+        const mul = (x: number[][], y: number[][]) => Array.from({ length: size }, (_, i) =>
+            Array.from({ length: size }, (_, j) => x[i].reduce((acc, v, k) => acc + v * y[k][j], 0)));
+        let result: number[][] = Array.from({ length: size }, (_, i) => Array.from({ length: size }, (_, j) => (i === j ? 1 : 0)));
+        let base = a.map(r => r.map(num));
+        while (p > 0) {
+            if (p & 1) result = mul(result, base);
+            base = mul(base, base);
+            p >>= 1;
+        }
+        return tag(result);
+    },
+
+    /**
+     * `matrix.eigenvectors(id)` — a matrix whose COLUMNS are the eigenvectors,
+     * in the order `eigenvalues` returns their values. The accumulated QR
+     * rotations, which are the eigenvectors of a symmetric matrix exactly and
+     * the Schur vectors of any other.
+     */
+    eigenvectors: (id: any): Matrix => {
+        const a = mx(id, "eigenvectors");
+        const size = rowsOf(a);
+        if (colsOf(a) !== size) throw new Error(`matrix.eigenvectors: the matrix must be square, it is ${size}x${colsOf(a)}`);
+        let m = a.map(r => r.map(num));
+        let v: number[][] = Array.from({ length: size }, (_, i) => Array.from({ length: size }, (_, j) => (i === j ? 1 : 0)));
+        for (let iter = 0; iter < 500; iter++) {
+            const q: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
+            const r: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
+            for (let j = 0; j < size; j++) {
+                const col = m.map(row => row[j]);
+                for (let k = 0; k < j; k++) {
+                    const dot = q.reduce((s, row, i) => s + row[k] * m[i][j], 0);
+                    r[k][j] = dot;
+                    for (let i = 0; i < size; i++) col[i] -= dot * q[i][k];
+                }
+                const norm = Math.sqrt(col.reduce((s, x) => s + x * x, 0));
+                r[j][j] = norm;
+                for (let i = 0; i < size; i++) q[i][j] = norm === 0 ? 0 : col[i] / norm;
+            }
+            m = Array.from({ length: size }, (_, i) =>
+                Array.from({ length: size }, (_, j) => r[i].reduce((s, x, k) => s + x * q[k][j], 0)));
+            v = Array.from({ length: size }, (_, i) =>
+                Array.from({ length: size }, (_, j) => v[i].reduce((s, x, k) => s + x * q[k][j], 0)));
+        }
+        const order = m.map((row, i) => [row[i], i] as const).sort((x, y) => y[0] - x[0]).map(p => p[1]);
+        return tag(v.map(row => order.map(j => row[j])));
+    },
+
+    /**
+     * `matrix.eigenvalues(id)` — a square matrix's eigenvalues, largest first.
+     * By the unshifted QR algorithm, which converges to the real eigenvalues;
+     * a pair of complex ones has no real answer and stays as the 2x2 block's
+     * diagonal.
+     */
+    eigenvalues: (id: any): number[] => {
+        const a = mx(id, "eigenvalues");
+        const size = rowsOf(a);
+        if (colsOf(a) !== size) throw new Error(`matrix.eigenvalues: the matrix must be square, it is ${size}x${colsOf(a)}`);
+        let m = a.map(r => r.map(num));
+        for (let iter = 0; iter < 500; iter++) {
+            // Gram–Schmidt QR.
+            const q: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
+            const r: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
+            for (let j = 0; j < size; j++) {
+                const v = m.map(row => row[j]);
+                for (let k = 0; k < j; k++) {
+                    const dot = q.reduce((s, row, i) => s + row[k] * m[i][j], 0);
+                    r[k][j] = dot;
+                    for (let i = 0; i < size; i++) v[i] -= dot * q[i][k];
+                }
+                const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+                r[j][j] = norm;
+                for (let i = 0; i < size; i++) q[i][j] = norm === 0 ? 0 : v[i] / norm;
+            }
+            m = Array.from({ length: size }, (_, i) =>
+                Array.from({ length: size }, (_, j) => r[i].reduce((s, x, k) => s + x * q[k][j], 0)));
+        }
+        return m.map((row, i) => row[i]).sort((x, y) => y - x);
+    },
+
+    /**
      * Determinant by Gaussian elimination with partial pivoting.
      *
      * Not cofactor expansion: that is O(n!) and loses to rounding well before
@@ -667,10 +758,17 @@ export const matrix = {
     },
 
     /** Sorts ROWS by the value in `column`, ascending unless told otherwise. */
-    sort: (id: any, column: any = 0, order: any = "ascending") => {
+    sort: (ctx: Context, id: any, column: any = 0, order: any = "ascending", sort_field?: any) => {
         const m = mx(id, "sort");
         const c = colsOf(m) === 0 ? 0 : index(Math.trunc(num(column) || 0), colsOf(m), "sort", "column");
         const descending = String(val(order)) === "descending";
+        // v6, April 2026: a matrix of objects sorts its rows by the column's
+        // `sort_field`.
+        if (byField(ctx, m.map(row => row[c]))) {
+            m.sort((a, b) => (descending ? -1 : 1)
+                * compareKeys(sortKey(a[c], sort_field), sortKey(b[c], sort_field)));
+            return;
+        }
         m.sort((a, b) => (descending ? num(b[c]) - num(a[c]) : num(a[c]) - num(b[c])));
     },
 };

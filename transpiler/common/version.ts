@@ -8,13 +8,13 @@
  * TradingView treats a script with no annotation as v1.
  */
 
-export type PineVersion = 1 | 2 | 3 | 4 | 5;
+export type PineVersion = 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
  * Versions this engine can PARSE an annotation for. Not the same as the
  * versions it can run — see LANGUAGE_PROFILES[v].implemented for that.
  */
-export const KNOWN_VERSIONS: readonly PineVersion[] = [1, 2, 3, 4, 5];
+export const KNOWN_VERSIONS: readonly PineVersion[] = [1, 2, 3, 4, 5, 6];
 
 /** A script with no //@version annotation is Pine Script v1. */
 export const DEFAULT_VERSION: PineVersion = 1;
@@ -82,9 +82,29 @@ function lineComments(source: string): string[] {
 /**
  * Matches an annotation comment. The comment body must *start* with `@version`
  * (after optional whitespace), so prose that merely mentions a version — like
- * `// ported from //@version=4` — is not picked up.
+ * `// ported from //@version=4` — is not picked up. Another `//` comment after
+ * the number is allowed after whitespace; glued to the number, as in a line
+ * pasted twice (`//@version=5//@version=5`), it is an error (see `DOUBLED`).
  */
-const ANNOTATION = /^\s*@version\s*=\s*(\d+)\s*$/;
+const ANNOTATION = /^\s*@version\s*=\s*(\d+)\s*(?:\s\/\/.*)?$/;
+
+/** A version line with something glued to the number: `//@version=5//@version=5`. */
+const DOUBLED = /^\s*@version\s*=\s*\d+\S/;
+
+/**
+ * TradingView rejects it on its line (conformance/v5/parity/parse_errors/
+ * pe4_doubled_version.png): "Version=5//@version=5" is not supported.
+ * Supported versions are <= 6 (PINE_VERSION_NOT_VALID). It reads everything
+ * after the `=` as the version.
+ */
+function doubledVersionError(source: string, comment: string): Error {
+  const seen = comment.trim().replace(/^@/, "").replace(/^./, c => c.toUpperCase());
+  const line = source.split(/\r?\n/).findIndex(l => /\/\/\s*@version\s*=\s*\d+\S/.test(l)) + 1;
+  const message = `"${seen}" is not supported. Supported versions are <= 6 (PINE_VERSION_NOT_VALID).`;
+  const error = new Error(message);
+  (error as any).errors = [{ line: Math.max(1, line), column: 0, message }];
+  return error;
+}
 
 /** True when only whitespace precedes `start` on its line. */
 function ownsItsLine(source: string, start: number): boolean {
@@ -109,7 +129,12 @@ export function registerImplementedVersions(versions: readonly PineVersion[]): v
   IMPLEMENTED = versions;
 }
 
-function implementedVersions(): readonly PineVersion[] {
+/**
+ * Exported so the profiles module can name what really runs without importing
+ * transpiler/common/index.ts, which imports profiles — the same cycle
+ * `registerImplementedVersions` exists to avoid.
+ */
+export function implementedVersions(): readonly PineVersion[] {
   return IMPLEMENTED;
 }
 
@@ -121,11 +146,20 @@ export class UnsupportedVersionError extends Error {
     const runs = implemented.length ? implemented.join(", ") : "none";
     super(
       `Unknown Pine Script version ${requested}. ` +
-      `OpenPineScript knows versions ${KNOWN_VERSIONS.join(", ")} ` +
+      `This engine knows versions ${KNOWN_VERSIONS.join(", ")} ` +
       `and currently runs ${runs}.`
     );
     this.name = "UnsupportedVersionError";
   }
+}
+
+/**
+ * True when the source has a `//@version` line of any form, valid or not. A
+ * script with none is read as v1, which is worth telling its author when the
+ * body is newer.
+ */
+export function hasVersionLine(source: string): boolean {
+  return lineComments(source).some(c => /^\s*@version\b/.test(c));
 }
 
 /**
@@ -136,7 +170,10 @@ export class UnsupportedVersionError extends Error {
 export function detectVersion(source: string): PineVersion {
   for (const comment of lineComments(source)) {
     const m = ANNOTATION.exec(comment);
-    if (!m) continue;
+    if (!m) {
+      if (DOUBLED.test(comment)) throw doubledVersionError(source, comment);
+      continue;
+    }
 
     const n = Number(m[1]);
     if (!KNOWN_VERSIONS.includes(n as PineVersion)) {

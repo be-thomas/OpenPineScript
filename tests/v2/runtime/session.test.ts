@@ -92,15 +92,21 @@ describe("runScript one-shot", () => {
     });
 
     it("resolves security() from supplied HTF data", () => {
-        // v3 default is lookahead_off: only HTF bars that have already closed.
+        // v3 default is lookahead_off: only HTF bars that have already closed. A
+        // requested bar closes on the chart bar that ends it (TradingView's log,
+        // conformance/v5/parity/harness_security_tf.BTCUSDT.5.csv), so the chart
+        // is 6-hour bars at their real span: the 06:00 bar of day 1 ends at 12:00,
+        // after day 0 closed and before day 1 does.
+        const DAY = 86_400_000;
         const r = runScript('//@version=3\nh = security("AAPL", "D", close)\nplot(h)\n', {
-            candles: [{ time: 150, open: 5, high: 5, low: 5, close: 5, volume: 1 }],
+            chart: { symbol: "X", timeframe: "360" },
+            candles: [{ time: DAY + DAY / 4, open: 5, high: 5, low: 5, close: 5, volume: 1 }],
             securities: [{ symbol: "AAPL", resolution: "D", candles: [
                 { time: 0, open: 100, high: 100, low: 100, close: 100, volume: 1 },
-                { time: 100, open: 110, high: 110, low: 110, close: 110, volume: 1 },
+                { time: DAY, open: 110, high: 110, low: 110, close: 110, volume: 1 },
             ] }],
         });
-        assert.strictEqual((r.series[0].data[0] as any).value, 100); // daily[0] closed by t=150
+        assert.strictEqual((r.series[0].data[0] as any).value, 100); // daily[0] closed, daily[1] forming
     });
 });
 

@@ -82,6 +82,9 @@ export function plot(
     trackprice?: any, histbase?: any, offset?: any, join?: any,
     editable?: any, show_last?: any, display?: any,
     format?: any, precision?: any, force_overlay?: any,
+    // v6, September 2025: one of `plot.linestyle_*`, for the styles that draw
+    // a line. Gated to v6 by V6_ONLY_PARAMS.
+    linestyle?: any,
 ): string {
     ctx.registerPlot({
         type: 'line',
@@ -91,7 +94,7 @@ export function plot(
         linewidth,
         style,
         ...shown({ trackprice, histbase, offset, join, editable, show_last,
-                     display, format, precision, force_overlay }),
+                     display, format, precision, force_overlay, linestyle }),
     });
     // Return the ID (title) so it can be used by fill()
     return title;
@@ -279,6 +282,32 @@ export function barcolor(
     });
 }
 
+/**
+ * `fill` has two published signatures:
+ *
+ *   fill(plot1, plot2, color, title, editable, fillgaps, display, …)
+ *   fill(plot1, plot2, top_value, bottom_value, top_color, bottom_color,
+ *        title, display, fillgaps, editable, force_overlay)
+ *
+ * The registry holds one, so `fill(a, b, close + 10, close - 10, c1, c2)` bound
+ * the price to `color`. A call is the gradient form when it NAMES one of the
+ * four gradient parameters, or when its third AND fourth positional arguments
+ * are numbers (the colour form's third is a colour, `na` included, and its fourth
+ * a title or a flag). The positional
+ * arguments are then re-read in the gradient order: `SLOTS` says which
+ * parameter of the shared signature each positional argument landed in, for
+ * the version being run (see V6_POSITIONAL). A keyword argument is bound by
+ * name either way. A v6 positional argument past the eighth has no slot and
+ * is dropped, as it always was.
+ */
+const FILL_GRADIENT = ["plot1", "plot2", "top_value", "bottom_value", "top_color",
+                       "bottom_color", "title", "display", "fillgaps", "editable",
+                       "force_overlay"] as const;
+const FILL_SLOTS_V5 = ["plot1", "plot2", "color", "title", "editable", "fillgaps",
+                       "transp", "display", "force_overlay", "show_last"] as const;
+const FILL_SLOTS_V6 = ["plot1", "plot2", "color", "title", "editable", "show_last",
+                       "fillgaps", "display"] as const;
+
 export function fill(
     ctx: Context,
     plot1: string,
@@ -289,10 +318,43 @@ export function fill(
     fillgaps?: boolean,
     transp?: any,
     display?: any, force_overlay?: any,
+    // Last, not where v5 lists it: the shared signature keeps v1-v4's order.
+    // v6 positional arguments are placed by name (V6_POSITIONAL).
+    show_last?: any,
+    top_value?: any, bottom_value?: any, top_color?: any, bottom_color?: any,
 ): void {
+    const named = ctx.keywordArguments;
+    const asNumber = (x: any) => typeof (x as any)?.valueOf?.() === "number";
+    const gradient = ["top_value", "bottom_value", "top_color", "bottom_color"].some((k) => named.has(k))
+        // An `na` colour is NaN, a number too, so the third argument alone cannot decide:
+        // the gradient form's fourth (bottom_value) is a number as well, the colour form's
+        // fourth (title, editable) never is.
+        || (!named.has("color") && ctx.positionalArguments > 3 && asNumber(color) && asNumber(title));
+    if (!gradient) {
+        ctx.registerFill(plot1, plot2, {
+            color: withTransp(color, transp), title,
+            ...shown({ editable, fillgaps, display, force_overlay, show_last }),
+        });
+        return;
+    }
+
+    const bound: Record<string, any> = {
+        plot1, plot2, color, title, editable, fillgaps, transp, display, force_overlay,
+        show_last, top_value, bottom_value, top_color, bottom_color,
+    };
+    const slots = ctx.profile.version >= 6 ? FILL_SLOTS_V6 : FILL_SLOTS_V5;
+    const g: Record<string, any> = {};
+    FILL_GRADIENT.forEach((name, k) => {
+        if (named.has(name)) g[name] = bound[name];
+        else if (k < ctx.positionalArguments && k < slots.length) g[name] = bound[slots[k]];
+    });
+    // `fill(show_last)` is a colour-form parameter, but it exists in both.
     ctx.registerFill(plot1, plot2, {
-        color: withTransp(color, transp), title,
-        ...shown({ editable, fillgaps, display, force_overlay }),
+        color: "#00000000", title: g.title,
+        top_value: g.top_value, bottom_value: g.bottom_value,
+        top_color: g.top_color, bottom_color: g.bottom_color, gradient: true,
+        ...shown({ editable: g.editable, fillgaps: g.fillgaps, display: g.display,
+                   force_overlay: g.force_overlay, show_last: named.has("show_last") ? show_last : undefined }),
     });
 }
 
@@ -339,9 +401,18 @@ export const size = {
  * color(col, transp) — the v1-v3 spelling. v4 renamed it to color.new().
  * Applies a transparency percentage (0 = opaque, 100 = invisible) to a hex
  * colour, returning #RRGGBBAA.
+ *
+ * `color(na)` is `na`. It used to build the string "NaNff" from the NaN, so a
+ * label drawn with `color = color(na)` carried a colour no renderer can parse,
+ * where `color = na` carries `na` (NaN, which serialises as null) and is drawn
+ * with no fill. On TradingView the ▲/▼ labels of harness_trader_club, drawn
+ * with `color(na)`, show as bare text with no background (seen on the chart;
+ * Pine Logs do not carry colours).
  */
-export function color(col: any, transp?: any): string {
-    const base = String(col && typeof col.valueOf === "function" ? col.valueOf() : col ?? "#000000");
+export function color(col: any, transp?: any): string | number {
+    const raw = col && typeof col.valueOf === "function" ? col.valueOf() : col;
+    if (raw === null || (typeof raw === "number" && Number.isNaN(raw))) return NaN;
+    const base = String(raw ?? "#000000");
     const t = Number(transp && typeof transp.valueOf === "function" ? transp.valueOf() : transp ?? 0);
     const hex = base.slice(0, 7);
     if (!Number.isFinite(t)) return hex;
@@ -449,4 +520,9 @@ export const currency = {
     KRW: "KRW", BRL: "BRL", CNY: "CNY", DKK: "DKK", ILS: "ILS",
     MYR: "MYR", NOK: "NOK", PHP: "PHP", PLN: "PLN", SEK: "SEK",
     THB: "THB", MXN: "MXN", ARS: "ARS", BTC: "BTC", ETH: "ETH",
+    HUF: "HUF", CZK: "CZK", RON: "RON", RSD: "RSD", ISK: "ISK", IDR: "IDR",
+    TWD: "TWD", VND: "VND", PKR: "PKR", BDT: "BDT", LKR: "LKR", KWD: "KWD",
+    BHD: "BHD", QAR: "QAR", SAR: "SAR", AED: "AED", EGP: "EGP", NGN: "NGN",
+    KES: "KES", MAD: "MAD", TND: "TND", CLP: "CLP", COP: "COP", PEN: "PEN",
+    VES: "VES", USDT: "USDT",
 };

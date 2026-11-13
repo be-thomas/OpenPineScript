@@ -97,6 +97,16 @@ export const ta = {
  */
 export const ticker = {
   /**
+   * `ticker.standard(symbol)` — the ticker id with any non-standard chart
+   * type removed ("heikinashi:", "renko:" …), so a request reads ordinary
+   * candles. A plain id is returned as it is.
+   */
+  standard: (symbol: any = undefined): string => {
+    const id = String(val(symbol) ?? "");
+    return id.replace(/^(heikinashi|renko|linebreak|kagi|pointfigure|range):/i, "");
+  },
+
+  /**
    * `ticker.inherit(tickerid, from_tickerid)` — take another symbol's settings.
    *
    * Builds a ticker id for `tickerid` carrying whatever session, adjustment and

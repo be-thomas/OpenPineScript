@@ -110,12 +110,70 @@ export function safe_sub(a: any, b: any): number {
  * `na` needs no special handling: it is NaN, and NaN equals nothing including
  * itself, which is what Pine reports for a comparison involving `na`.
  */
+/**
+ * TradingView treats two floats as equal when they differ by at most 1e-10
+ * (absolute, at any magnitude). Measured with Pine Logs; see
+ * dev-docs/tv-parity/ENGINE-BUGS.md section 5.
+ */
+export const FLOAT_TOLERANCE = 1e-10;
+
 export function safe_eq(a: any, b: any): boolean {
-    return val(a) == val(b);
+    if (typeof a === "number" && typeof b === "number") {
+        const d = a - b;
+        return d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE;
+    }
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") {
+        const d = x - y;
+        return d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE;
+    }
+    return x == y;
 }
 
 export function safe_ne(a: any, b: any): boolean {
-    return val(a) != val(b);
+    if (typeof a === "number" && typeof b === "number") {
+        const d = a - b;
+        return !(d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE);
+    }
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") {
+        const d = x - y;
+        return !(d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE);
+    }
+    return x != y;
+}
+
+/**
+ * Ordering comparisons share the equality tolerance: `a < b` is "less AND not
+ * equal", `a <= b` is "less OR equal". A NaN difference fails every test, so
+ * `na` stays false throughout, as before.
+ */
+export function safe_lt(a: any, b: any): boolean {
+    if (typeof a === "number" && typeof b === "number") return a - b < -FLOAT_TOLERANCE;
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") return x - y < -FLOAT_TOLERANCE;
+    return x < y;
+}
+
+export function safe_gt(a: any, b: any): boolean {
+    if (typeof a === "number" && typeof b === "number") return a - b > FLOAT_TOLERANCE;
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") return x - y > FLOAT_TOLERANCE;
+    return x > y;
+}
+
+export function safe_le(a: any, b: any): boolean {
+    if (typeof a === "number" && typeof b === "number") return a - b <= FLOAT_TOLERANCE;
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") return x - y <= FLOAT_TOLERANCE;
+    return x <= y;
+}
+
+export function safe_ge(a: any, b: any): boolean {
+    if (typeof a === "number" && typeof b === "number") return a - b >= -FLOAT_TOLERANCE;
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") return x - y >= -FLOAT_TOLERANCE;
+    return x >= y;
 }
 
 // --- Type Conversion (v2 Only) ---
@@ -183,11 +241,40 @@ export function pow(x: any, y: any): number {
     return Math.pow(val(x), val(y));
 }
 
-export function round(x: any): number {
-    return Math.round(val(x));
+/**
+ * `round(x)`, and from v5 `math.round(number, precision)`.
+ *
+ * Half rounds AWAY from zero, and `precision` rounds to that many decimals as
+ * the number is WRITTEN: TradingView's log gives math.round(-2.5) = -3 and
+ * math.round(1.005, 2) = 1.01 (conformance/v6/golden/harness_v6_language).
+ * JavaScript's Math.round gives -2, and 1.005 * 100 is 100.49999999999999 in
+ * binary, so both need doing here. Shifting by exponent notation —
+ * Number("1.005e2") is exactly 100.5 — moves the decimal point in the decimal
+ * representation instead of multiplying in binary.
+ */
+export function round(x: any, precision?: any): number {
+    const n = Number(val(x));
+    if (!Number.isFinite(n)) return n;
+    const p = precision === undefined || precision === null ? 0 : Math.trunc(Number(val(precision)));
+    if (!(p > 0)) return Math.sign(n) * Math.round(Math.abs(n));
+    return Math.sign(n) * decimalShift(Math.round(decimalShift(Math.abs(n), p)), -p);
+}
+
+/**
+ * `x * 10^by`, done on the decimal digits rather than in binary. Appending
+ * `e<by>` to `String(x)` broke once String(x) was itself in exponent form:
+ * 0.0000001 is "1e-7", and "1e-7e2" is NaN. toExponential always gives
+ * "<mantissa>e<exponent>", so the exponent can be adjusted as a number.
+ */
+function decimalShift(x: number, by: number): number {
+    if (x === 0) return 0;
+    const [mantissa, exponent] = x.toExponential().split("e");
+    return Number(`${mantissa}e${Number(exponent) + by}`);
 }
 
 export function sign(x: any): number {
+    // Exact: TradingView gives sign(+-5.55e-17) = +-1 on v5 and v6 (_probes/sign-tiny); the
+    // comparison tolerance does not apply to it.
     return Math.sign(val(x));
 }
 

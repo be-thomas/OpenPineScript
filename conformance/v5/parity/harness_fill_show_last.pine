@@ -1,0 +1,17 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// OPS visual probe: fill(..., show_last = 5). Logs cannot show a fill, so this
+// one needs a SCREENSHOT.
+//
+// RUN ON : BINANCE:BTCUSDT, 1D. Paste, Add to chart, scroll to the right edge.
+// CAPTURE: one screenshot of the last ~20 bars including the right edge.
+//          Save as conformance/v5/parity/harness_fill_show_last.png
+//
+// Expected to see (state what you actually see): the blue band between the two
+// lines is filled on exactly how many bars at the right edge? (5 as documented,
+// or more/fewer?) Also say whether the fill's last bar is the live bar.
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("OPS fill show_last", overlay = true)
+p1 = plot(high, "high", color = color.gray)
+p2 = plot(low, "low", color = color.gray)
+fill(p1, p2, color = color.new(color.blue, 70), show_last = 5)

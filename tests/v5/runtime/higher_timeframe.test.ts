@@ -71,17 +71,18 @@ describe("the chart's own timeframe", () => {
 });
 
 describe("a HIGHER timeframe is folded from the chart's bars", () => {
-  it("a weekly close appears on the Monday after the week ends", () => {
+  it("a weekly close appears on the chart bar that ends the week", () => {
     const got = series('x = request.security(syminfo.tickerid, "W", close)\n', "x");
-    // Bars 0-4 are Mon-Fri of week one; nothing is settled until bar 7, the
-    // Monday of week two, when the first week has closed at bar 6's close.
-    expect(got.slice(0, 7).every(v => Number.isNaN(v))).toBe(true);
-    expect(got[7]).toBe(bars[6].close);
+    // TradingView's log (conformance/v5/parity/harness_security_tf.BTCUSDT.5.csv, bars 4475, 4487, ...): a requested bar's value appears on the chart bar that ENDS it. Daily bars 0-6 are Mon-Sun of week one: nothing is settled
+    // until bar 6, the Sunday that ends it, which carries bar 6's close.
+    expect(got.slice(0, 6).every(v => Number.isNaN(v))).toBe(true);
+    expect(got[6]).toBe(bars[6].close);
   });
 
-  it("...and holds for the rest of that week", () => {
+  it("...and holds through the next week, until the chart bar that ends that one", () => {
     const got = series('x = request.security(syminfo.tickerid, "W", close)\n', "x");
-    expect(got.slice(7, 14).every(v => v === bars[6].close)).toBe(true);
+    expect(got.slice(6, 13).every(v => v === bars[6].close)).toBe(true);
+    expect(got[13]).toBe(bars[13].close);
   });
 
   it("a weekly high is the highest of its days", () => {
@@ -132,12 +133,12 @@ describe("what is not derived", () => {
     const exec = compile(js.replace(/\blet\b/g, "var "), ctx, Object.create(null));
     ctx.setBar(MONDAY, 100, 110, 90, 100, 10);
     exec();
-    // 7, not 100: the supplied series is what the request reads. And 7 rather
-    // than 9 because HOST data keeps the closed-bar rule even at a matching
-    // label — a host may hand over any series under the name "D", and only a
-    // series this engine derived from the chart's own bars is known to line up
-    // with them.
-    expect(ctx.vars.get("opsv2_x")?.valueOf()).toBe(7);
+    // 9, not 100: the supplied series is what the request reads. And 9 rather
+    // than 7 because the supplied daily bar ends where this chart bar ends, so
+    // it closes with it: TradingView's log (harness_security_tf, whose replay
+    // feeds the hourly series from the host exactly like this) shows the value on
+    // the chart bar that ends the requested bar.
+    expect(ctx.vars.get("opsv2_x")?.valueOf()).toBe(9);
   });
 });
 

@@ -25,6 +25,8 @@ import { compile, Context } from "../../../runtime/v5";
 
 const HEAD = '//@version=5\nindicator("t")\n';
 const STRAT = '//@version=5\nstrategy("t")\n';
+// One entry a bar stacks, so these tests say how far.
+const STRATP = '//@version=5\nstrategy("t", pyramiding = 10)\n';
 
 function run(src: string, bars = 1, tune?: (c: Context) => void) {
   const { js, profile } = compileScript(src);
@@ -73,12 +75,12 @@ describe("`when` gates a strategy order", () => {
   });
 
   it("true places it", () => {
-    const ctx = run(STRAT + 'strategy.entry("L", strategy.long, when = true)\n', 4);
+    const ctx = run(STRATP + 'strategy.entry("L", strategy.long, when = true)\n', 4);
     expect(ctx.position.size).toBe(3);
   });
 
   it("absent means true, which is the documented default", () => {
-    const ctx = run(STRAT + 'strategy.entry("L", strategy.long)\n', 4);
+    const ctx = run(STRATP + 'strategy.entry("L", strategy.long)\n', 4);
     expect(ctx.position.size).toBe(3);
   });
 
@@ -130,7 +132,9 @@ describe("plot display arguments", () => {
     const ctx = run(HEAD +
       "plotcandle(open, high, low, close, wickcolor = color.red, bordercolor = color.blue)\n");
     const first = plots(ctx)[0][1][0] as any;
-    expect([first.wickcolor, first.bordercolor]).toEqual(["#FF5252", "#2196F3"]);
+    // color.blue is #2962FF at v5, as TradingView's own log reports it
+    // (conformance/common/v5_gaps_golden.test.ts).
+    expect([first.wickcolor, first.bordercolor]).toEqual(["#FF5252", "#2962FF"]);
   });
 });
 

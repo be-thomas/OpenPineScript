@@ -35,6 +35,7 @@ import type { PineVersion } from "../../transpiler/common/version";
  *   v1  grammar/v1/PineV1Lexer.g4
  *   v4  grammar/v4/PineV4Lexer.g4   the type words
  *   v5  grammar/v5/PineV5Lexer.g4   loops, UDTs, methods, libraries
+ *   v6  grammar/v6/PineV6Lexer.g4   `once`
  *
  * `true` and `false` come from BOOL_LITERAL rather than from keyword tokens,
  * and `na` is a registry value, not a keyword — both are listed here anyway
@@ -54,6 +55,7 @@ const KEYWORDS_BY_VERSION: Record<number, string[]> = {
         "while", "switch", "type", "method", "import", "export", "enum",
         "as", "in",
     ],
+    6: ["once"],
 };
 
 export interface LanguageSpec {

@@ -10,11 +10,12 @@ import {
   transpile,
   IMPLEMENTED_VERSIONS as ROUTER_IMPLEMENTED,
 } from "../../transpiler/common";
-import type { PineVersion } from "../../transpiler/common/version";
+import { KNOWN_VERSIONS, type PineVersion } from "../../transpiler/common/version";
 
 export type { PineVersion };
 
-export const ALL_VERSIONS: PineVersion[] = [1, 2, 3, 4, 5];
+/** Every version Pine has, from the version module rather than restated here. */
+export const ALL_VERSIONS: PineVersion[] = [...KNOWN_VERSIONS];
 
 /**
  * Versions the engine currently implements.

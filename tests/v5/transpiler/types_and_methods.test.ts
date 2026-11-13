@@ -347,3 +347,53 @@ describe("a `varip` field", () => {
                            "t = T.new()\nx = t.a\n")).not.toThrow();
   });
 });
+
+describe("a field holds the value it was given, not the series it came from", () => {
+  // TradingView, checked with Pine Logs (dev-docs/tv-parity/_probes/na-drawings/parity-udt-fields.pine):
+  // items pushed on bars 0..4 read back born=0..4, each with its own box, and
+  // deleting the first item's box leaves the other four intact. Before the
+  // fix every item read the CURRENT bar's values, so `box.delete(first.bx)`
+  // deleted the newest box and the next `box.set_right` on it threw.
+  const SRC = HEAD + [
+    "type Item",
+    "    box   bx",
+    "    int   born",
+    "    float top",
+    "var array<Item> items = array.new<Item>()",
+    "var int firstBorn = -1",
+    "var int nextBorn = -1",
+    "var string borns = ''",
+    "var bool topsMatch = false",
+    "if bar_index < 5",
+    "    box   b = box.new(bar_index, high + bar_index, bar_index + 1, low)",
+    "    float t = high + bar_index",
+    "    items.push(Item.new(b, bar_index, t))",
+    "if bar_index == 5",
+    "    topsMatch := true",
+    "    for i = 0 to items.size() - 1",
+    "        Item it = items.get(i)",
+    "        borns := borns + str.tostring(it.born)",
+    "        topsMatch := topsMatch and it.top == box.get_top(it.bx) and it.top == 12 + it.born",
+    "    Item first = items.shift()",
+    "    box.delete(first.bx)",
+    "    firstBorn := first.born",
+    "    nextBorn := items.get(0).born",
+    "    for i = 0 to items.size() - 1",
+    "        box.set_right(items.get(i).bx, bar_index)",
+  ].join("\n") + "\n";
+
+  it("each item keeps its own bar's values", () => {
+    expect(series(SRC, "borns", 6)[5]).toBe("01234");
+    expect(series(SRC, "topsMatch", 6)[5]).toBe(true);
+  });
+
+  it("shift returns the oldest, and deleting its box leaves the others", () => {
+    expect(series(SRC, "firstBorn", 6)[5]).toBe(0);
+    expect(series(SRC, "nextBorn", 6)[5]).toBe(1);
+  });
+
+  it("a series passed to a field is stored as its value on that bar", () => {
+    const src = HEAD + "type P\n    int b\nvar P first = na\nif bar_index == 0\n    first := P.new(bar_index)\nx = first.b\n";
+    expect(series(src, "x", 4)).toEqual([0, 0, 0, 0]);
+  });
+});

@@ -9,7 +9,7 @@ No TradingView account. No cloud. No execution quota. No 500 ms loop timeout.
 
 [![TradingView parity](https://img.shields.io/badge/TradingView_parity-112_columns_×_2%2C474_bars-7B3FE4?style=for-the-badge)](docs/common/CONFORMANCE.md)
 [![Tests](https://img.shields.io/badge/tests-2%2C396_passing-22C55E?style=for-the-badge)](docs/common/CONFORMANCE.md#testing)
-[![Pine Script](https://img.shields.io/badge/Pine_Script-v1_→_v5-F97316?style=for-the-badge)](#-supported-pine-script-versions)
+[![Pine Script](https://img.shields.io/badge/Pine_Script-v1_→_v6-F97316?style=for-the-badge)](#-supported-pine-script-versions)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/node-≥20-339933.svg?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
@@ -30,8 +30,8 @@ can **backtest a Pine Script strategy offline**, run a Pine indicator in CI,
 convert Pine Script to JavaScript for embedding elsewhere, or batch-test
 thousands of scripts without touching a browser.
 
-Pine Script **v1, v2, v3, v4 and v5** are implemented, each with its own grammar
-and its own emitter.
+Pine Script **v1, v2, v3, v4, v5 and v6** are implemented, each with its own
+grammar and its own emitter.
 
 ```
 === v4-essential-strategies-00.pine — Summary ===
@@ -117,10 +117,10 @@ npm run replv2
 |---|---|
 | 📊 **Numbers you can trust** | 112 indicator, control-flow and broker columns matched **bar for bar** against TradingView's own output. Not against a spec — against the platform. |
 | 🔌 **Completely offline** | Your data, your machine, your loop budget. No account, no quota, no rate limit, no network. |
-| 🗂️ **Five language versions** | v1 → v5, each with its own grammar and emitter, so a v2 script is parsed by a parser that has never heard of `var`. |
+| 🗂️ **Six language versions** | v1 → v6, each with its own grammar and emitter, so a v2 script is parsed by a parser that has never heard of `var`. |
 | 🔁 **Pine → JavaScript** | Emit readable JS and embed it anywhere — a worker, a server, a browser, a CI job. |
 | 🤖 **Built for automation** | JSON output, exit codes, input overrides, and a comparison mode that diffs your run against a TradingView export. |
-| 🧪 **2,396 tests** | Differential testing against an independent oracle, a full version matrix, 763 real scripts from TradingView's docs, and the parity suites above. |
+| 🧪 **3,389 tests** | Differential testing against an independent oracle, a full version matrix, 763 real scripts from TradingView's docs, and the parity suites above. |
 
 ---
 
@@ -163,6 +163,7 @@ The `//@version` annotation selects the language version; a script without one i
 | **v3** | ✅ Implemented | A five-item tightening of v2 |
 | **v4** | ✅ Implemented | `var` / `varip`, arrays, drawing objects, the namespace migration |
 | **v5** | ✅ Implemented | `while`, `switch`, user-defined types, methods, libraries, matrices, maps, Pine Logs, the `ta.*` / `math.*` / `str.*` migration |
+| **v6** | ✅ Implemented | The migration guide's rules — strict bools, lazy `and`/`or`, dynamic `for` bounds, negative array indices, margin enforcement, `strategy.exit()` parameter pairs — plus `once`, multiline strings, `request.footprint()`, text formatting, library constants and `sort_field` |
 
 Roughly **270 standard-library names** are implemented, along with the strategy
 broker emulator, multi-timeframe `security()`, and the real-time tick model.
@@ -237,9 +238,17 @@ implemented too.
 <summary><b>Does it support Pine Script v6?</b></summary>
 <br>
 
-Not yet. v6 is the next target. The architecture is built for it: each version
-has its own grammar and its own emitter, inheriting from the one before, so
-adding a version does not mean editing an earlier one.
+Yes. v6 has its own grammar and emitter, inheriting from v5's, so adding it did
+not change what any v1–v5 script compiles to. It covers TradingView's v6
+migration guide and the release notes through September 2026.
+
+One caveat worth knowing before relying on v6 strategy numbers: the v1–v5
+broker columns are matched against TradingView's own output, and v6's are not
+yet. v6 changes the broker — `strategy.exit()` takes whichever paired level
+triggers first, and margin is enforced by default — and those rules are
+implemented from TradingView's documentation without captured fixtures to check
+them against. The same goes for `request.footprint()`'s Value Area and
+imbalance rules, which the documentation leaves partly unstated.
 </details>
 
 <details>

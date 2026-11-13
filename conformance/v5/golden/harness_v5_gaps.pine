@@ -1,0 +1,89 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// v5 conformance probe — the gaps found while building v6.
+//
+//   Captured on TradingView: BINANCE:BTCUSDT, 1-minute, 2026-10-19 → 10-24,
+//   via More (⋮) → Pine Logs. The log beside this file is the first 2,500
+//   rows, which is enough to cross a UTC day boundary; the constant columns are
+//   identical on every row of the full export. Replayed by
+//   conformance/common/v5_gaps_golden.test.ts.
+//
+// One OPSHEAD line, then one OPS row per bar — the format the other harnesses
+// in conformance/v5/golden use. List values use ';' so a row stays CSV-safe.
+//
+// Questions each column answers:
+//
+//   time()/time_close()  do they align to the start/end of the HIGHER
+//                        timeframe's bar? (this engine returns the chart bar's
+//                        own time)
+//   set_xloc_*           does line.set_xloc(id, x1, x2, xloc) move both x
+//                        coordinates? (this engine's takes only (id, xloc))
+//   sort_idx / bs_*      array.sort_indices and binary_search_leftmost/
+//                        rightmost — absent from this engine's v5 entirely —
+//                        including na, duplicates and missing values
+//   rgb_* / t_*          the exact value of every color.* constant
+//   div_*                int / int: const, input and series qualifiers
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("OPS v5 gaps probe", overlay = true, max_lines_count = 10)
+
+f(x) => str.tostring(x, "#.##########")
+lst(a) => str.replace_all(str.tostring(a), ", ", ";")
+rgb(c) => color.r(c) * 65536 + color.g(c) * 256 + color.b(c)
+
+// ── 1. time() alignment ──────────────────────────────────────────────────────
+t_D    = time("D")
+t_W    = time("W")
+t_M    = time("M")
+t_240  = time("240")
+tc_D   = time_close("D")
+tc_W   = time_close("W")
+
+// ── 2. line.set_xloc(id, x1, x2, xloc) ───────────────────────────────────────
+var line ln = line.new(0, close, 1, close)
+line.set_xloc(ln, bar_index - 3, bar_index, xloc.bar_index)
+x1 = line.get_x1(ln)
+x2 = line.get_x2(ln)
+
+// ── 3. sort_indices and the leftmost/rightmost searches ──────────────────────
+live = array.from(close, open, high, low, close[1])        // close[1] is na on bar 0
+sort_asc  = lst(array.sort_indices(live))
+sort_desc = lst(array.sort_indices(live, order.descending))
+
+dup = array.from(1, 2, 2, 2, 3, 5)
+bs_2   = array.binary_search(dup, 2)
+bsl_2  = array.binary_search_leftmost(dup, 2)
+bsr_2  = array.binary_search_rightmost(dup, 2)
+bsl_4  = array.binary_search_leftmost(dup, 4)
+bsr_4  = array.binary_search_rightmost(dup, 4)
+bsl_0  = array.binary_search_leftmost(dup, 0)
+bsr_0  = array.binary_search_rightmost(dup, 0)
+bsl_6  = array.binary_search_leftmost(dup, 6)
+bsr_6  = array.binary_search_rightmost(dup, 6)
+
+// ── 4. colour constants ──────────────────────────────────────────────────────
+colours = "aqua,black,blue,fuchsia,gray,green,lime,maroon,navy,olive,orange,purple,red,silver,teal,white,yellow"
+rgbs = lst(array.from(rgb(color.aqua), rgb(color.black), rgb(color.blue), rgb(color.fuchsia),
+                      rgb(color.gray), rgb(color.green), rgb(color.lime), rgb(color.maroon),
+                      rgb(color.navy), rgb(color.olive), rgb(color.orange), rgb(color.purple),
+                      rgb(color.red), rgb(color.silver), rgb(color.teal), rgb(color.white),
+                      rgb(color.yellow)))
+ts = lst(array.from(color.t(color.red), color.t(color.teal), color.t(color.yellow), color.t(color.white)))
+
+// ── 5. integer division ──────────────────────────────────────────────────────
+div_const  = 5 / 2
+div_input  = input.int(5, "five") / 2
+div_series = (bar_index * 0 + 5) / 2
+
+// ── log ──────────────────────────────────────────────────────────────────────
+if barstate.isfirst
+    log.info("OPSHEAD|time,open,high,low,close,volume,t_D,t_W,t_M,t_240,tc_D,tc_W,set_xloc_x1,set_xloc_x2,sort_asc,sort_desc,bs_2,bsl_2,bsr_2,bsl_4,bsr_4,bsl_0,bsr_0,bsl_6,bsr_6,rgb[" + str.replace_all(colours, ",", ";") + "],t[red;teal;yellow;white],div_const,div_input,div_series")
+
+log.info("OPS|" + str.tostring(time, "#") + "," + f(open) + "," + f(high) + "," + f(low) + "," + f(close) + "," + f(volume) + "," +
+     str.tostring(t_D, "#") + "," + str.tostring(t_W, "#") + "," + str.tostring(t_M, "#") + "," + str.tostring(t_240, "#") + "," +
+     str.tostring(tc_D, "#") + "," + str.tostring(tc_W, "#") + "," +
+     f(x1) + "," + f(x2) + "," + sort_asc + "," + sort_desc + "," +
+     f(bs_2) + "," + f(bsl_2) + "," + f(bsr_2) + "," + f(bsl_4) + "," + f(bsr_4) + "," +
+     f(bsl_0) + "," + f(bsr_0) + "," + f(bsl_6) + "," + f(bsr_6) + "," +
+     rgbs + "," + ts + "," + f(div_const) + "," + f(div_input) + "," + f(div_series))
+
+plot(close, "close", display = display.none)

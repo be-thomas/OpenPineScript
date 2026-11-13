@@ -1,4 +1,7 @@
 import type { Context } from "../context";
+import { brokerFor } from "../broker";
+import { val, text, directionOf } from "../broker/val";
+import { openTrades } from "../openTrades";
 
 /**
  * strategy.ts - Backtesting Engine Logic
@@ -29,7 +32,6 @@ export const commission = {
     /** A fixed amount per order, regardless of size. */
     cash_per_order: "commission.cash_per_order",
 };
-
 export const direction = {
     long: long,
     short: short
@@ -53,10 +55,8 @@ export const oca = {
     none:   "none"
 };
 
-// Helper to safely unwrap Series objects into primitive numbers
-function val(x: any): number {
-    return (x !== null && x !== undefined && typeof x.valueOf === 'function') ? Number(x.valueOf()) : Number(x);
-}
+// `val` lives in ../broker/val.ts: every export of a stdlib module becomes a
+// Pine built-in, and an unwrapping helper is not one.
 
 // --- Pending Order Queue Interfaces ---
 
@@ -84,8 +84,39 @@ export interface PendingExit {
     /** The bar this order was first registered on. See `livesYet`. */
     placedBar: number;
     oca_name: string;
+    /** `comment`, and the three that replace it by how the exit filled. */
+    comment?: string;
+    comment_profit?: string;
+    comment_loss?: string;
+    comment_trailing?: string;
+    /**
+     * One unit per TRADE the exit applies to (the trades `from_entry` names, or
+     * every trade): its own price to measure relative levels from, its own
+     * trailing high-water mark, and whether it has filled. A script re-issues the
+     * same `strategy.exit` every bar, and the units survive that. A trade filled
+     * after the last call has no unit until the next call (or, for an entry
+     * that was pending at the call, `arms`).
+     */
+    units?: ExitUnit[];
+    /** Entry ids that had an order pending when the exit was called, and the bar of that first call. */
+    arms?: Record<string, number>;
 }
 
+/** One trade's share of a `strategy.exit`; see `PendingExit.units`. */
+export interface ExitUnit {
+    /** `OpenEntry.uid` of the trade. */
+    uid: string;
+    /** The trade's entry id: what `from_entry` and the id ledger speak of. */
+    id: string;
+    /** The trade's fill price: relative levels (`profit`, `loss`, `trail_points`) are measured from it. */
+    basis: number;
+    /** What the trade opened with: a `qty_percent` is a share of it. */
+    opened: number;
+    /** The bar the unit was created on; it is live from the next. */
+    placedBar: number;
+    trail_peak: number;
+    filled: boolean;
+}
 export interface PendingEntry {
     id: string;
     dir: string;
@@ -96,25 +127,10 @@ export interface PendingEntry {
     placedBar: number;
     oca_name: string;
     oca_type: string;
+    /** Placed by `strategy.order`, which `pyramiding` does not bind. */
+    exempt?: boolean;
 }
-
-function getPendingExits(ctx: Context): Map<string, PendingExit> {
-    if (!(ctx as any)._pendingExits) {
-        (ctx as any)._pendingExits = new Map<string, PendingExit>();
-    }
-    return (ctx as any)._pendingExits;
-}
-
-function getPendingEntries(ctx: Context): Map<string, PendingEntry> {
-    if (!(ctx as any)._pendingEntries) {
-        (ctx as any)._pendingEntries = new Map<string, PendingEntry>();
-    }
-    return (ctx as any)._pendingEntries;
-}
-
-// --- RISK MANAGEMENT STATE ---
-
-interface RiskState {
+export interface RiskState {
     // Configured limits
     max_intraday_loss: number;
     max_intraday_loss_type: string;
@@ -135,163 +151,43 @@ interface RiskState {
     last_settled_day: number;
     is_halted: boolean;
 }
-
-function getRiskState(ctx: Context): RiskState {
-    if (!(ctx as any)._riskState) {
-        (ctx as any)._riskState = {
-            max_intraday_loss: Number.NaN,
-            max_intraday_loss_type: "cash",
-            max_intraday_filled_orders: Infinity,
-            max_drawdown: Number.NaN,
-            max_drawdown_type: "percent",
-            max_cons_loss_days: Infinity,
-            max_position_size: Infinity,
-            allow_entry_in: "all",
-
-            start_equity: ctx.cash,
-            peak_equity: ctx.cash,
-            last_day: -1,
-            daily_filled_orders: 0,
-            cons_loss_days: 0,
-            prev_day_equity: ctx.cash,
-            last_settled_day: -1,
-            is_halted: false
-        } as RiskState;
-    }
-    return (ctx as any)._riskState;
-}
-
-/**
- * strategy.risk namespace
- */
 export const risk = {
     max_intraday_loss: (ctx: Context, value: any, type: string = "cash") => {
-        const state = getRiskState(ctx);
+        const state = brokerFor(ctx).getRiskState();
         state.max_intraday_loss = val(value);
         state.max_intraday_loss_type = type;
     },
 
     max_intraday_filled_orders: (ctx: Context, count: any) => {
-        const state = getRiskState(ctx);
+        const state = brokerFor(ctx).getRiskState();
         state.max_intraday_filled_orders = val(count);
     },
 
     max_drawdown: (ctx: Context, value: any, type: string = "percent") => {
-        const state = getRiskState(ctx);
+        const state = brokerFor(ctx).getRiskState();
         state.max_drawdown = val(value);
         state.max_drawdown_type = type;
     },
 
     max_cons_loss_days: (ctx: Context, count: any) => {
-        const state = getRiskState(ctx);
+        const state = brokerFor(ctx).getRiskState();
         state.max_cons_loss_days = val(count);
     },
 
     max_position_size: (ctx: Context, size: any) => {
-        const state = getRiskState(ctx);
+        const state = brokerFor(ctx).getRiskState();
         state.max_position_size = val(size);
     },
 
     allow_entry_in: (ctx: Context, dir: string) => {
-        const state = getRiskState(ctx);
+        const state = brokerFor(ctx).getRiskState();
         state.allow_entry_in = dir; // "long", "short", or strategy.direction.long / .short
     }
 };
 
 // --- DAY TRANSITION & RISK SYNC ---
 
-function syncRiskState(ctx: Context): RiskState {
-    const rs = getRiskState(ctx);
-    const date = new Date(ctx.time);
-    const day = date.getUTCDate();
 
-    if (day !== rs.last_day) {
-        // Settle the previous day: check if it was a losing day
-        if (rs.last_day !== -1) {
-            const eod_equity = equity(ctx);
-            if (eod_equity < rs.prev_day_equity) {
-                rs.cons_loss_days++;
-            } else {
-                rs.cons_loss_days = 0;
-            }
-            rs.prev_day_equity = eod_equity;
-        }
-
-        rs.last_day = day;
-        rs.start_equity = equity(ctx);
-        rs.daily_filled_orders = 0;
-        rs.is_halted = false;
-    }
-
-    // Track peak equity for max_drawdown
-    const cur = equity(ctx);
-    if (cur > rs.peak_equity) rs.peak_equity = cur;
-
-    return rs;
-}
-
-/**
- * Checks all risk rules and returns true if the engine should be halted.
- * Does NOT liquidate — caller decides what to do.
- */
-function checkRiskHalt(ctx: Context, rs: RiskState): boolean {
-    if (rs.is_halted) return true;
-
-    // 1. Max consecutive loss days
-    if (rs.cons_loss_days >= rs.max_cons_loss_days) {
-        rs.is_halted = true;
-        return true;
-    }
-
-    // 2. Max drawdown (from peak equity)
-    if (!Number.isNaN(rs.max_drawdown)) {
-        const cur = equity(ctx);
-        if (rs.max_drawdown_type === "percent") {
-            const ddPct = rs.peak_equity > 0 ? ((rs.peak_equity - cur) / rs.peak_equity) * 100 : 0;
-            if (ddPct >= rs.max_drawdown) {
-                rs.is_halted = true;
-                return true;
-            }
-        } else {
-            const ddCash = rs.peak_equity - cur;
-            if (ddCash >= rs.max_drawdown) {
-                rs.is_halted = true;
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-// --- CORE EXECUTIONS ---
-
-/**
- * `when` — the v1–v4 way of gating an order.
- *
- * "when (bool) Condition. If it is false, the command is ignored." v5 removed
- * the parameter in favour of an `if` block, but every strategy function carried
- * it before that, and six of TradingView's own v4 examples use it —
- * `strategy.entry("buy", strategy.long, 4, when = strategy.position_size <= 0)`.
- *
- * The parameter was in none of these signatures, so `Context.call` dropped it
- * and the order fired UNCONDITIONALLY. A strategy that should have entered once
- * entered on every bar, and the equity curve was wrong with nothing to say so.
- *
- * Absent means true, which is the documented default.
- */
-function gated(when: any): boolean {
-    if (when === undefined || when === null) return true;
-    const v = val(when);
-    if (v === null || v === undefined) return false;
-    if (typeof v === "number") return !Number.isNaN(v) && v !== 0;
-    return Boolean(v);
-}
-
-
-/**
- * Registers a pending entry order (Limit or Stop).
- */
 export function order(
     ctx: Context,
     id: string,
@@ -303,95 +199,12 @@ export function order(
     oca_type: string = oca.none,
     comment: string = "",
     when: any = undefined,
-    alert_message: string = "",
-): void {
-    if (!gated(when)) return;
-    void comment; void alert_message;
-
-    const lim = val(limit);
-    const stp = val(stop);
-
-    // If no limit/stop, it's a market order — execute immediately.
-    if (Number.isNaN(lim) && Number.isNaN(stp)) {
-        return entry(ctx, id, dir, qty, Number.NaN, Number.NaN, oca_name, oca_type);
-    }
-
-    const entries = getPendingEntries(ctx);
-    const existing = entries.get(id);
-    entries.set(id, {
-        id,
-        dir,
-        // `undefined` means "the strategy did not say", which `entry` reads as
-        // "use the declared default size". `val(undefined)` is NaN, and NaN is
-        // not `undefined`, so the default was skipped and the finite-quantity
-        // guard then threw the order away: a limit or stop entry written
-        // without an explicit size silently never filled. The market-order
-        // path above passes `qty` through untouched, which is why only the
-        // pending orders were affected.
-        qty: qty === undefined ? undefined : val(qty),
-        limit: lim,
-        stop: stp,
-        placedBar: existing ? existing.placedBar : ctx.currentBarIndex,
-        oca_name: oca_name || "",
-        oca_type: oca_type || oca.none
-    });
+    alert_message: string = ""): void {
+    return brokerFor(ctx).order(text(id), directionOf(dir), qty, limit, stop, text(oca_name), text(oca_type), text(comment), when, text(alert_message));
 }
 
-/**
- * A market order the script has placed but the broker has not filled yet.
- *
- * ── Why market orders do not fill on the bar that places them ───────────────
- *
- * TradingView executes a market order at the OPEN of the bar AFTER the one the
- * script placed it on, and `strategy.position_size` read on the placing bar
- * still reports the position as it was. Its own output says so: in
- * conformance/v5/golden/harness_strategy.BTCUSDT.1D.log the entry signal fires
- * on bar 400 while `position_size` stays 0, turns 1 on bar 401, and `equity`
- * moves by exactly `close[401] - open[401]` — the fill is at that bar's open,
- * to the last decimal.
- *
- * The engine used to fill at `close` on the placing bar, which made every
- * backtest one bar early AND filled it at the wrong price. Both errors
- * flattered a signal-following strategy, because the bar a crossover fires on
- * is by construction a bar that already moved.
- *
- * Plain data, not a closure: Context snapshots itself with `structuredClone`
- * for the live-tick baseline, and a queued order has to survive that.
- */
-export interface MarketOrder {
-    kind: "entry" | "close";
-    id: string;
-    direction?: string;
-    qty?: number;
-    comment?: string;
-}
 
-/**
- * Fills every market order placed on the previous bar, at this bar's open.
- *
- * Called from `Context.setBar`, which is the only moment that is both after
- * the open is known and before the script runs.
- */
-export function fillMarketOrders(ctx: Context): void {
-    const queue = ctx.marketOrders;
-    if (queue.length === 0) return;
-    ctx.marketOrders = [];
 
-    const price = ctx.open;
-    for (const o of queue) {
-        if (o.kind === "entry") {
-            entry(ctx, o.id, o.direction!, o.qty, Number.NaN, Number.NaN,
-                  "", oca.none, o.comment ?? "", undefined, "", price);
-        } else {
-            closeAt(ctx, o.comment ?? "", price);
-        }
-    }
-}
-
-/**
- * Enters a position.
- * If we are in the opposite position, it closes it first (reverses).
- */
 export function entry(
     ctx: Context,
     id: string,
@@ -406,264 +219,47 @@ export function entry(
     comment: string = "",
     when: any = undefined,
     alert_message: string = "",
-    // Not a Pine parameter. `strategy.order` calls back in here once a pending
-    // limit or stop has been triggered, and passes the price it filled at.
-    overridePrice?: number,
-    // Nor this. True when the fill came from the LIMIT leg, which fills at
-    // its price or better and so takes no slippage.
-    viaLimit: boolean = false,
-) {
-    if (!gated(when)) return;
-
-    // A limit or stop price makes this a PENDING order rather than a market
-    // one — "limit (float) Limit price of the order" — and `strategy.order`
-    // already owns that queue.
-    const lim = val(limit);
-    const stp = val(stop);
-    if (overridePrice === undefined && (!Number.isNaN(lim) || !Number.isNaN(stp))) {
-        return order(ctx, id, direction, qty, limit, stop, oca_name, oca_type, comment);
-    }
-
-    const dir = direction;
-    void comment; void alert_message; void oca_name; void oca_type;
-
-    // No fill price means this came from the SCRIPT, and a market order waits
-    // for the next bar's open. A price means the broker is filling it now —
-    // `fillMarketOrders` draining this queue, `processPendingOrders` matching a
-    // limit or stop, or a risk rule liquidating — and those execute in place.
-    if (overridePrice === undefined) {
-        // `undefined` travels with the order: a cash or percent-of-equity
-        // size is resolved at the price it fills at, which is not known yet.
-        ctx.marketOrders.push({
-            kind: "entry", id, direction: dir,
-            qty: qty === undefined ? undefined : val(qty),
-            comment,
-        });
-        return;
-    }
-
-    const rs = syncRiskState(ctx);
-    if (rs.is_halted) return;
-    if (checkRiskHalt(ctx, rs)) return;
-
-    // max_intraday_filled_orders check
-    if (rs.daily_filled_orders >= rs.max_intraday_filled_orders) return;
-
-    const isLong = dir === DIR.long;
-
-    // allow_entry_in check
-    if (rs.allow_entry_in !== "all") {
-        if (isLong && rs.allow_entry_in !== DIR.long) return;
-        if (!isLong && rs.allow_entry_in !== DIR.short) return;
-    }
-
-    const modelPrice = overridePrice !== undefined ? overridePrice : ctx.close;
-    // A triggered LIMIT order fills at its price or better, so slippage does
-    // not apply to it. Market and stop orders are the ones that slip.
-    const currentPrice = viaLimit
-        ? toTick(ctx, modelPrice)
-        : toTick(ctx, slip(ctx, modelPrice, isLong));
-    let numQty = qty === undefined ? defaultQty(ctx, currentPrice) : val(qty);
-    if (!Number.isFinite(numQty) || numQty <= 0) return;
-
-    // max_position_size clamp
-    if (rs.max_position_size !== Infinity) {
-        const currentAbs = Math.abs(ctx.position.size);
-        const sameDir = (isLong && ctx.position.size >= 0) || (!isLong && ctx.position.size <= 0);
-        if (sameDir) {
-            const remaining = rs.max_position_size - currentAbs;
-            if (remaining <= 0) return;
-            if (numQty > remaining) numQty = remaining;
-        }
-    }
-
-    // 1. Reverse opposite position
-    if (ctx.position.size !== 0) {
-        const isCurrentLong = ctx.position.size > 0;
-        if (isLong !== isCurrentLong) {
-            // The MODEL price, not the slipped one. `closeAt` slips what it
-            // is given, in the direction of the trade that closes the
-            // position — which for a reversal is the same direction as this
-            // entry — so handing it `currentPrice` applied slippage twice.
-            // Reversing a short with `slippage = 2` closed it four ticks
-            // above the open instead of two, and every reversal's P&L was
-            // short by `slippage * mintick * qty`.
-            closeAt(ctx, `Reverse for ${id}`, modelPrice);
-        }
-    }
-
-    // 2. Execute Entry
-    const newQty = isLong ? numQty : -numQty;
-    const currentVal = Math.abs(ctx.position.size) * ctx.position.avgPrice;
-    const newVal = Math.abs(newQty) * currentPrice;
-    const totalQty = Math.abs(ctx.position.size + newQty);
-
-    if (totalQty !== 0) {
-        ctx.position.avgPrice = (currentVal + newVal) / totalQty;
-    } else {
-        ctx.position.avgPrice = currentPrice;
-    }
-
-    const wasFlat = ctx.position.size === 0;
-    ctx.position.size += newQty;
-
-    // Stamp the OPENING fill only. A pyramided add does not restart the trade,
-    // so `strategy.opentrades.entry_bar_index` must keep naming the bar the
-    // position began on.
-    if (wasFlat) {
-        ctx.position.entryBarIndex = ctx.currentBarIndex;
-        ctx.position.entryTime = ctx.time;
-        ctx.position.entryId = id;
-        ctx.position.entryCommission = 0;
-        // A NEW position measures its excursion from here. Leaving the old
-        // figures in place made a reversal inherit them, because a reversal
-        // never passes through flat at a bar boundary and the end-of-bar
-        // reset therefore never fired — so a short that gave back 1.74 was
-        // still reporting 1.74 three long trades later.
-        ctx.positionRunup = 0;
-        ctx.positionDrawdown = 0;
-    }
-
-    // Counted at the FILL, not only at the end of the bar. `sampleEquity`
-    // takes its reading after the script and the broker have both had the
-    // bar, so a position opened at the open and stopped out on the same bar
-    // was flat again by the time it looked and never counted at all.
-    const held = Math.abs(ctx.position.size);
-    if (held > ctx.maxContractsHeld) ctx.maxContractsHeld = held;
-
-    // Commission on the ENTRY side is charged here, at the fill, because it is
-    // a fee on an ORDER. `recordTrade` used to compute a whole round turn per
-    // closed-trade record, which is only the same thing when one entry is
-    // closed by one exit. Two partial exits of one entry are three orders and
-    // were billed for four; three pyramided entries closed in one go are four
-    // orders and were billed for two. An exit now charges its own side and
-    // claims its share of what the entries already paid.
-    const entryFee = commissionFor(ctx, currentPrice, numQty);
-    if (entryFee !== 0) {
-        ctx.cash -= entryFee;
-        ctx.commissionPaid += entryFee;
-        ctx.position.entryCommission = (ctx.position.entryCommission ?? 0) + entryFee;
-    }
-
-    // Track filled orders for intraday limit
-    rs.daily_filled_orders++;
+    // `overridePrice` is NOT here, though the broker method takes it: it is
+    // the price a triggered pending order fills at, passed by the broker to
+    // itself. Everything this wrapper declares is a Pine argument, and with
+    // it declared a script's eleventh positional argument — `disable_alert`
+    // on TradingView — became a fill price.
+    ): any {
+    // The broker reports whether it filled; the Pine function returns nothing.
+    brokerFor(ctx).entry(text(id), directionOf(direction), qty, limit, stop, text(oca_name), text(oca_type), text(comment), when, text(alert_message));
 }
 
-/**
- * How big an order is when the script did not say.
- *
- * `strategy(default_qty_type = ..., default_qty_value = ...)`, which the
- * engine recognised as constants and then ignored: every entry without an
- * explicit `qty` was one contract, whatever the strategy had declared. A
- * strategy sized at 10% of equity was being backtested at one share.
- *
- *   strategy.fixed              `value` contracts
- *   strategy.cash               `value` of currency, at the fill price
- *   strategy.percent_of_equity  `value`% of equity, at the fill price
- *
- * The two price-based forms are sized at the price the order actually fills
- * at, which is why this is resolved at the fill and not where the order was
- * placed.
- */
-function defaultQty(ctx: Context, price: number): number {
-    const meta = ctx.scriptMeta;
-    const value = Number(meta?.default_qty_value ?? 1);
-    if (!Number.isFinite(value) || value <= 0) return 0;
 
-    switch (meta?.default_qty_type) {
-        case cash:
-            return price > 0 ? value / price : 0;
-        case percent_of_equity:
-            return price > 0 ? (equity(ctx) * value / 100) / price : 0;
-        default:
-            return value;
-    }
-}
-
-/**
- * Closes a specific position or all positions.
- */
 export function close(
     ctx: Context, id: string, when: any = undefined, comment: string = "",
     qty: any = Number.NaN, qty_percent: any = Number.NaN, alert_message: string = "",
-) {
-    if (!gated(when)) return;
-    void qty; void qty_percent; void alert_message;
-    close_all(ctx, comment || `Close ${id}`);
+    // Appended, not where TradingView lists it: the shared signature keeps v4's
+    // order, as for `strategy.exit`'s `comment_*`. See V6_POSITIONAL.
+    immediately: any = false, disable_alert: any = false): any {
+    void disable_alert;
+    return brokerFor(ctx).close(text(id), when, text(comment), qty, qty_percent, text(alert_message), immediately);
 }
+
 
 export function close_all(
     ctx: Context, comment: string = "", when: any = undefined, alert_message: string = "",
-) {
-    if (!gated(when)) return;
-    void alert_message;
-    // Queued, not filled — see MarketOrder. A caller that already knows the
-    // fill price calls `closeAt` instead.
-    ctx.marketOrders.push({ kind: "close", id: comment, comment });
+    immediately: any = false, disable_alert: any = false): any {
+    void disable_alert;
+    return brokerFor(ctx).close_all(text(comment), when, text(alert_message), immediately);
 }
 
-/**
- * Flattens the position at a KNOWN price, now.
- *
- * The execution half of `close_all`, split out so the broker's own paths —
- * draining the market queue at the open, reversing inside an entry, a risk
- * rule liquidating at a computed level — are not routed back through the
- * queue they are supposed to be servicing.
- */
-export function closeAt(ctx: Context, comment: string, price: number): void {
-    if (ctx.position.size === 0) return;
 
-    const isLong = ctx.position.size > 0;
-    const currentPrice = toTick(ctx, slip(ctx, price, !isLong));
-    const qty = Math.abs(ctx.position.size);
 
-    let pnl = 0;
-    if (isLong) {
-        pnl = (currentPrice - ctx.position.avgPrice) * qty;
-    } else {
-        pnl = (ctx.position.avgPrice - currentPrice) * qty;
-    }
-
-    recordTrade(ctx, {
-        id: comment || "Close",
-        entryPrice: ctx.position.avgPrice,
-        exitPrice: currentPrice,
-        qty: qty,
-        pnl: pnl,
-        direction: isLong ? "long" : "short",
-    });
-
-    ctx.position.size = 0;
-    ctx.position.avgPrice = 0;
-    ctx.position.entryBarIndex = undefined;
-    ctx.position.entryTime = undefined;
-    ctx.position.entryCommission = 0;
-    ctx.position.entryId = undefined;
-    getPendingExits(ctx).clear();
-}
-
-/**
- * Cancels a pending order by ID.
- */
 export function cancel(ctx: Context, id: string, when: any = undefined): void {
-    if (!gated(when)) return;
-    getPendingEntries(ctx).delete(id);
-    getPendingExits(ctx).delete(id);
+    return brokerFor(ctx).cancel(text(id), when);
 }
 
-/**
- * Cancels all pending orders.
- */
+
 export function cancel_all(ctx: Context): void {
-    getPendingEntries(ctx).clear();
-    getPendingExits(ctx).clear();
+    return brokerFor(ctx).cancel_all();
 }
 
-// --- EXITS & MATCHING ENGINE ---
 
-/**
- * Registers a Take Profit / Stop Loss bracket order into the pending queue.
- */
 export function exit(
     ctx: Context,
     id: string,
@@ -682,574 +278,37 @@ export function exit(
     comment: string = "",
     when: any = undefined,
     alert_message: string = "",
-): void {
-    if (!gated(when)) return;
-    void comment; void alert_message;
-    const exits = getPendingExits(ctx);
-    const existing = exits.get(id);
-    exits.set(id, {
-        id,
-        from_entry,
-        qty: val(qty),
-        qty_percent: val(qty_percent),
-        limit: val(limit),
-        stop: val(stop),
-        profit: val(profit),
-        loss: val(loss),
-        trail_price: val(trail_price),
-        trail_points: val(trail_points),
-        trail_offset: val(trail_offset),
-        // A script re-issues the same `strategy.exit` call on every bar, so the
-        // trail's high-water mark has to survive the re-registration or it would
-        // reset each time and the stop would never move.
-        trail_peak: existing ? existing.trail_peak : Number.NaN,
-        // Set when the order is CREATED and carried across re-registration. A
-        // script re-issues `strategy.exit` every bar, and restamping it here
-        // would hold it one bar behind the market forever — it would never
-        // become live at all.
-        placedBar: existing ? existing.placedBar : ctx.currentBarIndex,
-        oca_name: oca_name || ""
-    });
+    // Appended rather than placed where TradingView's reference lists them, so
+    // a v1–v5 call passing `when` or `alert_message` by position still lands
+    // there. Keyword use, the only kind the reference examples show, finds
+    // them by name.
+    comment_profit: string = "",
+    comment_loss: string = "",
+    comment_trailing: string = ""): void {
+        return brokerFor(ctx).exit(text(id), text(from_entry), qty, qty_percent, profit, limit, loss, stop, trail_price, trail_points, trail_offset, text(oca_name), text(comment), when, text(alert_message), text(comment_profit), text(comment_loss), text(comment_trailing));
 }
 
-/**
- * The prices one pending exit would fill at, on the bar just seen.
- *
- * ── Ticks and prices are different parameters ───────────────────────────────
- *
- * `strategy.exit` takes a profit target twice: `limit` is a PRICE and `profit`
- * is a distance in TICKS from the entry. The same for `stop` and `loss`. Only
- * the two price forms were kept — `profit` and `loss` were accepted and then
- * left out of the pending record — so
- *
- *     strategy.exit("bracket1", "buy", 2, profit = 10, stop = 10)
- *
- * (TradingView's own partial-exit demo) armed the stop and silently ignored the
- * target: a bracket with one side missing, which is worse than no bracket.
- *
- * ── Trailing ────────────────────────────────────────────────────────────────
- *
- * "trail_points — trailing stop activation level offset, expressed in ticks"
- * and "trail_offset — trailing stop offset, expressed in ticks". The trail ARMS
- * when price reaches the activation level, and then follows the best price seen
- * since, `trail_offset` ticks behind it. `trail_price` gives the activation
- * level as a price instead of an offset.
- */
-function exitLevels(
-    ctx: Context, ex: PendingExit, isLong: boolean, high: number, low: number,
-): { limit: number; stop: number } {
-    const tick = ctx.mintick > 0 ? ctx.mintick : 0.01;
-    const entryPrice = ctx.position.avgPrice;
-    const away = (ticks: number, favourable: boolean): number =>
-        entryPrice + (isLong === favourable ? 1 : -1) * ticks * tick;
 
-    const limit = !Number.isNaN(ex.limit) ? ex.limit
-        : !Number.isNaN(ex.profit) ? away(ex.profit, true) : Number.NaN;
-
-    let stop = !Number.isNaN(ex.stop) ? ex.stop
-        : !Number.isNaN(ex.loss) ? away(ex.loss, false) : Number.NaN;
-
-    const activation = !Number.isNaN(ex.trail_price) ? ex.trail_price
-        : !Number.isNaN(ex.trail_points) ? away(ex.trail_points, true) : Number.NaN;
-
-    if (!Number.isNaN(activation) && !Number.isNaN(ex.trail_offset)) {
-        const best = isLong ? high : low;
-        const armed = !Number.isNaN(ex.trail_peak)
-            || (isLong ? high >= activation : low <= activation);
-        if (armed) {
-            ex.trail_peak = Number.isNaN(ex.trail_peak) ? best
-                : (isLong ? Math.max(ex.trail_peak, best) : Math.min(ex.trail_peak, best));
-            const trailing = ex.trail_peak + (isLong ? -1 : 1) * ex.trail_offset * tick;
-            // The tighter of the two stops wins — a trailing stop that has moved
-            // past the fixed one replaces it.
-            stop = Number.isNaN(stop) ? trailing
-                : (isLong ? Math.max(stop, trailing) : Math.min(stop, trailing));
-        }
-    }
-
-    return { limit, stop };
-}
-
-// --- OCA HELPERS ---
-
-/**
- * After a pending entry fills, apply OCA logic to other entries in the same group.
- */
-function applyEntryOCA(entries: Map<string, PendingEntry>, filledOrder: PendingEntry): void {
-    if (!filledOrder.oca_name) return;
-
-    const toDelete: string[] = [];
-    for (const [id, ord] of entries.entries()) {
-        if (id === filledOrder.id) continue;
-        if (ord.oca_name !== filledOrder.oca_name) continue;
-
-        if (filledOrder.oca_type === oca.cancel) {
-            toDelete.push(id);
-        } else if (filledOrder.oca_type === oca.reduce) {
-            ord.qty = Math.max(0, ord.qty - filledOrder.qty);
-            if (ord.qty <= 0) toDelete.push(id);
-        }
-        // oca.none — do nothing
-    }
-    for (const id of toDelete) entries.delete(id);
-}
-
-/**
- * After a pending exit fills, apply OCA logic to other exits in the same group.
- * Exit OCA default is cancel (TradingView behavior: when one TP/SL hits, cancel the other).
- */
-function applyExitOCA(exits: Map<string, PendingExit>, filledExit: PendingExit): void {
-    if (!filledExit.oca_name) return;
-
-    const toDelete: string[] = [];
-    for (const [id, ex] of exits.entries()) {
-        if (id === filledExit.id) continue;
-        if (ex.oca_name !== filledExit.oca_name) continue;
-        toDelete.push(id);
-    }
-    for (const id of toDelete) exits.delete(id);
-}
-
-/**
- * When the open position was entered, as a timestamp.
- *
- * A closed `Trade` records `entryTime`, and it used to be written as the
- * literal `0` at both places a trade is booked. Two things read it and both
- * were wrong because of it: a host drawing an entry marker had no bar to put
- * it on, and `strategy.closedtrades.entry_bar_index()` resolves the time back
- * to an index, so it answered `na` for every trade.
- */
-/**
- * The commission on ONE order, in currency.
- *
- * `strategy(commission_type = ..., commission_value = ...)`, which until now
- * the engine only had constants for: the three types were declarable and
- * nothing was ever charged, so every backtest reported a gross result as
- * though it were net.
- *
- *   commission.percent            value% of the order's cash volume
- *   commission.cash_per_contract  value per contract
- *   commission.cash_per_order     value per order
- *
- * A round turn is two orders, so a trade pays this twice — once at the entry
- * price and once at the exit.
- */
-function commissionFor(ctx: Context, price: number, qty: number): number {
-    const meta = ctx.scriptMeta;
-    const value = Number(meta?.commission_value ?? 0);
-    if (!Number.isFinite(value) || value === 0) return 0;
-    switch (meta?.commission_type) {
-        case commission.cash_per_contract: return value * Math.abs(qty);
-        case commission.cash_per_order: return value;
-        default: return Math.abs(price * qty) * value / 100;
-    }
-}
-
-/**
- * A fill price moved against the order by `strategy(slippage = n)` ticks.
- *
- * Slippage is declared in TICKS, and is always adverse: a buy fills higher
- * than the model price and a sell lower. Zero by default, so a strategy that
- * does not declare it is unaffected.
- */
-function slip(ctx: Context, price: number, buying: boolean): number {
-    const ticks = Number(ctx.scriptMeta?.slippage ?? 0);
-    const tick = Number(ctx.mintick);
-    if (!Number.isFinite(ticks) || ticks === 0) return price;
-    if (!Number.isFinite(tick) || tick <= 0 || !Number.isFinite(price)) return price;
-    return price + (buying ? 1 : -1) * ticks * tick;
-}
-
-/**
- * Books a closed trade: the one place a Trade is created.
- *
- * Both exit paths — a flattening `closeAt` and a bracket order filling —
- * used to build the record inline, which is why the two disagreed about
- * what a trade carries. Everything a host needs beyond the P&L is stamped
- * here, where it is still known: the bar each leg landed on, the id of the
- * order that OPENED the position (`id` names the one that closed it), and
- * the excursion the Context has been accumulating since the entry.
- *
- * `pnl` arrives GROSS and leaves net: commission is charged on the round
- * turn and deducted here, so one subtraction serves every exit path.
- */
-function recordTrade(ctx: Context, t: {
-    id: string; entryPrice: number; exitPrice: number;
-    qty: number; pnl: number; direction: "long" | "short";
-}): void {
-    // The exit's own order fee, plus this trade's share of what the position's
-    // entries already paid — pro rata by quantity, which is exact for the two
-    // per-contract and percentage types and the only sensible split of a flat
-    // per-order fee across a partial exit. The position has not been reduced
-    // yet at this point, so `size` is what was held going in.
-    // The bar this exit filled on has not been through `sampleEquity` yet:
-    // bracket exits fill in `setBar` before the script runs, and a market
-    // close fills at the next open, both ahead of the end-of-bar sample. So
-    // the excursion was read WITHOUT the bar the trade died on — a long at
-    // 100 stopped out at 95 on the next bar reported a drawdown of zero.
-    //
-    // Folding in the exit price is a lower bound, deliberately. Where the
-    // price went between this bar's open and the fill is not knowable from a
-    // candle, and claiming the bar's full high and low would credit the trade
-    // with an extreme it may have been closed before reaching.
-    const travelled = t.direction === "long"
-        ? t.exitPrice - t.entryPrice
-        : t.entryPrice - t.exitPrice;
-    const runup = Math.max(ctx.positionRunup, Math.max(0, travelled) * t.qty);
-    const drawdown = Math.max(ctx.positionDrawdown, Math.max(0, -travelled) * t.qty);
-
-    const exitFee = commissionFor(ctx, t.exitPrice, t.qty);
-    const held = Math.abs(ctx.position.size) || t.qty;
-    const paidOnEntry = ctx.position.entryCommission ?? 0;
-    const entryShare = held > 0 ? paidOnEntry * Math.min(1, t.qty / held) : paidOnEntry;
-    ctx.position.entryCommission = paidOnEntry - entryShare;
-
-    const fee = exitFee + entryShare;
-    const net = t.pnl - fee;
-
-    ctx.trades.push({
-        id: t.id,
-        entryTime: entryTimeOf(ctx),
-        entryPrice: t.entryPrice,
-        exitTime: ctx.time,
-        exitPrice: t.exitPrice,
-        qty: t.qty,
-        pnl: net,
-        direction: t.direction,
-        entryBarIndex: ctx.position.entryBarIndex,
-        exitBarIndex: ctx.currentBarIndex,
-        entryId: ctx.position.entryId,
-        runup,
-        drawdown,
-        commission: fee,
-    });
-
-    // Only the exit side moves cash and the running total here; the entry
-    // side left both at its own fill.
-    ctx.cash += t.pnl - exitFee;
-    ctx.commissionPaid += exitFee;
-}
-
-/**
- * When the open position opened.
- *
- * `position.entryTime` is stamped at the fill and is the answer. Resolving it
- * back out of `entryBarIndex` was the older way round, from before the
- * position carried a time at all, and left two routes to one fact that could
- * disagree — the bar lookup silently answers 0 for an index the bar list no
- * longer covers. The index lookup remains as a fallback for a position
- * restored without a time.
- */
-function entryTimeOf(ctx: Context): number {
-    const stamped = ctx.position.entryTime;
-    if (typeof stamped === "number") return stamped;
-    const bar = ctx.position.entryBarIndex;
-    if (bar === undefined) return 0;
-    const at = ctx.barTimes[bar];
-    return typeof at === "number" ? at : 0;
-}
-
-/**
- * A fill price, snapped to the instrument's minimum tick.
- *
- * "the dataset's minimum tick size, i.e., the smallest increment by which the
- * instrument's recorded prices change" — a fill cannot land between two
- * tradeable prices, and TradingView's does not. Its golden exits export reports
- * an entry at 39030.91 where the bar's own open is 39030.9094208, and an exit
- * at 36056.47 where the open is 36056.4719785.
- *
- * Each rounding is far below the comparison tolerance on a price. It is NOT
- * below it on `strategy.netprofit`, which is a difference of two prices and so
- * carries the same absolute error against a much smaller number — that column
- * is where this showed up, at 1.2e-5 relative.
- *
- * `ctx.mintick` is host-supplied (R-12) and defaults to 0.01, so this is
- * parameterised rather than assumed for one symbol.
- */
-function toTick(ctx: Context, price: number): number {
-    const tick = Number(ctx.mintick);
-    if (!Number.isFinite(tick) || tick <= 0 || !Number.isFinite(price)) return price;
-    return Math.round(price / tick) * tick;
-}
-
-/**
- * An order's LEVEL, snapped to a tick away from the market.
- *
- * A level is a price the order may not do better than, and it has to land on a
- * tradeable increment. Rounding it to the NEAREST tick can move it closer to
- * the market, which fills the order at a price it never agreed to.
- *
- * TradingView's golden exits export: a long entered at 6985.25 carries a 5%
- * target of 7334.5125, and TradingView reports the exit at 7334.52 — up, not
- * at the nearer 7334.51. `above` says which side of the market the level sits
- * on, so a sell target rounds up and a protective stop rounds down.
- */
-function levelToTick(ctx: Context, level: number, above: boolean): number {
-    const tick = Number(ctx.mintick);
-    if (!Number.isFinite(tick) || tick <= 0 || !Number.isFinite(level)) return level;
-    const n = level / tick;
-    // Nudge before rounding: 7334.5125/0.01 is 733451.2499999999 in binary
-    // floating point, and a bare Math.ceil would take it to the wrong tick.
-    const eps = 1e-9;
-    return (above ? Math.ceil(n - eps) : Math.floor(n + eps)) * tick;
-}
-
-/**
- * The price a triggered order actually fills at.
- *
- * A limit or stop names the WORST price the order accepts, not the price it
- * gets. When the bar has already opened past the level, the level never
- * traded on that bar and the fill happens at the open instead.
- *
- * TradingView's own output, from the golden exits export: a long entered at
- * bar 532's open (38402.15) carries a 3% stop at 37250.08. Bar 533 opens at
- * 36056.47 — below the stop already — and TradingView reports the exit at
- * 36056.47, the open. Filling at the stop, as this used to, books a price
- * that did not trade, and flatters every gap the strategy is caught in.
- *
- * `worseIsHigher` is true for an order that fills by price RISING to it — a
- * sell target or a buy stop — and false for one that fills by price falling.
- */
-function fillPrice(level: number, open: number, worseIsHigher: boolean): number {
-    if (!Number.isFinite(open)) return level;
-    return worseIsHigher ? Math.max(level, open) : Math.min(level, open);
-}
-
-/**
- * Is this order allowed to fill on the current bar yet?
- *
- * No, if it was registered on it. A limit or stop placed during bar N starts
- * being matched on bar N+1, the same bar a market order would fill on.
- *
- * TradingView's own output settles it. In the golden exits export a long is
- * entered at bar 401's open (39030.91) and its bracket — a 5% target and a 3%
- * stop — is registered on that same bar. Bar 401's own range (H 39836.03,
- * L 37151.59) dips through the stop at 37859.98 but never reaches the target
- * at 40982.46, so matching against it closes the trade at the stop. Bar 402's
- * range (H 46997.07, L 38034.25) does the opposite: it never touches the stop
- * and runs well past the target. TradingView reports the exit at 40982.46 —
- * the target, on bar 402 — so the placing bar is not matched at all.
- */
-function livesYet(ctx: Context, placedBar: number): boolean {
-    return placedBar < ctx.currentBarIndex;
-}
-
-/**
- * Matches the standing limit and stop orders against this bar's High and Low.
- *
- * Called from `Context.setBar`, BEFORE the script runs on the bar — a fill is
- * already applied by the time the script next executes. See the note there.
- */
 export function processPendingOrders(ctx: Context, high: number, low: number): void {
-    // Once per bar. `Context.setBar` calls this for every run, and the strategy
-    // test harness calls it directly as well; without a guard the second call
-    // would fill a pending entry that the first one just placed.
-    const state = ctx as any;
-    if (state._ordersProcessedBar === ctx.currentBarIndex) return;
-    state._ordersProcessedBar = ctx.currentBarIndex;
-
-    const rs = syncRiskState(ctx);
-
-    // --- Max Intraday Loss check ---
-    if (!rs.is_halted && !Number.isNaN(rs.max_intraday_loss) && ctx.position.size !== 0) {
-        const worstPrice = ctx.position.size > 0 ? low : high;
-        const unrealized = (worstPrice - ctx.position.avgPrice) * ctx.position.size;
-        const currentEquity = ctx.cash + unrealized;
-
-        let breached = false;
-        if (rs.max_intraday_loss_type === "percent") {
-            const lossPct = rs.start_equity > 0 ? ((rs.start_equity - currentEquity) / rs.start_equity) * 100 : 0;
-            breached = lossPct >= rs.max_intraday_loss;
-        } else {
-            breached = (rs.start_equity - currentEquity) >= rs.max_intraday_loss;
-        }
-
-        if (breached) {
-            rs.is_halted = true;
-
-            const targetEquity = rs.max_intraday_loss_type === "percent"
-                ? rs.start_equity * (1 - rs.max_intraday_loss / 100)
-                : rs.start_equity - rs.max_intraday_loss;
-            const liquidationPrice = ctx.position.avgPrice + (targetEquity - ctx.cash) / ctx.position.size;
-
-            // Liquidated AT the level that breaches the limit, not at the
-            // close. This used to be done by assigning over `ctx.close` for
-            // the duration of the call, which `closeAt` makes unnecessary.
-            closeAt(ctx, "Max Intraday Loss Breach", liquidationPrice);
-
-            cancel_all(ctx);
-            return;
-        }
-    }
-
-    // Global risk checks
-    if (checkRiskHalt(ctx, rs)) {
-        cancel_all(ctx);
-        if (ctx.position.size !== 0) closeAt(ctx, "Risk Halt", ctx.open);
-        return;
-    }
-
-    // If halted from previous bar, block everything
-    if (rs.is_halted) {
-        cancel_all(ctx);
-        if (ctx.position.size !== 0) closeAt(ctx, "Risk Halt", ctx.open);
-        return;
-    }
-
-    // 1. Process Pending Entries (strategy.order)
-    const entries = getPendingEntries(ctx);
-    const filledEntryIds: string[] = [];
-
-    for (const [id, ord] of entries.entries()) {
-        // Check intraday filled orders limit
-        if (rs.daily_filled_orders >= rs.max_intraday_filled_orders) break;
-        if (!livesYet(ctx, ord.placedBar)) continue;
-
-        // Snapped the same way an exit's levels are: a level the caller named
-        // has to land on a tradeable increment, and rounding it toward the
-        // market would fill at a price the order never agreed to. Buying, a
-        // limit sits BELOW the market and a stop above; selling, the reverse.
-        const buying = ord.dir === direction.long;
-        const entryLimit = levelToTick(ctx, ord.limit, !buying);
-        const entryStop = levelToTick(ctx, ord.stop, buying);
-
-        let price = Number.NaN;
-        let filledOnLimit = false;
-        if (buying) {
-            // A limit waits for the price to FALL to it, a stop for it to
-            // rise. Either way the open can have passed it already.
-            if (!Number.isNaN(entryLimit) && low <= entryLimit) {
-                price = fillPrice(entryLimit, ctx.open, false);
-                filledOnLimit = true;
-            } else if (!Number.isNaN(entryStop) && high >= entryStop) {
-                price = fillPrice(entryStop, ctx.open, true);
-            }
-        } else {
-            if (!Number.isNaN(entryLimit) && high >= entryLimit) {
-                price = fillPrice(entryLimit, ctx.open, true);
-                filledOnLimit = true;
-            } else if (!Number.isNaN(entryStop) && low <= entryStop) {
-                price = fillPrice(entryStop, ctx.open, false);
-            }
-        }
-
-        if (!Number.isNaN(price)) {
-            // The fill price goes in the LAST slot now: the Pine signature owns
-            // the five before it (`limit`, `stop`, `oca_name`, `oca_type`,
-            // `comment`, `when`, `alert_message`).
-            entry(ctx, id, ord.dir, ord.qty, Number.NaN, Number.NaN,
-                  ord.oca_name, ord.oca_type, "", undefined, "", price, filledOnLimit);
-            filledEntryIds.push(id);
-            applyEntryOCA(entries, ord);
-        }
-    }
-    for (const id of filledEntryIds) entries.delete(id);
-
-    // 2. Process Pending Exits (strategy.exit)
-    if (ctx.position.size === 0) return;
-
-    const exits = getPendingExits(ctx);
-    if (exits.size === 0) return;
-
-    const isLong = ctx.position.size > 0;
-
-    for (const [exitId, pendingExit] of exits.entries()) {
-        if (!livesYet(ctx, pendingExit.placedBar)) continue;
-        let executedPrice = Number.NaN;
-
-        const level = exitLevels(ctx, pendingExit, isLong, high, low);
-
-        // Closing a long is a SELL: the target sits above the market and the
-        // stop below it; closing a short is the mirror image.
-        const limitAt = levelToTick(ctx, level.limit, isLong);
-        const stopAt = levelToTick(ctx, level.stop, !isLong);
-
-        let exitOnLimit = false;
-        if (isLong) {
-            if (!Number.isNaN(limitAt) && high >= limitAt) {
-                executedPrice = fillPrice(limitAt, ctx.open, true);
-                exitOnLimit = true;
-            } else if (!Number.isNaN(stopAt) && low <= stopAt) {
-                executedPrice = fillPrice(stopAt, ctx.open, false);
-            }
-        } else {
-            if (!Number.isNaN(limitAt) && low <= limitAt) {
-                executedPrice = fillPrice(limitAt, ctx.open, false);
-                exitOnLimit = true;
-            } else if (!Number.isNaN(stopAt) && high >= stopAt) {
-                executedPrice = fillPrice(stopAt, ctx.open, true);
-            }
-        }
-
-        if (!Number.isNaN(executedPrice)) {
-            // Closing a long is a sell, closing a short a buy — slippage is
-            // adverse either way. But only on the STOP leg: a limit order
-            // fills at its price or better, and slipping the take-profit
-            // recorded it filling WORSE than the limit, which is something a
-            // limit order cannot do. Every take-profit trade's P&L was short
-            // by `slippage * mintick * qty`.
-            executedPrice = exitOnLimit
-                ? toTick(ctx, executedPrice)
-                : toTick(ctx, slip(ctx, executedPrice, !isLong));
-            const held = Math.abs(ctx.position.size);
-            // "Ignored if `qty` is not na" — an explicit quantity wins over a
-            // percentage, and neither given closes the whole position.
-            const qty = !Number.isNaN(pendingExit.qty) ? pendingExit.qty
-                : !Number.isNaN(pendingExit.qty_percent)
-                    ? held * Math.min(100, Math.max(0, pendingExit.qty_percent)) / 100
-                    : held;
-            const pnl = isLong
-                ? (executedPrice - ctx.position.avgPrice) * qty
-                : (ctx.position.avgPrice - executedPrice) * qty;
-
-            recordTrade(ctx, {
-                id: `Exit ${exitId}`,
-                entryPrice: ctx.position.avgPrice,
-                exitPrice: executedPrice,
-                qty: qty,
-                pnl: pnl,
-                direction: isLong ? "long" : "short",
-            });
-
-            rs.daily_filled_orders++;
-
-            // Apply OCA logic for exits with named groups
-            if (pendingExit.oca_name) {
-                applyExitOCA(exits, pendingExit);
-            }
-
-            // A PARTIAL exit leaves a position behind. Booking the P&L on
-            // `qty` and then flattening regardless made the rest of the
-            // position disappear without ever being sold: long 10 at 100 with
-            // `strategy.exit("tp", qty_percent = 50, limit = 110)` recorded a
-            // 5-contract trade and silently dropped the other five.
-            //
-            // The average entry price does NOT move — selling part of a
-            // position does not change what the remainder cost.
-            const remaining = Math.max(0, held - Math.abs(qty));
-            // `0`, never `-0`: a flat position compares equal to zero under
-            // Object.is, which is what the assertions and `== 0` guards use.
-            ctx.position.size = remaining === 0 ? 0 : (isLong ? remaining : -remaining);
-
-            if (remaining === 0) {
-                ctx.position.avgPrice = 0;
-                ctx.position.entryBarIndex = undefined;
-                ctx.position.entryTime = undefined;
-                ctx.position.entryCommission = 0;
-                ctx.position.entryId = undefined;
-                // Nothing left to protect, so the other brackets go with it.
-                exits.clear();
-            } else {
-                // Only the order that filled is spent; the rest still guard
-                // what is left.
-                exits.delete(exitId);
-            }
-            break;
-        }
-    }
+    return brokerFor(ctx).processPendingOrders(high, low);
 }
-
-// --- STATE GETTERS ---
+export interface MarketOrder {
+    kind: "entry" | "close";
+    id: string;
+    direction?: string;
+    qty?: number;
+    comment?: string;
+    /** For a close: the entry it closes, or absent for the whole position. */
+    entry?: string;
+    /** For a close: `qty` / `qty_percent`, which limit how much of that entry goes. */
+    qty_percent?: number;
+    /** For an entry placed by `strategy.order`, which `pyramiding` does not bind. */
+    exempt?: boolean;
+    /** For an entry: the close of the bar that placed it, which sizes it (see `Broker.sizesAtOrderPrice`). */
+    placedClose?: number;
+    /** For a close placed with `immediately`: it fills at the close of this bar, once the script has run. */
+    atClose?: boolean;
+}
 
 /** @getter */
 export function position_size(ctx: Context): number {
@@ -1258,7 +317,85 @@ export function position_size(ctx: Context): number {
 
 /** @getter */
 export function opentrades(ctx: Context): number {
-    return ctx.position.size !== 0 ? 1 : 0;
+    return openTrades(ctx).length;
+}
+
+/**
+ * `strategy.max_drawdown` / `max_runup` and their percentages — the largest
+ * fall from a peak, and rise from a trough, of the strategy's equity over the
+ * whole run, read off the per-bar equity curve and the bar in progress.
+ * The percentage is of the peak (or trough) it was measured from.
+ */
+function equityExtremes(ctx: Context): { drawdown: number; drawdownPct: number; runup: number; runupPct: number } {
+    const points = [...((ctx as any).equityCurve ?? []).map((p: any) => Number(p?.equity ?? p)), equity(ctx)]
+        .filter(Number.isFinite);
+    let peak = -Infinity, trough = Infinity;
+    let drawdown = 0, drawdownPct = 0, runup = 0, runupPct = 0;
+    for (const e of points) {
+        if (e > peak) peak = e;
+        if (e < trough) trough = e;
+        if (peak - e > drawdown) { drawdown = peak - e; drawdownPct = peak > 0 ? (drawdown / peak) * 100 : 0; }
+        if (e - trough > runup) { runup = e - trough; runupPct = trough > 0 ? (runup / trough) * 100 : 0; }
+    }
+    return { drawdown, drawdownPct, runup, runupPct };
+}
+
+/** @getter */
+export function max_drawdown(ctx: Context): number { return equityExtremes(ctx).drawdown; }
+/** @getter */
+export function max_drawdown_percent(ctx: Context): number { return equityExtremes(ctx).drawdownPct; }
+/** @getter */
+export function max_runup(ctx: Context): number { return equityExtremes(ctx).runup; }
+/** @getter */
+export function max_runup_percent(ctx: Context): number { return equityExtremes(ctx).runupPct; }
+
+/**
+ * Converts between the strategy's account currency and the symbol's. One
+ * currency runs here, so a value converts to itself.
+ */
+export function convert_to_symbol(value: any): number { return Number(val(value)); }
+export function convert_to_account(value: any): number { return Number(val(value)); }
+
+/**
+ * `strategy.default_entry_qty(fill_price)` — the quantity a `strategy.entry`
+ * with no `qty` would take at that price, by the script's default_qty_type.
+ */
+export function default_entry_qty(ctx: Context, fill_price: any): number {
+    return brokerFor(ctx).entryQtyAt(Number(val(fill_price)));
+}
+
+/**
+ * `strategy.margin_liquidation_price` — where the open position would be
+ * margin-called: the price at which equity falls to the margin it requires,
+ *
+ *     cash + (price - entry) * size = |size| * price * margin
+ *
+ * solved for price. `na` when flat, when the side's margin is 0, and for a
+ * long at 100% margin, which no price can call. TradingView's log has na on
+ * every long and 82588.14 for a 1.209 short entered at 82387.95.
+ *
+ * @getter
+ */
+export function margin_liquidation_price(ctx: Context): number {
+    const pos = ctx.position;
+    if (pos.size === 0) return NaN;
+    // The broker's own ratio, so this cannot drift from where it liquidates.
+    const m = brokerFor(ctx).marginRatio(pos.size > 0);
+    if (m === 0) return NaN;
+    const q = Math.abs(pos.size);
+    const price = pos.size > 0
+        ? (pos.avgPrice * q - ctx.cash) / (q * (1 - m))
+        : (ctx.cash + pos.avgPrice * q) / (q * (1 + m));
+    if (!(Number.isFinite(price) && price > 0)) return NaN;
+    // On the tick grid, toward the ADVERSE side: TradingView reports a short's
+    // 82806.1605… as 82806.17 and 82588.1388… as 82588.14. A long's is rounded
+    // down by the same rule; the log has no long at less than 100% margin.
+    const tick = ctx.mintick > 0 ? ctx.mintick : 0;
+    if (tick === 0) return price;
+    const decimals = Math.max(0, Math.ceil(-Math.log10(tick) - 1e-9));
+    const steps = price / tick;
+    const snapped = pos.size < 0 ? Math.ceil(steps - 1e-9) : Math.floor(steps + 1e-9);
+    return Number((snapped * tick).toFixed(decimals));
 }
 
 /** @getter */
@@ -1300,7 +437,7 @@ export function closedtrades(ctx: Context): number {
  * @getter
  */
 export function netprofit(ctx: Context): number {
-    return ctx.trades.reduce((total, t) => total + t.pnl, 0);
+    return brokerFor(ctx).reportedNetProfit();
 }
 
 /**
@@ -1383,9 +520,28 @@ export function avg_losing_trade(ctx: Context): number {
     return losses.length === 0 ? NaN : -losses.reduce((s, t) => s + t.pnl, 0) / losses.length;
 }
 
+/**
+ * `strategy.avg_trade_percent` — the mean of each closed trade's result as a
+ * percentage of what it cost to enter (entry price × size).
+ * @getter
+ */
+export function avg_trade_percent(ctx: Context): number {
+    const pct = ctx.trades.map(t => t.pnl / (t.entryPrice * t.qty) * 100).filter(Number.isFinite);
+    return pct.length === 0 ? NaN : pct.reduce((s, x) => s + x, 0) / pct.length;
+}
+
+/**
+ * `strategy.openprofit_percent` — the open position's unrealised result as a
+ * percentage of the initial capital, as `netprofit_percent` is of realised.
+ * @getter
+ */
+export function openprofit_percent(ctx: Context): number {
+    return ctx.initialCapital === 0 ? NaN : (openprofit(ctx) / ctx.initialCapital) * 100;
+}
+
 /** `strategy.avg_trade` — the mean result of ALL closed trades, signed. @getter */
 export function avg_trade(ctx: Context): number {
-    return ctx.trades.length === 0 ? NaN : netprofit(ctx) / ctx.trades.length;
+    return ctx.trades.length === 0 ? NaN : brokerFor(ctx).netProfit() / ctx.trades.length;
 }
 
 /**
@@ -1395,7 +551,7 @@ export function avg_trade(ctx: Context): number {
  * @getter
  */
 export function netprofit_percent(ctx: Context): number {
-    return ctx.initialCapital === 0 ? NaN : (netprofit(ctx) / ctx.initialCapital) * 100;
+    return ctx.initialCapital === 0 ? NaN : (brokerFor(ctx).netProfit() / ctx.initialCapital) * 100;
 }
 
 /** @getter */
@@ -1434,5 +590,4 @@ export const fixed = "strategy.fixed";
 export const cash = "strategy.cash";
 /** Size orders as a PERCENTAGE of available equity. */
 export const percent_of_equity = "strategy.percent_of_equity";
-
 export const __IS_NAMESPACE__ = true;

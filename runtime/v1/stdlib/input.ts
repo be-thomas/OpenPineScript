@@ -12,6 +12,9 @@ export function input(
     // — because the parameter did not exist to match the keyword against.
     minval?: any, maxval?: any, confirm?: any, step?: any, options?: any,
     tooltip?: any, inline?: any, group?: any, display?: any,
+    // v6, July 2025: `active` on every input*() — false greys the control
+    // out. Host-UI metadata like `tooltip`; gated to v6 by V6_ONLY_PARAMS.
+    active?: any,
 ) {
     // Unwrap Series values if they are passed as titles/types (though usually they are literals)
     const unwrap = (x: any) => (x && typeof x.valueOf === 'function') ? x.valueOf() : x;
@@ -20,8 +23,16 @@ export function input(
     const safeType = (type && typeof type.valueOf === 'function') ? type.valueOf() : "float";
 
     const meta: Record<string, any> = { defval: safeDefval };
-    const declared = { minval, maxval, confirm, step, options, tooltip, inline, group, display };
-    for (const [k, v] of Object.entries(declared)) if (v !== undefined) meta[k] = unwrap(v);
+    if (minval !== undefined) meta.minval = unwrap(minval);
+    if (maxval !== undefined) meta.maxval = unwrap(maxval);
+    if (confirm !== undefined) meta.confirm = unwrap(confirm);
+    if (step !== undefined) meta.step = unwrap(step);
+    if (options !== undefined) meta.options = unwrap(options);
+    if (tooltip !== undefined) meta.tooltip = unwrap(tooltip);
+    if (inline !== undefined) meta.inline = unwrap(inline);
+    if (group !== undefined) meta.group = unwrap(group);
+    if (display !== undefined) meta.display = unwrap(display);
+    if (active !== undefined) meta.active = unwrap(active);
 
     return ctx.registerInput(safeDefval, safeTitle, safeType, meta);
 }

@@ -19,6 +19,45 @@ function toHex(n: number): string {
 }
 
 
+/**
+ * `color.from_gradient`. `tvRounding`: TradingView's channel truncation and 0-100 transparency
+ * rounding, probed on v5 (v5-color-gradient) and v6 (color-gradient). v4 was not probed and keeps
+ * the earlier per-channel rounding (`Context`-free: createStdlib swaps it in for v4).
+ */
+function gradient(
+    value: any, bottomValue: any, topValue: any, bottomColor: any, topColor: any, tvRounding: boolean,
+): string {
+        const v = Number(val(value));
+        const lo = Number(val(bottomValue));
+        const hi = Number(val(topValue));
+        const from = String(val(bottomColor));
+        const to = String(val(topColor));
+
+        // A degenerate range has no gradient to walk; Pine answers with the top
+        // colour rather than dividing by zero.
+        if (!Number.isFinite(v) || !Number.isFinite(lo) || !Number.isFinite(hi)) return to;
+        const span = hi - lo;
+        const ratio = span === 0 ? 1 : clamp((v - lo) / span, 0, 1);
+
+        const channel = (hex: string, at: number, fallback: number): number => {
+            if (hex.length < at + 2) return fallback;
+            const n = parseInt(hex.substring(at, at + 2), 16);
+            return Number.isFinite(n) ? n : fallback;
+        };
+        // TradingView truncates each RGB channel (255 * 0.25 = 63.75 -> 63)...
+        const mix = (at: number, fallback = 0): number => (tvRounding ? Math.trunc : Math.round)(
+            channel(from, at, fallback) + (channel(to, at, fallback) - channel(from, at, fallback)) * ratio,
+        );
+        // ...but interpolates transparency in Pine's 0-100 space and rounds it
+        // (70 * 0.25 = 17.5 -> 18). Alpha defaults to opaque for #RRGGBB.
+        const transp = (hex: string): number => Math.round(100 - channel(hex, 7, 255) / 2.55);
+        const t0 = transp(from);
+        const t = Math.round(t0 + (transp(to) - t0) * ratio);
+        const alpha = tvRounding ? Math.round((100 - clamp(t, 0, 100)) * 2.55) : mix(7, 255);
+
+        return `#${toHex(mix(1))}${toHex(mix(3))}${toHex(mix(5))}${toHex(alpha)}`;
+}
+
 const color = {
 
     // --- Functions ---
@@ -87,37 +126,13 @@ const color = {
      * provided reference is not a function".
      *
      * `value` is clamped to [bottom_value, top_value] — outside the range Pine
-     * returns the endpoint colour rather than extrapolating — and each RGBA
-     * channel, transparency included, is interpolated independently.
+     * returns the endpoint colour rather than extrapolating — and RGB
+     * channels truncate while transparency is interpolated in 0-100 space and
+     * rounded (Pine Logs probe color-gradient).
      */
     "from_gradient": (
         value: any, bottomValue: any, topValue: any, bottomColor: any, topColor: any,
-    ): string => {
-        const v = Number(val(value));
-        const lo = Number(val(bottomValue));
-        const hi = Number(val(topValue));
-        const from = String(val(bottomColor));
-        const to = String(val(topColor));
-
-        // A degenerate range has no gradient to walk; Pine answers with the top
-        // colour rather than dividing by zero.
-        if (!Number.isFinite(v) || !Number.isFinite(lo) || !Number.isFinite(hi)) return to;
-        const span = hi - lo;
-        const ratio = span === 0 ? 1 : clamp((v - lo) / span, 0, 1);
-
-        const channel = (hex: string, at: number, fallback: number): number => {
-            if (hex.length < at + 2) return fallback;
-            const n = parseInt(hex.substring(at, at + 2), 16);
-            return Number.isFinite(n) ? n : fallback;
-        };
-        const mix = (at: number, fallback: number): number => Math.round(
-            channel(from, at, fallback) +
-            (channel(to, at, fallback) - channel(from, at, fallback)) * ratio,
-        );
-
-        // Alpha defaults to opaque when a colour is given as #RRGGBB.
-        return `#${toHex(mix(1, 0))}${toHex(mix(3, 0))}${toHex(mix(5, 0))}${toHex(mix(7, 255))}`;
-    },
+    ): string => gradient(value, bottomValue, topValue, bottomColor, topColor, true),
 
     /**
      * color.r / .g / .b / .t
@@ -143,7 +158,7 @@ const color = {
         if (hex.length === 9) {
             const alpha = parseInt(hex.substring(7, 9), 16);
             // Convert Alpha (0-255) back to Transp (100-0)
-            return 100 - (alpha / 2.55);
+            return Math.round(100 - (alpha / 2.55));
         }
         return 0; // Default to opaque (transp 0)
     }
@@ -162,3 +177,8 @@ const color = {
 // come out as `color.new`, which is what Pine spells. registry_keys.test.ts
 // asserts that.
 export default color;
+
+/** v4's `color.from_gradient`: not probed on TradingView, so it keeps per-channel rounding. */
+export const legacyFromGradient = (
+    value: any, bottomValue: any, topValue: any, bottomColor: any, topColor: any,
+): string => gradient(value, bottomValue, topValue, bottomColor, topColor, false);

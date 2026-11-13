@@ -1,0 +1,93 @@
+//@version=4
+// ─────────────────────────────────────────────────────────────────────────────
+// OPS golden harness: v4 strategy.entry / strategy.order with the `long`
+// argument, and strategy.close(id) in a reversal.
+//
+// Pine Logs (log.info) do not exist in v4, so this one cannot log. It plots the
+// state per bar instead, and the trades come from the Strategy Tester.
+//
+// RUN ON : BINANCE:BTCUSDT, 1D (daily), at least 300 bars loaded.
+//
+// COLLECT (two things; the second is the one that cannot be missed):
+//   1. Pine Editor -> paste -> Add to chart. Don't scroll back.
+//   2. Strategy Tester -> "List of Trades": screenshot every row (scroll if
+//      needed), or select all and copy it into a text file. The columns that
+//      matter: trade #, type (Entry long / Exit long / Entry short ...), signal
+//      (the order id), date/time, price, size. Save the screenshot or text as
+//      conformance/v5/parity/harness_strategy_v4_long.trades.png (or .txt).
+//   3. If your plan has "Export chart data...": chart menu -> Export chart data
+//      (time format: ISO or UNIX, either works) -> save as
+//      conformance/v5/parity/harness_strategy_v4_long.BTCUSDT.1D.csv
+//      The plots below are in that CSV (phase, lc, position_size, avg_price,
+//      opentrades, closedtrades, netprofit), and
+//      conformance/common/strategy_v4_golden.test.ts replays it the moment it
+//      exists. Without the CSV the screenshot / list is the evidence.
+//
+// Phases (20 bars each, bar_index only; phase k owns bars 20k..20k+19, lc is
+// bar_index % 20; every phase ends with close_all() on lc 12):
+//   0  entry("Long", long=true) lc 1; entry("Short", long=false) lc 5: a
+//      reversal; position after, and does "Short" close "Long"?
+//   1  entry("Short", long=false) from flat, lc 1: opens a SHORT of qty 1?
+//   2  positional entry("S2", false) lc 1: also a short?
+//   3  entry("Long", true) lc 1; strategy.close("Short") lc 6, a "Short" that
+//      is NOT open: does the long survive?
+//   4  entry("Long", true) lc 1; entry("S2", false) lc 4 (reversal to short);
+//      strategy.close("Short") lc 8 while "S2" is the open short: does it close
+//      S2, or nothing?
+//   5  strategy.order("O", false) lc 1 and strategy.order("P", true, qty=2) lc
+//      4: order() with the long argument, positional and named
+//
+// Fixed quantity 1 (qty is explicit where it differs), commission 0,
+// process_orders_on_close = false (the default), default pyramiding.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("OPS strategy v4 long", overlay = false, default_qty_type = strategy.fixed, default_qty_value = 1,
+     commission_type = strategy.commission.percent, commission_value = 0, initial_capital = 1000000,
+     process_orders_on_close = false)
+
+ph = floor(bar_index / 20)
+lc = bar_index % 20
+
+// 0
+if ph == 0 and lc == 1
+    strategy.entry("Long", long = true)
+if ph == 0 and lc == 5
+    strategy.entry("Short", long = false)
+
+// 1
+if ph == 1 and lc == 1
+    strategy.entry("Short", long = false)
+
+// 2
+if ph == 2 and lc == 1
+    strategy.entry("S2", false)
+
+// 3
+if ph == 3 and lc == 1
+    strategy.entry("Long", true)
+if ph == 3 and lc == 6
+    strategy.close("Short")
+
+// 4
+if ph == 4 and lc == 1
+    strategy.entry("Long", true)
+if ph == 4 and lc == 4
+    strategy.entry("S2", false)
+if ph == 4 and lc == 8
+    strategy.close("Short")
+
+// 5
+if ph == 5 and lc == 1
+    strategy.order("O", false)
+if ph == 5 and lc == 4
+    strategy.order("P", true, qty = 2)
+
+if lc == 12
+    strategy.close_all()
+
+plot(ph, "phase")
+plot(lc, "lc")
+plot(strategy.position_size, "position_size")
+plot(strategy.position_avg_price, "avg_price")
+plot(strategy.opentrades, "opentrades")
+plot(strategy.closedtrades, "closedtrades")
+plot(strategy.netprofit, "netprofit")

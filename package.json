@@ -1,12 +1,13 @@
 {
   "name": "open-pinescript",
   "version": "0.1.0",
-  "description": "Run TradingView Pine Script locally and offline. Compiles Pine Script v1-v5 to JavaScript and executes it against your own OHLCV data, with indicator, plotting and strategy backtesting output verified against TradingView itself.",
+  "description": "Run TradingView Pine Script locally and offline. Compiles Pine Script v1-v6 to JavaScript and executes it against your own OHLCV data, with indicator, plotting and strategy backtesting output verified against TradingView itself.",
   "keywords": [
     "pine-script",
     "pinescript",
     "tradingview",
     "pine-script-v5",
+    "pine-script-v6",
     "trading",
     "backtesting",
     "backtest",
@@ -58,6 +59,7 @@
     "generate:parser:v3": "node scripts/common/build-grammars.mjs v3",
     "generate:parser:v4": "node scripts/common/build-grammars.mjs v4",
     "generate:parser:v5": "node scripts/common/build-grammars.mjs v5",
+    "generate:parser:v6": "node scripts/common/build-grammars.mjs v6",
     "prebuild": "ts-node scripts/common/generate-metadata.ts",
     "build": "npm run generate:parser && node scripts/common/build-dist.mjs",
     "parse": "tsx parser/v2/run_antlr.ts",

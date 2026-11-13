@@ -210,7 +210,7 @@ export const V4_ONLY_NAMES: readonly string[] = [
     // Seconds-based timeframes, and the `is*` member that reports one. The
     // other five `timeframe.is*` are v1–v3 flat names the table below renames;
     // this one never had a flat spelling because seconds postdate them.
-    "timeframe.isseconds",
+    "timeframe.isseconds", "timeframe.isminutes", "timeframe.isdwm", "timeframe.isticks",
 
     // The only two `syminfo.` members that are v4.
     //

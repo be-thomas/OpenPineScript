@@ -29,6 +29,8 @@
 import type { PineVersion } from "../common/version";
 import { V3ToJsVisitor } from "../v3/ToJsVisitor";
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
+import { isProvablyFloat, isPlainNa, isConstNumber } from "../common/passes/TypeRules";
+import { CONST_DEFAULT } from "../../runtime/v1/constDefault";
 import { V4_VIEW } from "../../runtime/v1/stdlib";
 import { V4_RENAMES } from "../../runtime/v1/stdlib/renames";
 import {
@@ -59,6 +61,18 @@ type Persistence = "var" | "varip" | null;
 const REPLACEMENT = new Map<string, string>(
   V4_RENAMES.filter(r => r.from !== undefined).map(r => [r.from!, r.to]),
 );
+
+/** Functions whose second positional argument (or `length=`) is a `series int`. */
+/** The x coordinates of each drawing constructor, with their positional slot. */
+const DRAWING_X_PARAMS: Record<string, { name: string; index: number }[]> = {
+  "label.new": [{ name: "x", index: 0 }],
+  "line.new": [{ name: "x1", index: 0 }, { name: "x2", index: 2 }],
+  "box.new": [{ name: "left", index: 0 }, { name: "right", index: 2 }],
+};
+
+const INT_LENGTH_CALLS = new Set([
+  "sma", "ema", "rma", "wma", "vwma", "hma", "highest", "lowest", "stdev", "rsi",
+]);
 
 export class V4ToJsVisitor extends V3ToJsVisitor {
   protected override readonly version: PineVersion = 4;
@@ -196,6 +210,7 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
    * initialised flag.
    */
   override visitVar_def(ctx: Var_defContext): string {
+    this.enforceDeclarationTypes(ctx);
     const persistence = this.persistenceOf(ctx);
     if (!persistence) return super.visitVar_def(ctx as any);
 
@@ -229,6 +244,151 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
       `'${persistence}' on a tuple declaration is not implemented yet. ` +
       `Declare the elements separately, or drop '${persistence}'.`
     );
+  }
+
+  // ── Type errors TradingView raises at compile time ─────────────────────────
+
+  /** Script-scope names declared with an explicit `int`, bound once. */
+  private readonly declaredInts = new Set<string>();
+
+  /**
+   * "Value with NA type cannot be assigned to a variable that was defined
+   * without type keyword" — `x = na`, and the `b = na` of `var float a = na, b = na`,
+   * where the keyword covers `a` only. v1–v3 accept it, so this lives in v4.
+   *
+   * `int q = close` — a float stored in a declared int. Only when the
+   * initialiser is PROVABLY a float (see TypeRules.ts).
+   */
+  protected enforceDeclarationTypes(ctx: Var_defContext): void {
+    const c = ctx as any;
+    const name = ctx.id().getText();
+    const declared: string | null = (c.field_type?.() ?? c.type_name?.())?.getText() ?? null;
+    const value = ctx.arith_expr();
+
+    if (!declared && !c.decl_mod?.() && !c.type_qual?.() && isPlainNa(value)) {
+      throw this.err(
+        ctx as SourceLocated,
+        `Value with NA type cannot be assigned to a variable that was defined without type keyword.`,
+      );
+    }
+
+    if (declared !== "int") return;
+    if (isProvablyFloat(value, this.scopes)) throw this.err(ctx as SourceLocated, this.declaredIntMessage(name));
+    // Recorded for the `:=` check; a shadowed or function-local name is not.
+    if (!this.scopes.functionScoped.has(name) && this.scopes.scopesOf.get(name)?.length === 1) {
+      this.declaredInts.add(name);
+    }
+  }
+
+  /** TradingView's wording, which differs by version. */
+  protected declaredIntMessage(name: string): string {
+    if (this.version === 4) {
+      return `Variable '${name}' was declared with 'integer' type. Cannot assign it expression of type 'series[float]'.`;
+    }
+    // v5 quotes types with backticks and the name with '; v6 uses " for both.
+    const [type, who] = this.version === 5 ? ["`", "'"] : ['"', '"'];
+    return `Cannot assign a value of the ${type}float${type} type to the ${who}${name}${who} variable. ` +
+           `The variable is declared with the ${type}int${type} type.`;
+  }
+
+  /**
+   * A float argument where a `series int` length is required. The first
+   * positional slot of these functions is the source, so only the second is
+   * read — `ta.highest(10)` has its length first and is left alone.
+   */
+  protected enforceIntLengthArgument(ctx: Fun_callContext): void {
+    const callee = ctx.id().getText();
+    const bare = this.version === 4 ? callee : callee.startsWith("ta.") ? callee.slice(3) : null;
+    if (!bare || !INT_LENGTH_CALLS.has(bare)) return;
+    if (this.scopes.functions.has(callee)) return;
+
+    const args = (ctx as any).fun_actual_args?.();
+    const positional: any[] = args?.pos_args?.()?.children?.filter((x: any) => typeof x?.getChildCount === "function" && !x.symbol) ?? [];
+    const keyword = (args?.kw_args?.()?.kw_arg?.() ?? []).find((k: any) => k.id().getText() === "length");
+    const arg = keyword ? keyword.arith_expr?.() : positional.length >= 2 ? positional[1] : null;
+    if (!arg || !isProvablyFloat(arg, this.scopes)) return;
+
+    throw this.err(
+      ctx as SourceLocated,
+      this.version === 4
+        ? `Cannot call '${callee}' with 'length'=float. The argument should be of type: series[integer]`
+        : `Cannot call '${callee}' with argument 'length'='${arg.getText()}'. ` +
+          `An argument of 'float' type was used but a 'series int' is expected.`,
+    );
+  }
+
+  /**
+   * A float where a drawing constructor's x coordinate (a `series int`) is
+   * required: `label.new(bar_index - 10.7, ...)` is a compile error on v4, v5
+   * and v6. `w / 2` between ints is no proof (see isProvablyFloat), so it still
+   * compiles. The `chart.point` overloads (v5/v6) take points, not coordinates,
+   * so only the 4-coordinate form (4+ positional args, or the x1/x2 keywords)
+   * is read.
+   */
+  protected enforceIntCoordinateArguments(ctx: Fun_callContext): void {
+    const callee = ctx.id().getText();
+    const params = DRAWING_X_PARAMS[callee];
+    if (!params || this.scopes.functions.has(callee)) return;
+
+    const args = (ctx as any).fun_actual_args?.();
+    const positional: any[] = args?.pos_args?.()?.children?.filter((x: any) => typeof x?.getChildCount === "function" && !x.symbol) ?? [];
+    const keywords: any[] = args?.kw_args?.()?.kw_arg?.() ?? [];
+    const kwNamed = (name: string) => keywords.find((k: any) => k.id().getText() === name)?.arith_expr?.() ?? null;
+
+    // label.new is always treated as a coordinate call. On v4 it has only the (x, y, ...) form; v5/v6
+    // also have label.new(chart.point, ...), but there the first argument is a point, which is never
+    // provably a float, so nothing is flagged. The other drawings need 4 coordinates (or the first
+    // coordinate by keyword) to be sure.
+    const coordinateForm = callee === "label.new" || positional.length >= 4 || keywords.some((k: any) => k.id().getText() === params[0].name);
+    if (!coordinateForm) return;
+
+    for (const { name, index } of params) {
+      const arg = kwNamed(name) ?? (positional.length > index ? positional[index] : null);
+      if (!arg || !isProvablyFloat(arg, this.scopes)) continue;
+
+      throw this.err(
+        ctx as SourceLocated,
+        this.version === 4
+          ? `Cannot call '${callee}' with '${name}'=series[float]. The argument should be of type: series[integer]`
+          : `Cannot call '${callee}' with argument '${name}'='${this.describeFloatOperand(arg)}'. ` +
+            `An argument of 'series float' type was used but a 'series int' is expected.`,
+      );
+    }
+  }
+
+  /** TradingView names a binary expression `call 'operator -' (series float)`; anything else is shown as written. */
+  private describeFloatOperand(node: any): string {
+    let n = node;
+    while (n.getChildCount?.() === 1) n = n.getChild(0);
+    if (n.getChildCount?.() === 3 && n.getChild(1).symbol) {
+      return `call 'operator ${n.getChild(1).getText()}' (series float)`;
+    }
+    return node.getText();
+  }
+
+  // `any`: the v1 base types its parameter with the v1 parser's context.
+  override visitFun_call(ctx: any): string {
+    this.enforceIntLengthArgument(ctx);
+    this.enforceIntCoordinateArguments(ctx);
+    return this.markConstTostring(ctx, super.visitFun_call(ctx as any));
+  }
+
+  /**
+   * `tostring(x)` / `str.tostring(x)` of a constant number prints differently
+   * from the same call on a series (runtime/v1/stdlib/str.ts `numberToString`),
+   * and only the source can tell them apart. A call with no format whose
+   * argument is provably constant gets the runtime's CONST_DEFAULT marker in
+   * the format position.
+   */
+  private markConstTostring(ctx: any, emitted: string): string {
+    const name = ctx.id().getText();
+    if ((name !== "tostring" && name !== "str.tostring") || this.userFunctions.has(name)) return emitted;
+    if (ctx.call_suffix?.()?.length || !emitted.endsWith(")")) return emitted;
+    const args = ctx.fun_actual_args?.();
+    if (!args || args.kw_args?.()?.kw_arg?.().length) return emitted;
+    const positional = args.pos_args?.()?.pos_arg?.() ?? [];
+    if (positional.length !== 1 || !isConstNumber(positional[0], this.scopes)) return emitted;
+    return `${emitted.slice(0, -1)}, ${JSON.stringify(CONST_DEFAULT)})`;
   }
 
   // ── Compound assignment ───────────────────────────────────────────────────
@@ -273,6 +433,11 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
    */
   override visitVar_assign(ctx: Var_assignContext): string {
     const op = this.compoundOperatorOf(ctx);
+    const target = ctx.id().getText();
+    if (this.declaredInts.has(target) && !this.scopes.functionScoped.has(target)
+        && isProvablyFloat(ctx.arith_expr(), this.scopes)) {
+      throw this.err(ctx as SourceLocated, this.declaredIntMessage(target));
+    }
     if (!op) return super.visitVar_assign(ctx as any);
 
     this.enforceDeclaredBeforeReassignment(ctx as any);

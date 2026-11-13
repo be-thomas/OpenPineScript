@@ -1,0 +1,4 @@
+//@version=5
+indicator("PE dollar in name")
+my$var = close
+plot(my$var)

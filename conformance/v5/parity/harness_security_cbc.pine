@@ -1,0 +1,46 @@
+//@version=5
+// OPS probe: what calc_bars_count does inside request.security / security_lower_tf.
+// RUN ON : BINANCE:BTCUSDT, 5 minutes (same chart as harness_security_tf). Don't scroll back.
+// SAVE AS: pine-logs-OPS security cbc.csv (Pine Logs -> export)
+//
+// bar_index and ta.cum(1) evaluated INSIDE the requested context show how much
+// history that context has: with calc_bars_count = 50 on "60", does the hourly
+// context start 50 hours before the end (and the chart bars before that get na),
+// or does it see everything?
+indicator("OPS security cbc", overlay = false)
+
+h_bi    = request.security(syminfo.tickerid, "60", bar_index, calc_bars_count = 50)
+h_cum   = request.security(syminfo.tickerid, "60", ta.cum(1), calc_bars_count = 50)
+h_all   = request.security(syminfo.tickerid, "60", bar_index)
+l_cbc   = request.security_lower_tf(syminfo.tickerid, "1", bar_index, calc_bars_count = 200)
+l_all   = request.security_lower_tf(syminfo.tickerid, "1", bar_index)
+
+f(x) => na(x) ? "na" : str.tostring(x, "#.##")
+first(a) => a.size() > 0 ? f(a.get(0)) : "-"
+
+var int naH = 0
+var int firstH = -1
+var int emptyL = 0
+var int firstL = -1
+if na(h_bi)
+    naH += 1
+else if firstH < 0
+    firstH := bar_index
+if l_cbc.size() == 0
+    emptyL += 1
+else if firstL < 0
+    firstL := bar_index
+
+row = str.tostring(bar_index) + "," + str.tostring(time, "#") + "," + f(h_bi) + "," + f(h_cum) + "," + f(h_all) + "," +
+     str.tostring(l_cbc.size()) + "," + first(l_cbc) + "," + str.tostring(l_all.size()) + "," + first(l_all)
+
+if barstate.isfirst
+    log.info("OPSCHEAD|bar_index,time,h_bi,h_cum,h_all,l_cbc_size,l_cbc_first,l_all_size,l_all_first")
+// every 25th bar, the first 30 and last 30 bars, and wherever h_bi or l_cbc changes between na/empty and not
+nowNa = na(h_bi) or l_cbc.size() == 0
+if bar_index < 30 or bar_index % 25 == 0 or nowNa != nowNa[1] or last_bar_index - bar_index < 30
+    log.info("OPSC|" + row)
+if barstate.islast
+    log.info("OPSCSUM|bars=" + str.tostring(bar_index + 1) + ",h_bi_na=" + str.tostring(naH) + ",h_bi_first=" + str.tostring(firstH) +
+         ",l_cbc_empty=" + str.tostring(emptyL) + ",l_cbc_first=" + str.tostring(firstL))
+plot(close)

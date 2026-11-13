@@ -53,6 +53,7 @@ const BARS = [
 
 const HEAD: Record<PineVersion, string> = {
   1: "", 2: "//@version=2\n", 3: "//@version=3\n", 4: "//@version=4\n", 5: "//@version=5\n",
+  6: "//@version=6\n",
 };
 
 /** Runs `body` at `version` over BARS and returns each named variable per bar. */
@@ -86,7 +87,8 @@ interface Probe {
 }
 
 function sourceFor(p: Probe, version: PineVersion): string {
-  return version === 5 ? p.v5 : version === 4 ? p.v4 : p.v1to3;
+  // v6 renames nothing, so a v5 spelling is a v6 spelling.
+  return version >= 5 ? p.v5 : version === 4 ? p.v4 : p.v1to3;
 }
 
 describe("ta.sar seeds on bar 1 at every version", () => {
@@ -131,6 +133,8 @@ describe("ta.vwap restarts every session at every version", () => {
   }
 });
 
+const defaultCapital = (version: PineVersion) => (version === 5 ? 1_000_000 : 100_000);
+
 describe("a strategy's starting capital at every version", () => {
   const byDefault: Probe = {
     v1to3: 'strategy("s")\nc = strategy.initial_capital\n',
@@ -144,10 +148,9 @@ describe("a strategy's starting capital at every version", () => {
   };
 
   for (const version of IMPLEMENTED_VERSIONS) {
-    it(`v${version}: 1,000,000 by default`, () => {
-      // TradingView's figure, read off its own output: the golden strategy
-      // export declares none and reports exactly this before the first fill.
-      expect(runAt(version, sourceFor(byDefault, version), ["c"]).c[0]).toBe(1_000_000);
+    it(`v${version}: ${defaultCapital(version).toLocaleString("en-US")} by default`, () => {
+      // 100,000 everywhere but v5 (1,000,000): dev-docs/tv-parity/_probes/default-capital/ and capital-v2/.
+      expect(runAt(version, sourceFor(byDefault, version), ["c"]).c[0]).toBe(defaultCapital(version));
     });
 
     it(`v${version}: and honours what strategy() declares`, () => {
@@ -177,7 +180,7 @@ describe("market orders fill at the next bar's open at every version", () => {
       // equity on the fill bar is capital + (close - fill price). open[2] is
       // 118 and close[1] is 118 here by coincidence of the data, so bar 2 alone
       // cannot tell the two apart — bar 3 can, and does.
-      const capital = 1_000_000;
+      const capital = defaultCapital(version);
       expect(e[2]).toBeCloseTo(capital + (BARS[2].c - BARS[2].o), 9);
       expect(e[3]).toBeCloseTo(capital + (BARS[3].c - BARS[2].o), 9);
     });

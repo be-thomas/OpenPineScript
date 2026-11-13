@@ -1,0 +1,221 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// OPS golden harness: strategy.exit mixed with strategy.close(id), and a pending
+// entry that pyramiding holds back. Version 5, pyramiding = 3.
+//
+// RUN ON : BINANCE:BTCUSDT, 1D (daily), at least 120 bars loaded.
+// SAVE AS: conformance/v5/parity/harness_strategy_exit_mix.BTCUSDT.1D.csv
+//
+// What it settles. Below v6 this engine books a partial strategy.exit against
+// the entries it sells (the oldest, or those named by from_entry), re-averages
+// the position from what is left, and books strategy.close(id) entry by entry.
+// Whether TradingView's v5 broker does the same, and what it does with a
+// pending entry that pyramiding blocks, is not in any log yet.
+//
+// Phases (tag column), each answering one question:
+//   a   two entries, A qty 2 (lc 1) and B qty 2 (lc 2): exit("x", from_entry =
+//       "B", qty = 1, profit = 1) on lc 5, then close("A") on lc 9. Does the
+//       exit sell from B, not A? What is avg_price after it? Do the two
+//       closed-trade lists and net profit agree with selling B's unit at B's
+//       price and then all of A at A's?
+//   b   three entries A, B, C qty 1 (lc 1, 2, 3), the third being the
+//       pyramiding limit: exit("x", qty = 1, profit = 1) on lc 6 with no
+//       from_entry, then close("B") on lc 9. Which entry does the exit sell
+//       (the oldest?), and is it booked at its own price or at the average?
+//   c   A qty 1 (lc 1), B qty 2 (lc 2): exit("x", profit = 1) on lc 5, no
+//       from_entry and no qty. Both entries sold by the one order: one closed
+//       trade each, or one at the average price?
+//   d   A qty 2 (lc 1), B qty 2 (lc 2): two exit ids on lc 5, "xa" from_entry
+//       "A" qty 1 and "xb" with no from_entry qty 1. Which entries does each
+//       sell, and do both fill on the same bar?
+//   e   A, B, C qty 2 (lc 1, 2, 3): partial exits "x1" from_entry "A" qty 1
+//       (lc 6) and "x2" from_entry "C" qty_percent 50 (lc 8), then close_all()
+//       on lc 10. The trades closed by close_all, and avg_price in between.
+//   f   A, B, C qty 1 (lc 1, 2, 3: pyramiding is at its limit), then on lc 5 two
+//       pending entries in one OCA cancel group "g": P, a long stop 0.2% above
+//       the close (blocked by pyramiding when it triggers), and Q, a short stop
+//       2% below it (a reversal, never blocked). close("A") on lc 9 frees a
+//       slot. Does P stay pending and fill later, or is it dropped? Is Q
+//       cancelled when P is blocked? Read it from open_ids and position_size on
+//       lc 6-13. (Which of them triggers first is the market's: the answer is in
+//       the rows, not in a fixed price.)
+//   Every bar of every phase logs position_size, avg_price, opentrades,
+//   closedtrades, netprofit, and open_ids (the open entries, id:size/...).
+//   "pyramiding 2 and 3" is covered as two and three entries on the way up to
+//   the limit: the declared pyramiding is 3.
+//
+// Fixed quantities (qty is always explicit), commission 0,
+// process_orders_on_close=false. Exits use profit = 1 (one tick above the
+// entry): it fills on the first bar that trades higher, which on BTC daily is
+// the bar after the order.
+// Collect it like this:
+//   1. Pine Editor -> paste -> Add to chart. Don't scroll back, don't change the
+//      timeframe afterwards.
+//   2. Wait for the chart to finish loading (the script reads bars 0-119 only, so
+//      any chart with at least 120 bars works; BINANCE:BTCUSDT daily has ~3,000).
+//   3. More (...) -> Pine Logs -> export (or select all and copy) and save as
+//      the filename below.
+//
+//   OPSMETA / OPSHEAD   script, symbol facts, then the column names, once
+//   OPS|row|row|...     every bar 0-119, as many as fit in 3,900 characters:
+//                       time,open,high,low,close,volume,bar_index,tag,
+//                       position_size,avg_price,opentrades,closedtrades,netprofit,open_ids
+//   OPSLAST             bar 119 again
+//   OPSCOUNT            closed / open trade counts, net profit, position size
+//   OPSCLOSED           every closed trade, entry_id:exit_id:entry_bar:exit_bar:
+//                       entry_price:exit_price:size:profit
+//   OPSOPEN             every open trade, entry_id:entry_bar:entry_price:size:profit
+//
+// Everything happens on bar_index, not price. Phases are 20 bars: phase k owns
+// bars 20k..20k+19; lc below is bar_index % 20. Each phase starts flat and ends
+// with strategy.cancel_all() and strategy.close_all() on lc 12 (fills lc 13);
+// lc 14-19 are the gap.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("OPS strategy exit mix", overlay = true, default_qty_type = strategy.fixed, default_qty_value = 1,
+     pyramiding = 3, commission_type = strategy.commission.percent, commission_value = 0, initial_capital = 1000000,
+     process_orders_on_close = false)
+
+OPS_SCRIPT = "strategy_exit_mix"
+OPS_LAST = 119
+
+ph = math.floor(bar_index / 20)
+lc = bar_index % 20
+var tags = array.from("a", "b", "c", "d", "e", "f")
+string ops_tag = ph < tags.size() ? tags.get(ph) : "-"
+
+// a) exit from one entry, then close the other
+if ph == 0 and lc == 1
+    strategy.entry("A", strategy.long, qty = 2)
+if ph == 0 and lc == 2
+    strategy.entry("B", strategy.long, qty = 2)
+if ph == 0 and lc == 5
+    strategy.exit("x", from_entry = "B", qty = 1, profit = 1)
+if ph == 0 and lc == 9
+    strategy.close("A")
+
+// b) an exit with no from_entry, at the pyramiding limit
+if ph == 1 and lc >= 1 and lc <= 3
+    strategy.entry(lc == 1 ? "A" : lc == 2 ? "B" : "C", strategy.long, qty = 1)
+if ph == 1 and lc == 6
+    strategy.exit("x", qty = 1, profit = 1)
+if ph == 1 and lc == 9
+    strategy.close("B")
+
+// c) one exit, no from_entry, no qty, across two ids
+if ph == 2 and lc == 1
+    strategy.entry("A", strategy.long, qty = 1)
+if ph == 2 and lc == 2
+    strategy.entry("B", strategy.long, qty = 2)
+if ph == 2 and lc == 5
+    strategy.exit("x", profit = 1)
+
+// d) two exit ids
+if ph == 3 and lc == 1
+    strategy.entry("A", strategy.long, qty = 2)
+if ph == 3 and lc == 2
+    strategy.entry("B", strategy.long, qty = 2)
+if ph == 3 and lc == 5
+    strategy.exit("xa", from_entry = "A", qty = 1, profit = 1)
+    strategy.exit("xb", qty = 1, profit = 1)
+
+// e) close_all after partial exits
+if ph == 4 and lc >= 1 and lc <= 3
+    strategy.entry(lc == 1 ? "A" : lc == 2 ? "B" : "C", strategy.long, qty = 2)
+if ph == 4 and lc == 6
+    strategy.exit("x1", from_entry = "A", qty = 1, profit = 1)
+if ph == 4 and lc == 8
+    strategy.exit("x2", from_entry = "C", qty_percent = 50, profit = 1)
+if ph == 4 and lc == 10
+    strategy.close_all()
+
+// f) a pending entry blocked by pyramiding, in an OCA cancel group
+if ph == 5 and lc >= 1 and lc <= 3
+    strategy.entry(lc == 1 ? "A" : lc == 2 ? "B" : "C", strategy.long, qty = 1)
+if ph == 5 and lc == 5
+    strategy.entry("P", strategy.long, qty = 1, stop = close * 1.002, oca_name = "g", oca_type = strategy.oca.cancel)
+    strategy.entry("Q", strategy.short, qty = 1, stop = close * 0.98, oca_name = "g", oca_type = strategy.oca.cancel)
+if ph == 5 and lc == 9
+    strategy.close("A")
+
+if lc == 12
+    strategy.cancel_all()
+    strategy.close_all()
+
+// ── OPS logging block ───────────────────────────────────────────────────────
+ops_f(x) => str.tostring(x, "#.##########")
+
+var ops_heads = array.new_string(0)
+ops_vals = array.new_string(0)
+ops_col(string name, string v) =>
+    if barstate.isfirst
+        ops_heads.push(name)
+    ops_vals.push(v)
+
+ops_col("time", str.tostring(time, "#"))
+ops_col("open", ops_f(open))
+ops_col("high", ops_f(high))
+ops_col("low", ops_f(low))
+ops_col("close", ops_f(close))
+ops_col("volume", ops_f(volume))
+ops_col("bar_index", str.tostring(bar_index))
+ops_col("tag", ops_tag)
+ops_col("position_size", ops_f(strategy.position_size))
+ops_col("avg_price", ops_f(strategy.position_avg_price))
+ops_col("opentrades", str.tostring(strategy.opentrades))
+ops_col("closedtrades", str.tostring(strategy.closedtrades))
+ops_col("netprofit", ops_f(strategy.netprofit))
+string ops_ids = ""
+if strategy.opentrades > 0
+    for k = 0 to strategy.opentrades - 1
+        ops_ids += (k > 0 ? "/" : "") + strategy.opentrades.entry_id(k) + ":" + ops_f(strategy.opentrades.size(k))
+ops_col("open_ids", ops_ids == "" ? "-" : ops_ids)
+
+if barstate.isfirst
+    log.info("OPSMETA|script=" + OPS_SCRIPT + ",version=5,tickerid=" + syminfo.tickerid + ",mintick=" + ops_f(syminfo.mintick) +
+         ",timezone=" + syminfo.timezone + ",timeframe=" + timeframe.period + ",type=" + syminfo.type)
+    log.info("OPSHEAD|" + ops_heads.join(","))
+
+// Pine v5 strings stop at 4,096 characters: a message goes out before the
+// next row would take it past 3,900, so each stays under 4,000 with its prefix.
+var string ops_buf = ""
+ops_active = OPS_LAST < 0 or bar_index <= OPS_LAST
+ops_final = OPS_LAST < 0 ? barstate.islast : bar_index == OPS_LAST
+if barstate.isconfirmed and ops_active
+    ops_next = "|" + ops_vals.join(",")
+    if str.length(ops_buf) + str.length(ops_next) > 3900
+        log.info("OPS" + ops_buf)
+        ops_buf := ""
+    ops_buf := ops_buf + ops_next
+if str.length(ops_buf) > 0 and (barstate.islastconfirmedhistory or barstate.isrealtime or ops_final)
+    log.info("OPS" + ops_buf)
+    ops_buf := ""
+
+// The trade dump, once, on the final bar. Entries are ;-separated, fields :-separated:
+//   closed: entry_id : exit_id : entry_bar_index : exit_bar_index : entry_price : exit_price : size : profit
+//   open:   entry_id : entry_bar_index : entry_price : size : profit
+varip bool ops_dumped = false
+if ops_final and not ops_dumped
+    ops_dumped := true
+    log.info("OPSLAST|" + ops_vals.join(","))
+    ops_nc = strategy.closedtrades
+    ops_no = strategy.opentrades
+    log.info("OPSCOUNT|closed=" + str.tostring(ops_nc) + ",open=" + str.tostring(ops_no) +
+         ",netprofit=" + ops_f(strategy.netprofit) + ",position_size=" + ops_f(strategy.position_size))
+    ops_row = ""
+    if ops_nc > 0
+        for k = 0 to ops_nc - 1
+            ops_row += ";" + strategy.closedtrades.entry_id(k) + ":" + strategy.closedtrades.exit_id(k) + ":" +
+                 str.tostring(strategy.closedtrades.entry_bar_index(k)) + ":" + str.tostring(strategy.closedtrades.exit_bar_index(k)) + ":" +
+                 ops_f(strategy.closedtrades.entry_price(k)) + ":" + ops_f(strategy.closedtrades.exit_price(k)) + ":" +
+                 ops_f(strategy.closedtrades.size(k)) + ":" + ops_f(strategy.closedtrades.profit(k))
+            if str.length(ops_row) > 3700 or k == ops_nc - 1
+                log.info("OPSCLOSED|" + str.tostring(k) + ops_row)
+                ops_row := ""
+    if ops_no > 0
+        for k = 0 to ops_no - 1
+            ops_row += ";" + strategy.opentrades.entry_id(k) + ":" + str.tostring(strategy.opentrades.entry_bar_index(k)) + ":" +
+                 ops_f(strategy.opentrades.entry_price(k)) + ":" + ops_f(strategy.opentrades.size(k)) + ":" +
+                 ops_f(strategy.opentrades.profit(k))
+            if str.length(ops_row) > 3700 or k == ops_no - 1
+                log.info("OPSOPEN|" + str.tostring(k) + ops_row)
+                ops_row := ""

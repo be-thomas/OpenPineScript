@@ -1,0 +1,5 @@
+//@version=5
+indicator("PE string across lines")
+x = "abc
+def"
+plot(close)

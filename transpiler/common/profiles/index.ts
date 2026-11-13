@@ -21,7 +21,7 @@
  * TradingView's official migration guides.
  */
 
-import { PineVersion, DEFAULT_VERSION } from "../version";
+import { PineVersion, DEFAULT_VERSION, implementedVersions } from "../version";
 
 export interface LanguageProfile {
   readonly version: PineVersion;
@@ -44,6 +44,60 @@ export interface LanguageProfile {
      * lets a test assert the constant against itself and call it coverage.
      */
     readonly securityLookahead: "on" | "off";
+
+    /**
+     * ── v6 behavioural flags ──────────────────────────────────────────────
+     *
+     * Optional, and ABSENT on v1–v5 rather than set to a v5 value. Absence is
+     * what "this version predates the question" looks like, and it keeps the
+     * five earlier profile literals byte-identical — so no v5 script can pick
+     * up a v6 default by way of an edit to a shared helper.
+     *
+     * Each is read in exactly one place, named on the field.
+     */
+
+    /**
+     * Colour constants whose VALUE changed, keyed by their dotted name.
+     * MG §"Color changes". Read by createStdlib in runtime/v1/stdlib/index.ts.
+     */
+    readonly palette?: Readonly<Record<string, string>>;
+
+    /**
+     * `time(timeframe)` returns the start of that timeframe's bar, not the
+     * chart bar's own time. Verified for v5 against TradingView's log
+     * (conformance/common/v5_gaps_golden.test.ts). Read by `time()` in
+     * runtime/v1/stdlib/time.ts.
+     */
+    readonly alignsTimeframe?: boolean;
+
+    /**
+     * `timeframe.period` always carries a multiplier: "D" -> "1D".
+     * MG §"Timeframes must include a multiplier". Read by `period()` in
+     * runtime/v1/stdlib/chart.ts.
+     */
+    readonly timeframeAlwaysMultiplied?: boolean;
+
+    /**
+     * Array accessors read -1 as the last element. MG §"Negative indices in
+     * arrays". Read by the index check in runtime/v1/stdlib/arrays.ts.
+     */
+    readonly negativeArrayIndices?: boolean;
+
+    /**
+     * A bool can never be `na`, so history past the start of a bool series is
+     * `false`. MG §"Boolean values cannot be na". Read by Context.get.
+     */
+    readonly boolsCanBeNa?: boolean;
+
+    /**
+     * How many of the most recent closed trades stay inspectable. Older ones
+     * are "trimmed": `strategy.closedtrades.*()` returns na for them and
+     * `strategy.closedtrades.first_index` names the oldest kept. MG §"Excess
+     * orders are trimmed", detailed on the Strategies page's trade-limit
+     * section. Read by `closed()` in runtime/v1/stdlib/trades.ts.
+     */
+    readonly retainedClosedTrades?: number;
+
   };
 }
 
@@ -107,14 +161,85 @@ function profile(version: PineVersion, overrides: Partial<LanguageProfile> = {})
   };
 }
 
+/**
+ * The colour constants whose v5 value differs from the shared stdlib's, as
+ * TradingView reports them through `color.r/g/b` on every bar of the v5 gaps
+ * probe. The other nine — aqua, fuchsia, green, olive, orange, purple, red,
+ * white, yellow — already matched.
+ */
+const V5_PALETTE: Readonly<Record<string, string>> = {
+  "color.black": "#363A45",
+  "color.blue": "#2962FF",
+  "color.gray": "#787B86",
+  "color.lime": "#00E676",
+  "color.maroon": "#880E4F",
+  "color.navy": "#311B92",
+  "color.silver": "#B2B5BE",
+  "color.teal": "#00897B",
+};
+
+/**
+ * v1–v3 named colours, spelled bare (`red`, not `color.red`). Measured on
+ * TradingView per version (dev-docs/tv-parity/_probes/version-scope/
+ * v{1,2,3}-palette-17): the original pure-RGB set, which is neither v4's nor
+ * the shared stdlib's Material values.
+ */
+const V1_PALETTE: Readonly<Record<string, string>> = {
+  "aqua": "#00FFFF",
+  "black": "#000000",
+  "blue": "#0000FF",
+  "fuchsia": "#FF00FF",
+  "gray": "#808080",
+  "green": "#008000",
+  "lime": "#00FF00",
+  "maroon": "#800000",
+  "navy": "#000080",
+  "olive": "#808000",
+  "orange": "#FF7F00",
+  "purple": "#800080",
+  "red": "#FF0000",
+  "silver": "#C0C0C0",
+  "teal": "#008080",
+  "white": "#FFFFFF",
+  "yellow": "#FFFF00",
+};
+
+/**
+ * v4 named colours (dev-docs/tv-parity/_probes/version-scope/v4-palette-17).
+ * Differs from v5 in blue (#2196F3) and from the shared stdlib in seven.
+ */
+const V4_PALETTE: Readonly<Record<string, string>> = {
+  "color.aqua": "#00BCD4",
+  "color.black": "#363A45",
+  "color.blue": "#2196F3",
+  "color.fuchsia": "#E040FB",
+  "color.gray": "#787B86",
+  "color.green": "#4CAF50",
+  "color.lime": "#00E676",
+  "color.maroon": "#880E4F",
+  "color.navy": "#311B92",
+  "color.olive": "#808000",
+  "color.orange": "#FF9800",
+  "color.purple": "#9C27B0",
+  "color.red": "#FF5252",
+  "color.silver": "#B2B5BE",
+  "color.teal": "#00897B",
+  "color.white": "#FFFFFF",
+  "color.yellow": "#FFEB3B",
+};
+
+function withPalette(p: LanguageProfile, palette: Readonly<Record<string, string>>): LanguageProfile {
+  return { ...p, defaults: { ...p.defaults, palette } };
+}
+
 export const LANGUAGE_PROFILES: Readonly<Record<PineVersion, LanguageProfile>> = {
   // v1 and v2 are semantically identical — TradingView states v2 is "fully
   // backwards compatible" with v1, the annotation being the only difference.
-  1: profile(1),
-  2: profile(2),
+  1: withPalette(profile(1), V1_PALETTE),
+  2: withPalette(profile(2), V1_PALETTE),
 
   // The one v2→v3 behaviour change that is neither syntax nor a rejection rule.
-  3: profile(3, { defaults: { scriptDirective: "study", securityLookahead: "off" } }),
+  3: profile(3, { defaults: { scriptDirective: "study", securityLookahead: "off", palette: V1_PALETTE } }),
 
   // v4 INVERTS the bar-counter ban. `n` was renamed to `bar_index`, and the old
   // spelling is gone — a v4 script using `n` gets "Undeclared identifier 'n'"
@@ -127,16 +252,51 @@ export const LANGUAGE_PROFILES: Readonly<Record<PineVersion, LanguageProfile>> =
   4: {
     ...profile(4),
     banned: bannedBarCounter(4),
-    defaults: { scriptDirective: "study", securityLookahead: "off" },
+    defaults: { scriptDirective: "study", securityLookahead: "off", palette: V4_PALETTE },
   },
 
   // v5 keeps v4's bar-counter rename and renames the DIRECTIVE: study()
   // becomes indicator(). securityLookahead stays "off" — v3 flipped it and
   // neither v4 nor v5 flips it back.
+  //
+  // Its palette and `time()` alignment are corrections measured against
+  // TradingView's own Pine Logs (conformance/common/v5_gaps_golden.test.ts):
+  // eight of the seventeen colour constants had stale values. v1–v4 keep
+  // theirs, measured separately (V1_PALETTE, V4_PALETTE).
   5: {
     ...profile(5),
     banned: bannedBarCounter(5),
-    defaults: { scriptDirective: "indicator", securityLookahead: "off" },
+    defaults: {
+      scriptDirective: "indicator",
+      securityLookahead: "off",
+      palette: V5_PALETTE,
+      alignsTimeframe: true,
+    },
+  },
+
+  // v6 renames nothing and keeps v5's bar counter and directive. Its
+  // behavioural differences are added here one at a time, each beside the
+  // consumer that reads it.
+  6: {
+    ...profile(6),
+    banned: bannedBarCounter(6),
+    defaults: {
+      scriptDirective: "indicator",
+      securityLookahead: "off",
+      // v5's palette, then the three constants v6 changed (MG §"Color
+      // changes"). The guide lists only those three, so the rest are v5's.
+      palette: {
+        ...V5_PALETTE,
+        "color.red": "#F23645",
+        "color.teal": "#089981",
+        "color.yellow": "#FDD835",
+      },
+      alignsTimeframe: true,
+      timeframeAlwaysMultiplied: true,
+      negativeArrayIndices: true,
+      boolsCanBeNa: false,
+      retainedClosedTrades: 9000,
+    },
   },
 };
 
@@ -149,8 +309,14 @@ export const DEFAULT_PROFILE = LANGUAGE_PROFILES[DEFAULT_VERSION];
 export class UnimplementedVersionError extends Error {
   constructor(public readonly version: PineVersion) {
     super(
+      // Reads the registered list rather than naming versions inline. The
+      // message used to say "implements v1, v2, v3, v4, and v5" as a literal,
+      // which was correct only for as long as nobody added a version — the
+      // failure mode being a diagnostic that confidently lists the version it
+      // is refusing.
       `Pine Script v${version} support is not yet implemented. ` +
-      `OpenPineScript currently implements v1, v2, v3, v4, and v5.`
+      `This engine currently implements ` +
+      `${implementedVersions().map(v => `v${v}`).join(", ") || "no versions"}.`
     );
     this.name = "UnimplementedVersionError";
   }

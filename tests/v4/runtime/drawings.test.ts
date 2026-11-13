@@ -71,9 +71,12 @@ describe("line", () => {
     expect(ctx.drawings.size).toBe(0);
   });
 
-  it("reading a deleted drawing is an error, not a silent na", () => {
-    expect(() => build("l = line.new(0, 1.0, 5, 2.0)\nline.delete(l)\ny = line.get_y1(l)\n"))
-      .toThrow(/no such drawing/);
+  // TradingView does not raise here: Pine Logs show get_y1 / get_x1 /
+  // get_price on a deleted line are NaN and its setters are ignored
+  // (dev-docs/tv-parity/_probes/na-drawings/parity-deleted-drawings.pine).
+  it("reading a deleted drawing is na, not an error", () => {
+    const ctx = build("l = line.new(0, 1.0, 5, 2.0)\nline.delete(l)\ny = line.get_y1(l)\n");
+    expect(Number.isNaN(value(ctx, "y"))).toBe(true);
   });
 });
 

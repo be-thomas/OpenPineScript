@@ -80,10 +80,11 @@ describe("undeclared identifiers are rejected at compile time", () => {
   it("behaves identically at v1 and v2 — they are the same language", () => {
     const src = "plot(nosuchthing)\n";
     // Normalise the version number and the line — a `//@version` annotation
-    // shifts every line by one, which is the ONLY difference allowed here.
+    // shifts every line by one, which is the ONLY difference allowed here --
+    // and the hint an unversioned script gets, which is about the missing line.
     const at = (n: string) => {
       try { compileScript(n + src); return "accepted"; }
-      catch (e: any) { return e.message.replace(/v\d/, "vN").replace(/@L\d+:/, "@L:"); }
+      catch (e: any) { return e.message.replace(/v\d/, "vN").replace(/@L\d+:/, "@L:").replace(/ This script has no `\/\/@version` line.*$/, ""); }
     };
     expect(at("")).toBe(at("//@version=2\n"));
   });
@@ -103,6 +104,6 @@ describe("built-ins that are Pine but deliberately unimplemented", () => {
     const ctx = new Context(profile);
     const exec = compile(js, ctx, { ctx });
     ctx.setBar(0, 10, 12, 8, 11, 100);
-    expect(() => exec()).toThrow(/'accdist' is a Pine built-in that OpenPineScript does not implement/);
+    expect(() => exec()).toThrow(/'accdist' is a Pine built-in that this engine does not implement/);
   });
 });

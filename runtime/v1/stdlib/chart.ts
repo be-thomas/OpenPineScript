@@ -20,6 +20,12 @@ import { periodIndex, specSeconds as seconds } from "../timeframes";
  * @returns {string} The resolution string.
  */
 export function period(ctx: Context): string {
+  // v6: "timeframe.period always includes a multiplier. On a daily chart it
+  // returns "1D", not "D"" — and a comparison against "D" is false there. A
+  // resolution that is ONLY a unit letter gets the implicit 1 spelled out.
+  if (ctx.profile?.defaults.timeframeAlwaysMultiplied && /^[A-Za-z]+$/.test(String(ctx.resolution))) {
+    return `1${ctx.resolution}`;
+  }
   return ctx.resolution;
 }
 
@@ -147,7 +153,7 @@ export const timeframe = {
     // Largest unit that divides evenly, biggest first — so 604800 is "1W" and
     // not "10080", which is the same duration spelled less usefully.
     const UNITS: Array<[number, string]> = [
-      [2592000, "M"], [604800, "W"], [86400, "D"], [60, ""],
+      [2628003, "M"], [604800, "W"], [86400, "D"], [60, ""],
     ];
     for (const [size, suffix] of UNITS) {
       if (total % size === 0) return `${total / size}${suffix}`;
@@ -191,6 +197,30 @@ export const timeframe = {
    * @returns {bool}
    */
   isseconds: (ctx: Context): boolean => /^\d*S$/.test(String(ctx.resolution).trim().toUpperCase()),
+
+  /**
+   * `timeframe.isminutes` — is the chart's timeframe measured in minutes?
+   * A bare number is minutes in the timeframe format ("1", "60", "240").
+   * @getter
+   * @returns {bool}
+   */
+  isminutes: (ctx: Context): boolean => /^\d+$/.test(String(ctx.resolution).trim()),
+
+  /**
+   * `timeframe.isdwm` — is it days, weeks or months?
+   * @getter
+   * @returns {bool}
+   */
+  isdwm: (ctx: Context): boolean => /^\d*[DWM]$/.test(String(ctx.resolution).trim().toUpperCase()),
+
+  /**
+   * `timeframe.isticks` — is the chart's timeframe measured in ticks ("1T")?
+   * False on every time-based timeframe, which is every one a host charts
+   * today.
+   * @getter
+   * @returns {bool}
+   */
+  isticks: (ctx: Context): boolean => /^\d*T$/.test(String(ctx.resolution).trim().toUpperCase()),
 };
 
 // ─── Day-of-week constants (v1-v3) ─────────────────────────────────────────
@@ -287,7 +317,7 @@ export const HEIKINASHI_PREFIX = "heikinashi:";
  */
 function refuseChartType(name: string, detail: string): never {
   throw new Error(
-    `${name}: OpenPineScript cannot build ${detail} from OHLCV bars — the ` +
+    `${name}: this engine cannot build ${detail} from OHLCV bars — the ` +
     `transform needs intrabar prices this engine is not given, and returning ` +
     `the untransformed symbol would silently produce standard candles. ` +
     `See runtime/v1/stdlib/chart.ts.`,
@@ -390,8 +420,8 @@ export const chart = {
    * "written out literally" note at the top of ./drawings.ts.
    */
   point: {
-    /** `chart.point.new(index, time, price)` — every field given. */
-    new: (index: any, time: any, price: any): ChartPoint => ({
+    /** `chart.point.new(time, index, price)` — every field given. */
+    new: (time: any, index: any, price: any): ChartPoint => ({
       index: Number(val(index)),
       time: Number(val(time)),
       price: Number(val(price)),
@@ -463,6 +493,23 @@ export const chart = {
    * @getter
    */
   is_standard: (_ctx: Context): boolean => IS_STANDARD,
+
+  /**
+   * The non-standard chart types. This engine draws standard candles only,
+   * so each is false — the same fact `is_standard` states from the other side.
+   * @getter
+   */
+  is_heikinashi: (_ctx: Context): boolean => !IS_STANDARD,
+  /** @getter */
+  is_kagi: (_ctx: Context): boolean => !IS_STANDARD,
+  /** @getter */
+  is_linebreak: (_ctx: Context): boolean => !IS_STANDARD,
+  /** @getter */
+  is_pnf: (_ctx: Context): boolean => !IS_STANDARD,
+  /** @getter */
+  is_range: (_ctx: Context): boolean => !IS_STANDARD,
+  /** @getter */
+  is_renko: (_ctx: Context): boolean => !IS_STANDARD,
 
   /**
    * Opening time of the leftmost VISIBLE bar.

@@ -58,7 +58,13 @@ describe("every rename resolves at v4 to the value its v3 spelling had", () => {
    */
   const NOT_VALUE_IDENTICAL = new Set(["syminfo.tickerid"]);
 
-  for (const { to, from } of aliased) {
+  // The named colours were RENAMED at v4 and RE-VALUED too: TradingView draws
+  // v1–v3 `red` as #FF0000 and v4 `color.red` as #FF5252. Their per-version
+  // values are asserted against the probes in
+  // tests/v5/runtime/palette_by_version_tv.test.ts, not compared here.
+  const isColour = (to: string) => /^color\.[a-z]+$/.test(to) && !["color.new", "color.rgb"].includes(to);
+
+  for (const { to, from } of aliased.filter(r => !isColour(r.to))) {
     it(`${from} → ${to}`, () => {
       if (NOT_VALUE_IDENTICAL.has(to)) {
         // The rename still has to RESOLVE, and to the right kind of thing.

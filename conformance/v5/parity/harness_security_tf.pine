@@ -1,0 +1,173 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// OPS golden harness: request.security / request.security_lower_tf on the
+// chart's own timeframe, calc_bars_count, and an invalid lower timeframe.
+//
+// RUN ON : BINANCE:BTCUSDT, 5 minutes. Don't scroll back after adding it.
+//          (If TradingView refuses with an "intrabar limit" error, say so and
+//          rerun on the 15-minute chart; the filename then says 15.)
+// SAVE AS: conformance/v5/parity/harness_security_tf.BTCUSDT.5.csv
+//
+// Collect: Pine Editor -> paste -> Add to chart -> wait for the last bar ->
+// More (...) -> Pine Logs -> export, save as the filename above.
+//
+// Only the last 1000 chart bars are logged (OPS_WIN). Per bar, in this order:
+//   chart     time,open,high,low,close,volume,bar_index
+//   a         sec_empty    security(syminfo.tickerid, "", close)
+//             sec_period   security(syminfo.tickerid, timeframe.period, close)
+//             (the bare close is the `close` column)
+//   b         sma_plain, sma_empty, sma_period: ta.sma(close, 20) plain, and
+//             through security with "" and timeframe.period
+//             (the first 19 logged bars have no 20-bar history in a replay and
+//             are not compared on the sma columns)
+//   c         h50   security(syminfo.tickerid, "60", close, calc_bars_count=50)
+//             -> which chart bars are na? (also OPSSUM: how many, and the time
+//             of the first non-na bar)
+//   d         l1_size,l1_sum,l1_first,l1_last
+//             request.security_lower_tf(syminfo.tickerid, "1", close): the
+//             array's size, sum, first and last element (NaN when empty)
+//   e         l200_size,l200_sum,l200_first,l200_last   the same with
+//             calc_bars_count=200
+//   f         l60_na, l60_size   security_lower_tf(syminfo.tickerid, "60",
+//             close, ignore_invalid_timeframe=true) on a 5m chart: is the
+//             result na (l60_na=1, l60_size=-1) or an empty array (0 and 0)?
+//   data      ht,ho,hh,hl,hc,hv   the 60-minute bar this chart bar is inside
+//             (lookahead_on, so every hour is whole), and lt, lc: the 1-minute
+//             bar times and closes inside this chart bar, "/"-separated.
+//             These exist only so a replay can rebuild the hourly and 1-minute
+//             series from the log.
+//
+//   OPSMETA / OPSHEAD   script, symbol facts, column names (once)
+//   OPS|row|row|...     confirmed bars, as many as fit in 4,000 characters
+//   OPSLAST             the final bar
+//   OPSSUM              counts over the logged bars: na bars of h50, empty
+//                       arrays of l1 and l200, first non-na times
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("OPS security tf", overlay = false)
+
+OPS_WIN = 1000
+
+sec_empty = request.security(syminfo.tickerid, "", close)
+sec_period = request.security(syminfo.tickerid, timeframe.period, close)
+
+sma_plain = ta.sma(close, 20)
+sma_empty = request.security(syminfo.tickerid, "", ta.sma(close, 20))
+sma_period = request.security(syminfo.tickerid, timeframe.period, ta.sma(close, 20))
+
+h50 = request.security(syminfo.tickerid, "60", close, calc_bars_count = 50)
+
+l1 = request.security_lower_tf(syminfo.tickerid, "1", close)
+l200 = request.security_lower_tf(syminfo.tickerid, "1", close, calc_bars_count = 200)
+l60 = request.security_lower_tf(syminfo.tickerid, "60", close, ignore_invalid_timeframe = true)
+
+[ht, ho, hh, hl, hc, hv] = request.security(syminfo.tickerid, "60", [time, open, high, low, close, volume], lookahead = barmerge.lookahead_on)
+[lt, lcl] = request.security_lower_tf(syminfo.tickerid, "1", [time, close])
+
+// ── OPS logging block ───────────────────────────────────────────────────────
+ops_f(x) => str.tostring(x, "#.##########")
+
+f_arr(a) =>
+    na(a) ? "-1,NaN,NaN,NaN" : str.tostring(array.size(a)) + "," + ops_f(array.sum(a)) + "," +
+         (array.size(a) > 0 ? ops_f(array.first(a)) : "NaN") + "," + (array.size(a) > 0 ? ops_f(array.last(a)) : "NaN")
+
+// An intrabar array can hold a whole chart bar of lower-timeframe values (1,440
+// one-minute bars on a daily chart), and a joined string stops at 4,096
+// characters ("String is too long 4101"). So a field is the count, then the
+// first and last 3 elements, "~" between them when the middle is left out:
+// "1440:a/b/c~x/y/z", never more than about 100 characters.
+f_join(a, bool isTime) =>
+    string s = ""
+    int n = na(a) ? 0 : array.size(a)
+    int keep = 3
+    if n > 0
+        s := str.tostring(n) + ":"
+        for i = 0 to n - 1
+            if n <= 2 * keep or i < keep or i >= n - keep
+                s += (i == 0 ? "" : (n > 2 * keep and i == n - keep ? "~" : "/")) + (isTime ? str.tostring(array.get(a, i), "#") : ops_f(array.get(a, i)))
+    s
+
+var ops_heads = array.new_string(0)
+ops_vals = array.new_string(0)
+ops_col(string name, string v) =>
+    if barstate.isfirst
+        ops_heads.push(name)
+    ops_vals.push(v)
+
+ops_col("time", str.tostring(time, "#"))
+ops_col("open", ops_f(open))
+ops_col("high", ops_f(high))
+ops_col("low", ops_f(low))
+ops_col("close", ops_f(close))
+ops_col("volume", ops_f(volume))
+ops_col("bar_index", str.tostring(bar_index))
+ops_col("sec_empty", ops_f(sec_empty))
+ops_col("sec_period", ops_f(sec_period))
+ops_col("sma_plain", ops_f(sma_plain))
+ops_col("sma_empty", ops_f(sma_empty))
+ops_col("sma_period", ops_f(sma_period))
+ops_col("h50", ops_f(h50))
+ops_col("l1_size,l1_sum,l1_first,l1_last", f_arr(l1))
+ops_col("l200_size,l200_sum,l200_first,l200_last", f_arr(l200))
+ops_col("l60_na", na(l60) ? "1" : "0")
+ops_col("l60_size", na(l60) ? "-1" : str.tostring(array.size(l60)))
+ops_col("ht", str.tostring(ht, "#"))
+ops_col("ho", ops_f(ho))
+ops_col("hh", ops_f(hh))
+ops_col("hl", ops_f(hl))
+ops_col("hc", ops_f(hc))
+ops_col("hv", ops_f(hv))
+ops_col("lt", f_join(lt, true))
+ops_col("lc", f_join(lcl, false))
+
+if barstate.isfirst
+    log.info("OPSMETA|script=security_tf,version=5,tickerid=" + syminfo.tickerid + ",mintick=" + ops_f(syminfo.mintick) +
+         ",timezone=" + syminfo.timezone + ",timeframe=" + timeframe.period + ",type=" + syminfo.type)
+    log.info("OPSHEAD|" + ops_heads.join(","))
+
+// Pine v5 strings stop at 4,096 characters: a message goes out before the
+// next row would take it past 3,900, so each stays under 4,000 with its prefix.
+var string ops_buf = ""
+ops_active = bar_index > last_bar_index - OPS_WIN
+if barstate.isconfirmed and ops_active
+    ops_next = "|" + ops_vals.join(",")
+    if str.length(ops_buf) + str.length(ops_next) > 3900
+        log.info("OPS" + ops_buf)
+        ops_buf := ""
+    ops_buf := ops_buf + ops_next
+if str.length(ops_buf) > 0 and (barstate.islastconfirmedhistory or barstate.isrealtime)
+    log.info("OPS" + ops_buf)
+    ops_buf := ""
+
+// Counts over the logged bars only, on confirmed bars.
+var int ops_n = 0
+var int ops_h50_na = 0
+var int ops_l1_empty = 0
+var int ops_l200_empty = 0
+var int ops_l200_na = 0
+var int ops_l60_na = 0
+var int ops_h50_first = 0
+var int ops_l200_first = 0
+if barstate.isconfirmed and ops_active
+    ops_n += 1
+    if na(h50)
+        ops_h50_na += 1
+    else if ops_h50_first == 0
+        ops_h50_first := time
+    if na(l1) or array.size(l1) == 0
+        ops_l1_empty += 1
+    if na(l200)
+        ops_l200_na += 1
+    else if array.size(l200) == 0
+        ops_l200_empty += 1
+    else if ops_l200_first == 0
+        ops_l200_first := time
+    if na(l60)
+        ops_l60_na += 1
+
+varip bool ops_dumped = false
+if barstate.islast and not ops_dumped
+    ops_dumped := true
+    log.info("OPSLAST|" + ops_vals.join(","))
+    log.info("OPSSUM|bars=" + str.tostring(ops_n) + ",h50_na=" + str.tostring(ops_h50_na) + ",h50_first_time=" + str.tostring(ops_h50_first, "#") +
+         ",l1_empty=" + str.tostring(ops_l1_empty) + ",l200_na=" + str.tostring(ops_l200_na) + ",l200_empty=" + str.tostring(ops_l200_empty) +
+         ",l200_first_time=" + str.tostring(ops_l200_first, "#") + ",l60_na_bars=" + str.tostring(ops_l60_na))

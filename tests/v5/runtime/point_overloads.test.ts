@@ -72,7 +72,7 @@ const drawings = (ctx: Context, kind: string) =>
 
 const first = (ctx: Context, kind: string) => drawings(ctx, kind)[0].props;
 
-const P = "a = chart.point.new(1, 100, 20.0)\nb = chart.point.new(4, 400, 25.0)\n";
+const P = "a = chart.point.new(100, 1, 20.0)\nb = chart.point.new(400, 4, 25.0)\n";
 
 describe("line.new(first_point, second_point)", () => {
   it("takes both coordinates from the points", () => {
@@ -140,7 +140,9 @@ describe("box.new(top_left, bottom_right)", () => {
   it("the coordinate form still applies every default", () => {
     const p = first(run("bx = box.new(1, 20.0, 4, 25.0)"), "box");
     expect([p.border_color, p.border_width, p.border_style, p.extend, p.xloc])
-      .toEqual(["#2196F3", 1, "solid", "none", "bar_index"]);
+      // v5's color.blue: TradingView's default border (OpenChartingView
+      // e2e/tradingview-drawings/page2.png draws v5 defaults in #2962FF).
+      .toEqual(["#2962FF", 1, "solid", "none", "bar_index"]);
     expect([p.text, p.text_size, p.text_halign]).toEqual(["", "auto", "center"]);
   });
 
@@ -166,7 +168,8 @@ describe("label.new(point, text)", () => {
   it("keyword arguments bind past the shift", () => {
     const p = first(
       run(P + 'lb = label.new(a, "hi", style = label.style_circle, size = size.large)'), "label");
-    expect([p.style, p.size, p.textcolor]).toEqual(["circle", "large", "#FFFFFF"]);
+    // textcolor defaults to v5's color.black, as TradingView draws it.
+    expect([p.style, p.size, p.textcolor]).toEqual(["circle", "large", "#363A45"]);
   });
 
   it("chart.point.now() is the usual argument, and carries this bar", () => {
@@ -186,6 +189,6 @@ describe("an na placeholder is still na", () => {
     // later. That must keep working: na is not a chart point.
     const p = first(run("var l = line.new(na, na, na, na, color = color.gray)"), "line");
     expect(Number.isNaN(p.x1)).toBe(true);
-    expect(p.color).toBe("#9E9E9E");
+    expect(p.color).toBe("#787B86");   // v5's color.gray, per TradingView's log
   });
 });

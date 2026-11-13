@@ -1,0 +1,101 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// OPS probe: higher-timeframe requests across a REGULAR SESSION.
+//
+// RUN ON : NASDAQ:AAPL, 5 minutes, regular session (no extended hours). Don't
+//          scroll back, don't change the timeframe afterwards.
+// SAVE AS: conformance/v5/parity/harness_security_session.AAPL.5.csv
+//          (Pine Logs -> export)
+//
+// The question: an hourly or daily bar of a stock ends where the SESSION ends,
+// not on a clock boundary. A regular session of 09:30-16:00 New York has 78
+// five-minute bars and its hourly bars start at 09:30, 10:30, ... with a last
+// half-hour bar from 15:30. On which chart bar do the request's values step in:
+//   h60   request.security(syminfo.tickerid, "60", close)
+//   d1    request.security(syminfo.tickerid, "D", close)
+// The session's last hourly bar (15:30-16:00) and the daily bar each end on the
+// last 5-minute bar of the day (15:55). Do h60 and d1 take their new value ON
+// that bar (as the 5-minute log of BTCUSDT does for an hour, in
+// harness_security_tf), or on the first bar of the next session?
+//
+// Each row also logs, so a replay can rebuild the series without other data:
+//   t60, t_close60   the open and close time of the hourly bar in effect
+//                    (lookahead_on: the bar the chart bar is INSIDE)
+//   o60,h60la,l60,c60 and v60  its OHLCV (lookahead_on, so the whole bar)
+//   td, od,hd,ld,cd,vd the same for the daily bar
+//   last_bar         1 on the last bar of the regular session
+//
+//   OPSMETA / OPSHEAD   script, symbol facts, column names (once)
+//   OPS|row|row|...     confirmed bars of the last 1000 (about 13 sessions), as
+//                       many as fit in 3,900 characters
+//   OPSLAST             the final bar
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("OPS security session", overlay = false)
+
+OPS_WIN = 1000
+
+h60 = request.security(syminfo.tickerid, "60", close)
+d1 = request.security(syminfo.tickerid, "D", close)
+
+[t60, tc60, o60, hi60, l60, c60, v60] = request.security(syminfo.tickerid, "60",
+     [time, time_close, open, high, low, close, volume], lookahead = barmerge.lookahead_on)
+[td, od, hid, ld, cd, vd] = request.security(syminfo.tickerid, "D",
+     [time, open, high, low, close, volume], lookahead = barmerge.lookahead_on)
+
+// ── OPS logging block ───────────────────────────────────────────────────────
+ops_f(x) => str.tostring(x, "#.##########")
+
+var ops_heads = array.new_string(0)
+ops_vals = array.new_string(0)
+ops_col(string name, string v) =>
+    if barstate.isfirst
+        ops_heads.push(name)
+    ops_vals.push(v)
+
+ops_col("time", str.tostring(time, "#"))
+ops_col("open", ops_f(open))
+ops_col("high", ops_f(high))
+ops_col("low", ops_f(low))
+ops_col("close", ops_f(close))
+ops_col("volume", ops_f(volume))
+ops_col("bar_index", str.tostring(bar_index))
+ops_col("last_bar", session.islastbar_regular ? "1" : "0")
+ops_col("h60", ops_f(h60))
+ops_col("d1", ops_f(d1))
+ops_col("t60", str.tostring(t60, "#"))
+ops_col("tc60", str.tostring(tc60, "#"))
+ops_col("o60", ops_f(o60))
+ops_col("hi60", ops_f(hi60))
+ops_col("l60", ops_f(l60))
+ops_col("c60", ops_f(c60))
+ops_col("v60", ops_f(v60))
+ops_col("td", str.tostring(td, "#"))
+ops_col("od", ops_f(od))
+ops_col("hid", ops_f(hid))
+ops_col("ld", ops_f(ld))
+ops_col("cd", ops_f(cd))
+ops_col("vd", ops_f(vd))
+
+if barstate.isfirst
+    log.info("OPSMETA|script=security_session,version=5,tickerid=" + syminfo.tickerid + ",mintick=" + ops_f(syminfo.mintick) +
+         ",timezone=" + syminfo.timezone + ",timeframe=" + timeframe.period + ",type=" + syminfo.type + ",session=" + syminfo.session)
+    log.info("OPSHEAD|" + ops_heads.join(","))
+
+// Pine v5 strings stop at 4,096 characters: a message goes out before the
+// next row would take it past 3,900, so each stays under 4,000 with its prefix.
+var string ops_buf = ""
+ops_active = bar_index > last_bar_index - OPS_WIN
+if barstate.isconfirmed and ops_active
+    ops_next = "|" + ops_vals.join(",")
+    if str.length(ops_buf) + str.length(ops_next) > 3900
+        log.info("OPS" + ops_buf)
+        ops_buf := ""
+    ops_buf := ops_buf + ops_next
+if str.length(ops_buf) > 0 and (barstate.islastconfirmedhistory or barstate.isrealtime)
+    log.info("OPS" + ops_buf)
+    ops_buf := ""
+
+varip bool ops_dumped = false
+if barstate.islast and not ops_dumped
+    ops_dumped := true
+    log.info("OPSLAST|" + ops_vals.join(","))

@@ -107,6 +107,11 @@ export interface ScopeInfo {
    */
   tupleArity: ReadonlyMap<string, number>;
   /**
+   * Functions whose body COULD end in a tuple without stating its width —
+   * a call, a switch — so a `[a, b] = f()` against them cannot be refused.
+   */
+  mayReturnTuple: ReadonlySet<string>;
+  /**
    * name → its Pine TYPE, where that is knowable without evaluating anything.
    *
    * v5 dispatches an overloaded method on its receiver: "The underlying type of
@@ -123,6 +128,15 @@ export interface ScopeInfo {
    * shadowing a global would otherwise retype the global.
    */
   staticTypes: ReadonlyMap<string, string>;
+  /**
+   * name → the initialiser of a bare script-scope `name = expr` binding.
+   *
+   * Only the plain form — no `var`/`varip`, no qualifier, no type — because
+   * that is the one whose constness follows from its initialiser alone.
+   * Consulted by `isConstNumber`, which also requires the name to be bound
+   * once and never reassigned.
+   */
+  inits: ReadonlyMap<string, any>;
 }
 
 /** Half-open in neither direction: both token indices are inside the scope. */
@@ -208,6 +222,83 @@ function tupleArityOfIf(node: any): number | null {
   // v4's `else if` puts another if_expr where the else block would be.
   const chained = node.if_expr?.();
   return chained ? tupleArityOfIf(chained) : null;
+}
+
+/**
+ * Could the body end in a tuple? True for a `[ … ]` list, for a call or a
+ * method call in last position (whatever it returns is not visible here), and
+ * for an `if` or `switch` any of whose branches could. False only when every
+ * way out is plainly a single value — the case a `[a, b] = f()` can be refused
+ * for with certainty.
+ */
+function mayReturnTupleContents(contents: any[] | null): boolean {
+  const last = contents?.[contents.length - 1];
+  if (!last) return false;
+  if (last.arith_exprs?.()) return true;
+  const conditional = last.if_expr?.() ?? last.arith_expr?.()?.if_expr?.();
+  if (conditional) return mayReturnTupleIf(conditional);
+  const sw = last.switch_expr?.() ?? last.arith_expr?.()?.switch_expr?.();
+  if (sw) {
+    return (sw.switch_body?.()?.switch_case?.() ?? []).some((c: any) => {
+      const single = c.local_stmt_singleline?.()?.local_stmt_content?.();
+      return single ? mayReturnTupleContents(single) : mayReturnTupleContents(lastContents(c.stmts_block?.()));
+    });
+  }
+  const callsSomething = (n: any): boolean => {
+    if (!n) return false;
+    const kind = n.constructor?.name;
+    if (kind === "Fun_callContext") return true;
+    if (kind === "Call_suffixContext" && n.LPAR?.()) return true;
+    for (let i = 0; i < (n.getChildCount?.() ?? 0); i++) if (callsSomething(n.getChild(i))) return true;
+    return false;
+  };
+  return callsSomething(last);
+}
+
+/**
+ * The width of each way out of an `if` or `switch` that initialises a tuple:
+ * the length of a `[ … ]` it ends in, 1 for a plain expression with no call
+ * in it, and null where the width is not visible here (a call, a loop, a
+ * statement). Nested conditionals contribute their own branches.
+ */
+export function branchTupleWidths(node: any): Array<number | null> {
+  const widths: Array<number | null> = [];
+  const ofContents = (contents: any[] | null) => {
+    const last = contents?.[contents.length - 1];
+    if (!last) return;
+    const list = last.arith_exprs?.();
+    if (list) { widths.push(list.arith_expr?.().length ?? null); return; }
+    const expr = last.arith_expr?.();
+    const inner = expr?.if_expr?.() ?? expr?.switch_expr?.();
+    if (inner) { widths.push(...branchTupleWidths(inner)); return; }
+    widths.push(expr?.ternary_expr?.() && !mayReturnTupleContents(contents) ? 1 : null);
+  };
+  if (node.switch_body) {
+    for (const c of node.switch_body()?.switch_case?.() ?? []) {
+      const single = c.local_stmt_singleline?.()?.local_stmt_content?.();
+      ofContents(single ?? lastContents(c.stmts_block?.()));
+    }
+    return widths;
+  }
+  for (const block of node.stmts_block?.() ?? []) ofContents(lastContents(block));
+  const chained = node.if_expr?.();
+  if (chained) widths.push(...branchTupleWidths(chained));
+  return widths;
+}
+
+function mayReturnTupleIf(node: any): boolean {
+  for (const block of node.stmts_block?.() ?? []) {
+    if (mayReturnTupleContents(lastContents(block))) return true;
+  }
+  const chained = node.if_expr?.();
+  return chained ? mayReturnTupleIf(chained) : false;
+}
+
+function mayReturnTupleBody(node: any): boolean {
+  const single =
+    node.fun_body_singleline?.()?.local_stmt_singleline?.()?.local_stmt_content?.();
+  if (single) return mayReturnTupleContents(single);
+  return mayReturnTupleContents(lastContents(node.fun_body_multiline?.()));
 }
 
 function tupleArityOfBody(node: any): number | null {
@@ -351,7 +442,9 @@ class Collector {
   readonly functionScoped = new Set<string>();
   readonly scopesOf = new Map<string, Array<Span | null>>();
   readonly tupleArity = new Map<string, number>();
+  readonly mayReturnTuple = new Set<string>();
   readonly staticTypes = new Map<string, string>();
+  readonly inits = new Map<string, any>();
 
   /** The local scopes currently open, innermost last. */
   private scopeStack: Array<Span | null> = [];
@@ -385,6 +478,7 @@ class Collector {
           this.record(name);
           const arity = tupleArityOfBody(node);
           if (arity !== null) this.tupleArity.set(name, arity);
+          if (mayReturnTupleBody(node)) this.mayReturnTuple.add(name);
         }
 
         // Parameters belong to the FUNCTION, not to the scope its declaration
@@ -442,6 +536,9 @@ class Collector {
           if (this.fnDepth === 0 && isStaticallyBool(node.arith_expr?.(), this.booleans)) {
             this.booleans.add(name);
           }
+          if (this.fnDepth === 0 && !this.inits.has(name) && node.getChild?.(0) === node.id?.()) {
+            this.inits.set(name, node.arith_expr?.());
+          }
           if (this.fnDepth === 0 && !this.staticTypes.has(name)) {
             // Declared beats inferred: `float x = 1` is a float, whatever the
             // literal says.
@@ -462,6 +559,9 @@ class Collector {
           if (this.fnDepth === 0 && !this.declared.has(name)) {
             this.declared.set(name, positionOf(node));
           }
+          // A destructured LOCAL, as a `var_def` local is: its name says nothing
+          // about the position of a same-named global declared later.
+          if (this.fnDepth > 0) this.functionScoped.add(name);
         }
         break;
       }
@@ -521,6 +621,8 @@ export function analyseScopes(tree: ParseTree | ParserRuleContext): ScopeInfo {
     functionScoped: c.functionScoped,
     scopesOf: c.scopesOf,
     tupleArity: c.tupleArity,
+    mayReturnTuple: c.mayReturnTuple,
     staticTypes: c.staticTypes,
+    inits: c.inits,
   };
 }

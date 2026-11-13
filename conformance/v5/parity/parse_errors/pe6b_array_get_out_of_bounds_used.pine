@@ -1,0 +1,7 @@
+//@version=5
+indicator("PE array.get out of bounds, used")
+a = array.new_float(3, 1.0)
+var float v = 0.0
+if bar_index == 10
+    v := array.get(a, 5)
+plot(v)

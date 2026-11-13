@@ -27,6 +27,7 @@
 export {
     Session,
     runScript,
+    letToVar,
     buildRenderModel,
     PROTOCOL_VERSION,
     ENGINE_VERSION,
@@ -43,6 +44,8 @@ export type {
     Performance,
     PerformanceStats,
     Candle,
+    ChartSettings,
+    RunOptions,
 } from "./runtime/v1/session";
 
 // ── The render model's own types ───────────────────────────────────────────
@@ -68,6 +71,8 @@ export {
 } from "./transpiler/common";
 
 export type { PineVersion, TranspileOptions, CompileResult } from "./transpiler/common";
+export { importsOf, requiredLibraries } from "./transpiler/common/libraries";
+export type { ImportsOptions } from "./transpiler/common/libraries";
 
 // ── The language itself, for an editor ─────────────────────────────────────
 //

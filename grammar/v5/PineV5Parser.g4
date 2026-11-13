@@ -89,7 +89,7 @@ switch_case : ternary_expr? ARROW ( local_stmt_singleline | stmts_block ) ;
  * `(type_name | id)` rather than just `id` because v4 turned the built-in type
  * words into their own tokens, so `float` no longer lexes as an ID.
  */
-field_type : ( type_name | id ) type_args? ;
+field_type : ( type_name | id ) type_args? ( LSQBR RSQBR )? ;
 
 /**
  * `type Name` + an indented list of fields.
@@ -164,9 +164,18 @@ export_stmt : EXPORT ( type_def_stmt | enum_def_stmt | method_def_stmt | fun_def
  * The path is slash-separated, so it lexes as ID DIV ID DIV INT_LITERAL — the
  * same tokens as a division. Nothing else can start with IMPORT, so there is no
  * ambiguity to resolve.
+ *
+ * TradingView usernames may contain `-` (`S-Schmidt`), which lexes as MINUS
+ * between two names, so the user part admits that too; a part may start with
+ * digits (`relax-mop-2fast`, `1CG`), which lex as INT_LITERAL followed by a
+ * name. A `.` needs nothing: `harrell.jordon` is already one dotted `id`. The
+ * compiler keys the library by `getText()` of this rule, which drops
+ * whitespace between tokens.
  */
 import_stmt : IMPORT import_path ( AS id )? ;
-import_path : id ( DIV ( id | INT_LITERAL | FLOAT_LITERAL ) )* ;
+import_path : import_user ( DIV ( id | INT_LITERAL | FLOAT_LITERAL ) )* ;
+import_user : user_part ( MINUS user_part )* ;
+user_part   : id | INT_LITERAL id? ;
 
 /**
  * One parameter of a function or method.
@@ -266,6 +275,15 @@ call_suffix : DOT id ( type_args? LPAR ( fun_actual_args )? RPAR )? ;
 fun_call : id type_args? LPAR ( fun_actual_args )? RPAR call_suffix* ;
 
 /**
+ * A literal or a parenthesised value takes the same suffixes a call's result
+ * does: `"".printLines(…)` and `(na(x) ? a : b).to_sess_string()` call a
+ * method on a value, and published v5 libraries write both. v6 inherits this
+ * rule and needs the parenthesised form: MG §"History of UDT fields" replaces
+ * `obj.field[10]` with `(obj[10]).field`, "with the parentheses required".
+ */
+atom : fun_call | id | literal call_suffix* | LPAR arith_expr RPAR call_suffix* ;
+
+/**
  * A dotted name may END in one of v5's declaration keywords.
  *
  * `syminfo.type` is the case that matters — it is a live built-in, used in six
@@ -298,14 +316,18 @@ fun_head : LPAR ( fun_param ( COMMA fun_param )* )? RPAR ;
 var_def  : decl_mod? type_qual? field_type? id DEFINE arith_expr ;
 var_defs : decl_mod? type_qual? field_type? ids_array DEFINE arith_expr ;
 
-// `as` is a name part so that a script may still bind a variable called `as`;
-// the other four v5 keywords are deliberately absent (see PineV5Lexer.g4).
+// `as`, `type` and `method` are name parts, so a script may still bind a
+// variable or parameter called any of them. `type` and `method` are keywords
+// only where a declaration begins (`type Point`, `method f(…)`): published
+// libraries write `string method = "zscore"`, `f(int type)` and
+// `if method == "Pearson"`, and every one of them compiles on TradingView.
+// `import`, `export` and `enum` stay reserved (see PineV5Lexer.g4).
 id_part
   : ID
   | SERIES | SIMPLE | CONST
   | INT_TYPE | FLOAT_TYPE | BOOL_TYPE | STRING_TYPE | COLOR_TYPE
   | LINE_TYPE | LABEL_TYPE | BOX_TYPE | TABLE_TYPE
-  | AS
+  | AS | TYPE | METHOD
   ;
 
 

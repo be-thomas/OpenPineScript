@@ -12,27 +12,32 @@
  *   v3        import PineV2*       parser/v3         extends V2
  *   v4        import PineV3* + var parser/v4         extends V3
  *   v5        import PineV4* + while/switch  parser/v5   extends V4
+ *   v6        import PineV5* + once/"""      parser/v6   extends V5
  *
  * This module is the ONLY place that maps a version number to a pipeline. It is
  * deliberately un-versioned: it belongs to no single version, and adding v4 must
  * mean adding a row to PIPELINES, never editing v1, v2 or v3.
  */
-import { parse as parseV1 } from "../../parser/v1";
+import { parse as parseV1, type ParserError } from "../../parser/v1";
 import { parse as parseV2 } from "../../parser/v2";
 import { parse as parseV3 } from "../../parser/v3";
 import { parse as parseV4 } from "../../parser/v4";
 import { parse as parseV5 } from "../../parser/v5";
+import { parse as parseV6 } from "../../parser/v6";
 import { V1ToJsVisitor } from "../v1/ToJsVisitor";
 import { V2ToJsVisitor } from "../v2/ToJsVisitor";
 import { V3ToJsVisitor } from "../v3/ToJsVisitor";
 import { V4ToJsVisitor } from "../v4/ToJsVisitor";
 import { V5ToJsVisitor } from "../v5/ToJsVisitor";
+import { V6ToJsVisitor } from "../v6/ToJsVisitor";
 import {
   detectVersion,
+  hasVersionLine,
   PineVersion,
   KNOWN_VERSIONS,
   registerImplementedVersions,
 } from "./version";
+import { explainParseErrors, explainEndOfFile, NO_VERSION_HINT } from "./parseErrors";
 import { LanguageProfile, profileFor, UnimplementedVersionError } from "./profiles";
 
 /** One version's complete front end. */
@@ -54,7 +59,8 @@ const PIPELINES: Readonly<Record<PineVersion, Pipeline | null>> = {
   4: { parse: parseV4, createVisitor: () => new V4ToJsVisitor() },
   // v5 is the first version whose emitter needs anything from the CALLER: an
   // `import` names a library this engine cannot fetch, so the host supplies it.
-  5: { parse: parseV5, createVisitor: opts => new V5ToJsVisitor({ libraries: opts.libraries }) },
+  5: { parse: parseV5, createVisitor: opts => new V5ToJsVisitor({ libraries: opts.libraries, editorRules: opts.editorRules }) },
+  6: { parse: parseV6, createVisitor: opts => new V6ToJsVisitor({ libraries: opts.libraries, editorRules: opts.editorRules }) },
 };
 
 /** Versions with a working pipeline, ascending. */
@@ -84,6 +90,12 @@ export interface TranspileOptions {
    * than stubbed out.
    */
   libraries?: Readonly<Record<string, string>>;
+
+  /**
+   * Apply the checks TradingView's chart editor makes (v5/v6 only). `Session`
+   * sets it; a bare transpile leaves it off so fixtures can be partial scripts.
+   */
+  editorRules?: boolean;
 }
 
 export interface CompileResult {
@@ -104,19 +116,31 @@ export function compileScript(source: string, opts: TranspileOptions = {}): Comp
   if (!pipeline) throw new UnimplementedVersionError(version);
 
   const { tree, errorCount, errors } = pipeline.parse(source);
+  const noVersionLine = opts.version === undefined && !hasVersionLine(source);
+  const parsesAsNewer = () => ([5, 6] as const).some(v => PIPELINES[v]!.parse(source).errorCount === 0);
 
   if (errorCount > 0) {
     const error = new Error(`Pine Script v${version}: parsing failed with ${errorCount} error(s)`);
-    (error as any).errors = errors;
+    (error as any).errors = explainParseErrors(source, errors as ParserError[], { noVersionLine, parsesAsNewer });
     (error as any).version = version;
     throw error;
   }
 
-  return {
-    js: pipeline.createVisitor(opts).visit(tree),
-    version,
-    profile: profileFor(version),
-  };
+  let js: string;
+  try {
+    js = pipeline.createVisitor(opts).visit(tree);
+  } catch (e: any) {
+    const more = typeof e?.message === "string" ? explainEndOfFile(source, e.message) : null;
+    if (more) e.message = `${e.message} ${more}`;
+    if (noVersionLine && typeof e?.message === "string" && parsesAsNewer()) {
+      // TradingView's own words for a v5 script read as v1 (pe3_no_version_v5_body.png).
+      const call = /Undeclared identifier '(indicator|strategy|library)'/.exec(e.message)?.[1];
+      if (call) e.detail = `${e.message} — TradingView: Could not find function or function reference '${call}'.`;
+      e.message += NO_VERSION_HINT;
+    }
+    throw e;
+  }
+  return { js, version, profile: profileFor(version) };
 }
 
 /**
@@ -127,6 +151,15 @@ export function compileScript(source: string, opts: TranspileOptions = {}): Comp
  */
 export function transpile(source: string, opts: TranspileOptions = {}): string {
   return compileScript(source, opts).js;
+}
+
+/**
+ * The hint for an error found after the transpiler, on the compile dry run: ""
+ * unless the source has no `//@version` line and parses as v5 or v6.
+ */
+export function noVersionHint(source: string): string {
+  const parsesAsNewer = ([5, 6] as const).some(v => PIPELINES[v]!.parse(source).errorCount === 0);
+  return !hasVersionLine(source) && parsesAsNewer ? NO_VERSION_HINT : "";
 }
 
 export { detectVersion } from "./version";

@@ -150,6 +150,20 @@ describe("transp= was deprecated, not removed", () => {
   });
 });
 
+describe("strategy.long / strategy.short cannot be a `when`", () => {
+  // Migration guide to v5: a direction constant is not a condition.
+  const STRAT = '//@version=5\nstrategy("t")\n';
+  it("is an error, naming the call", () => {
+    expect(() => compileScript(`${STRAT}strategy.entry("L", strategy.long, when = strategy.long)\n`))
+      .toThrow(/strategy\.long' is a direction, not a condition.*strategy\.entry/);
+    expect(() => compileScript(`${STRAT}strategy.order("S", strategy.short, when = strategy.short)\n`))
+      .toThrow(/strategy\.short' is a direction/);
+  });
+  it("a real condition is fine", () => {
+    expect(() => compileScript(`${STRAT}strategy.entry("L", strategy.long, when = close > open)\n`)).not.toThrow();
+  });
+});
+
 describe("strategy.exit() must be able to fill", () => {
   const STRAT = '//@version=5\nstrategy("t")\n';
 
@@ -331,11 +345,17 @@ describe("the v5 declaration keywords are keywords now", () => {
     expect(() => compileScript(`${HEAD}x = syminfo.type\n`)).not.toThrow();
   });
 
-  it("...but a keyword still cannot BEGIN one", () => {
-    // Which is what keeps `type Point` a type declaration rather than two
-    // identifiers. `id` requires an ordinary `id_part` first.
-    expect(() => compileScript(`${HEAD}x = type.foo\n`)).toThrow();
-    expect(() => compileScript(`${HEAD}type = 5\n`)).toThrow(/parsing failed/);
+  it("`type` and `method` declare only where a declaration begins, and are names elsewhere", () => {
+    // Published libraries write `string method = "zscore"`, `f(int type)` and
+    // `if method == "Pearson"`, and they compile on TradingView, so the two
+    // words are contextual: `type Point` and `method f(…)` still declare, and
+    // anywhere else each is an ordinary name. This used to assert that
+    // `type = 5` failed to parse, on the assumption that v5 reserved the word.
+    expect(() => compileScript(`${HEAD}type = 5\nplot(type)\n`)).not.toThrow();
+    expect(() => compileScript(`${HEAD}f(string method) => method == "a"\nx = f("a")\n`)).not.toThrow();
+    expect(() => compileScript(`${HEAD}type P\n    float v\nmethod twice(P p) => p.v * 2\nx = P.new(1).twice()\n`)).not.toThrow();
+    // `import` and `export` stay reserved.
+    expect(() => compileScript(`${HEAD}export = 5\n`)).toThrow();
   });
 });
 

@@ -1,0 +1,129 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// v6 conformance probe 2 of 3 — the broker: every v6 strategy rule that moves
+// a fill, in one 120-bar cycle that repeats for the whole chart.
+//
+//   1. Add to a BINANCE:BTCUSDT chart on the 1-minute timeframe, at or under
+//      10,000 bars. Leave the strategy's Properties at their defaults — the
+//      v6 defaults are the thing under test.
+//   2. More (⋮) → Pine Logs, select all, copy.
+//   3. Save as conformance/v6/golden/harness_v6_strategy.BTCUSDT.1.log
+//
+// The cycle (c = bar_index % 120; odd and even cycles swap which level is the
+// nearer one, so both halves of each pair get exercised):
+//
+//   c = 0     long "L", 60% of equity. Two exits share it:
+//               XL1  half the position: profit (ticks) AND limit (price),
+//                    loss (ticks) AND stop (price)
+//               XL2  the rest: the same pairs set wider
+//             MG "strategy.exit() evaluates parameter pairs": the level that
+//             triggers first wins, where v5 always took limit/stop
+//   c = 59    whatever is left of L is closed
+//   c = 62    long "BIG" at 150% of equity. MG: margin_long now defaults to
+//             100, so an order the account cannot fund is not filled
+//   c = 64    BIG closed, if it ever opened
+//   c = 66    short "S" at 99.5% of equity. At 100% margin a ~0.25% rise
+//             leaves funds below the requirement: MG "margin call" — the
+//             position is partly liquidated under the comment "Margin call"
+//   c = 66–115  trailing exit XS: trail_points AND trail_price (another
+//             pair), with trail_offset
+//   c = 116   whatever is left of S is closed
+//
+// Commission is 0.02% a side, so equity, the margin test and the liquidation
+// size all carry it.
+//
+// closed_now lists every trade that closed on this bar, so two closes on one
+// bar cannot hide behind each other:
+//   entry_id:exit_id:exit_comment:entry_price:exit_price:size:profit:commission:entry_bar:exit_bar
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("OPS v6 strategy probe", overlay = true, initial_capital = 100000,
+     commission_type = strategy.commission.percent, commission_value = 0.02)
+
+f(x) => str.tostring(x, "#.##########")
+s(string x) => na(x) ? "na" : x
+
+var heads = array.new_string(0)
+vals = array.new_string(0)
+col(string name, string v) =>
+    if barstate.isfirst
+        heads.push(name)
+    vals.push(v)
+
+c = bar_index % 120
+odd = math.floor(bar_index / 120) % 2 == 1
+flat = strategy.position_size == 0
+ref = flat ? close : strategy.position_avg_price
+ticks(float frac) => math.round(ref * frac / syminfo.mintick)
+
+// ── Long: two exits, each with a profit/limit and a loss/stop pair ───────────
+if c == 0 and flat
+    strategy.entry("L", strategy.long, qty = math.round(strategy.equity * 0.6 / close, 3))
+if c < 59
+    strategy.exit("XL1", "L", qty_percent = 50,
+         profit = ticks(odd ? 0.004 : 0.0015), limit = ref * (1 + (odd ? 0.0015 : 0.004)),
+         loss = ticks(odd ? 0.002 : 0.005), stop = ref * (1 - (odd ? 0.005 : 0.002)),
+         comment_profit = "TP1", comment_loss = "SL1", comment = "X1")
+    strategy.exit("XL2", "L",
+         profit = ticks(odd ? 0.008 : 0.003), limit = ref * (1 + (odd ? 0.003 : 0.008)),
+         loss = ticks(odd ? 0.003 : 0.006), stop = ref * (1 - (odd ? 0.006 : 0.003)),
+         comment_profit = "TP2", comment_loss = "SL2", comment = "X2")
+if c == 59
+    strategy.close("L", comment = "L-time")
+
+// ── An entry the account cannot fund ─────────────────────────────────────────
+if c == 62 and flat
+    strategy.entry("BIG", strategy.long, qty = math.round(strategy.equity * 1.5 / close, 3))
+if c == 64
+    strategy.close("BIG", comment = "BIG-time")
+
+// ── Short at nearly all of equity: margin calls, and a trailing pair ─────────
+if c == 66 and flat
+    strategy.entry("S", strategy.short, qty = math.round(strategy.equity * 0.995 / close, 3))
+if c >= 66 and c < 116
+    strategy.exit("XS", "S",
+         trail_points = ticks(odd ? 0.003 : 0.001), trail_price = ref * (1 - (odd ? 0.001 : 0.003)),
+         trail_offset = ticks(0.0008), comment_trailing = "TR", comment = "XS")
+if c == 116
+    strategy.close("S", comment = "S-time")
+
+// ── What closed on this bar ──────────────────────────────────────────────────
+var int seen = 0
+closedNow = ""
+n = strategy.closedtrades
+if n > seen
+    for i = seen to n - 1
+        closedNow += (i > seen ? ";" : "") +
+             s(strategy.closedtrades.entry_id(i)) + ":" + s(strategy.closedtrades.exit_id(i)) + ":" +
+             s(strategy.closedtrades.exit_comment(i)) + ":" +
+             f(strategy.closedtrades.entry_price(i)) + ":" + f(strategy.closedtrades.exit_price(i)) + ":" +
+             f(strategy.closedtrades.size(i)) + ":" + f(strategy.closedtrades.profit(i)) + ":" +
+             f(strategy.closedtrades.commission(i)) + ":" +
+             str.tostring(strategy.closedtrades.entry_bar_index(i)) + ":" +
+             str.tostring(strategy.closedtrades.exit_bar_index(i))
+    seen := n
+
+col("time", str.tostring(time, "#"))
+col("open", f(open))
+col("high", f(high))
+col("low", f(low))
+col("close", f(close))
+col("volume", f(volume))
+col("bar_index", str.tostring(bar_index))
+col("position_size", f(strategy.position_size))
+col("position_avg_price", f(strategy.position_avg_price))
+col("equity", f(strategy.equity))
+col("netprofit", f(strategy.netprofit))
+col("openprofit", f(strategy.openprofit))
+col("closedtrades", str.tostring(strategy.closedtrades))
+col("opentrades", str.tostring(strategy.opentrades))
+col("first_index", str.tostring(strategy.closedtrades.first_index))
+col("margin_liquidation_price", f(strategy.margin_liquidation_price))
+col("closed_now", closedNow)
+
+if barstate.isfirst
+    log.info("OPSMETA|tickerid=" + syminfo.tickerid + ",mintick=" + f(syminfo.mintick) +
+         ",mincontract=" + f(syminfo.mincontract) + ",pointvalue=" + f(syminfo.pointvalue) +
+         ",timezone=" + syminfo.timezone + ",currency=" + syminfo.currency +
+         ",basecurrency=" + syminfo.basecurrency + ",type=" + syminfo.type + ",isin=" + syminfo.isin)
+    log.info("OPSHEAD|" + heads.join(","))
+log.info("OPS|" + vals.join(","))

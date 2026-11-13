@@ -1,0 +1,75 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// v6 conformance probe 3 of 3 — request.footprint() (RN January 2026).
+//
+// Needs a Premium or Ultimate plan. On any other plan TradingView stops on
+// bar 0 with "This script uses volume footprints, which are available to only
+// Premium and Ultimate plans", and there is nothing to collect: skip it. The
+// other two probes do not depend on it.
+//
+//   1. Add to a BINANCE:BTCUSDT chart on the 1-minute timeframe, at or under
+//      10,000 bars.
+//   2. More (⋮) → Pine Logs, select all, copy.
+//   3. Save as conformance/v6/golden/harness_v6_footprint.BTCUSDT.1.log
+//
+// fp_rows is TradingView's own ladder, every row of every bar:
+//   down_price:up_price:buy_volume:sell_volume:imbalance
+// where imbalance is "B", "S", "BS" or empty. The replay feeds the engine the
+// row volumes and checks everything the engine DERIVES from them: the row
+// boundaries, the Point of Control, the Value Area at the default 70%, the
+// imbalances at the default 300%, and the totals. Those rules are the ones
+// runtime/v1/stdlib/footprint.ts lists as chosen rather than documented.
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("OPS v6 footprint probe", overlay = true)
+
+f(x) => str.tostring(x, "#.##########")
+
+var heads = array.new_string(0)
+vals = array.new_string(0)
+col(string name, string v) =>
+    if barstate.isfirst
+        heads.push(name)
+    vals.push(v)
+
+// 1000 ticks of 0.01 = 10 USDT rows, a handful per 1-minute bar.
+fp = request.footprint(1000)
+
+rowsS = "na"
+pocS = "na"
+vahS = "na"
+valS = "na"
+totS = "na"
+if not na(fp)
+    rowsS := ""
+    for [i, r] in footprint.rows(fp)
+        rowsS += (i > 0 ? ";" : "") + f(volume_row.down_price(r)) + ":" + f(volume_row.up_price(r)) + ":" +
+             f(volume_row.buy_volume(r)) + ":" + f(volume_row.sell_volume(r)) + ":" +
+             (volume_row.has_buy_imbalance(r) ? "B" : "") + (volume_row.has_sell_imbalance(r) ? "S" : "")
+    poc = footprint.poc(fp)
+    vah = footprint.vah(fp)
+    val = footprint.val(fp)
+    pocS := f(volume_row.down_price(poc)) + ":" + f(volume_row.up_price(poc)) + ":" + f(volume_row.total_volume(poc)) + ":" + f(volume_row.delta(poc))
+    vahS := f(volume_row.down_price(vah)) + ":" + f(volume_row.up_price(vah))
+    valS := f(volume_row.down_price(val)) + ":" + f(volume_row.up_price(val))
+    totS := f(footprint.total_volume(fp)) + ":" + f(footprint.buy_volume(fp)) + ":" + f(footprint.sell_volume(fp)) + ":" + f(footprint.delta(fp))
+
+col("time", str.tostring(time, "#"))
+col("open", f(open))
+col("high", f(high))
+col("low", f(low))
+col("close", f(close))
+col("volume", f(volume))
+col("bar_index", str.tostring(bar_index))
+col("fp_rows", rowsS)
+col("fp_poc[down;up;total;delta]", pocS)
+col("fp_vah[down;up]", vahS)
+col("fp_val[down;up]", valS)
+col("fp_total[total;buy;sell;delta]", totS)
+
+if barstate.isfirst
+    log.info("OPSMETA|tickerid=" + syminfo.tickerid + ",mintick=" + f(syminfo.mintick) +
+         ",mincontract=" + f(syminfo.mincontract) + ",pointvalue=" + f(syminfo.pointvalue) +
+         ",timezone=" + syminfo.timezone + ",currency=" + syminfo.currency +
+         ",basecurrency=" + syminfo.basecurrency + ",type=" + syminfo.type + ",isin=" + syminfo.isin)
+    log.info("OPSHEAD|" + heads.join(","))
+log.info("OPS|" + vals.join(","))

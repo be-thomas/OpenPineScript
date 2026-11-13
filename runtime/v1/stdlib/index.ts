@@ -1,4 +1,6 @@
 import { Context } from "../context";
+import { safe_add } from "./core";
+import { PineRuntimeError } from "./errors";
 import { getGeneratedRegistry, StdlibEntry } from "./metadata";
 import {
     V4_RENAMES, V4_REMOVED, V4_ONLY_NAMESPACES, V4_ONLY_NAMES, RenameSpec,
@@ -6,6 +8,7 @@ import {
 import {
     V5_RENAMES, V5_REMOVED, V5_ONLY_NAMESPACES, V5_ONLY_NAMES,
 } from "./renames5";
+import { V6_ONLY_NAMESPACES, V6_ONLY_NAMES, V6_REMOVED } from "./renames6";
 
 /**
  * ── Version-scoped registry views ───────────────────────────────────────────
@@ -39,6 +42,8 @@ const v4OnlyNamespaces = new Set(V4_ONLY_NAMESPACES);
 const v4OnlyNames = new Set(V4_ONLY_NAMES);
 const v5OnlyNamespaces = new Set(V5_ONLY_NAMESPACES);
 const v5OnlyNames = new Set(V5_ONLY_NAMES);
+const v6OnlyNamespaces = new Set(V6_ONLY_NAMESPACES);
+const v6OnlyNames = new Set(V6_ONLY_NAMES);
 
 /** The root of a dotted key, or the key itself when it is flat. */
 const rootOf = (key: string): string => key.split(".")[0];
@@ -76,6 +81,20 @@ function isV5Only(key: string): boolean {
     return key !== root && v5OnlyNamespaces.has(root);
 }
 
+/**
+ * True when `key` arrives at v6 and must not appear in any earlier view.
+ *
+ * Checked FIRST by every earlier view, and deliberately not by `isV5Only` or
+ * `isV4Only` — those answer "does this belong to v4/v5", and a v6 name belongs
+ * to neither. Folding it into one of them would make the three predicates
+ * disagree about what their own question means.
+ */
+function isV6Only(key: string): boolean {
+    if (v6OnlyNames.has(key)) return true;
+    const root = rootOf(key);
+    return key !== root && v6OnlyNamespaces.has(root);
+}
+
 /** Selects the generated entries a predicate accepts. */
 function select(accept: (key: string) => boolean): Record<string, StdlibEntry> {
     const out: Record<string, StdlibEntry> = {};
@@ -95,13 +114,18 @@ function select(accept: (key: string) => boolean): Record<string, StdlibEntry> {
  * them.
  */
 export const BASE_REGISTRY: Record<string, StdlibEntry> =
-    select(key => !isV4Only(key) && !isV5Only(key));
+    select(key => !isV4Only(key) && !isV5Only(key) && !isV6Only(key));
 
 /** The v4-only names, kept aside so v4's view can add them back. */
-export const V4_NAMESPACE_REGISTRY: Record<string, StdlibEntry> = select(isV4Only);
+// Neither takes a v6-only key, even one whose ROOT is a v4 or v5 namespace:
+// `text.format_bold` is a member of v4's `text`, and selecting by root alone
+// made it spellable at v4 and v5.
+export const V4_NAMESPACE_REGISTRY: Record<string, StdlibEntry> =
+    select(key => isV4Only(key) && !isV6Only(key));
 
 /** The v5-only names, kept aside so v5's view can add them back. */
-export const V5_NAMESPACE_REGISTRY: Record<string, StdlibEntry> = select(isV5Only);
+export const V5_NAMESPACE_REGISTRY: Record<string, StdlibEntry> =
+    select(key => isV5Only(key) && !isV6Only(key));
 
 /**
  * Builds an alias table: each new spelling inherits its source entry wholesale.
@@ -224,11 +248,27 @@ const V5_CASTS: Record<string, StdlibEntry> = castsFor(["linefill"]);
 /** Everything under `cast.` — present so it can be excluded, never spelled. */
 const CAST_KEYS = Object.keys(V4_NAMESPACE_REGISTRY).filter(k => k.startsWith("cast."));
 
+/**
+ * v4's `format.*` constants and its two-argument `tostring(x, format)`.
+ *
+ * TradingView v4 compiles `tostring(close, format.mintick)`, `format.volume`,
+ * `format.percent`, `format.price`, `format.inherit` and `"#.##"` patterns and
+ * prints exactly what v5's `str.tostring` prints for the same arguments
+ * (dev-docs/tv-parity/_probes/version-scope/v4-draw-fmt, v4-tostring-default,
+ * 2026-11-12). The base `tostring` took one argument and ignored the format.
+ * v1–v3 keep the base entry: unprobed there.
+ */
+const V4_FORMAT: Record<string, StdlibEntry> = {
+    ...Object.fromEntries(Object.entries(V5_NAMESPACE_REGISTRY).filter(([k]) => k.startsWith("format."))),
+    tostring: V5_NAMESPACE_REGISTRY["str.tostring"],
+};
+
 export const V4_VIEW: Record<string, StdlibEntry> = {
     ...without(BASE_REGISTRY, V4_REMOVED),
     ...without(V4_NAMESPACE_REGISTRY, CAST_KEYS),
     ...V4_REGISTRY,
     ...V4_CASTS,
+    ...V4_FORMAT,
 };
 
 export const V5_REGISTRY: Record<string, StdlibEntry> =
@@ -241,6 +281,34 @@ export const V5_VIEW: Record<string, StdlibEntry> = {
     ...V5_REGISTRY,
     ...V4_CASTS,
     ...V5_CASTS,
+};
+
+/**
+ * The v6-only names, kept out of every earlier view and added back here.
+ *
+ * Built from GENERATED rather than from a literal, so a name on the v6 list
+ * that nothing implements yet is simply absent — rather than a registry entry
+ * pointing at nothing, which would compile and then fail at run time.
+ */
+export const V6_REGISTRY: Record<string, StdlibEntry> = select(isV6Only);
+
+/**
+ * What a v6 script may spell.
+ *
+ * v6 is the first version since v3 that renames nothing. Its registry delta is
+ * entirely SUBTRACTIVE plus a handful of new members, so this view is built
+ * the same way V5_VIEW is — remove, then add — with an empty rename table.
+ *
+ * The removals are the migration guide's: `transp` off the six plotting
+ * functions, `when` off the seven strategy functions. Those are PARAMETERS
+ * rather than registry keys, so they are enforced by the emitter, which can
+ * name the line; see transpiler/v6/ToJsVisitor.ts. Nothing v5 could spell as a
+ * NAME was taken away, which is why V6_REMOVED is empty rather than absent —
+ * an empty list that is spread is a statement that the question was asked.
+ */
+export const V6_VIEW: Record<string, StdlibEntry> = {
+    ...without(V5_VIEW, V6_REMOVED),
+    ...V6_REGISTRY,
 };
 
 /**
@@ -263,6 +331,7 @@ export const REGISTRY: Record<string, StdlibEntry> = {
     ...V4_REGISTRY,
     ...V5_NAMESPACE_REGISTRY,
     ...V5_REGISTRY,
+    ...V6_REGISTRY,
 };
 
 /**
@@ -274,7 +343,8 @@ export const REGISTRY: Record<string, StdlibEntry> = {
  * a name is allowed, only about which of two meanings a name has.
  */
 export function viewFor(version: number): Record<string, StdlibEntry> {
-    if (version >= 5) return V5_VIEW;
+    if (version >= 6) return V6_VIEW;
+    if (version === 5) return V5_VIEW;
     if (version === 4) return V4_VIEW;
     return BASE_REGISTRY;
 }
@@ -423,6 +493,30 @@ export function createStdlib(ctx: Context) {
         }
     }
 
+    // String `+` is length-limited at v5 and later, and the limit needs the
+    // script's version and the current bar, which `safe_add` (no ctx) does not
+    // have. This sandbox is built per Context, so the binding is too.
+    //
+    // TradingView raised, at runtime, on a v5 script: "String is too long
+    // 4148, max allowed length is 4096." v6 raised the limit to 40,960
+    // (TradingView release notes, August 2025). v1-v4 have no evidence and
+    // keep the unlimited behaviour.
+    //
+    // The number path pays one `typeof` on the result and nothing else.
+    const stringLimit = ctx.profile.version >= 6 ? 40960 : ctx.profile.version === 5 ? 4096 : undefined;
+    if (stringLimit !== undefined) {
+        sandboxStdlib["safe_add"] = (a: any, b: any): number | string => {
+            const out = safe_add(a, b);
+            if (typeof out === "string" && out.length > stringLimit) {
+                throw new PineRuntimeError(
+                    `String is too long ${out.length}, max allowed length is ${stringLimit}.`,
+                    ctx.currentBarIndex,
+                );
+            }
+            return out;
+        };
+    }
+
     // `cross` is BOTH things at v1–v3, and one sandbox slot has to carry both.
     //
     //   cross(x, y)                  the crossover test
@@ -461,6 +555,34 @@ export function createStdlib(ctx: Context) {
             Object.defineProperty(crossStyle, "valueOf", { value: () => "cross", enumerable: false });
             Object.defineProperty(crossStyle, "toString", { value: () => "cross", enumerable: false });
             sandboxStdlib["cross"] = crossStyle;
+        }
+    }
+
+    // v6 changed the VALUE of three colour constants (MG §"Color changes"):
+    // red #FF5252 -> #F23645, teal -> #089981, yellow #FFEB3B -> #FDD835. The
+    // keys are unchanged, so this is not a registry difference — it is data on
+    // the profile, applied to this sandbox only.
+    //
+    // ON A COPY of the namespace. `color` is a shared module-level object (and
+    // at v4+ the cast function the members hang off), the same one every
+    // Context in the process receives — so writing `red` onto it in place
+    // would turn every LATER v5 session's red into v6 red. That is precisely
+    // the cross-session leak the `cross` wrapper above was written to undo.
+    const palette = ctx.profile.defaults.palette;
+    if (palette) {
+        for (const [key, value] of Object.entries(palette)) {
+            const dot = key.lastIndexOf(".");
+            // v1–v3 spell the constants bare (`red`): a top-level binding.
+            if (dot < 0) { sandboxStdlib[key] = value; continue; }
+            const root = key.slice(0, dot);
+            const member = key.slice(dot + 1);
+            const shared = sandboxStdlib[root];
+            if (shared === undefined) continue;
+            const own = typeof shared === "function"
+                ? Object.assign((...args: any[]) => shared(...args), shared)
+                : { ...shared };
+            own[member] = value;
+            sandboxStdlib[root] = own;
         }
     }
 

@@ -63,7 +63,7 @@ describe("mixed multiplicative chains", () => {
 describe("mixed comparison chains", () => {
   // Rare in real scripts, but broken the same way and for the same reason.
   it("a > b < c keeps each operator", () => {
-    expect(transpile(DECLS + "x = a > b < c\n")).toContain("(opsv2_a > opsv2_b) < opsv2_c");
+    expect(transpile(DECLS + "x = a > b < c\n")).toContain("opsv2_safe_lt(opsv2_safe_gt(opsv2_a, opsv2_b), opsv2_c)");
   });
 
   it("a != b == c keeps each operator", () => {

@@ -132,8 +132,8 @@ function initializeSandbox(sandbox: any, ctx: Context) {
             if (!target || typeof target !== "object") continue;
             Object.defineProperty(target, key, {
                 get() {
-                    throw new Error(
-                        `'${name}' is a Pine built-in that OpenPineScript does not ` +
+                    throw compileTimeError(
+                        `'${name}' is a Pine built-in that this engine does not ` +
                         `implement. Its published definitions disagree on the seed ` +
                         `value, and a wrong seed produces a series that is the right ` +
                         `shape and the wrong number forever. See ` +
@@ -150,7 +150,7 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         // hit before the outer scope, so the throw happens on read.
         for (const [name, message] of ctx.profile.banned) {
             Object.defineProperty(sandbox, `${PREFIX}${name}`, {
-                get() { throw new Error(message); },
+                get() { throw compileTimeError(message); },
                 configurable: true, enumerable: false,
             });
         }
@@ -159,6 +159,16 @@ function initializeSandbox(sandbox: any, ctx: Context) {
             value: true, writable: true, enumerable: false
         });
     }
+}
+
+/**
+ * An error about the SCRIPT rather than about what it did with the data: a
+ * built-in this engine lacks, a name the language version bans. Thrown when the
+ * name is read, which for a script's first bar is the compile dry run, and the
+ * session reports it as a compile error there and not as a run-time one.
+ */
+function compileTimeError(message: string): Error {
+    return Object.assign(new Error(message), { compileTime: true });
 }
 
 /**
@@ -201,5 +211,5 @@ export function compile(jsCode: string, ctx: Context, sandbox: any) {
 
 // Embeddable session/render-model API (see session.ts).
 export { Session, runScript, buildRenderModel, PROTOCOL_VERSION, ENGINE_VERSION } from "./session";
-export type { Compiled, SimResult, RenderSeries, RenderDelta, EngineError, InputView, Candle } from "./session";
+export type { Compiled, SimResult, RenderSeries, RenderDelta, EngineError, InputView, Candle, ChartSettings, RunOptions } from "./session";
 export type { Drawing, LogEntry, PlotData, FillData, ScriptMeta, SecurityCandle, InputDef, Trade, Position } from "./context";

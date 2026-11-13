@@ -1,0 +1,333 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// v6 conformance probe 1 of 3 — the language: every v6 rule that changes a
+// value a script computes, with no compile error to warn anyone.
+//
+//   1. Add to a BINANCE:BTCUSDT chart on the 1-minute timeframe. Intraday
+//      matters for time() and request.security(); crypto matters because a
+//      24/7 UTC market lets the engine rebuild the 5/15/60-minute bars from
+//      the chart's own.
+//   2. Keep the chart at or under 10,000 bars, so the Pine Logs pane still
+//      holds bar 0. The replay starts from the first bar and checks it.
+//   3. More (⋮) → Pine Logs, select all, copy.
+//   4. Save as conformance/v6/golden/harness_v6_language.BTCUSDT.1.log
+//
+// One OPSMETA line (symbol facts the engine needs as input), one OPSHEAD line,
+// then one OPS row per bar. Lists use ';' so a row stays CSV-safe, and no value
+// contains a double quote, which the log export would escape.
+//
+// What each group of columns asks, by migration-guide (MG) or release-note
+// (RN) section:
+//
+//   lz_*     MG "Lazy evaluation of conditions": the right side of and/or is
+//            skipped, including the ta.* state inside it. Plus the ternary,
+//            which the guide does not mention
+//   bh_* / b_*  MG "Boolean values cannot be na": history before bar 0, an
+//            if/switch with no branch taken, a UDT field, a new array, a
+//            missing map key, bool() of na
+//   d_* / m_* / r_*  MG "Division of two 'const int' operands": every
+//            qualifier, negative operands, and the modulo and round() rules
+//            next to them
+//   ni_*     MG "Negative indices in arrays", including insert and remove
+//   lp_*     MG "for loop boundaries are evaluated dynamically"
+//   rgb / ct MG "Color changes": all 17 constants
+//   tf_*     MG "Timeframes must include a multiplier", reached through
+//            timeframe.from_seconds() since the chart itself is "1"
+//   t_* / tc_*  RN Oct 2025 timeframe_bars_back, alongside bars_back
+//   sym_* / bid / ask  RN Nov 2024 and Feb 2025 additions
+//   s_*      RN Apr 2026 multiline strings; RN Aug 2025 40,960-char strings
+//   o_*      RN Aug 2026 `once`: no condition, a condition, inside a function
+//            called twice, inside a loop, inside an if not reached on bar 0
+//   sf_*     RN Apr/Aug 2026 sort_field on arrays of objects, with na and ties
+//   p_hist   MG "History of UDT fields": (obj[1]).field
+//   bx_*     RN Mar 2025 box.set_xloc, alternating xloc.bar_index/bar_time
+//   sec_*    RN Nov 2024 dynamic requests: request.security in a for loop, a
+//            series string timeframe, and main_* read from inside a request
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("OPS v6 language probe", overlay = true, max_boxes_count = 5, max_labels_count = 5)
+
+f(x) => str.tostring(x, "#.##########")
+b(bool x) => x ? "1" : "0"
+lst(a) => str.replace_all(str.tostring(a), ", ", ";")
+rgb(c) => color.r(c) * 65536 + color.g(c) * 256 + color.b(c)
+
+var heads = array.new_string(0)
+vals = array.new_string(0)
+// One call per column, so the header and the row cannot drift apart.
+col(string name, string v) =>
+    if barstate.isfirst
+        heads.push(name)
+    vals.push(v)
+
+col("time", str.tostring(time, "#"))
+col("open", f(open))
+col("high", f(high))
+col("low", f(low))
+col("close", f(close))
+col("volume", f(volume))
+col("bar_index", str.tostring(bar_index))
+
+// ── Lazy evaluation of and / or ──────────────────────────────────────────────
+var evals = array.new_int(4, 0)
+hit(int slot) =>
+    evals.set(slot, evals.get(slot) + 1)
+    true
+var taSeen = array.new_float(2, na)
+seeSma() =>
+    s = ta.sma(close, 3)
+    taSeen.set(0, s)
+    true
+seeCum() =>
+    c = ta.cum(1)
+    taSeen.set(1, c)
+    false
+
+lz_and  = bar_index % 3 == 0 and hit(0)
+lz_or   = bar_index % 3 == 0 or hit(1)
+lz_tern = bar_index % 2 == 0 ? hit(2) : false
+lz_nest = (bar_index % 5 == 0 or close > open) and hit(3)
+lz_sma  = close > open and seeSma()
+lz_cum  = close < open or seeCum()
+col("lz_and", b(lz_and))
+col("lz_or", b(lz_or))
+col("lz_tern", b(lz_tern))
+col("lz_nest", b(lz_nest))
+col("lz_evals[and;or;tern;nest]", lst(evals))
+col("lz_sma", b(lz_sma))
+col("lz_sma_value", f(taSeen.get(0)))
+col("lz_cum", b(lz_cum))
+col("lz_cum_value", f(taSeen.get(1)))
+
+// ── Booleans cannot be na ────────────────────────────────────────────────────
+up = close > open
+fb() =>
+    u = close >= open
+    u[2]
+bool b_if = if close < 0
+    true
+bool b_sw = switch bar_index % 7
+    1 => true
+    2 => false
+type Flags
+    bool on
+    float v
+fl = Flags.new()
+ab = array.new_bool(2)
+mb = map.new<string, bool>()
+nf = float(na)
+col("bh_1", b(up[1]))
+col("bh_3", b(up[3]))
+col("bh_fn", b(fb()))
+col("b_if", b(b_if))
+col("b_sw", b(b_sw))
+col("b_udt", b(fl.on))
+col("b_udt_float", f(fl.v))
+col("b_array", b(ab.get(0)))
+col("b_map_missing", b(mb.get("missing")))
+col("b_cast_na", b(bool(nf)))
+col("b_cast_zero", b(bool(close - close)))
+col("b_cast_bar", b(bool(bar_index)))
+
+// ── Division, modulo, rounding ───────────────────────────────────────────────
+int seven = 7
+col("d_const", f(5 / 2))
+col("d_declared", f(seven / 2))
+col("d_neg", f(-7 / 2))
+col("d_series", f((bar_index * 0 + 7) / 2))
+col("d_int_cast", f(int(-7 / 2)))
+col("m_neg", f(-7 % 3))
+col("m_negdiv", f(7 % -3))
+col("m_float", f(5.5 % 2))
+col("r_half", f(math.round(2.5)))
+col("r_neghalf", f(math.round(-2.5)))
+col("r_prec", f(math.round(1.005, 2)))
+
+// ── Negative array indices ───────────────────────────────────────────────────
+ni = array.from(10, 20, 30, 40, 50)
+ni_g1 = ni.get(-1)
+ni_g5 = ni.get(-5)
+ni.set(-2, -9)
+ni.insert(-1, -7)
+ni_r = ni.remove(-1)
+col("ni_get-1", f(ni_g1))
+col("ni_get-5", f(ni_g5))
+col("ni_removed", f(ni_r))
+col("ni_after", lst(ni))
+
+// ── for loop bounds re-evaluated ─────────────────────────────────────────────
+grow = array.new_int(0)
+for i = 0 to grow.size()
+    if grow.size() < 4
+        grow.push(i)
+lim = 10
+lp_cnt = 0
+for i = 0 to lim
+    lim -= 2
+    lp_cnt += 1
+col("lp_grow", f(grow.size()))
+col("lp_shrink", f(lp_cnt))
+
+// ── Colour constants ─────────────────────────────────────────────────────────
+rgbs = array.from(rgb(color.aqua), rgb(color.black), rgb(color.blue), rgb(color.fuchsia),
+                  rgb(color.gray), rgb(color.green), rgb(color.lime), rgb(color.maroon),
+                  rgb(color.navy), rgb(color.olive), rgb(color.orange), rgb(color.purple),
+                  rgb(color.red), rgb(color.silver), rgb(color.teal), rgb(color.white),
+                  rgb(color.yellow))
+col("rgb[aqua;black;blue;fuchsia;gray;green;lime;maroon;navy;olive;orange;purple;red;silver;teal;white;yellow]", lst(rgbs))
+col("ct[red;teal;yellow;white]", lst(array.from(color.t(color.red), color.t(color.teal), color.t(color.yellow), color.t(color.white))))
+
+// ── Timeframe strings ────────────────────────────────────────────────────────
+col("tf_period", timeframe.period)
+col("tf_main_period", timeframe.main_period)
+col("tf_from_seconds[1;60;3600;14400;86400;172800;604800;2628003]", lst(array.from(
+     timeframe.from_seconds(1), timeframe.from_seconds(60), timeframe.from_seconds(3600),
+     timeframe.from_seconds(14400), timeframe.from_seconds(86400), timeframe.from_seconds(172800),
+     timeframe.from_seconds(604800), timeframe.from_seconds(2628003))))
+col("tf_in_seconds[1D;D;1W;1M;12M;240]", lst(array.from(
+     timeframe.in_seconds("1D"), timeframe.in_seconds("D"), timeframe.in_seconds("1W"),
+     timeframe.in_seconds("1M"), timeframe.in_seconds("12M"), timeframe.in_seconds("240"))))
+col("tf_change_60", b(timeframe.change("60")))
+
+// ── time() / time_close(): timeframe_bars_back and bars_back ─────────────────
+col("t_D", str.tostring(time("D"), "#"))
+col("t_D_back1", str.tostring(time("D", timeframe_bars_back = 1), "#"))
+col("t_D_fwd1", str.tostring(time("D", timeframe_bars_back = -1), "#"))
+col("t_240_back2", str.tostring(time("240", timeframe_bars_back = 2), "#"))
+col("t_1M_back3", str.tostring(time("1M", timeframe_bars_back = 3), "#"))
+col("t_1W_back1", str.tostring(time("1W", timeframe_bars_back = 1), "#"))
+col("tc_D_fwd1", str.tostring(time_close("D", timeframe_bars_back = -1), "#"))
+col("tc_60_back1", str.tostring(time_close("60", timeframe_bars_back = 1), "#"))
+col("t_60_bars90", str.tostring(time("60", bars_back = 90), "#"))
+col("t_60_bars90_back1", str.tostring(time("60", bars_back = 90, timeframe_bars_back = 1), "#"))
+col("t_chart_back2", str.tostring(time("", timeframe_bars_back = 2), "#"))
+col("t_chart_bars-3", str.tostring(time("", bars_back = -3), "#"))
+
+// ── syminfo / timeframe additions, bid and ask ───────────────────────────────
+col("sym_main_tickerid", syminfo.main_tickerid)
+col("sym_mincontract", f(syminfo.mincontract))
+col("bid", f(bid))
+col("ask", f(ask))
+
+// ── Strings ──────────────────────────────────────────────────────────────────
+ml = """first \
+second
+    third"""
+ml2 = '''it's'''
+big = str.repeat("ab", 15000)
+col("s_multiline", str.replace_all(ml, "\n", "/"))
+col("s_multiline_len", f(str.length(ml)))
+col("s_single_quoted", ml2)
+col("s_big_len", f(str.length(big)))
+col("s_big_tail", str.substring(big, 29997))
+// RN Dec 2025: inside parentheses, a wrapped line may use any indentation —
+// including a multiple of four, which v5 read as a new block.
+wrapped = math.max(1,
+    2,
+        3)
+col("s_wrapped", f(wrapped))
+
+// ── once ─────────────────────────────────────────────────────────────────────
+var o_first = 0
+once
+    o_first += 1
+var o_cond = -1
+once close > open and bar_index > 5
+    o_cond := bar_index
+f_once(int x) =>
+    var k = 0
+    once
+        k += x
+    k
+var o_loop = 0
+for i = 0 to 3
+    once
+        o_loop += 1
+var o_late = -1
+if bar_index % 10 == 9
+    once
+        o_late := bar_index
+col("o_first", f(o_first))
+col("o_cond", f(o_cond))
+col("o_fn_a", f(f_once(1)))
+col("o_fn_b", f(f_once(5)))
+col("o_loop", f(o_loop))
+col("o_late", f(o_late))
+
+// ── sort_field ───────────────────────────────────────────────────────────────
+type Lvl
+    float price
+    string name
+    int stamp
+names(array<Lvl> a, array<int> idx) =>
+    s = ""
+    for i in idx
+        s += a.get(i).name
+    s
+lv = array.from(Lvl.new(close, "c", 3), Lvl.new(open, "o", 1), Lvl.new(high, "h", 2),
+                Lvl.new(low, "l", 2), Lvl.new(close[1], "p", 0))
+lv0 = lv.copy()
+// A field NAME goes only to sort(), the one place the release notes show it.
+// TradingView rejected lv.sort_indices(sort_field = "stamp") with "The `Lvl`
+// user-defined type does not include a field named "#loc_57"", so
+// sort_indices and the searches take the field's INDEX (stamp is 2).
+idxFirst = lv.sort_indices()
+idxStamp = lv.sort_indices(sort_field = 2)
+idxDesc = lv.sort_indices(order.descending, sort_field = 1)
+lv.sort(sort_field = "stamp")
+bs3 = lv.binary_search(3, sort_field = 2)
+bsl2 = lv.binary_search_leftmost(2, sort_field = 2)
+bsr2 = lv.binary_search_rightmost(2, sort_field = 2)
+bsl4 = lv.binary_search_leftmost(4, sort_field = 2)
+col("sf_by_first_field", names(lv0, idxFirst))
+col("sf_by_stamp", names(lv0, idxStamp))
+col("sf_by_index_desc", names(lv0, idxDesc))
+col("sf_bs_3", f(bs3))
+col("sf_bsl_2", f(bsl2))
+col("sf_bsr_2", f(bsr2))
+col("sf_bsl_4", f(bsl4))
+
+// ── History of an object, then its field ─────────────────────────────────────
+type P
+    float v
+p = P.new(close)
+float p_hist = na
+if bar_index > 0
+    p_hist := (p[1]).v
+col("p_hist", f(p_hist))
+
+// ── box.set_xloc ─────────────────────────────────────────────────────────────
+var bx = box.new(0, high, 1, low)
+if bar_index % 2 == 0
+    box.set_xloc(bx, math.max(0, bar_index - 2), bar_index, xloc.bar_index)
+else
+    box.set_xloc(bx, time - 120000, time, xloc.bar_time)
+col("bx_left", str.tostring(bx.get_left(), "#"))
+col("bx_right", str.tostring(bx.get_right(), "#"))
+
+// ── Dynamic requests ─────────────────────────────────────────────────────────
+tfs = array.from("5", "15", "60")
+secClose = array.new_float(0)
+secTf = array.new_string(0)
+for tf in tfs
+    secClose.push(request.security(syminfo.tickerid, tf, close))
+    secTf.push(request.security(syminfo.tickerid, tf, timeframe.period + "/" + timeframe.main_period))
+tfAlt = bar_index % 2 == 0 ? "5" : "15"
+col("sec_loop_close[5;15;60]", lst(secClose))
+col("sec_loop_tf[5;15;60]", lst(secTf))
+col("sec_series_tf_sma", f(request.security(syminfo.tickerid, tfAlt, ta.sma(close, 2))))
+col("sec_main_tickerid", request.security(syminfo.tickerid, "5", syminfo.main_tickerid))
+
+// ── v6-only parameters, compiled here and recorded, with nothing to read back
+len = input.int(3, "len", active = true)
+if barstate.isfirst
+    label.new(bar_index, high, "v6", size = 14, text_formatting = text.format_bold + text.format_italic, force_overlay = true)
+plot(ta.sma(close, len), "sma", display = display.none, linestyle = plot.linestyle_dashed)
+
+// ── log ──────────────────────────────────────────────────────────────────────
+if barstate.isfirst
+    log.info("OPSMETA|tickerid=" + syminfo.tickerid + ",mintick=" + f(syminfo.mintick) +
+         ",mincontract=" + f(syminfo.mincontract) + ",pointvalue=" + f(syminfo.pointvalue) +
+         ",timezone=" + syminfo.timezone + ",currency=" + syminfo.currency +
+         ",basecurrency=" + syminfo.basecurrency + ",type=" + syminfo.type + ",isin=" + syminfo.isin)
+    log.info("OPSHEAD|" + heads.join(","))
+log.info("OPS|" + vals.join(","))

@@ -14,6 +14,8 @@ export interface ParserError {
   line: number;
   column: number;
   message: string;
+  /** The parser's own text, when `message` was rewritten to say what is wrong. */
+  original?: string;
 }
 
 /**
