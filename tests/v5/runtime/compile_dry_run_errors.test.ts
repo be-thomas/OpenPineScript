@@ -31,11 +31,11 @@ describe("an error on the compile dry run", () => {
     expect(c.errors[0].phase).toBe("transpile");
   });
 
-  it("is phase transpile when it is about the script: a built-in this engine does not implement", () => {
-    const c = new Session().compile('//@version=5\nindicator("x")\nplot(ta.accdist)\n');
+  it("is phase transpile when it is about the script: a built-in the version lacks", () => {
+    const c = new Session().compile('//@version=3\nstudy("x")\nplot(obv)\n');
     expect(c.errors).toHaveLength(1);
     expect(c.errors[0]).toMatchObject({ phase: "transpile", severity: "error" });
-    expect(c.errors[0].message).toMatch(/'ta\.accdist' is a Pine built-in that this engine does not implement/);
+    expect(c.errors[0].message).toMatch(/'obv' is not available in Pine Script v3/);
   });
 
   it("is phase transpile for a name the version bans: bar_index in v1", () => {

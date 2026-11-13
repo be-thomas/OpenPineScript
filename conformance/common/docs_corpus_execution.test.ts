@@ -6,8 +6,8 @@
  *
  * ── Why it is pinned by CAUSE rather than counted ───────────────────────────
  *
- * "39 raise a runtime error" is a statement about the engine only if each of
- * the 39 is something the engine ought to raise. Three things qualify:
+ * "37 raise a runtime error" is a statement about the engine only if each of
+ * the 37 is something the engine ought to raise. Three things qualify:
  *
  *   THE SCRIPT'S OWN ERROR   a `runtime.error()` call, or an index/shape the
  *                            page is written to show failing. TradingView's
@@ -18,12 +18,11 @@
  *                            rest need data this engine cannot fetch. It says
  *                            so and stops, rather than inventing a series.
  *   A DELIBERATE REFUSAL     `renko`, `linebreak`, `kagi` and `pointfigure`
- *                            cannot be rebuilt from OHLCV bars, and `accdist`'s
- *                            published definitions disagree on a seed. A named
- *                            refusal beats a plausible wrong number.
+ *                            cannot be rebuilt from OHLCV bars. A named refusal
+ *                            beats a plausible wrong number.
  *
  * Anything else is a bug, and this suite exists so that a new one cannot arrive
- * quietly. The list shrank from 124 to 39 by being written down and worked
+ * quietly. The list shrank from 124 to 37 by being written down and worked
  * through; without a pin it would drift back up.
  *
  * ── Thirty bars, not five hundred ───────────────────────────────────────────
@@ -156,15 +155,6 @@ const EXPECTED: Record<string, RegExp> = {
   "v5/v5-faq-data-structures-05.pine": /request\.earnings: no data was supplied/,
   "v5/v5-release-notes-00.pine": /request\.financial: no data was supplied/,
 
-  // ── A deliberate refusal ──────────────────────────────────────────────────
-  "v4/v4-annotations-price-levels-hline-00.pine": /'accdist' is a Pine built-in that this engine does not implement/,
-  // The v5 spelling of the same refusal. It used to read `undefined` instead:
-  // the register poisons `opsv2_accdist` on the sandbox, and v5 writes
-  // `opsv2_ta.opsv2_accdist`, so a sandbox property literally named
-  // "opsv2_ta.accdist" was unreachable by any identifier. The Chaikin
-  // oscillator on TradingView's Text and shapes page was NaN on every bar
-  // while the v4 script one page over correctly refused.
-  "v5/v5-concepts-text-and-shapes-07.pine": /'ta\.accdist' is a Pine built-in that this engine does not implement/,
   "v4/v4-essential-non-standard-chart-types-data-03.pine": /^renko: /,
   "v4/v4-essential-non-standard-chart-types-data-04.pine": /^linebreak: /,
   "v4/v4-essential-non-standard-chart-types-data-05.pine": /^kagi: /,

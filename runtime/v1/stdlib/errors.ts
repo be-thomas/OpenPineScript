@@ -16,9 +16,16 @@ import { val } from "../../../utils/v2/common";
  * written, the second is a bug here.
  */
 export class PineRuntimeError extends Error {
-    constructor(message: string, public readonly bar: number) {
+    /**
+     * True only for `runtime.error(...)`: the script's own message. The same
+     * class also carries limits TradingView enforces at run time ("String is
+     * too long ..."), which are failures, not the script speaking.
+     */
+    public readonly fromScript: boolean;
+    constructor(message: string, public readonly bar: number, fromScript = false) {
         super(message);
         this.name = "PineRuntimeError";
+        this.fromScript = fromScript;
     }
 }
 
@@ -28,6 +35,7 @@ export const runtime = {
         throw new PineRuntimeError(
             text === null || text === undefined ? "" : String(text),
             ctx.currentBarIndex,
+            true,
         );
     },
 };

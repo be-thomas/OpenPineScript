@@ -47,6 +47,12 @@ export interface EngineError {
     bar?: number;
     /** The parser's own text, when `message` was rewritten to say what is wrong. */
     detail?: string;
+    /**
+     * `script` when the error is the script's own `runtime.error(...)`: the
+     * script working as written and refusing to go on, not a fault in it or
+     * in the engine. A host can show it as the script's message.
+     */
+    kind?: "script";
     severity: "error" | "warning";
 }
 
@@ -283,6 +289,7 @@ function toEngineErrors(e: any): EngineError[] {
         ...(pine?.library ? { library: { alias: pine.library, line: pine.line, col: pine.col } } : {}),
         message: msg,
         ...(typeof e?.detail === "string" ? { detail: e.detail } : {}),
+        ...(e?.fromScript === true ? { kind: "script" as const } : {}),
         severity: "error",
     }];
 }

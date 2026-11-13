@@ -260,10 +260,13 @@ limits TradingView applies and the engine does not, and for compile-time checks
 not yet made, see
 [CONFORMANCE.md](CONFORMANCE.md#restrictions-the-engine-does-not-enforce).
 
-- **The volume family** (`ta.accdist`, `.iii`, `.nvi`, `.obv`, `.pvi`, `.pvt`,
-  `.wad`, `.wvad`) is refused with an error naming it: published definitions
-  disagree on the seed value, and a wrong seed gives a series of the right shape
-  and the wrong level forever. An absent name is refused; a wrong one is not.
+- **The volume family** (`accdist`, `iii`, `nvi`, `obv`, `pvi`, `pvt`, `wad`,
+  `wvad`) is implemented at v4 (bare names) and v5/v6 (`ta.*`), each checked
+  against a TradingView run of that version. At v1–v3 TradingView has only
+  `accdist` (same values as v4); the other seven are undeclared there, and so
+  are rejected here. Binance's public
+  history differs slightly from TradingView's early years, so a cumulative
+  series computed from it can sit a constant away from TradingView's.
 - **`math.random`'s sequence.** The seed makes a run repeatable, which a backtest
   needs, but TradingView's generator is unpublished so the numbers differ.
 - **`var` on a tuple declaration** is rejected explicitly (see §3b).

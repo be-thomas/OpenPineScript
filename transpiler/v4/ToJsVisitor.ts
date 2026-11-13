@@ -77,6 +77,9 @@ const INT_LENGTH_CALLS = new Set([
 export class V4ToJsVisitor extends V3ToJsVisitor {
   protected override readonly version: PineVersion = 4;
 
+  /** v4 onward keeps the lazy ternary (unprobed); see the v1 hook. */
+  protected override ternaryRunsBothBranches(): boolean { return false; }
+
   // ── The §3a rename table ──────────────────────────────────────────────────
 
   /**

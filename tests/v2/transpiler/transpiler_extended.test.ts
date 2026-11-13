@@ -35,6 +35,7 @@ function runPine(pineSource: string): Record<string, unknown> {
   // holding the same number was false.
   sandbox[`${OPSV2}safe_eq`] = (a: any, b: any) => (a?.valueOf?.() ?? a) == (b?.valueOf?.() ?? b);
   sandbox[`${OPSV2}safe_ne`] = (a: any, b: any) => (a?.valueOf?.() ?? a) != (b?.valueOf?.() ?? b);
+  sandbox[`${OPSV2}$pick`] = (c: any, t: any, f: any) => (c ? t : f);
   
   vm.createContext(sandbox);
   vm.runInContext(js, sandbox);

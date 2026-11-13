@@ -41,6 +41,7 @@ function runPine(pineSource: string): Record<string, unknown> {
   sandbox.opsv2_safe_eq = (a: any, b: any) => (a?.valueOf?.() ?? a) == (b?.valueOf?.() ?? b);
   sandbox.opsv2_safe_ne = (a: any, b: any) => (a?.valueOf?.() ?? a) != (b?.valueOf?.() ?? b);
   sandbox.opsv2_safe_sub = (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) - (Number.isNaN(Number(b)) ? 0 : Number(b));
+  sandbox["opsv2_$pick"] = (c: any, t: any, f: any) => (c ? t : f);
 
   vm.createContext(sandbox);
   vm.runInContext(js, sandbox);
