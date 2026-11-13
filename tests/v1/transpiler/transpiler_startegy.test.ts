@@ -427,6 +427,7 @@ describe("Broker Emulator: strategy.risk.max_position_size", () => {
 
     it("should clamp entry qty to respect position limit", () => {
         const pine = [
+            'strategy("t", pyramiding = 5)',
             'strategy.risk.max_position_size(3)',
             'if n == 0',
             '    strategy.entry("E1", strategy.long, 2)',
@@ -531,6 +532,7 @@ describe("Broker Emulator: strategy.risk.max_intraday_filled_orders", () => {
 
     it("should reset the fill counter on a new day", () => {
         const pine = [
+            'strategy("t", pyramiding = 5)',
             'strategy.risk.max_intraday_filled_orders(1)',
             'if n == 0 or n == 1 or n == 2',
             '    strategy.entry("Entry", strategy.long)',

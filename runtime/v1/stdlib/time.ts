@@ -1,3 +1,4 @@
+import { specSeconds, periodEnd as resolutionEnd } from "../timeframes";
 import { Context } from "../context";
 import { utcFromZoned, zonedFields } from "../zones";
 
@@ -360,12 +361,15 @@ function parseSession(spec: string): { ranges: Array<[number, number]>; days: Se
  * time when it falls INSIDE that session and `na` otherwise — which is how
  * pre-v4 scripts express "only trade the cash session".
  *
- * ⚠ TIMEZONE. TradingView evaluates the session in the EXCHANGE's timezone.
- * This engine has no exchange calendar, so it evaluates in UTC. For a symbol
- * whose exchange is not UTC the session boundaries are shifted, and a script
- * that filters on them will differ from TradingView. Supplying bar timestamps
- * pre-shifted to the exchange timezone makes the two agree. Documented rather
- * than silently approximated — see dev-docs/04-skipped-restrictions.md.
+ * TIMEZONE. The session window, and its day mask, are evaluated in the
+ * `timezone` argument when one is given, otherwise in the symbol's exchange
+ * timezone (`ctx.timezone`, which a host sets with `Session.setChart`; "UTC"
+ * until it does). Evidence: TradingView's Pine Logs for the ICT Silver Bullet
+ * script (conformance/v5/parity/harness_ict_silver_bullet.BTCUSDT.5.csv) show
+ * "0300-0400" in "America/New_York" opening at 07:00 UTC on 2026-10-05 (EDT,
+ * UTC-4); evaluated in UTC it opened at 03:00. Daylight saving follows the
+ * zone, so the same window opens at 08:00 UTC in winter. An unknown zone name
+ * reads as UTC, as for `hour()` and the other calendar accessors.
  *
  * The `resolution` argument is accepted and ignored: honouring it means
  * re-aggregating the chart into that timeframe, which is the same missing
@@ -384,17 +388,56 @@ function parseSession(spec: string): { ranges: Array<[number, number]>; days: Se
  *
  * @returns {series float} The bar's UNIX time in ms, or na.
  */
-export function time(ctx: any, _resolution?: any, session?: any): number {
+export function time(
+    ctx: any, _resolution?: any, session?: any,
+    timezone?: any, bars_back?: any, timeframe_bars_back?: any,
+): number {
     const unwrap = (x: any) => (x != null && typeof x.valueOf === "function" ? x.valueOf() : x);
-    const t = Number(unwrap(ctx?.vars?.get?.("opsv2_time")) ?? NaN);
-    if (!Number.isFinite(t)) return NaN;
+    // TradingView's order is (timeframe, session, timezone, bars_back,
+    // timeframe_bars_back), and the last must stay last: put third, a v5
+    // script's positional `timezone` was read as a bar offset and the result
+    // was na on every bar. `timezone` places the SESSION window (below).
+    // `bars_back` arrived in v5; earlier versions record it the same way.
+    if ((ctx?.profile?.version ?? 1) < 5 && ctx?.keywordArguments?.has?.("bars_back")) {
+        ctx.droppedArguments?.add?.("time(bars_back)");
+    }
+
+    // `bars_back` (v5): "the timestamp from the bar N bars back", or for a
+    // negative N the expected time of a future bar. Applied first; the
+    // release notes say `timeframe_bars_back` then steps from its result.
+    const barTime = barsBack(ctx, bars_back);
+    if (!Number.isFinite(barTime)) return NaN;
+    let t = barTime;
+
+    // An empty timeframe is Pine's spelling of "the chart's".
+    const chart = String(ctx?.resolution ?? "");
+    const written = _resolution == null ? "" : String(unwrap(_resolution) ?? "");
+    const spec = written.trim() === "" ? chart : written;
+
+    if (_resolution != null && alignsHere(ctx, barTime, spec, chart)) {
+        // An unparseable timeframe — "1T", a range chart — leaves the bar's
+        // time as it is. It never turns a valid time into na.
+        const aligned = resolutionStart(t, spec);
+        if (Number.isFinite(aligned)) t = aligned;
+    }
+
+    // v6, October 2025: `timeframe_bars_back` — "the bar offset on the
+    // `timeframe` argument's timeframe". It steps from the aligned start.
+    if (timeframe_bars_back != null) {
+        t = stepTimeframeBars(t, spec, Number(unwrap(timeframe_bars_back)));
+        if (!Number.isFinite(t)) return NaN;
+    }
 
     if (session == null) return t;
 
     const { ranges, days } = parseSession(String(unwrap(session)));
     if (ranges.length === 0) return t; // unparseable spec: do not silently filter
 
-    const d = new Date(t);
+    // The session is a filter on the BAR, whatever time is returned for it,
+    // read on the wall clock of `timezone` (else the exchange's).
+    const zoneArg = unwrap(timezone);
+    const zone = zoneArg == null || zoneArg === "" ? ctx?.timezone : String(zoneArg);
+    const d = new Date(zonedFields(barTime, zone));
     if (days && !days.has(d.getUTCDay() + 1)) return NaN; // Pine: 1 = Sunday
     const minuteOfDay = d.getUTCHours() * 60 + d.getUTCMinutes();
 
@@ -402,35 +445,123 @@ export function time(ctx: any, _resolution?: any, session?: any): number {
 }
 
 /**
- * The end of the bar's timeframe, given its opening time.
+ * The time of the bar `bars_back` bars from this one, on the chart's own
+ * timeframe — this bar's when it is not given.
  *
- * Pine reports a bar's CLOSING time as the instant the next bar of the same
- * timeframe opens, so this is calendar arithmetic rather than a fixed offset:
- * a month is not 30 days and a week is not always 7 × 24 h across a DST
- * boundary. Days/weeks/months are advanced on the UTC calendar for the same
- * reason every other accessor in this file reads UTC — see the header.
- *
- * Resolution strings follow TradingView's spelling: "1"/"5"/"60" are minutes,
- * "30S" is seconds, and "D"/"W"/"M" carry an optional multiplier ("2W").
+ * A v5 parameter (honoured from v5; v1–v4 have no such argument). Past bars
+ * are read from the bars actually seen, so a gap in the data is respected; a
+ * future bar is the expected time, stepped forward one chart period at a time.
  */
-function resolutionEnd(openTime: number, resolution: string): number {
+function barsBack(ctx: any, bars_back: any): number {
+    const unwrap = (x: any) => (x != null && typeof x.valueOf === "function" ? x.valueOf() : x);
+    const now = Number(unwrap(ctx?.vars?.get?.("opsv2_time")) ?? NaN);
+    const n = bars_back == null ? 0 : Math.trunc(Number(unwrap(bars_back)));
+    if (n === 0 || !Number.isFinite(n) || (ctx?.profile?.version ?? 1) < 5) return now;
+    if (n > 0) {
+        const at = ctx?.barTimes?.[ctx.currentBarIndex - n];
+        return typeof at === "number" ? at : NaN;
+    }
+    let t = now;
+    for (let i = 0; i < -n && Number.isFinite(t); i++) t = resolutionEnd(t, String(ctx?.resolution ?? ""));
+    return t;
+}
+
+/**
+ * Does `time(spec)` align to the start of `spec`'s bar here?
+ *
+ * Only where TradingView's log shows it does. That log
+ * (conformance/common/v5_gaps_golden.test.ts) is a 24/7 market on the UTC
+ * calendar, the one case where a timeframe's bars and the UTC grid coincide.
+ * So alignment needs all three:
+ *
+ *   - a timeframe HIGHER than the chart's: `time(timeframe.period)` is the
+ *     bar's own open on every market, and rounding it moved a 09:15 IST
+ *     hourly bar to 09:00;
+ *   - an exchange timezone the host declares as UTC;
+ *   - chart bars that sit on the UTC grid of their own timeframe — a US daily
+ *     bar stamped 14:30Z does not, and is left alone.
+ *
+ * Anywhere else this engine keeps its earlier answer, the bar's own time,
+ * rather than guess at an exchange's session anchor it is not told.
+ */
+function alignsHere(ctx: any, barTime: number, spec: string, chart: string): boolean {
+    if (!ctx?.profile?.defaults?.alignsTimeframe) return false;
+    const want = specSeconds(spec), have = specSeconds(chart);
+    if (!(want > have)) return false;
+    const tz = String(ctx?.timezone ?? "UTC").toUpperCase();
+    if (tz !== "UTC" && tz !== "ETC/UTC" && tz !== "GMT" && tz !== "ETC/GMT") return false;
+    return resolutionStart(barTime, chart) === barTime;
+}
+
+
+/**
+ * The opening time of the `spec`-timeframe period containing `t`.
+ *
+ * UTC-anchored, as everything in this file is: minutes and seconds count from
+ * the epoch, days from UTC midnight, weeks from Monday, months from the 1st.
+ * TradingView anchors intraday periods to the SESSION start instead, which
+ * agrees with this for any period that divides an hour and for a session
+ * opening on the hour — and differs, for example, for "240" on a 09:30 open.
+ */
+function resolutionStart(t: number, resolution: string): number {
     const spec = String(resolution ?? "").trim().toUpperCase();
     const m = /^(\d*)([SDWM]?)$/.exec(spec);
     if (!m) return NaN;
-
     const count = m[1] === "" ? 1 : parseInt(m[1], 10);
     const unit = m[2];
     if (!Number.isFinite(count) || count <= 0) return NaN;
 
-    // Intraday: a plain number is MINUTES, "S" is seconds. Both are fixed spans.
-    if (unit === "") return openTime + count * 60_000;
-    if (unit === "S") return openTime + count * 1_000;
+    if (unit === "" || unit === "S") {
+        const span = count * (unit === "S" ? 1_000 : 60_000);
+        return Math.floor(t / span) * span;
+    }
+    const d = new Date(t);
+    const midnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    if (unit === "D") {
+        const days = Math.floor(midnight / 86_400_000);
+        return (days - (days % count)) * 86_400_000;
+    }
+    if (unit === "W") {
+        // Weeks counted from the Monday before the epoch (1970-01-01 was a
+        // Thursday), so "2W" groups pairs of weeks rather than ignoring its 2.
+        const WEEK = 7 * 86_400_000, MONDAY = 3 * 86_400_000;
+        const index = Math.floor((midnight + MONDAY) / WEEK);
+        return (index - (((index % count) + count) % count)) * WEEK - MONDAY;
+    }
+    const monthIndex = d.getUTCFullYear() * 12 + d.getUTCMonth();
+    const aligned = monthIndex - (monthIndex % count);
+    return Date.UTC(Math.floor(aligned / 12), aligned % 12, 1);
+}
 
-    const d = new Date(openTime);
-    if (unit === "D") d.setUTCDate(d.getUTCDate() + count);
-    else if (unit === "W") d.setUTCDate(d.getUTCDate() + count * 7);
-    else d.setUTCMonth(d.getUTCMonth() + count);
-    return d.getTime();
+/**
+ * `timeframe_bars_back` (v6, October 2025): the opening time of the period
+ * `n` bars of the `resolution` timeframe away from the one containing `t`.
+ * "Positive values go back in time; negative values give the expected time of
+ * a future bar."
+ *
+ * Aligns first, so it is correct whether or not the caller already did.
+ */
+function stepTimeframeBars(t: number, resolution: string, n: number): number {
+    const start = resolutionStart(t, resolution);
+    if (!Number.isFinite(start) || !Number.isFinite(n)) return NaN;
+    const steps = Math.trunc(n);
+    if (steps === 0) return start;
+
+    // Arithmetic, not a loop: the offset is a script value, and stepping one
+    // period at a time made `timeframe_bars_back = 50000000` on "1" take
+    // seconds per bar. Every unit is a fixed span on the UTC calendar except
+    // the month, which is stepped by month index instead.
+    const spec = String(resolution ?? "").trim().toUpperCase();
+    const m = /^(\d*)([SDWM]?)$/.exec(spec)!;
+    const count = m[1] === "" ? 1 : parseInt(m[1], 10);
+    const unit = m[2];
+    if (unit === "M") {
+        const d = new Date(start);
+        const index = d.getUTCFullYear() * 12 + d.getUTCMonth() - steps * count;
+        return Date.UTC(Math.floor(index / 12), ((index % 12) + 12) % 12, 1);
+    }
+    const span = unit === "S" ? 1_000 : unit === "" ? 60_000 : unit === "D" ? 86_400_000 : 7 * 86_400_000;
+    return start - steps * count * span;
 }
 
 /**
@@ -444,8 +575,8 @@ function resolutionEnd(openTime: number, resolution: string): number {
  * because the closing time of the bar being evaluated is the OPENING time of a
  * bar that has not arrived yet — on the last bar there is no next bar to read.
  *
- * `session` filters exactly as it does for `time()`, and carries the same
- * caveat: this engine has no exchange calendar and evaluates in UTC.
+ * `session` filters exactly as it does for `time()`, in the same timezone
+ * (the `timezone` argument, else the exchange's).
  *
  * Marked `@getter` because Pine documents it as "both a variable and a
  * function": bare `time_close` must read as the current bar's closing time,
@@ -458,12 +589,18 @@ function resolutionEnd(openTime: number, resolution: string): number {
  * @getter
  * @returns {series float} The bar's closing UNIX time in ms, or na.
  */
-export function time_close(ctx: any, resolution?: any, session?: any): number {
-    const open = time(ctx, resolution, session);
+export function time_close(
+    ctx: any, resolution?: any, session?: any,
+    timezone?: any, bars_back?: any, timeframe_bars_back?: any,
+): number {
+    const open = time(ctx, resolution, session, timezone, bars_back, timeframe_bars_back);
     if (!Number.isFinite(open)) return NaN;
 
     const unwrap = (x: any) => (x != null && typeof x.valueOf === "function" ? x.valueOf() : x);
-    const spec = resolution == null ? ctx?.resolution : unwrap(resolution);
+    // "" is the chart's timeframe, as in `time()`; read as a spec it was one
+    // minute, and `time_close("")` on a daily chart was the open plus 60 s.
+    const written = resolution == null ? "" : String(unwrap(resolution) ?? "");
+    const spec = written.trim() === "" ? ctx?.resolution : written;
     return resolutionEnd(open, String(spec));
 }
 

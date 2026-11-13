@@ -6,7 +6,7 @@
  *
  * How far it may see is the `lookahead` argument, and its DEFAULT is
  * version-dependent — the one v2→v3 change that is a behaviour flip rather than
- * a rejection rule (dev-docs/01-version-delta-spec.md §2 D3.1):
+ * a rejection rule (docs/common/VERSIONS.md §2 D3.1):
  *
  *   v1 / v2 → barmerge.lookahead_on   (sees the HTF bar it is inside; repaints)
  *   v3      → barmerge.lookahead_off  (only HTF bars that have closed)
@@ -24,16 +24,22 @@ import type { PineVersion } from "../../../transpiler/common/version";
 function build(pine: string, version: PineVersion = 1) {
     const js = transpile(pine, { version }).replace(/\blet\b/g, "var ");
     const ctx = new Context(profileFor(version));
+    // A 6-hour chart: a requested bar closes on the chart bar that ENDS it
+    // (TradingView's log, conformance/v5/parity/harness_security_tf.BTCUSDT.5.csv,
+    // bars 4475, 4487, ...), so the chart bars need a real span next to the
+    // daily candles' real length.
+    ctx.resolution = "360";
     const exec = compile(js, ctx, Object.create(null));
     return { ctx, exec };
 }
 const vv = (ctx: Context, name: string): any => ctx.vars.get("opsv2_" + name)?.valueOf();
 
-// Daily candles: closes 100, 110, 120 opening at t = 0, 100, 200.
+// Daily candles: closes 100, 110, 120 opening at t = 0, 1, 2 days.
+const DAY = 86_400_000;
 const DAILY = [
     { time: 0, open: 100, high: 100, low: 100, close: 100, volume: 1 },
-    { time: 100, open: 110, high: 110, low: 110, close: 110, volume: 1 },
-    { time: 200, open: 120, high: 120, low: 120, close: 120, volume: 1 },
+    { time: DAY, open: 110, high: 110, low: 110, close: 110, volume: 1 },
+    { time: 2 * DAY, open: 120, high: 120, low: 120, close: 120, volume: 1 },
 ];
 
 /** Runs one bar per chart time and returns `h` at each. */
@@ -50,7 +56,8 @@ function trace(pine: string, version: PineVersion, times: number[]): number[] {
 }
 
 const SRC = 'h = security("AAPL", "D", close)\n';
-const TIMES = [50, 150, 250];
+// 6-hour chart bars, one inside each daily candle (the 06:00 bar of each day).
+const TIMES = [DAY / 4, DAY + DAY / 4, 2 * DAY + DAY / 4];
 
 describe("security() lookahead default is version-dependent", () => {
     it("v1 defaults to lookahead_on — sees the HTF bar it is inside", () => {
@@ -77,6 +84,21 @@ describe("security() lookahead default is version-dependent", () => {
     });
 });
 
+describe("a closed HTF bar appears on the chart bar that ends it", () => {
+    // TradingView's log (conformance/v5/parity/harness_security_tf.BTCUSDT.5.csv,
+    // bars 4475, 4487, ...): the hourly close shows on the LAST 5-minute bar of
+    // the hour, not on the first bar of the next. Here the 6-hour chart bars of
+    // day 0 start at 0h, 6h, 12h and 18h; the 18h bar ends the day.
+    const H = DAY / 4;
+    for (const version of [3, 4] as PineVersion[]) {
+        it(`v${version}: daily[0]'s close steps in on the 18:00 bar, not the next day's first`, () => {
+            const got = trace(SRC, version, [0, H, 2 * H, 3 * H, 4 * H]);
+            assert.deepStrictEqual(got.slice(0, 3).every(Number.isNaN), true);
+            assert.deepStrictEqual(got.slice(3), [100, 100]);
+        });
+    }
+});
+
 describe("security() explicit lookahead overrides the default", () => {
     const OFF = 'h = security("AAPL", "D", close, false, barmerge.lookahead_off)\n';
     const ON = 'h = security("AAPL", "D", close, false, barmerge.lookahead_on)\n';
@@ -97,11 +119,11 @@ describe("security() — HTF expression sub-evaluation", () => {
         const { ctx, exec } = build('v = security("AAPL", "D", sma(close, 2))\n', 3);
         ctx.provideSecurityData("AAPL", "D", DAILY);
 
-        ctx.setBar(150, 5, 5, 5, 5, 1); exec();   // only 1 daily closed -> sma(2) = NaN
+        ctx.setBar(TIMES[1], 5, 5, 5, 5, 1); exec();   // only 1 daily closed -> sma(2) = NaN
         assert.ok(Number.isNaN(vv(ctx, "v")));
         ctx.finalizeBar();
 
-        ctx.setBar(250, 5, 5, 5, 5, 1); exec();   // 2 daily closed: 100,110 -> 105
+        ctx.setBar(TIMES[2], 5, 5, 5, 5, 1); exec();   // 2 daily closed: 100,110 -> 105
         assert.strictEqual(vv(ctx, "v"), 105);
         ctx.finalizeBar();
     });
@@ -121,14 +143,14 @@ describe("security() — live-tick stability", () => {
         const { ctx, exec } = build(SRC, 3);
         ctx.provideSecurityData("AAPL", "D", DAILY);
         // commit two historical bars so daily[0] then daily[1] close
-        ctx.setBar(150, 5, 5, 5, 5, 1); exec(); ctx.finalizeBar();   // h=100
-        ctx.setBar(250, 5, 5, 5, 5, 1); exec(); ctx.finalizeBar();   // h=110
-        // forming bar at t=260: re-tick repeatedly; HTF value must stay 110
-        ctx.applyTick(260, 5, 5, 5, 5, 1); exec();
+        ctx.setBar(TIMES[1], 5, 5, 5, 5, 1); exec(); ctx.finalizeBar();   // h=100
+        ctx.setBar(TIMES[2], 5, 5, 5, 5, 1); exec(); ctx.finalizeBar();   // h=110
+        // forming bar just after the last: re-tick repeatedly; HTF value must stay 110
+        ctx.applyTick(TIMES[2] + 1000, 5, 5, 5, 5, 1); exec();
         assert.strictEqual(vv(ctx, "h"), 110);
-        ctx.applyTick(260, 9, 9, 9, 9, 1); exec();
+        ctx.applyTick(TIMES[2] + 1000, 9, 9, 9, 9, 1); exec();
         assert.strictEqual(vv(ctx, "h"), 110);
-        ctx.applyTick(260, 7, 7, 7, 7, 1); exec();
+        ctx.applyTick(TIMES[2] + 1000, 7, 7, 7, 7, 1); exec();
         assert.strictEqual(vv(ctx, "h"), 110);
     });
 });

@@ -39,9 +39,10 @@
 // the source, which is `series float` and takes `close[i]` quite happily — so
 // that is what varies below.
 //
-// (That refusal is itself a finding, recorded as R-16 in
-// dev-docs/04-skipped-restrictions.md: this engine has no simple/series
-// qualifier on parameters and accepts what TradingView rejects.)
+// (That refusal is itself a finding, recorded in
+// docs/common/CONFORMANCE.md ("Restrictions the engine does not enforce"):
+// this engine has no simple/series qualifier on parameters and accepts what
+// TradingView rejects.)
 //
 // ── Reading the result ──────────────────────────────────────────────────────
 //

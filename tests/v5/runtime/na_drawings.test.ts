@@ -19,7 +19,9 @@
  *   them before the first assignment.
  *
  * So a setter on an absent drawing does nothing and a getter on one reads `na`.
- * A STALE id — one that was deleted — is still an error, which it should be.
+ * A STALE id — one that was deleted — does the same: TradingView raises no
+ * error for it either (checked with Pine Logs, dev-docs/tv-parity/_probes/
+ * na-drawings/parity-deleted-drawings.pine).
  *
  * ── `.copy()` ──────────────────────────────────────────────────────────────
  *
@@ -86,10 +88,25 @@ describe("what an na id does NOT excuse", () => {
       .toThrow(/expected an array, got na/);
   });
 
-  it("a DELETED drawing is still an error", () => {
-    const src = HEAD + "l = line.new(0, 0.0, 1, 1.0)\nline.delete(l)\nline.set_color(l, color.red)\n";
-    expect(() => build(src).exec()).toThrow(/no such drawing/);
-  });
+});
+
+describe("a DELETED drawing behaves like na", () => {
+  // TradingView, checked with Pine Logs (dev-docs/tv-parity/_probes/na-drawings/:
+  // parity-deleted-drawings.pine, parity-udt-fields.pine): setters on a deleted line, label or
+  // box are ignored, getters return NaN, and deleting twice is not an error.
+  // This used to throw "no such drawing", which stopped real scripts --
+  // a Hidden Order Block indicator that keeps box ids in objects -- that run
+  // on TradingView.
+  for (const [kind, make, setter, getter] of [
+    ["line", "line.new(0, 0.0, 1, 1.0)", "line.set_color(d, color.red)", "line.get_y1(d)"],
+    ["label", "label.new(0, 0.0, 'x')", "label.set_text(d, 'y')", "label.get_x(d)"],
+    ["box", "box.new(0, 1.0, 1, 0.0)", "box.set_right(d, 5)", "box.get_top(d)"],
+  ] as const) {
+    it(`${kind}: setters are ignored, getters are na, a second delete is fine`, () => {
+      const src = HEAD + `d = ${make}\n${kind}.delete(d)\n${setter}\nv = ${getter}\n${kind}.delete(d)\n`;
+      expect(Number.isNaN(value(src, "v"))).toBe(true);
+    });
+  }
 });
 
 describe("copy() on a drawing clones the drawing", () => {

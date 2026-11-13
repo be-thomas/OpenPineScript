@@ -1,0 +1,113 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// OPS golden harness: examples/v5/tradingview-docs/v5-release-notes-04.pine,
+// unchanged (its four lines are below), with a logging block appended.
+//
+// The engine's trade count for it moved from 515 to 849 and its pnl from
+// 134,428 to 179 when strategy.close/pyramiding were corrected; TradingView's
+// own answer is what this collects. It enters "Long" with qty = 100 on every
+// bar and has two partial strategy.exit calls (20% each) with trailing stops.
+//
+// RUN ON : BINANCE:ETHUSDT, 1D (daily). Use whatever history loads and don't
+//          scroll back after adding it. The bars are in the log, so the engine
+//          replays exactly TradingView's bars; no bar count is required, but
+//          note it (the number of OPS rows) if you want to compare with 515/849.
+// SAVE AS: conformance/v5/parity/harness_release_notes_04.ETHUSDT.1D.csv
+//          (ETHUSDT, not BTCUSDT: the script buys qty = 100 per bar and TradingView
+//          refuses orders larger than equity allows, so the symbol decides the answer.)
+//
+// Collect: Pine Editor -> paste -> Add to chart -> wait for it to finish ->
+// More (...) -> Pine Logs -> export, save as the filename above. Also screenshot
+// the Strategy Tester Overview (total closed trades, net profit) for the record.
+//
+//   OPSMETA / OPSHEAD   script, symbol facts, column names (once)
+//   OPS|row|row|...     every confirmed bar: time,open,high,low,close,volume,
+//                       bar_index,tag,position_size,avg_price,opentrades,
+//                       closedtrades,netprofit
+//   OPSLAST             the final bar
+//   OPSCOUNT            closed / open trade counts, net profit, position size
+//   OPSCLOSED           every closed trade, entry_id:exit_id:entry_bar:exit_bar:
+//                       entry_price:exit_price:size:profit
+//   OPSOPEN             every open trade, entry_id:entry_bar:entry_price:size:profit
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("strategy.exit() example v6", overlay = true)
+strategy.entry("Long", strategy.long, qty = 100)
+strategy.exit("Exit Long1", "Long", trail_points = 50, trail_offset = 0, qty_percent = 20)
+strategy.exit("Exit Long2", "Long", trail_points = 100, trail_offset = 0, qty_percent = 20)
+OPS_SCRIPT = "release_notes_04"
+OPS_LAST = -1
+string ops_tag = ""
+
+// ── OPS logging block ───────────────────────────────────────────────────────
+ops_f(x) => str.tostring(x, "#.##########")
+
+var ops_heads = array.new_string(0)
+ops_vals = array.new_string(0)
+ops_col(string name, string v) =>
+    if barstate.isfirst
+        ops_heads.push(name)
+    ops_vals.push(v)
+
+ops_col("time", str.tostring(time, "#"))
+ops_col("open", ops_f(open))
+ops_col("high", ops_f(high))
+ops_col("low", ops_f(low))
+ops_col("close", ops_f(close))
+ops_col("volume", ops_f(volume))
+ops_col("bar_index", str.tostring(bar_index))
+ops_col("tag", ops_tag)
+ops_col("position_size", ops_f(strategy.position_size))
+ops_col("avg_price", ops_f(strategy.position_avg_price))
+ops_col("opentrades", str.tostring(strategy.opentrades))
+ops_col("closedtrades", str.tostring(strategy.closedtrades))
+ops_col("netprofit", ops_f(strategy.netprofit))
+
+if barstate.isfirst
+    log.info("OPSMETA|script=" + OPS_SCRIPT + ",version=5,tickerid=" + syminfo.tickerid + ",mintick=" + ops_f(syminfo.mintick) +
+         ",timezone=" + syminfo.timezone + ",timeframe=" + timeframe.period + ",type=" + syminfo.type)
+    log.info("OPSHEAD|" + ops_heads.join(","))
+
+// Pine v5 strings stop at 4,096 characters: a message goes out before the
+// next row would take it past 4,000.
+var string ops_buf = ""
+ops_active = OPS_LAST < 0 or bar_index <= OPS_LAST
+ops_final = OPS_LAST < 0 ? barstate.islast : bar_index == OPS_LAST
+if barstate.isconfirmed and ops_active
+    ops_next = "|" + ops_vals.join(",")
+    if str.length(ops_buf) + str.length(ops_next) > 4000
+        log.info("OPS" + ops_buf)
+        ops_buf := ""
+    ops_buf := ops_buf + ops_next
+if str.length(ops_buf) > 0 and (barstate.islastconfirmedhistory or barstate.isrealtime or ops_final)
+    log.info("OPS" + ops_buf)
+    ops_buf := ""
+
+// The trade dump, once, on the final bar. Entries are ;-separated, fields :-separated:
+//   closed: entry_id : exit_id : entry_bar_index : exit_bar_index : entry_price : exit_price : size : profit
+//   open:   entry_id : entry_bar_index : entry_price : size : profit
+varip bool ops_dumped = false
+if ops_final and not ops_dumped
+    ops_dumped := true
+    log.info("OPSLAST|" + ops_vals.join(","))
+    ops_nc = strategy.closedtrades
+    ops_no = strategy.opentrades
+    log.info("OPSCOUNT|closed=" + str.tostring(ops_nc) + ",open=" + str.tostring(ops_no) +
+         ",netprofit=" + ops_f(strategy.netprofit) + ",position_size=" + ops_f(strategy.position_size))
+    ops_row = ""
+    if ops_nc > 0
+        for k = 0 to ops_nc - 1
+            ops_row += ";" + strategy.closedtrades.entry_id(k) + ":" + strategy.closedtrades.exit_id(k) + ":" +
+                 str.tostring(strategy.closedtrades.entry_bar_index(k)) + ":" + str.tostring(strategy.closedtrades.exit_bar_index(k)) + ":" +
+                 ops_f(strategy.closedtrades.entry_price(k)) + ":" + ops_f(strategy.closedtrades.exit_price(k)) + ":" +
+                 ops_f(strategy.closedtrades.size(k)) + ":" + ops_f(strategy.closedtrades.profit(k))
+            if str.length(ops_row) > 3700 or k == ops_nc - 1
+                log.info("OPSCLOSED|" + str.tostring(k) + ops_row)
+                ops_row := ""
+    if ops_no > 0
+        for k = 0 to ops_no - 1
+            ops_row += ";" + strategy.opentrades.entry_id(k) + ":" + str.tostring(strategy.opentrades.entry_bar_index(k)) + ":" +
+                 ops_f(strategy.opentrades.entry_price(k)) + ":" + ops_f(strategy.opentrades.size(k)) + ":" +
+                 ops_f(strategy.opentrades.profit(k))
+            if str.length(ops_row) > 3700 or k == ops_no - 1
+                log.info("OPSOPEN|" + str.tostring(k) + ops_row)
+                ops_row := ""

@@ -193,16 +193,17 @@ describe("the two silent namespace gaps", () => {
   it("color.from_gradient interpolates, clamps, and defaults alpha to opaque", () => {
     const at = (v: number) =>
       plotted(run(`//@version=4\nstudy("t")\nplot(1)\nbgcolor(color.from_gradient(${v}, 0, 10, #000000, #ffffff))`, 2));
+    // RGB truncates, as TradingView does (probe: dev-docs/tv-parity/_probes/color-gradient/).
     // Values come back through the plot pipeline as colours, so assert on the
     // stdlib directly for the arithmetic and on compilation for the wiring.
     expect(color.from_gradient(0, 0, 10, "#000000ff", "#ffffffff")).toBe("#000000ff");
-    expect(color.from_gradient(5, 0, 10, "#000000ff", "#ffffffff")).toBe("#808080ff");
+    expect(color.from_gradient(5, 0, 10, "#000000ff", "#ffffffff")).toBe("#7f7f7fff");
     expect(color.from_gradient(10, 0, 10, "#000000ff", "#ffffffff")).toBe("#ffffffff");
     // Outside the range Pine returns the endpoint rather than extrapolating.
     expect(color.from_gradient(-99, 0, 10, "#000000ff", "#ffffffff")).toBe("#000000ff");
     expect(color.from_gradient(99, 0, 10, "#000000ff", "#ffffffff")).toBe("#ffffffff");
     // #RRGGBB carries no alpha; the result must still be opaque, not transparent.
-    expect(color.from_gradient(5, 0, 10, "#ff0000", "#0000ff")).toBe("#800080ff");
+    expect(color.from_gradient(5, 0, 10, "#ff0000", "#0000ff")).toBe("#7f007fff");
     expect(() => at(5)).not.toThrow();
   });
 

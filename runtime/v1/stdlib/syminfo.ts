@@ -162,4 +162,73 @@ export const syminfo = {
      * @getter
      */
     type: (ctx: Context): string => ctx.symbolType,
+
+    /**
+     * "The number of minimum price ticks in one point" side of the mintick:
+     * `syminfo.mintick = syminfo.minmove / syminfo.pricescale`. With the
+     * host stating only the tick, minmove is 1 and pricescale its inverse.
+     * @getter
+     */
+    pricescale: (ctx: Context): number => (ctx.mintick > 0 ? Math.round(1 / ctx.mintick) : NaN),
+    /** @getter */
+    minmove: (ctx: Context): number => (ctx.mintick > 0 ? 1 : NaN),
+
+    /**
+     * Company and contract facts a host may know and this engine does not:
+     * empty strings, and `na` for the expiry of a symbol that is not a future.
+     * @getter
+     */
+    sector: (_ctx: Context): string => "",
+    /** @getter */
+    industry: (_ctx: Context): string => "",
+    /** @getter */
+    country: (_ctx: Context): string => "",
+    /** @getter */
+    expiration_date: (_ctx: Context): number => NaN,
+
+    /**
+     * What the symbol's volume counts: "base" (units of the base currency, as
+     * a crypto pair's does), "quote", "tick", or "n/a" when unspecified.
+     * @getter
+     */
+    volumetype: (ctx: Context): string => (ctx.symbolType === "crypto" ? "base" : "n/a"),
+
+    /**
+     * Company fundamentals and analyst figures: data a host may hold and this
+     * engine does not, so `na`.
+     * @getter
+     */
+    shares_outstanding_float: (_ctx: Context): number => NaN,
+    /** @getter */
+    shares_outstanding_total: (_ctx: Context): number => NaN,
+    /** @getter */
+    employees: (_ctx: Context): number => NaN,
+    /** @getter */
+    shareholders: (_ctx: Context): number => NaN,
+    /** @getter */
+    recommendations_buy: (_ctx: Context): number => NaN,
+    /** @getter */
+    recommendations_buy_strong: (_ctx: Context): number => NaN,
+    /** @getter */
+    recommendations_date: (_ctx: Context): number => NaN,
+    /** @getter */
+    recommendations_hold: (_ctx: Context): number => NaN,
+    /** @getter */
+    recommendations_sell: (_ctx: Context): number => NaN,
+    /** @getter */
+    recommendations_sell_strong: (_ctx: Context): number => NaN,
+    /** @getter */
+    recommendations_total: (_ctx: Context): number => NaN,
+    /** @getter */
+    target_price_average: (_ctx: Context): number => NaN,
+    /** @getter */
+    target_price_date: (_ctx: Context): number => NaN,
+    /** @getter */
+    target_price_estimates: (_ctx: Context): number => NaN,
+    /** @getter */
+    target_price_high: (_ctx: Context): number => NaN,
+    /** @getter */
+    target_price_low: (_ctx: Context): number => NaN,
+    /** @getter */
+    target_price_median: (_ctx: Context): number => NaN,
 };

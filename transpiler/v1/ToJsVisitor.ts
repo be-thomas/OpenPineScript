@@ -22,7 +22,7 @@
  * rule that does not apply to v1 simply is not written here.
  *
  * See transpiler/v3/ToJsVisitor.ts for a worked example, and
- * dev-docs/00-architecture-assessment.md for the rationale.
+ * docs/common/ARCHITECTURE.md ("Design rules") for the rationale.
  */
 
 import { ParseTreeVisitor } from "antlr4ng";
@@ -152,6 +152,36 @@ export function unwrapString(text: string): string {
   return text.replace(/\r?\n[ \t]*|\r[ \t]*/g, " ");
 }
 
+/**
+ * Is `node` provably a constant INT — an integer literal, or `+ - * / %` of
+ * integer literals, possibly signed and parenthesised?
+ *
+ * Literals only, deliberately. A name declared `x = 5` or `const int x = 5` is
+ * also "const int" in Pine's qualifier system, but the probe that settled the
+ * rule covered literals, and a wrong guess here silently changes a v5 result.
+ * Names wait for evidence.
+ */
+function isConstIntLiteral(node: any): boolean {
+  const kids = (n: any): any[] =>
+    Array.from({ length: n?.getChildCount?.() ?? 0 }, (_, i) => n.getChild(i));
+  const rules = (n: any): any[] => kids(n).filter(c => !c.symbol && typeof c.getChildCount === "function");
+  const kind = (n: any): string => n?.constructor?.name ?? "";
+
+  let n = node;
+  for (;;) {
+    const k = kind(n);
+    if (k === "Num_literalContext") return !!n.INT_LITERAL?.();
+    if (k === "AtomContext" && n.arith_expr?.()) { n = n.arith_expr(); continue; }
+    if (k === "Unary_exprContext" && !n.NOT?.()) { n = n.sqbr_expr(); continue; }
+    if (k === "Add_exprContext" && n.mult_expr().length > 1) return n.mult_expr().every(isConstIntLiteral);
+    if (k === "Mult_exprContext" && n.unary_expr().length > 1) return n.unary_expr().every(isConstIntLiteral);
+    if (k === "Sqbr_exprContext" && n.arith_expr?.(0)) return false;
+    const r = rules(n);
+    if (r.length === 1 && kids(n).length === 1) { n = r[0]; continue; }
+    return false;
+  }
+}
+
 export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   /**
    * Depth of user-function bodies currently being emitted.
@@ -240,7 +270,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    * v1–v3 get the generated registry unchanged. v4 overrides this with its own
    * view. Nothing about v4 appears in this file, which is the point: adding a
    * version must never mean editing an earlier one
-   * (dev-docs/00-architecture-assessment.md §5).
+   * (docs/common/ARCHITECTURE.md ("Design rules")).
    */
   protected get registry(): Record<string, StdlibEntry> {
     return BASE_REGISTRY;
@@ -323,13 +353,13 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   //
   // A later version that LIFTS one of these overrides the enforce* method to a
   // no-op. A later version that ADDS a rule declares it in its own subclass —
-  // never here. See dev-docs/00-architecture-assessment.md.
+  // never here. See docs/common/ARCHITECTURE.md ("Design rules").
   //
   // NOTE: v1's two other restrictions are enforced by the GRAMMAR, not here.
   // `x := expr` and `else if` have no rule in PineV1Parser.g4, so they are
   // syntax errors — which is what TradingView reports.
   //
-  // See dev-docs/01-version-delta-spec.md for the source of each rule.
+  // See docs/common/VERSIONS.md for the source of each rule.
   // ───────────────────────────────────────────────────────────────────────
 
   /** '==' / '!=' against 'na' silently misbehaves — require the na(x) function. */
@@ -460,8 +490,17 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     // not — and `Undeclared identifier` has to fire identically at v1 and v2,
     // which TradingView states are the same language.
     this.scopes = analyseScopes(ctx as any);
+    this.securityFunctions = this.collectSecurityFunctions(ctx);
 
-    const stmts = ctx.stmt().map((s) => this.visit(s)).filter(Boolean);
+    const stmts = ctx.stmt().map((s) => {
+      this.globalPrelude = [];
+      try {
+        const js = this.visit(s);
+        // Hoisted history series (see visitSqbr_expr) run before the statement
+        // that owns them, so they are written on every bar.
+        return this.globalPrelude.length ? [...this.globalPrelude, js].join("\n") : js;
+      } finally { this.globalPrelude = null; }
+    }).filter(Boolean);
     const body = stmts.join("\n");
 
     if (this.hoisted.size === 0) return body;
@@ -906,6 +945,20 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     });
 
 
+    this.checkTupleSource(ctx, ids);
+
+    const idsArrayJs = `[${ids.join(", ")}]`; 
+    const idsStringsJs = `[${ids.map(id => `"${this.seriesKey(id)}"`).join(", ")}]`;
+    const value = this.visit(ctx.arith_expr());
+
+    return `let ${idsArrayJs} = ctx.new_vars(${idsStringsJs}, ${value})`;
+  }
+
+  /**
+   * Where a `[a, b] = …` may take its values from, and how many there are.
+   * Throws on a source this version does not admit. A seam: v5 widens it.
+   */
+  protected checkTupleSource(ctx: Var_defsContext, ids: string[]): void {
     // V2 Constraint: Multi-variable assignment MUST originate from an authorized built-in tuple return
     const arith = ctx.arith_expr();
     
@@ -1000,11 +1053,6 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
         throw this.err(ctx, `Multi-variable assignment must originate directly from a supported built-in function call.`);
     }
 
-    const idsArrayJs = `[${ids.join(", ")}]`; 
-    const idsStringsJs = `[${ids.map(id => `"${this.seriesKey(id)}"`).join(", ")}]`;
-    const value = this.visit(ctx.arith_expr());
-
-    return `let ${idsArrayJs} = ctx.new_vars(${idsStringsJs}, ${value})`;
   }
 
   visitIds_array(ctx: Ids_arrayContext): string {
@@ -1042,7 +1090,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     return content?.if_expr?.() ?? content?.arith_expr?.()?.if_expr?.() ?? null;
   }
 
-  private isStatementPosition(ctx: If_exprContext): boolean {
+  protected isStatementPosition(ctx: If_exprContext): boolean {
     // `arith_expr : ternary_expr | if_expr | for_expr` is a transparent wrapper,
     // and `local_stmt_content` reaches if_expr THROUGH it, so the immediate
     // parent is Arith_exprContext in both statement and expression position.
@@ -1116,10 +1164,22 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
       // needs the branch TYPE, which this emitter does not infer, so a
       // bool-valued `if` with no `else` yields `na` here and `false` on
       // TradingView.
-      return plain ? result : `(() => { ${result} return NaN; })()`;
+      return plain ? result : `(() => { ${result} return ${this.ifFallthrough(ctx)}; })()`;
     } finally {
       this.suppressBlockReturn = saved;
     }
+  }
+
+  /**
+   * What an if-EXPRESSION evaluates to when no branch runs.
+   *
+   * `na` here, per the manual sentence quoted in `visitIf_expr`. A seam because
+   * v6 changes the answer for a bool-valued `if`: bools may no longer be `na`,
+   * so the unspecified branch yields `false` — which is the "KNOWN GAP" noted
+   * above, closed for the version where TradingView made it the rule.
+   */
+  protected ifFallthrough(_ctx: If_exprContext): string {
+    return "NaN";
   }
 
   /**
@@ -1267,7 +1327,20 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
         const target = topLevelReturns[topLevelReturns.length - 1];
         safeBody = rawBody.substring(0, target.index) + `${res} = ` + rawBody.substring(target.index + 7);
     }
-    return safeBody;
+    return this.catchLoopSignals(safeBody);
+  }
+
+  /**
+   * A `break`/`continue` that had to leave a function boundary (a v5 `switch`
+   * is emitted as one) arrives as a thrown loop signal; the loop whose body
+   * this is is the one it is for when no loop opened in between. Every loop
+   * form wraps its body with this, `while` included.
+   */
+  protected catchLoopSignals(body: string): string {
+    if (!body.includes("ctx.LOOP_BREAK") && !body.includes("ctx.LOOP_CONTINUE")) return body;
+    return `try {\n    ${body}\n    } catch (__signal) {\n` +
+        `      if (__signal === ctx.LOOP_BREAK) break;\n` +
+        `      if (__signal === ctx.LOOP_CONTINUE) continue;\n      throw __signal;\n    }`;
   }
 
   visitStmts_block(ctx: Stmts_blockContext): string {
@@ -1387,7 +1460,8 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      out = `(${out} ${this.operatorBefore(ctx as any, i)} ${parts[i]})`;
+      const helper = { "<": "safe_lt", ">": "safe_gt", "<=": "safe_le", ">=": "safe_ge" }[this.operatorBefore(ctx as any, i)];
+      out = `opsv2_${helper}(${out}, ${parts[i]})`;
     }
     return out;
   }
@@ -1418,9 +1492,38 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (parts.length === 1) return parts[0];
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
-      out = `(${out} ${this.operatorBefore(ctx as any, i)} ${parts[i]})`;
+      out = this.emitMultOp(out, this.operatorBefore(ctx as any, i), parts[i], ctx, i);
     }
     return out;
+  }
+
+  /**
+   * "v5: Division of two const int values truncates (5/2 = 2). Any input,
+   * simple, or series int keeps the remainder (2.5)." — the v6 migration
+   * guide, describing v5, and TradingView's own log agrees: `5 / 2` logs 2,
+   * while `input.int(5) / 2` and a series 5 / 2 log 2.5
+   * (conformance/common/v5_gaps_golden.test.ts).
+   *
+   * v1-v4 do the same (probes v1..v4-int-div: `1 / 3` is 0, `-7 / 2` is -3,
+   * `7 / 2.0` is 3.5, `bar_index / 7` keeps its fraction).
+   *
+   * Decided per operator, left to right: the chain so far must be a constant
+   * int, and so must the divisor. A seam rather than a flag, because v6
+   * reverses the rule and V6ToJsVisitor overrides `truncatesConstIntDivision`.
+   */
+  protected emitMultOp(left: string, op: string, right: string, ctx: Mult_exprContext, index: number): string {
+    if (op === "/" && this.truncatesConstIntDivision()) {
+      const operands = ctx.unary_expr();
+      if (operands.slice(0, index + 1).every(isConstIntLiteral)) {
+        return `Math.trunc(${left} / ${right})`;
+      }
+    }
+    return `(${left} ${op} ${right})`;
+  }
+
+  /** v1 through v5 truncate; see emitMultOp. */
+  protected truncatesConstIntDivision(): boolean {
+    return true;
   }
 
   visitUnary_expr(ctx: Unary_exprContext): string {
@@ -1429,6 +1532,137 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
     if (ctx.PLUS()) return `+${inner}`;
     if (ctx.MINUS()) return `-${inner}`;
     return inner;
+  }
+
+  /**
+   * Statements to emit immediately before the script-level statement being
+   * visited, or null outside one. Filled by `hoistHistoryBase`.
+   */
+  protected globalPrelude: string[] | null = null;
+
+  /**
+   * v2/v3 (any base) and v4 (call-free base) compute the base of `(expr)[n]`
+   * on EVERY bar when it sits in an `if`/`for` body, so TradingView reads true
+   * per-bar history there (v5/v6 carry the last value instead). Checked with
+   * Pine Logs: dev-docs/tv-parity/_probes/version-scope/ (v2-runtime,
+   * v3-runtime, v4-runtime, v6-expr-hist, v3-call-in-if).
+   *
+   * Returns the name of a series written every bar, emitted before the
+   * outermost script-level statement, or null when the hoist is not legal:
+   * not in a body, inside a function body, or a base that reads anything
+   * declared in a block, a loop counter, or a global not yet declared. Those
+   * cases are UNVERIFIED on TradingView and keep the carried series.
+   */
+  protected hoistHistoryBase(ctx: Sqbr_exprContext, base: string, id: string): string | null {
+    if (this.version < 2 || this.version > 4 || !this.globalPrelude) return null;
+
+    let inBody = false;
+    let stmt: any = null;
+    const loopVars = new Set<string>();
+    for (let n: any = (ctx as any).parent; n; n = n.parent) {
+      if (isRule(n, "Fun_def_singlelineContext") || isRule(n, "Fun_def_multilineContext")) return null;
+      if (isRule(n, "Local_stmts_multilineContext") || isRule(n, "Local_stmt_singlelineContext")) inBody = true;
+      if (isRule(n, "For_exprContext")) {
+        const v = n.var_def?.()?.id?.()?.getText?.();
+        if (v) loopVars.add(v);
+      }
+      if (isRule(n, "StmtContext")) stmt = n;
+    }
+    if (!inBody || !stmt) return null;
+
+    const atom: any = ctx.atom();
+    let legal = true;
+    const walk = (n: any): void => {
+      if (!legal || !n) return;
+      if (this.version === 4 && (isRule(n, "Fun_callContext") || isRule(n, "Call_suffixContext"))) {
+        legal = false; return;
+      }
+      if (isRule(n, "IdContext") && !(isRule(n.parent, "Kw_argContext") && n.parent.id?.() === n)) {
+        const isCallee = isRule(n.parent, "Fun_callContext") && n.parent.id?.() === n;
+        const text: string = n.getText();
+        const root = text.split(".")[0];
+        if (!isCallee) {
+          if (loopVars.has(root)) { legal = false; return; }
+          const scopes = this.scopes.scopesOf?.get(root);
+          if (scopes?.some(sc => sc !== null)) { legal = false; return; }
+          const decl = this.scopes.declared.get(root);
+          if (decl && decl.line >= stmt.start.line) { legal = false; return; }
+        }
+      }
+      const count = n.getChildCount?.() ?? 0;
+      for (let i = 0; i < count; i++) walk(n.getChild(i));
+    };
+    walk(atom);
+    if (!legal) return null;
+
+    const tmp = `${this.PREFIX}hist_${this.anonCounter++}`;
+    this.globalPrelude.push(`const ${tmp} = ctx.new_var(${id}, ${base});`);
+    return tmp;
+  }
+
+  /**
+   * `hlc3[1]`, `strategy.equity[1]`: a built-in series keeps its history on
+   * every bar, wherever the `[n]` sits. Emitted in place, the read is a getter
+   * call that only runs when its `if`/`for`/function body does, so the series
+   * had holes (`na`) on the bars the body skipped. Writing it before the
+   * script-level statement records it on every bar (probes:
+   * dev-docs/tv-parity/_probes/hlc3, sizing).
+   *
+   * Returns null when the base is not a bare built-in getter, there is no
+   * statement to hoist to, or it sits in a `security` argument (evaluated in
+   * the other context).
+   */
+  /**
+   * User functions called (directly or through another user function) from
+   * inside a `security` call's arguments. Filled by visitPine_script.
+   */
+  protected securityFunctions: ReadonlySet<string> = new Set();
+
+  protected collectSecurityFunctions(root: ParseTree): Set<string> {
+    const isSecurity = (n: any) =>
+      isRule(n, "Fun_callContext") && /(^|\.)security$|^request\.security/.test(n.id?.()?.getText?.() ?? "");
+    const defs = new Map<string, any>();
+    const found = new Set<string>();
+    const walk = (n: any, inSecurity: boolean): void => {
+      if (!n) return;
+      if (isRule(n, "Fun_def_singlelineContext") || isRule(n, "Fun_def_multilineContext")) {
+        defs.set(n.id().getText(), n);
+      }
+      const here = inSecurity || isSecurity(n);
+      if (here && isRule(n, "Fun_callContext") && this.userFunctions.has(n.id().getText())) found.add(n.id().getText());
+      const count = n.getChildCount?.() ?? 0;
+      for (let i = 0; i < count; i++) walk(n.getChild(i), here);
+    };
+    walk(root, false);
+    // a function the security expression reaches only through another function
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const name of [...found]) {
+        for (const other of defs.keys()) {
+          if (!found.has(other) && this.callsFunction(defs.get(name), other)) { found.add(other); grew = true; }
+        }
+      }
+    }
+    return found;
+  }
+
+  protected hoistBuiltinHistory(ctx: Sqbr_exprContext, base: string): { tmp: string; key: string } | null {
+    if (!this.globalPrelude) return null;
+    if (!/^ctx\.call\("[A-Za-z_][A-Za-z0-9_.]*@L\d+:C\d+", (?:ctx\.builtin\("[A-Za-z0-9_.]+"\)|[A-Za-z0-9_$.]+)\)$/.test(base)) return null;
+    for (let n: any = (ctx as any).parent; n; n = n.parent) {
+      if (isRule(n, "Fun_callContext") && /(^|\.)security$|^request\.security/.test(n.id?.()?.getText?.() ?? "")) return null;
+      // A function the script calls from a `security` expression runs in that
+      // context: a chart-context series written before the statement would be
+      // the chart's history, not the other timeframe's.
+      if ((isRule(n, "Fun_def_singlelineContext") || isRule(n, "Fun_def_multilineContext"))
+          && this.securityFunctions.has(n.id().getText())) return null;
+    }
+    // Its own id prefix: `Context.isOuterUserSeries` must not treat this as a
+    // user variable read from inside a function (per-call-site history).
+    const key = `"opsv2_builtin_hist_${this.anonCounter++}"`;
+    const tmp = `${this.PREFIX}hist_${this.anonCounter++}`;
+    this.globalPrelude.push(`const ${tmp} = ctx.new_var(${key}, ${base});`);
+    return { tmp, key };
   }
 
   // --- Series Access with ID Tagging ---
@@ -1463,8 +1697,36 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
       } else {
         // Complex expression history lookup: (close > open)[1] or sma(close, 14)[1]
         // We use the Inline Hook strategy to evaluate, store, and fetch in one line!
+        //
+        // `obj.field[n]` is the exception: TradingView reads the field of the
+        // object as it was n bars ago, `(obj[n]).field`, from the object
+        // variable's own history (checked with Pine Logs:
+        // dev-docs/tv-parity/_probes/udt-cond-formats/tv-run).
+        const fieldRead = /^((?:ctx\.field\()+)([A-Za-z_$][A-Za-z0-9_$]*)((?:, "[A-Za-z0-9_$]+"\))+)$/.exec(base);
+        if (fieldRead) {
+          const root = fieldRead[2];
+          return `${fieldRead[1]}ctx.get(${root}, ${index}, "${this.seriesKey(root)}")${fieldRead[3]}`;
+        }
         const anonId = `"opsv2_anon_expr_${this.anonCounter++}"`;
-        return `ctx.get(ctx.new_var(${anonId}, ${base}), ${index}, ${anonId})`;
+        // v1 predates `if` blocks, so its series is written wherever it runs.
+        if (this.version === 1) return `ctx.get(ctx.new_var(${anonId}, ${base}), ${index}, ${anonId})`;
+        const builtin = this.hoistBuiltinHistory(ctx, base);
+        if (builtin) return `ctx.get(${builtin.tmp}, ${index}, ${builtin.key})`;
+        const hoisted =this.hoistHistoryBase(ctx, base, anonId);
+        if (hoisted) {
+          // The hoisted write covers the bars the body does not run. Where the body DOES run, the
+          // base is evaluated again in place (same series, overwriting the bar's slot), so it sees
+          // the `:=` above it in the block. Not with a call in the base: a second call would add a
+          // second entry to the call's per-call history.
+          const hasCall = (n: any): boolean => isRule(n, "Fun_callContext") || isRule(n, "Call_suffixContext")
+            || Array.from({ length: n.getChildCount?.() ?? 0 }, (_, i) => n.getChild(i)).some(hasCall);
+          if (!hasCall(ctx.atom())) return `ctx.get(ctx.new_var(${anonId}, ${base}), ${index}, ${anonId})`;
+          return `ctx.get(${hoisted}, ${index}, ${anonId})`;
+        }
+        // v5/v6 — and v2-v4 where the hoist is not legal (UNVERIFIED on
+        // TradingView there): the series is bar-indexed and carries its last
+        // value over bars the expression did not run on (an `if`/`for` body).
+        return `ctx.get(ctx.new_anon(${anonId}, ${base}), ${index}, ${anonId})`;
       }
     }
     return base;
@@ -1685,7 +1947,9 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
 
   visitNum_literal(ctx: Num_literalContext): string {
     const t = ctx.INT_LITERAL() ?? ctx.FLOAT_LITERAL();
-    return t ? t.getText() : "";
+    // Leading zeros are a number to Pine and a syntax error to JavaScript:
+    // `00.00` and `007` are written in published scripts.
+    return t ? t.getText().replace(/^0+(?=\d)/, "") : "";
   }
 
   visitOther_literal(ctx: Other_literalContext): string {

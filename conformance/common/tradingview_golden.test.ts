@@ -396,11 +396,29 @@ function findCsvs(): string[] {
     const dir = path.join(GOLDEN_DIR, entry.name, "golden");
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir)) {
-      if (/\.(csv|log)$/i.test(f)) out.push(path.join(entry.name, "golden", f));
+      if (!/\.(csv|log)$/i.test(f)) continue;
+      if (COMPARED_ELSEWHERE.has(f.split(".")[0])) continue;
+      out.push(path.join(entry.name, "golden", f));
     }
   }
   return out.sort();
 }
+
+/**
+ * Harnesses whose logs this file does not read, and the test that does.
+ *
+ * Everything here is compared NUMERICALLY, column by column, after a warm-up.
+ * harness_v5_gaps logs lists and exact integers — `[3;0;1;2;4]`, a colour as
+ * 0xRRGGBB — which have no tolerance to speak of and no warm-up, so it is
+ * replayed string-for-string by conformance/common/v5_gaps_golden.test.ts.
+ * The v6 probes are the same kind of log, replayed by v6_golden.test.ts.
+ */
+const COMPARED_ELSEWHERE = new Set([
+  "harness_v5_gaps",
+  "harness_v6_language", "harness_v6_strategy", "harness_v6_footprint",
+  // OPS row logs of strategy order semantics: conformance/common/strategy_harness_golden.test.ts.
+  "harness_strategy_pyr0_v6", "harness_strategy_pyr3_v6", "harness_strategy_pooc_v6", "harness_release_notes_04_v6",
+]);
 
 const CSVS = findCsvs();
 

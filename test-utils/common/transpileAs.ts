@@ -3,18 +3,19 @@
  *
  * The version matrix is the core testing idea: a behaviour is asserted at
  * EVERY version, including the versions where it is illegal. See
- * dev-docs/03-tdd-workflow.md.
+ * docs/common/CONFORMANCE.md ("Testing").
  */
 import {
   compileScript,
   transpile,
   IMPLEMENTED_VERSIONS as ROUTER_IMPLEMENTED,
 } from "../../transpiler/common";
-import type { PineVersion } from "../../transpiler/common/version";
+import { KNOWN_VERSIONS, type PineVersion } from "../../transpiler/common/version";
 
 export type { PineVersion };
 
-export const ALL_VERSIONS: PineVersion[] = [1, 2, 3, 4, 5];
+/** Every version Pine has, from the version module rather than restated here. */
+export const ALL_VERSIONS: PineVersion[] = [...KNOWN_VERSIONS];
 
 /**
  * Versions the engine currently implements.

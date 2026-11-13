@@ -12,7 +12,14 @@
 const fs = require("fs");
 const path = require("path");
 
-const VERSIONS = [1, 2, 3, 4, 5];
+// Derived from grammar/, not hard-coded: build-grammars.mjs discovers versions
+// the same way, and a list here that lags behind it fails the count check below
+// with "did the parser generation step fail?" — which would be the wrong answer.
+const VERSIONS = fs
+    .readdirSync(path.join(__dirname, "../../grammar"))
+    .filter(d => /^v\d+$/.test(d))
+    .map(d => Number(d.slice(1)))
+    .sort((a, b) => a - b);
 let patched = 0;
 
 for (const v of VERSIONS) {

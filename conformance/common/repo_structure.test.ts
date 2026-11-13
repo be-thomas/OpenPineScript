@@ -148,7 +148,7 @@ describe("test discovery", () => {
 
   it("every version directory under tests/ is discovered", () => {
     // tests/ is organised by language version — see
-    // dev-docs/00-architecture-assessment.md §6. A version directory that
+    // docs/common/ARCHITECTURE.md ("Design rules"). A version directory that
     // exists but contains no suite is a silent hole.
     for (const v of ["v1", "v2", "v3"]) {
       const dir = path.join(ROOT, "tests", v);
@@ -161,7 +161,7 @@ describe("test discovery", () => {
 /**
  * ── The version layout ──────────────────────────────────────────────────────
  *
- * Every top-level folder holds ONLY `v1`–`v5` and `common`, and no loose files.
+ * Every top-level folder holds ONLY `v1`–`v6` and `common`, and no loose files.
  * The rule and its rationale are in CONTRIBUTING.md; this is the part that
  * fails the build, because a convention nothing checks is a convention that
  * rots.
@@ -179,7 +179,7 @@ describe("test discovery", () => {
  * is the package's, not this repository's. `node_modules` is not ours.
  */
 describe("every top-level folder follows the version layout", () => {
-  const ALLOWED = new Set(["v1", "v2", "v3", "v4", "v5", "common"]);
+  const ALLOWED = new Set(["v1", "v2", "v3", "v4", "v5", "v6", "common"]);
   const EXEMPT = new Set(["node_modules", "dev-docs", "results", "dist"]);
 
   const topLevel = fs.readdirSync(ROOT, { withFileTypes: true })

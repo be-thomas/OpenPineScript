@@ -1,0 +1,39 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// OPS probe: when TradingView deletes drawings past max_*_count, and how many
+// it keeps. harness_trader_club found 505 lines kept against a limit of 500;
+// this pins the rule down.
+//
+//   1. BINANCE:BTCUSDT, 5-minute chart. Add to chart; wait for a live tick.
+//   2. More (⋮) → Pine Logs → export or copy everything.
+//   3. Save as conformance/v5/parity/probe_drawing_limits.BTCUSDT.5.csv
+//
+//   HIST|bar|lines      one line per bar, limit 10: the count after each bar
+//   LOOP|n,n,n…         30 labels in one execution, limit 10: the count after
+//                       each label.new, inside the execution
+//   AFTER|labels        the label count on the next bar, after the burst
+//   LF|before|after     linefill.new on two na lines: does it create anything
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("OPS drawing limits probe", overlay = true, max_lines_count = 10, max_labels_count = 10)
+
+if bar_index < 30
+    line.new(bar_index, close, bar_index + 1, close)
+    log.info("HIST|" + str.tostring(bar_index) + "|" + str.tostring(line.all.size()))
+
+if bar_index == 40
+    before = linefill.all.size()
+    line nl = na
+    linefill.new(nl, nl, color.red)
+    log.info("LF|" + str.tostring(before) + "|" + str.tostring(linefill.all.size()))
+
+if barstate.islastconfirmedhistory
+    s = ""
+    for k = 1 to 30
+        label.new(bar_index, close, str.tostring(k))
+        s += (k > 1 ? "," : "") + str.tostring(label.all.size())
+    log.info("LOOP|" + s)
+
+varip bool after = false
+if barstate.isrealtime and not after
+    after := true
+    log.info("AFTER|" + str.tostring(label.all.size()))

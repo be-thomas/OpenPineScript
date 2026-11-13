@@ -96,7 +96,7 @@ describe("+= is Pine's +, not JavaScript's", () => {
   it("propagates na, rather than coercing it to 0 or NaN-by-accident", () => {
     // `na + 1` is `na` in Pine. A raw JS `+` would give NaN here too, so the
     // test that discriminates is the one below.
-    const src = HEAD + "x = na\nx += 1\n";
+    const src = HEAD + "float x = na\nx += 1\n";
     expect(Number.isNaN(run(src, [1], "x"))).toBe(true);
   });
 

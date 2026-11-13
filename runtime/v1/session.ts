@@ -13,11 +13,14 @@
  * The render model is derived from `ctx` (plots/fills/scriptMeta/trades), so the
  * typed PlotData union maps straight onto chart structures.
  */
-import { compileScript } from "../../transpiler/common";
+import { compileScript, noVersionHint } from "../../transpiler/common";
 import type { PineVersion } from "../../transpiler/common/version";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 import { compile, Context } from "./index";
-import type { Context as Ctx, PlotData, ScriptMeta, SecurityCandle, Drawing, LogEntry, Position, InputDef, Trade, EquityPoint } from "./context";
+import { paletteColor } from "./palette";
+import { specSeconds } from "./timeframes";
+import { requestKey } from "./stdlib/request";
+import type { Context as Ctx, PineLocation, PlotData, ScriptMeta, SecurityCandle, Drawing, LogEntry, Position, InputDef, Trade, EquityPoint } from "./context";
 
 // ─── Wire contract (mirrors ui-engine-control-protocol §5) ─────────────────────
 
@@ -26,9 +29,24 @@ export const ENGINE_VERSION = "v2" as const;
 
 export interface EngineError {
     phase: "parse" | "transpile" | "runtime";
+    /**
+     * The Pine source line and column, 1-based line and 0-based column as the
+     * compile errors report them. For a runtime error, where the call that
+     * raised it is; absent when the error was raised outside any call.
+     */
     line?: number;
     col?: number;
+    /**
+     * Set when a runtime error was raised inside an imported library: its
+     * alias, and the library's own line and column. `line` and `col` then
+     * name the call in the user's script that led there.
+     */
+    library?: { alias: string; line: number; col: number };
     message: string;
+    /** For a runtime error from `runHistory`: the bar (0-based index) it was raised on. */
+    bar?: number;
+    /** The parser's own text, when `message` was rewritten to say what is wrong. */
+    detail?: string;
     severity: "error" | "warning";
 }
 
@@ -110,6 +128,24 @@ export interface RenderSeries {
     location?: string;
     /** `plotshape`/`plotchar` text, and its size, when the script set them. */
     text?: string; size?: string;
+    /**
+     * Colour of a marker's text. `plotshape`/`plotchar` `textcolor`, or
+     * TradingView's default `color.blue` in the script's own palette when the
+     * script gave none (TradingView drew plotshape text with no textcolor in
+     * #2962FF on v5; OpenChartingView e2e/tradingview-drawings/page3.png).
+     * Present on marker series only.
+     */
+    textcolor?: string;
+    /**
+     * The `offset` the script gave `plot`/`plotshape`/`plotchar`, in bars
+     * (negative = left). Present only when it is non-zero.
+     *
+     * INFORMATIONAL: `data` is already shifted. The value computed on bar `n`
+     * sits at index `n + offset`, so a negative offset leaves the last
+     * |offset| entries null and a positive one extends `data` past the last
+     * bar. A host draws `data[i]` at bar `i` and must not shift it again.
+     */
+    offset?: number;
     data: RenderPoint[];
 }
 
@@ -132,6 +168,24 @@ export interface SimResult {
          * `null` at a bar means the fill is not drawn there.
          */
         colors?: Array<string | null>;
+        /**
+         * `fill(show_last = N)`: the fill covers only the last N bars. Already
+         * applied to `colors`, where every earlier bar is `null`; present for
+         * a host that wants the number.
+         */
+        showLast?: number;
+        /**
+         * The gradient overload, `fill(a, b, top_value, bottom_value, top_color,
+         * bottom_color)`: a vertical gradient between the two plots, `top_color`
+         * at the price `top_value` and `bottom_color` at `bottom_value`, each
+         * bar's own. The arrays are per bar, `null` where the fill is not
+         * drawn. `color` means nothing on a gradient fill.
+         */
+        gradient?: true;
+        topValues?: Array<number | null>;
+        bottomValues?: Array<number | null>;
+        topColors?: Array<string | null>;
+        bottomColors?: Array<string | null>;
     }>;
     trades: any[];
     /**
@@ -170,6 +224,21 @@ export interface SimResult {
     logs: LogEntry[];
     alerts: any[];
     errors: EngineError[];
+    /**
+     * Arguments the script passed that this engine does not implement, and so
+     * ignored, as `"function(parameter)"` -- `"fill(display)"`. Empty when the
+     * run honoured everything it was given. A host can say so beside a result
+     * that differs from TradingView's.
+     */
+    droppedArguments: string[];
+    /**
+     * Things the host got wrong or left unsaid that change what the script
+     * computed, in words a person can act on. Empty when there are none.
+     * Today: the chart's timeframe and symbol were never set (`Session.setChart`),
+     * and a `request.security` / `security_lower_tf` for data the host never
+     * supplied (`Session.provideData`), one note per symbol and timeframe.
+     */
+    warnings: string[];
 }
 
 export interface RenderDelta {
@@ -181,21 +250,39 @@ export interface RenderDelta {
 
 export interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number }
 
+/** Options for `Session.runHistory`. */
+export interface RunOptions {
+    /**
+     * Called as the run advances: `done` bars of `total` have been processed.
+     * Roughly every 1% of the bars, and once more at the end. A callback that
+     * throws is ignored: a host's progress display cannot fail the run. With
+     * no callback the run does nothing extra.
+     */
+    onProgress?: (done: number, total: number) => void;
+}
+
 // ─── Error normalization (B4) ──────────────────────────────────────────────────
 
 function toEngineErrors(e: any): EngineError[] {
     if (e && Array.isArray(e.errors)) {
         return e.errors.map((x: any) => ({
-            phase: "parse" as const, line: x.line, col: x.column, message: x.message, severity: "error" as const,
+            phase: "parse" as const, line: x.line, col: x.column, message: x.message,
+            ...(x.original !== undefined ? { detail: x.original } : {}), severity: "error" as const,
         }));
     }
     const msg = String(e?.message ?? e);
-    const loc = msg.match(/@L(\d+):C(\d+)/);
+    const pine = e?.pine as PineLocation | undefined;
+    // A runtime error knows the call it came from (Context.locateError); a
+    // message may also carry one, as the transpiler's do.
+    const at = pine?.library ? pine.caller : pine;
+    const loc = at ? null : msg.match(/@L(\d+):C(\d+)/);
     return [{
         phase: "transpile",
-        line: loc ? Number(loc[1]) : undefined,
-        col: loc ? Number(loc[2]) : undefined,
+        line: at ? at.line : loc ? Number(loc[1]) : undefined,
+        col: at ? at.col : loc ? Number(loc[2]) : undefined,
+        ...(pine?.library ? { library: { alias: pine.library, line: pine.line, col: pine.col } } : {}),
         message: msg,
+        ...(typeof e?.detail === "string" ? { detail: e.detail } : {}),
         severity: "error",
     }];
 }
@@ -204,7 +291,12 @@ function toEngineErrors(e: any): EngineError[] {
 
 const MARKER_TYPES = new Set(["shape", "char"]);
 
-function plotToSeries(id: string, entries: (PlotData | null)[], meta: ScriptMeta | null): RenderSeries {
+const shiftOf = (d: PlotData | undefined): number => {
+    const n = Math.trunc(Number((d as any)?.offset));
+    return Number.isFinite(n) ? n : 0;
+};
+
+function plotToSeries(id: string, entries: (PlotData | null)[], meta: ScriptMeta | null, defaultTextColor: string): RenderSeries {
     const sample = entries.find((d): d is PlotData => d !== null);
     const rawType = sample?.type ?? "line";
     const type: SeriesType =
@@ -285,6 +377,11 @@ function plotToSeries(id: string, entries: (PlotData | null)[], meta: ScriptMeta
         ...(sample && (sample as any).location !== undefined ? { location: (sample as any).location } : {}),
         ...(sample && (sample as any).text !== undefined ? { text: String((sample as any).text) } : {}),
         ...(sample && (sample as any).size !== undefined ? { size: String((sample as any).size) } : {}),
+        ...(type === "marker"
+            ? { textcolor: typeof (sample as any)?.textcolor === "string" && (sample as any).textcolor !== ""
+                  ? (sample as any).textcolor : defaultTextColor }
+            : {}),
+        ...(shiftOf(sample) !== 0 ? { offset: shiftOf(sample) } : {}),
         data,
     };
 }
@@ -501,23 +598,36 @@ function buildPerformance(ctx: Ctx): Performance | null {
     };
 }
 
-export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | "engineVersion" | "errors"> {
+export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | "engineVersion" | "errors" | "warnings"> {
     const meta = ctx.scriptMeta;
     const series: RenderSeries[] = [];
-    for (const [id, entries] of ctx.plots) series.push(plotToSeries(id, entries, meta));
+    for (const [id, entries] of ctx.plots) series.push(plotToSeries(id, entries, meta, paletteColor(ctx, "blue")));
 
     const fills: SimResult["fills"] = [];
     for (const [, entries] of ctx.fills) {
         const f = entries.find((d) => d !== null);
         if (!f) continue;
-        const colors = entries.map((d) => (d ? d.color : null));
+        // fill(show_last): "the number of bars, from the last bar back to the
+        // past, to fill on the chart". `currentBarIndex` is the count of bars the
+        // run completed, so the last N start N before it.
+        const showLast = [...entries].reverse().find((d) => d?.showLast !== undefined)?.showLast;
+        const firstShown = showLast === undefined ? 0 : ctx.currentBarIndex - showLast;
+        const colors = entries.map((d, i) => (d && i >= firstShown ? d.color : null));
         const distinct = new Set(colors.filter((c): c is string => c !== null));
         fills.push({
-            plotId1: f.plotId1, plotId2: f.plotId2, color: f.color, title: f.title,
+            plotId1: f.plotId1, plotId2: f.plotId2, color: (entries.find((d, i) => d && i >= firstShown) ?? f).color, title: f.title,
             // Carried only when it varies, exactly as a plot's per-point
             // colour is: one colour on the fill is the common case and the
             // array is 5,000 strings a host would have no use for.
-            ...(distinct.size > 1 ? { colors } : {}),
+            ...(distinct.size > 1 || showLast !== undefined ? { colors } : {}),
+            ...(showLast !== undefined ? { showLast } : {}),
+            ...(f.gradient ? {
+                gradient: true as const,
+                topValues: entries.map((d, i) => (d && i >= firstShown ? d.top_value ?? null : null)),
+                bottomValues: entries.map((d, i) => (d && i >= firstShown ? d.bottom_value ?? null : null)),
+                topColors: entries.map((d, i) => (d && i >= firstShown ? d.top_color ?? null : null)),
+                bottomColors: entries.map((d, i) => (d && i >= firstShown ? d.bottom_color ?? null : null)),
+            } : {}),
         });
     }
 
@@ -536,6 +646,7 @@ export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | 
         drawings: [...ctx.drawings.values()],
         logs: ctx.logs.slice(),
         alerts: [], // alertcondition: reserved (P2)
+        droppedArguments: [...ctx.droppedArguments],
     };
 }
 
@@ -643,6 +754,60 @@ function propertyViews(ctx: Ctx): PropertyView[] {
 
 // ─── Session (B3) ───────────────────────────────────────────────────────────────
 
+/**
+ * What the host knows about the chart the script is running on, and the engine
+ * cannot learn from OHLCV bars: its timeframe and the symbol's facts.
+ *
+ * `timeframe` is Pine's own spelling — "1", "5", "60", "240", "D", "W", "M",
+ * "12M", "1S" — NOT a charting library's ("5m", "1H"). Everything else is
+ * optional and falls back to the engine's defaults (see Context.provideSymbolInfo).
+ */
+export interface ChartSettings {
+    symbol: string;
+    timeframe: string;
+    mintick?: number;
+    type?: string;
+    currency?: string;
+    basecurrency?: string;
+    description?: string;
+    /** The exchange's IANA zone; `time(tf, session)` evaluates sessions in it. */
+    timezone?: string;
+    pointvalue?: number;
+    session?: string;
+    mincontract?: number;
+    root?: string;
+}
+
+/** Message carried by `SimResult.warnings` when the host never called `setChart`. */
+export const CHART_NOT_SET_WARNING =
+    "chart not set: timeframe defaults to D and symbol to SYMBOL — call Session.setChart";
+
+/**
+ * Pine's timeframe format, case-sensitively: a count (optional) and a unit
+ * ("S" seconds, none = minutes, "D", "W", "M"). `specSeconds` upper-cases its
+ * input, which would read "5m" as five MONTHS — so the shape is checked here.
+ */
+function validateChart(chart: ChartSettings): void {
+    if (!chart || typeof chart !== "object") throw new Error("setChart: a chart object is required");
+    if (typeof chart.symbol !== "string" || chart.symbol === "") {
+        throw new Error("setChart: symbol must be a non-empty string");
+    }
+    const tf = chart.timeframe;
+    if (typeof tf !== "string" || !/^\d*[SDWM]?$/.test(tf) || !Number.isFinite(specSeconds(tf))) {
+        throw new Error(
+            `setChart: timeframe ${JSON.stringify(tf)} is not a Pine timeframe — ` +
+            `use "1", "5", "60", "240", "D", "W", "M", "12M" or "1S" (not "5m" or "1H")`,
+        );
+    }
+}
+
+function applyChart(ctx: Ctx, chart: ChartSettings | null): void {
+    if (!chart) return;
+    ctx.resolution = chart.timeframe;
+    const { timeframe: _tf, ...info } = chart;
+    ctx.provideSymbolInfo(info);
+}
+
 export class Session {
     private js: string | null = null;
     private meta: ScriptMeta | null = null;
@@ -657,9 +822,30 @@ export class Session {
     private profile: LanguageProfile = DEFAULT_PROFILE;
     /** Pine Script version detected in the last compile(). */
     public pineVersion: PineVersion = 1;
+    // The chart the host declared; applied to every Context this session creates.
+    private chart: ChartSettings | null = null;
 
-    /** Transpile + validate; a 1-bar dry run on a throwaway context discovers inputs + metadata. */
-    compile(source: string): Compiled {
+    /**
+     * Tell the engine which chart it is running on: the timeframe and the
+     * symbol's facts. A host MUST call this — none of it can be derived from
+     * bars, and scripts branch on it (`timeframe.period`, `syminfo.type`,
+     * session windows in the exchange's `timezone`). It applies to the compile
+     * dry run and every `runHistory`; call it again to change the chart.
+     * Throws on a timeframe that is not in Pine's format.
+     */
+    setChart(chart: ChartSettings): void {
+        validateChart(chart);
+        this.chart = { ...chart };
+    }
+
+    /**
+     * Transpile + validate; a 1-bar dry run on a throwaway context discovers inputs + metadata.
+     *
+     * `opts.libraries`: sources for the libraries the script imports, keyed by
+     * `user/name/version` (see `requiredLibraries` for finding which). An
+     * import with no source is a compile error naming the library.
+     */
+    compile(source: string, opts: { libraries?: Readonly<Record<string, string>> } = {}): Compiled {
         // Reset ALL per-script state up front, version included. Writing
         // profile/pineVersion only inside the try left a failed compile
         // reporting the PREVIOUS script's version through the public field.
@@ -669,8 +855,8 @@ export class Session {
 
         let js: string;
         try {
-            const compiled = compileScript(source);
-            js = compiled.js.replace(/\blet\b/g, "var ");
+            const compiled = compileScript(source, { libraries: opts.libraries, editorRules: true });
+            js = letToVar(compiled.js);
             this.profile = compiled.profile;
             this.pineVersion = compiled.version;
         } catch (e) {
@@ -678,13 +864,32 @@ export class Session {
         }
 
         const ctx = new Context(this.profile);
+        applyChart(ctx, this.chart);
         Object.assign(ctx.propertyOverrides, this.propertyValues);
+        // The dry bar runs the script, so `request.currency_rate` must find its series.
+        for (const r of this.currencyRates) ctx.provideRequestData("currency_rate", requestKey([r.from, r.to]), r.samples);
+        let exec: () => void;
         try {
-            const exec = compile(js, ctx, Object.create(null));
+            exec = compile(js, ctx, Object.create(null));
+        } catch (e) {
+            // The emitted JavaScript did not even load: still the transpiler's.
+            return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: null, inputs: [], properties: [], errors: toEngineErrors(e) };
+        }
+        try {
             ctx.setBar(0, 1, 1, 1, 1, 1); // dry bar: input()/study()/strategy() run here
             exec();
         } catch (e) {
-            return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: null, inputs: [], properties: [], errors: toEngineErrors(e) };
+            // The script transpiled; this is what it did on the dry bar. A host
+            // that shows `phase` shows it as the run-time error it is, with the
+            // line `Context.locateError` pinned to it -- unless the error is
+            // about the script itself (a built-in this engine lacks, a name this
+            // version bans), which is the transpiler's kind and stays one.
+            const phase = (e as any)?.compileTime === true ? "transpile" as const : "runtime" as const;
+            // A script with no version line was read as v1, and what the dry bar
+            // found missing is very likely only that.
+            const hint = phase === "transpile" ? noVersionHint(source) : "";
+            const errors = toEngineErrors(e).map((x) => ({ ...x, phase, message: x.message + hint }));
+            return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: null, inputs: [], properties: [], errors };
         }
 
         this.js = js; this.meta = ctx.scriptMeta;
@@ -715,6 +920,22 @@ export class Session {
         Object.assign(this.propertyValues, values);
     }
 
+    private currencyRates: Array<{ from: string; to: string; samples: Array<{ time: number; value: number }> }> = [];
+
+    /**
+     * Supplies the daily conversion rate from one currency to another (what
+     * `request.currency_rate(from, to)` answers), as `{ time, value }` samples
+     * where `time` is the start of the day in ms. A strategy whose
+     * `strategy(currency = to)` differs from `syminfo.currency` (= `from`)
+     * books its closed trades at the rate in effect at the exit bar.
+     */
+    provideCurrencyRate(from: string, to: string, samples: Array<{ time: number; value: number }>): void {
+        const i = this.currencyRates.findIndex(r => r.from === from && r.to === to);
+        if (i >= 0) this.currencyRates[i] = { from, to, samples };
+        else this.currencyRates.push({ from, to, samples });
+        if (this.ctx) this.ctx.provideRequestData("currency_rate", requestKey([from, to]), samples);
+    }
+
     provideData(symbol: string, resolution: string, candles: SecurityCandle[]): void {
         this.securities.push({ symbol, resolution, candles });
         if (this.ctx) this.ctx.provideSecurityData(symbol, resolution, candles);
@@ -725,34 +946,111 @@ export class Session {
      * the sandbox's series references always match (ctx.reset() would re-create
      * the base series and orphan the sandbox bindings).
      */
-    runHistory(candles: Candle[]): SimResult {
+    runHistory(candles: Candle[], opts: RunOptions = {}): SimResult {
+        // Performance: the history keeps a rollback point per call site per bar
+        // only where the script repeats the call (see `Context.repeatingSites`),
+        // which it learns by being told: the first run does not know, and a
+        // call it finds repeated without one starts the run again with that
+        // site added. The results are those of a run that kept every point; only
+        // the cloning is spared (about 70% of a long run: 77 s, now 11.8 s).
+        // After four restarts it keeps them all.
+        //
+        // Invariants: a restart runs the whole history again on a fresh
+        // `Context`, so anything a run reports to the host before it returns
+        // would be reported twice. Today that is only `onProgress`; a callback
+        // added to `RunOptions` that reports during the run (alerts, logs,
+        // drawings) must be held back until `runHistoryOnce` returns a result,
+        // or this restart has to go. The forming bar that follows the history
+        // keeps a point at every site (`repeatingSites` is reset to null).
+        // Guarded by tests/v1/runtime/lazy_rollback_points.test.ts and
+        // rollback_snapshot_work.test.ts.
+        const repeating = new Set<string>();
+        for (let attempt = 0; ; attempt++) {
+            const result = this.runHistoryOnce(candles, opts, attempt < 4 ? repeating : null);
+            if (result) return result;
+        }
+    }
+
+    /** One pass of `runHistory`; null when it must start over (see there). */
+    private runHistoryOnce(candles: Candle[], opts: RunOptions, repeating: Set<string> | null): SimResult | null {
         if (!this.js) throw new Error("compile() first");
         const ctx = new Context(this.profile);
+        ctx.repeatingSites = repeating;
+        applyChart(ctx, this.chart);
         const exec = compile(this.js, ctx, Object.create(null));
         Object.assign(ctx.userInputs, this.inputValues);
         // Before the first bar: `declareScript` reads these, and it runs on it.
         Object.assign(ctx.propertyOverrides, this.propertyValues);
         for (const s of this.securities) ctx.provideSecurityData(s.symbol, s.resolution, s.candles);
+        for (const r of this.currencyRates) ctx.provideRequestData("currency_rate", requestKey([r.from, r.to]), r.samples);
         // `last_bar_index` / `last_bar_time` are documented as known from the
         // first bar, and only the caller knows how long the run is.
         if (candles.length > 0) {
             ctx.provideDatasetExtent(candles.length, candles[candles.length - 1].time);
         }
+        ctx.chartAhead = candles;
         this.ctx = ctx; this.exec = exec;
 
         const errors: EngineError[] = [];
+        const onProgress = opts.onProgress;
+        const total = candles.length;
+        // 0 disables the check below, so a run without a callback pays one
+        // comparison of a constant per bar.
+        const every = onProgress ? Math.max(1, Math.ceil(total / 100)) : 0;
+        const report = (done: number) => { try { onProgress!(done, total); } catch { /* a progress display cannot fail the run */ } };
         try {
-            for (let i = 0; i < candles.length; i++) {
+            for (let i = 0; i < total; i++) {
                 const b = candles[i];
-                ctx.setBar(b.time, b.open, b.high, b.low, b.close, b.volume);
-                exec();
+                if (ctx.calcOnOrderFills) {
+                    ctx.runBarWithFills(b.time, b.open, b.high, b.low, b.close, b.volume, exec);
+                } else {
+                    ctx.setBar(b.time, b.open, b.high, b.low, b.close, b.volume);
+                    exec();
+                }
                 ctx.finalizeBar();
+                if (every !== 0 && (i + 1) % every === 0 && i + 1 < total) report(i + 1);
             }
+            if (every !== 0) report(total);
         } catch (e) {
-            errors.push(...toEngineErrors({ ...(e as any), message: (e as any)?.message }).map((x) => ({ ...x, phase: "runtime" as const })));
+            // TradingView words it "Error on bar 10: In 'array.get()' function. Index 5
+            // is out of bounds, array size is 3." (parse_errors/pe6b_array_get_out_of_bounds_used.png):
+            // the bar it was raised on goes in `bar`, the sentence in `message`.
+            const bar = ctx.currentBarIndex;
+            errors.push(...toEngineErrors({ ...(e as any), message: (e as any)?.message }).map((x) => ({
+                ...x, phase: "runtime" as const, bar })));
         }
-        return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, ...buildRenderModel(ctx), errors };
+        if (repeating && ctx.missedRepeat !== null) {
+            repeating.add(ctx.missedRepeat);
+            return null;
+        }
+        // The forming bar that may follow takes a rollback point at every site.
+        ctx.repeatingSites = null;
+        const warnings = this.chart ? [] : [CHART_NOT_SET_WARNING];
+        // A request the host never supplied is not an error -- the script runs
+        // on, with `na` where the data would be -- so without a note the
+        // result looks like a script that plots nothing.
+        for (const key of ctx.requestedSecurities) {
+            const at = key.lastIndexOf("@");
+            const symbol = key.slice(0, at), timeframe = key.slice(at + 1);
+            warnings.push(
+                `no data was supplied for ${symbol} at timeframe ${timeframe}: what the script requested ` +
+                `from it is na (empty for request.security_lower_tf) — call Session.provideData(${JSON.stringify(symbol)}, ` +
+                `${JSON.stringify(timeframe)}, candles)`);
+        }
+        const account = ctx.scriptMeta?.currency;
+        if (account && account !== ctx.currency && !ctx.getRequestData("currency_rate", requestKey([ctx.currency, account]))) {
+            warnings.push(
+                `the strategy's currency is ${account} but the symbol's is ${ctx.currency}, and no rate was supplied: ` +
+                `results stay in ${ctx.currency} — call Session.provideCurrencyRate(${JSON.stringify(ctx.currency)}, ` +
+                `${JSON.stringify(account)}, samples)`);
+        }
+        return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, ...buildRenderModel(ctx), errors,
+            warnings,
+        };
     }
+
+    /** The forming bar's latest tick, replayed by `commit()` when no final candle is given. */
+    private lastTick: Candle | null = null;
 
     /** Live tick on the forming bar (P3). Honors calc_on_every_tick. */
     tick(candle: Candle): RenderDelta {
@@ -760,16 +1058,34 @@ export class Session {
         if (!ctx || !exec) throw new Error("runHistory() first");
         const everyTick = this.meta?.kind !== "strategy" || this.meta?.calc_on_every_tick !== false;
         ctx.applyTick(candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume);
+        this.lastTick = candle;
         if (everyTick) exec();
         return this.deltaForFormingBar();
     }
 
-    /** Close the forming bar; recompute once if calc_on_every_tick was off. */
-    commit(): { barIndex: number } {
+    /**
+     * Close the forming bar. TradingView runs the script one more time as the bar
+     * closes: a rollback re-execution on the bar's FINAL candle with
+     * `barstate.isconfirmed` true and `isnew` false (rt-confirmed-v6/v5 probes).
+     * `finalCandle` is that final OHLCV; without it the last tick's values are used
+     * (a bar that never ticked gets no closing execution). A strategy with
+     * calc_on_every_tick off executes only here, so this is its first execution
+     * (`isnew` true) as well as its confirmed one.
+     */
+    commit(finalCandle?: Candle): { barIndex: number } {
         const ctx = this.ctx, exec = this.exec;
         if (!ctx || !exec) throw new Error("compile() first");
         const everyTick = this.meta?.kind !== "strategy" || this.meta?.calc_on_every_tick !== false;
-        if (!everyTick) exec(); // compute the bar once at close
+        // The closing execution is probed on v5 and v6 only; v1-v4 compute a calc_on_every_tick=false bar once.
+        const c = ctx.realtimeBarStates ? (finalCandle ?? this.lastTick) : null;
+        if (!ctx.realtimeBarStates && !everyTick) exec();
+        if (c) ctx.applyTick(c.time, c.open, c.high, c.low, c.close, c.volume); // rolls back like a tick
+        if (c || (ctx.realtimeBarStates && !everyTick)) {
+            if (!everyTick) ctx.is_new = true;
+            ctx.is_confirmed = true;
+            exec();
+        }
+        this.lastTick = null;
         const barIndex = ctx.currentBarIndex;
         ctx.commitBar();
         return { barIndex };
@@ -790,21 +1106,83 @@ export class Session {
     }
 }
 
+/**
+ * `let` declarations in the emitted JS as `var`, and nothing else.
+ *
+ * A scanner, not a regex: string literals, comments and template literals
+ * (including code inside `${…}`) are tracked, and only a whole identifier
+ * `let` in code is rewritten -- not `$let`, not `x.let`, not the "let it be"
+ * in a script's or an inlined library's string.
+ */
+export function letToVar(js: string): string {
+    let out = "";
+    let prev = "";                 // last non-space code character
+    let depth = 0;                 // open `{` in code
+    const templates: number[] = []; // depth at which each open `${` began
+    let i = 0;
+    const n = js.length;
+    const template = () => {       // from just inside a backtick (or after `}` closing a `${`)
+        while (i < n) {
+            const c = js[i];
+            if (c === "\\") { out += js.slice(i, i + 2); i += 2; continue; }
+            if (c === "`") { out += c; i++; prev = c; return; }
+            if (c === "$" && js[i + 1] === "{") { out += "${"; i += 2; templates.push(depth); depth++; prev = "{"; return; }
+            out += c; i++;
+        }
+    };
+    while (i < n) {
+        const c = js[i];
+        if (c === '"' || c === "'") {
+            let j = i + 1;
+            while (j < n && js[j] !== c && js[j] !== "\n") j += js[j] === "\\" ? 2 : 1;
+            out += js.slice(i, j + 1); i = j + 1; prev = c; continue;
+        }
+        if (c === "`") { out += c; i++; template(); continue; }
+        if (c === "/" && js[i + 1] === "/") { const j = js.indexOf("\n", i); const e = j < 0 ? n : j; out += js.slice(i, e); i = e; continue; }
+        if (c === "/" && js[i + 1] === "*") { const j = js.indexOf("*/", i + 2); const e = j < 0 ? n : j + 2; out += js.slice(i, e); i = e; continue; }
+        if (c === "{") { depth++; out += c; i++; prev = c; continue; }
+        if (c === "}") {
+            depth--; out += c; i++; prev = c;
+            if (templates.length && depth === templates[templates.length - 1]) { templates.pop(); template(); }
+            continue;
+        }
+        if (/[A-Za-z_$]/.test(c)) {
+            let j = i + 1;
+            while (j < n && /[\w$]/.test(js[j])) j++;
+            const word = js.slice(i, j);
+            out += word === "let" && prev !== "." ? "var" : word;
+            i = j; prev = word[word.length - 1]; continue;
+        }
+        out += c; i++;
+        if (!/\s/.test(c)) prev = c;
+    }
+    return out;
+}
+
 /** One-shot convenience: compile + runHistory. */
 export function runScript(
     source: string,
-    opts: { candles: Candle[]; inputs?: Record<string, any>; properties?: Record<string, any>; securities?: Array<{ symbol: string; resolution: string; candles: SecurityCandle[] }> } = { candles: [] }
+    opts: {
+        candles: Candle[]; inputs?: Record<string, any>; properties?: Record<string, any>;
+        securities?: Array<{ symbol: string; resolution: string; candles: SecurityCandle[] }>;
+        /** Library sources by import path, as for `Session.compile`. */
+        libraries?: Readonly<Record<string, string>>;
+        /** The chart, as for `Session.setChart`. Without it the result carries a warning. */
+        chart?: ChartSettings;
+    } = { candles: [] }
 ): SimResult {
     const s = new Session();
+    if (opts.chart) s.setChart(opts.chart);
     if (opts.properties) s.setProperties(opts.properties);
-    const compiled = s.compile(source);
+    const compiled = s.compile(source, { libraries: opts.libraries });
     if (compiled.errors.length) {
         return {
             protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, meta: compiled.meta,
             barsProcessed: 0, series: [], fills: [], trades: [],
             position: { size: 0, avgPrice: 0 }, summary: null,
             performance: null, equity: [],
-            drawings: [], logs: [], alerts: [], errors: compiled.errors,
+            drawings: [], logs: [], alerts: [], errors: compiled.errors, droppedArguments: [],
+            warnings: opts.chart ? [] : [CHART_NOT_SET_WARNING],
         };
     }
     if (opts.inputs) s.setInputs(opts.inputs);

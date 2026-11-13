@@ -7,7 +7,7 @@
  *   v1/v2 → barmerge.lookahead_on   (the historical default)
  *   v3+   → barmerge.lookahead_off  (flipped by the v2→v3 migration)
  *
- * See dev-docs/01-version-delta-spec.md §2 D3.1.
+ * See docs/common/VERSIONS.md §2 D3.1.
  */
 
 export const __IS_NAMESPACE__ = true;

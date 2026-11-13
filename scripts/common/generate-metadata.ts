@@ -58,7 +58,7 @@ function generateConfig(stdlibPath: string) {
         // them put V4_RENAMES, V4_REMOVED and V4_ONLY_NAMESPACES into the
         // registry as though a script could spell them.
         return [".ts", ".js"].includes(ext)
-            && !["index", "metadata", "registry", "renames", "renames5"].includes(name);
+            && !["index", "metadata", "registry", "renames", "renames5", "renames6", "sort_field"].includes(name);
     });
 
     project.addSourceFilesAtPaths(files.map(f => path.join(absolutePath, f)));
@@ -262,6 +262,24 @@ ${registryEntries.join("\n")}
 `;
 
     const outputFile = path.join(absolutePath, "metadata.ts");
+
+    // `--check`: report drift instead of writing. metadata.ts is committed, and
+    // every test loads the committed copy — so a stdlib edit that changes what
+    // the generator would publish is invisible to the suite until someone runs
+    // a build. That is how broker internals (`strategy.val`,
+    // `strategy.fillMarketOrders`, a `viaLimit` argument) sat one `npm run
+    // build` away from becoming Pine built-ins. tests/common/metadata_drift
+    // runs this.
+    if (process.argv.includes("--check")) {
+        const current = fs.existsSync(outputFile) ? fs.readFileSync(outputFile, "utf8") : "";
+        if (current !== content) {
+            console.error(`metadata.ts is stale: regenerate with \`npx ts-node scripts/common/generate-metadata.ts\`.`);
+            process.exit(1);
+        }
+        console.log("metadata.ts is up to date.");
+        return;
+    }
+
     fs.writeFileSync(outputFile, content);
     console.log(`✅ Registry generated with structured types at: ${outputFile}`);
 }

@@ -1,0 +1,99 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// OPS drawing gallery: every drawing style TradingView renders, laid out on a
+// grid, so Zeal Terminal's renderer can be matched to it pixel for pixel.
+//
+// Sizes in Pine (size.tiny … size.huge, line widths, label padding) are fixed
+// in screen pixels, so they can be measured from a screenshot at any zoom.
+//
+//   1. BINANCE:BTCUSDT, 5-minute chart, dark theme. Add to chart.
+//   2. For each Page (Settings → Inputs → Page = 1, 2, 3, 4): scroll so the
+//      last bar is near the right edge, and take a screenshot of the chart
+//      at your normal browser zoom (100%). Note the zoom if it isn't 100%.
+//
+//   Page 1  label styles, each with text, size.normal
+//   Page 2  label sizes tiny…huge, text alignment, na background, text colours
+//   Page 3  plotshape / plotchar: every shape, above and below bar, with text
+//   Page 4  lines (style × width, extend), boxes, linefill, polyline, table
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("OPS drawing gallery", overlay = true, max_labels_count = 500, max_lines_count = 500, max_boxes_count = 500)
+
+page = input.int(1, "Page", minval = 1, maxval = 4)
+
+hi = ta.highest(high, 150)
+lo = ta.lowest(low, 150)
+rowY(k, rows) => hi - (hi - lo) * (k + 0.5) / rows
+// A bar index: TradingView refuses a float x ("series float … but a 'series
+// int' is expected").
+colX(c) => int(math.round(last_bar_index - 140 + c * 14))
+
+if barstate.islast and page == 1
+    styles = array.from(label.style_label_up, label.style_label_down, label.style_label_left, label.style_label_right,
+         label.style_label_center, label.style_label_upper_left, label.style_label_upper_right,
+         label.style_label_lower_left, label.style_label_lower_right, label.style_none, label.style_text_outline,
+         label.style_xcross, label.style_cross, label.style_triangleup, label.style_triangledown, label.style_flag,
+         label.style_circle, label.style_arrowup, label.style_arrowdown, label.style_square, label.style_diamond)
+    for [k, st] in styles
+        c = k % 7
+        r = math.floor(k / 7)
+        label.new(colX(c * 1.4), rowY(r, 3), "Sell " + str.tostring(k), style = st, color = color.red, textcolor = color.white, size = size.normal)
+
+if barstate.islast and page == 2
+    sizes = array.from(size.tiny, size.small, size.normal, size.large, size.huge)
+    for [k, sz] in sizes
+        label.new(colX(k * 2), rowY(0, 4), "Buy", style = label.style_label_up, color = color.green, textcolor = color.white, size = sz)
+        label.new(colX(k * 2), rowY(1, 4), "▼", style = label.style_label_down, color = color(na), textcolor = color.red, size = sz)
+    label.new(colX(0), rowY(2, 4), "left\naligned text", style = label.style_label_down, color = color.blue, textcolor = color.white, textalign = text.align_left)
+    label.new(colX(3), rowY(2, 4), "center\naligned text", style = label.style_label_down, color = color.blue, textcolor = color.white, textalign = text.align_center)
+    label.new(colX(6), rowY(2, 4), "right\naligned text", style = label.style_label_down, color = color.blue, textcolor = color.white, textalign = text.align_right)
+    label.new(colX(0), rowY(3, 4), "transparent 100", style = label.style_label_up, color = color.new(color.white, 100), textcolor = color.blue)
+    label.new(colX(3), rowY(3, 4), "transparent 50", style = label.style_label_up, color = color.new(color.orange, 50), textcolor = color.black)
+    label.new(colX(6), rowY(3, 4), "default colours", style = label.style_label_down)
+
+g3 = page == 3
+pick(c) => g3 and bar_index == colX(c)
+plotshape(pick(0), "xcross", shape.xcross, location.abovebar, color.red)
+plotshape(pick(1), "cross", shape.cross, location.abovebar, color.red)
+plotshape(pick(2), "triangleup", shape.triangleup, location.abovebar, color.red)
+plotshape(pick(3), "triangledown", shape.triangledown, location.abovebar, color.red)
+plotshape(pick(4), "flag", shape.flag, location.abovebar, color.red)
+plotshape(pick(5), "circle", shape.circle, location.abovebar, color.red)
+plotshape(pick(6), "arrowup", shape.arrowup, location.abovebar, color.red)
+plotshape(pick(7), "arrowdown", shape.arrowdown, location.abovebar, color.red)
+plotshape(pick(8), "square", shape.square, location.abovebar, color.red)
+plotshape(pick(9), "diamond", shape.diamond, location.abovebar, color.red)
+plotshape(pick(0), "xcross t", shape.xcross, location.belowbar, color.teal, text = "xc")
+plotshape(pick(2), "triangleup t", shape.triangleup, location.belowbar, color.teal, text = "up")
+plotshape(pick(4), "circle t", shape.circle, location.belowbar, color.teal, text = "ci", size = size.small)
+plotshape(pick(6), "arrowup t", shape.arrowup, location.belowbar, color.teal, text = "ar", size = size.large)
+plotshape(pick(8), "square t", shape.square, location.belowbar, color.teal, text = "sq", size = size.huge)
+plotshape(g3 and bar_index == colX(1) ? hi : na, "labelup tiny", shape.labelup, location.absolute, color.green, text = "Buy", textcolor = color.white, size = size.tiny)
+plotshape(g3 and bar_index == colX(3) ? hi : na, "labelup small", shape.labelup, location.absolute, color.green, text = "Buy", textcolor = color.white, size = size.small)
+plotshape(g3 and bar_index == colX(5) ? hi : na, "labelup normal", shape.labelup, location.absolute, color.green, text = "Buy", textcolor = color.white, size = size.normal)
+plotshape(g3 and bar_index == colX(7) ? hi : na, "labeldown tiny", shape.labeldown, location.absolute, color.red, text = "Sell", textcolor = color.white, size = size.tiny)
+plotshape(g3 and bar_index == colX(9) ? hi : na, "labeldown large", shape.labeldown, location.absolute, color.red, text = "Sell", textcolor = color.white, size = size.large)
+plotshape(g3 and bar_index == colX(5) ? lo : na, "labelup auto", shape.labelup, location.absolute, color.green, text = "auto")
+plotchar(pick(9), "char", "★", location.belowbar, color.orange, text = "ch", size = size.normal)
+
+if barstate.islast and page == 4
+    styles = array.from(line.style_solid, line.style_dashed, line.style_dotted, line.style_arrow_left, line.style_arrow_right, line.style_arrow_both)
+    for [k, st] in styles
+        for w = 1 to 4
+            line.new(colX(w * 2), rowY(k, 9), colX(w * 2 + 1), rowY(k, 9), style = st, width = w, color = color.aqua)
+    exts = array.from(extend.none, extend.left, extend.right, extend.both)
+    for [k, ex] in exts
+        line.new(colX(3), rowY(6, 9) - k * (hi - lo) / 40, colX(4), rowY(6, 9) - k * (hi - lo) / 40, extend = ex, color = color.yellow)
+    l1 = line.new(colX(0), rowY(7, 9), colX(4), rowY(7.4, 9), color = color.blue)
+    l2 = line.new(colX(0), rowY(8, 9), colX(4), rowY(7.8, 9), color = color.red)
+    linefill.new(l1, l2, color.new(color.blue, 80))
+    box.new(colX(6), rowY(6, 9), colX(8), rowY(7, 9), border_color = color.orange, bgcolor = color.new(color.orange, 80))
+    box.new(colX(6), rowY(7.3, 9), colX(8), rowY(8.3, 9), border_color = color.lime, border_width = 3, border_style = line.style_dashed, bgcolor = color.new(color.lime, 85), text = "box text", text_color = color.white)
+    pts = array.new<chart.point>()
+    for k = 0 to 6
+        pts.push(chart.point.from_index(colX(9 + k * 0.3), rowY(6.2 + (k % 2) * 1.5, 9)))
+    polyline.new(pts, line_color = color.fuchsia, line_width = 2)
+    t = table.new(position.bottom_right, 2, 2, bgcolor = #1e222d, border_color = #373a46, border_width = 1, frame_color = #373a46, frame_width = 1)
+    t.cell(0, 0, "tiny", text_color = color.white, text_size = size.tiny)
+    t.cell(1, 0, "normal", text_color = color.white, text_size = size.normal)
+    t.cell(0, 1, "large", text_color = color.yellow, text_size = size.large, bgcolor = color.new(color.blue, 60))
+    t.cell(1, 1, "right", text_color = color.white, text_halign = text.align_right, width = 10)

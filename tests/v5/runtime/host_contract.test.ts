@@ -1,7 +1,7 @@
 /**
  * The contract a HOST depends on, as distinct from the one a script does.
  *
- * These are the guarantees dev-docs/integration/ tells an integrator to rely
+ * These are the guarantees docs/common/integration/ tells an integrator to rely
  * on. Every one of them was broken at some point while that guide was being
  * written, and none of the other suites noticed: they drive the engine the way
  * the engine's own tests do, not the way an embedding application does.

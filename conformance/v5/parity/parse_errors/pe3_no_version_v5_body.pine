@@ -1,0 +1,3 @@
+indicator("PE no version line")
+x = ta.sma(close, 14)
+plot(x)

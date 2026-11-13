@@ -36,7 +36,7 @@
  * and the row would pass while asserting nothing. Those rows carry a `sources`
  * override for v5.
  *
- * Source for each rule: dev-docs/01-version-delta-spec.md §5.
+ * Source for each rule: docs/common/VERSIONS.md §5.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -68,7 +68,7 @@ const RULES: Rule[] = [
     // v2 introduced ':=' with no scope restriction, and v3 changed nothing
     // about it. This row previously expected a v2 GUARD; see the sourcing note
     // in transpiler/v2/ToJsVisitor.ts for why that was wrong.
-    expected: { 1: "syntax", 2: "accept", 3: "accept", 4: "accept", 5: "accept" },
+    expected: { 1: "syntax", 2: "accept", 3: "accept", 4: "accept", 5: "accept", 6: "accept" },
   },
   {
     name: "':=' on a name that was never declared",
@@ -81,7 +81,7 @@ const RULES: Rule[] = [
   {
     name: "':=' on a for-loop accumulator",
     source: "sum = 0\nfor i = 0 to 5\n    sum := sum + i\n",
-    expected: { 1: "syntax", 2: "accept", 3: "accept", 4: "accept", 5: "accept" },
+    expected: { 1: "syntax", 2: "accept", 3: "accept", 4: "accept", 5: "accept", 6: "accept" },
   },
   {
     name: "'x == na' comparison",
@@ -94,13 +94,13 @@ const RULES: Rule[] = [
   {
     name: "na(x) function",
     source: "y = na(close) ? 1 : 0\n",
-    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "accept" },
+    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "accept", 6: "accept" },
   },
   {
     name: "direct self-recursion",
     source: "f(x) => f(x)\n",
     // Recursion is banned in every Pine version.
-    expected: { 1: "guard", 2: "guard", 3: "guard", 4: "guard", 5: "guard" },
+    expected: { 1: "guard", 2: "guard", 3: "guard", 4: "guard", 5: "guard", 6: "guard" },
     because: /recursion is not allowed/,
   },
   {
@@ -108,8 +108,11 @@ const RULES: Rule[] = [
     source: 'study("X")\nstrategy.entry("L", strategy.long)\n',
     // v5 renamed the directive, so the v1-v4 source is rejected there for
     // naming `study` and never reaches the rule. The rule itself is unchanged.
-    sources: { 5: 'indicator("X")\nstrategy.entry("L", strategy.long)\n' },
-    expected: { 1: "guard", 2: "guard", 3: "guard", 4: "guard", 5: "guard" },
+    sources: {
+      5: 'indicator("X")\nstrategy.entry("L", strategy.long)\n',
+      6: 'indicator("X")\nstrategy.entry("L", strategy.long)\n',
+    },
+    expected: { 1: "guard", 2: "guard", 3: "guard", 4: "guard", 5: "guard", 6: "guard" },
     because: /unavailable in an? (study|indicator)\(\) script/,
   },
   {
@@ -122,7 +125,7 @@ const RULES: Rule[] = [
     name: "self-referencing declaration",
     source: "s = nz(s[1]) + close\nplot(s)\n",
     // v3 removed self-reference: declare first, then assign with ':='.
-    expected: { 1: "accept", 2: "accept", 3: "guard", 4: "guard", 5: "guard" },
+    expected: { 1: "accept", 2: "accept", 3: "guard", 4: "guard", 5: "guard", 6: "guard" },
     because: /cannot reference itself/,
   },
   {
@@ -130,32 +133,52 @@ const RULES: Rule[] = [
     source: "i = 0\nwhile i < 3\n    i := i + 1\n",
     // Added in v5. Before that the keyword does not exist, so `while i < 3` is
     // read as two statements and fails to parse.
-    expected: { 1: "syntax", 2: "syntax", 3: "syntax", 4: "syntax", 5: "accept" },
+    expected: { 1: "syntax", 2: "syntax", 3: "syntax", 4: "syntax", 5: "accept", 6: "accept" },
   },
   {
     name: "'switch' expression",
     source: "x = 1\nd = switch x\n    1 => 10\n    => 20\n",
-    expected: { 1: "syntax", 2: "syntax", 3: "syntax", 4: "syntax", 5: "accept" },
+    expected: { 1: "syntax", 2: "syntax", 3: "syntax", 4: "syntax", 5: "accept", 6: "accept" },
   },
   {
     name: "flat TA spelling (sma)",
     source: "plot(sma(close, 10))\n",
     // v5 moved the whole library under `ta.`; the flat name is gone.
-    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "guard" },
+    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "guard", 6: "guard" },
     because: /'sma' was renamed to 'ta\.sma' in Pine Script v5/,
   },
   {
     name: "a v5 reserved word as a variable name",
     source: "range = 5\nplot(range)\n",
-    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "guard" },
-    because: /'range' is a reserved word in Pine Script v5/,
+    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "guard", 6: "guard" },
+    because: /'range' is a reserved word in Pine Script v[56]/,
   },
   {
     name: "implicit bool→number arithmetic",
     source: "c = (close > open) + 1\nplot(c)\n",
     // v3 prohibits the implicit conversion; use `b ? 1 : 0`.
-    expected: { 1: "accept", 2: "accept", 3: "guard", 4: "guard", 5: "guard" },
+    expected: { 1: "accept", 2: "accept", 3: "guard", 4: "guard", 5: "guard", 6: "guard" },
     because: /cannot use a bool as an operand/,
+  },
+  {
+    name: "'once' block",
+    source: "once\n    x = 1\nplot(close)\n",
+    // Release notes, August 2026. Before v6 the keyword does not exist, so
+    // `once` followed by an indented block is not a statement.
+    expected: { 1: "syntax", 2: "syntax", 3: "syntax", 4: "syntax", 5: "syntax", 6: "accept" },
+  },
+  {
+    name: "'once' as a variable name",
+    source: "once = 5\nplot(once)\n",
+    // An ordinary name through v5. v6 makes it a keyword, so binding it is no
+    // longer a declaration the grammar can read.
+    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "accept", 6: "syntax" },
+  },
+  {
+    name: "triple-quoted string",
+    source: 's = """a\nb"""\nplot(close)\n',
+    // Release notes, April 2026.
+    expected: { 1: "syntax", 2: "syntax", 3: "syntax", 4: "syntax", 5: "syntax", 6: "accept" },
   },
 ];
 
@@ -219,7 +242,7 @@ describe("matrix coverage", () => {
     expect(
       IMPLEMENTED_VERSIONS.length,
       "a version became implemented — turn its intent cells into real assertions",
-    ).toBe(5);
+    ).toBe(6);
   });
 
   it("an unimplemented version, if one ever exists again, refuses every rule", () => {

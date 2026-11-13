@@ -53,7 +53,11 @@ describe("every rename resolves at v5 to what its v4 spelling meant", () => {
     it(`${from} → ${to}`, () => {
       expect(V5_VIEW[to], `${to} is missing from the v5 view`).toBeDefined();
       if (IMPLEMENTED_NOT_ALIASED.has(to)) {
-        expect(V5_VIEW[to].ref).not.toBe(V4_VIEW[from].ref);
+        // v4's own `tostring` is now the same two-argument implementation:
+        // TradingView v4 formats `tostring(x, format)` exactly as v5 does
+        // (dev-docs/tv-parity/_probes/version-scope/v4-draw-fmt). What must
+        // hold is that v5 did not inherit a one-argument version.
+        expect(V5_VIEW[to].args).toEqual(["value", "format"]);
         return;
       }
       expect(V5_VIEW[to].ref).toBe(V4_VIEW[from].ref);

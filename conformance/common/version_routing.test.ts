@@ -105,6 +105,6 @@ describe("profile invariants", () => {
     // Guards against re-introducing config that nothing reads, where a test
     // would only ever assert the constant against itself.
     expect(Object.keys(LANGUAGE_PROFILES[1].defaults).sort())
-      .toEqual(["scriptDirective", "securityLookahead"]);
+      .toEqual(["palette", "scriptDirective", "securityLookahead"]);
   });
 });

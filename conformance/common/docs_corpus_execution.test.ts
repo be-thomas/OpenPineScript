@@ -103,7 +103,7 @@ const errors = [...RESULTS].filter(([, e]) => e !== null) as Array<[string, stri
 const EXPECTED: Record<string, RegExp> = {
   // ── The script's own error ────────────────────────────────────────────────
   // Out-of-bounds and shape demos. Each says so in its own source or title.
-  "v4/v4-essential-arrays-21.pine": /array\.set: index 3 is out of bounds/,
+  "v4/v4-essential-arrays-21.pine": /In 'array\.set\(\)' function\. Index 3 is out of bounds/,
   "v4/v4-essential-arrays-23.pine": /array\.push: expected an array, got na/,
   // `lastHiBar = -highestbars(high, 100)` is `na` until 100 bars exist —
   // TradingView's own output says so, which is what put the warm-up gate into
@@ -116,10 +116,10 @@ const EXPECTED: Record<string, RegExp> = {
   // rather than raise. Nothing in the manual states which, and no export covers
   // it. Pinned with the cause named rather than quietly reverting a warm-up
   // rule that TradingView's own numbers establish across two harnesses.
-  "v4/v4-essential-arrays-03.pine": /array\.get: index NaN is out of bounds/,
+  "v4/v4-essential-arrays-03.pine": /In 'array\.get\(\)' function\. Index NaN is out of bounds/,
   // The same page in its v5 spelling, failing for the same reason.
-  "v5/v5-language-arrays-06.pine": /array\.get: index NaN is out of bounds/,
-  "v5/v5-language-arrays-29.pine":  /array\.set: index 3 is out of bounds/,
+  "v5/v5-language-arrays-06.pine": /In 'array\.get\(\)' function\. Index NaN is out of bounds/,
+  "v5/v5-language-arrays-29.pine":  /In 'array\.set\(\)' function\. Index 3 is out of bounds/,
   "v5/v5-language-arrays-33.pine":  /array\.push: expected an array, got na/,
   // `input.int(0, "Array size")` defaults to an EMPTY array, and popping one is
   // an error on TradingView too. The page is about the loop being protected
@@ -157,14 +157,14 @@ const EXPECTED: Record<string, RegExp> = {
   "v5/v5-release-notes-00.pine": /request\.financial: no data was supplied/,
 
   // ── A deliberate refusal ──────────────────────────────────────────────────
-  "v4/v4-annotations-price-levels-hline-00.pine": /'accdist' is a Pine built-in that OpenPineScript does not implement/,
+  "v4/v4-annotations-price-levels-hline-00.pine": /'accdist' is a Pine built-in that this engine does not implement/,
   // The v5 spelling of the same refusal. It used to read `undefined` instead:
   // the register poisons `opsv2_accdist` on the sandbox, and v5 writes
   // `opsv2_ta.opsv2_accdist`, so a sandbox property literally named
   // "opsv2_ta.accdist" was unreachable by any identifier. The Chaikin
   // oscillator on TradingView's Text and shapes page was NaN on every bar
   // while the v4 script one page over correctly refused.
-  "v5/v5-concepts-text-and-shapes-07.pine": /'ta\.accdist' is a Pine built-in that OpenPineScript does not implement/,
+  "v5/v5-concepts-text-and-shapes-07.pine": /'ta\.accdist' is a Pine built-in that this engine does not implement/,
   "v4/v4-essential-non-standard-chart-types-data-03.pine": /^renko: /,
   "v4/v4-essential-non-standard-chart-types-data-04.pine": /^linebreak: /,
   "v4/v4-essential-non-standard-chart-types-data-05.pine": /^kagi: /,

@@ -6,4 +6,4 @@
 import { PineV1Lexer } from "../../parser/v1/generated/PineV1Lexer.js";
 import { IndentTokenSource } from "./IndentTokenSource.js";
 
-export class PineV1TokenSource extends IndentTokenSource(PineV1Lexer) {}
+export class PineV1TokenSource extends IndentTokenSource(PineV1Lexer, { strictContinuation: true, columnZeroEndsCall: true }) {}

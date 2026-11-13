@@ -17,12 +17,15 @@ import { Enum_fieldContext } from "./PineV5Parser.js";
 import { Export_stmtContext } from "./PineV5Parser.js";
 import { Import_stmtContext } from "./PineV5Parser.js";
 import { Import_pathContext } from "./PineV5Parser.js";
+import { Import_userContext } from "./PineV5Parser.js";
+import { User_partContext } from "./PineV5Parser.js";
 import { Fun_paramContext } from "./PineV5Parser.js";
 import { Type_argsContext } from "./PineV5Parser.js";
 import { Type_argContext } from "./PineV5Parser.js";
 import { For_in_exprContext } from "./PineV5Parser.js";
 import { Call_suffixContext } from "./PineV5Parser.js";
 import { Fun_callContext } from "./PineV5Parser.js";
+import { AtomContext } from "./PineV5Parser.js";
 import { IdContext } from "./PineV5Parser.js";
 import { StmtContext } from "./PineV5Parser.js";
 import { Fun_headContext } from "./PineV5Parser.js";
@@ -66,7 +69,6 @@ import { Add_exprContext } from "./PineV5Parser.js";
 import { Mult_exprContext } from "./PineV5Parser.js";
 import { Unary_exprContext } from "./PineV5Parser.js";
 import { Sqbr_exprContext } from "./PineV5Parser.js";
-import { AtomContext } from "./PineV5Parser.js";
 import { Fun_actual_argsContext } from "./PineV5Parser.js";
 import { Kw_argsContext } from "./PineV5Parser.js";
 import { Kw_argContext } from "./PineV5Parser.js";
@@ -174,6 +176,18 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      */
     visitImport_path?: (ctx: Import_pathContext) => Result;
     /**
+     * Visit a parse tree produced by `PineV5Parser.import_user`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitImport_user?: (ctx: Import_userContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV5Parser.user_part`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitUser_part?: (ctx: User_partContext) => Result;
+    /**
      * Visit a parse tree produced by `PineV5Parser.fun_param`.
      * @param ctx the parse tree
      * @return the visitor result
@@ -209,6 +223,12 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitFun_call?: (ctx: Fun_callContext) => Result;
+    /**
+     * Visit a parse tree produced by `PineV5Parser.atom`.
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    visitAtom?: (ctx: AtomContext) => Result;
     /**
      * Visit a parse tree produced by `PineV5Parser.id`.
      * @param ctx the parse tree
@@ -467,12 +487,6 @@ export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
      * @return the visitor result
      */
     visitSqbr_expr?: (ctx: Sqbr_exprContext) => Result;
-    /**
-     * Visit a parse tree produced by `PineV5Parser.atom`.
-     * @param ctx the parse tree
-     * @return the visitor result
-     */
-    visitAtom?: (ctx: AtomContext) => Result;
     /**
      * Visit a parse tree produced by `PineV5Parser.fun_actual_args`.
      * @param ctx the parse tree

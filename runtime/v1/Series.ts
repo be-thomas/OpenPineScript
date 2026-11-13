@@ -72,6 +72,28 @@ export class Series<T = any> {
         return this;
     }
 
+    /**
+     * update() for the series behind a history reference on an expression
+     * (`(close + 0)[3]`), which TradingView indexes by BAR: on a bar where the
+     * expression is not evaluated -- inside an `if` or `for` body -- it keeps
+     * its last value, and `[n]` reads n bars back in that carried series.
+     *
+     * The bars skipped since the last write are filled with that last value
+     * here, so `get` stays a plain lookup and no other series changes meaning.
+     * Before the first evaluation they stay holes, which read as na.
+     */
+    public updateCarry(val: T | null): Series<T> {
+        if (this.startBarIndex !== -1) {
+            const last = this.buffer.length - 1;
+            const now = this.ctx.currentBarIndex - this.startBarIndex;
+            if (last >= 0 && last < now - 1) {
+                const held = this.buffer[last];
+                for (let i = last + 1; i < now; i++) this.buffer[i] = held;
+            }
+        }
+        return this.update(val);
+    }
+
     public get(offset: number): T | null {
         // Target Bar = Current - Offset
         const targetBarIndex = this.ctx.currentBarIndex - offset;

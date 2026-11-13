@@ -18,7 +18,7 @@
  *
  * ── The source list, and the two names that are not on it ───────────────────
  *
- * The lists below are transcribed from dev-docs/01-version-delta-spec.md §4a,
+ * The lists below are transcribed from docs/common/VERSIONS.md §4a,
  * which in turn is transcribed from TradingView's v4 → v5 migration guide.
  *
  * `trix` is the exception: it does not appear in the guide's enumeration and is
@@ -45,7 +45,7 @@
  * ── Source ──────────────────────────────────────────────────────────────────
  *
  * https://www.tradingview.com/pine-script-docs/migration-guides/to-pine-version-5/
- * transcribed into dev-docs/01-version-delta-spec.md §4.
+ * transcribed into docs/common/VERSIONS.md §4.
  */
 
 import type { RenameSpec } from "./renames";
@@ -169,7 +169,7 @@ export const V5_ONLY_NAMESPACES: readonly string[] = [
     "polyline", "linefill",
     // Field selectors for the non-price `request.*` calls, and the price
     // adjustment a ticker id can carry. All v5, like the requests themselves.
-    "dividends", "splits", "earnings", "adjustment",
+    "dividends", "splits", "earnings", "adjustment", "backadjustment", "settlement_as_close",
 ];
 
 /**
@@ -193,10 +193,36 @@ export const V5_ONLY_NAMES: readonly string[] = [
     //   "Returns the array's first element" / "... last element"       Jan 2023
     "timeframe.in_seconds", "timeframe.from_seconds", "timeframe.change",
     "array.first", "array.last", "array.binary_search",
+    // v5 built-ins this engine lacked until v6 needed them; their behaviour
+    // is pinned against TradingView by conformance/common/v5_gaps_golden.test.ts.
+    "array.sort_indices", "array.binary_search_leftmost", "array.binary_search_rightmost",
 
     // `text` is a v4 namespace for its five alignments; wrapping is a property
     // of a BOX's text, which arrived with box text in June 2022.
     "text.wrap_auto", "text.wrap_none",
+
+    // Strategy built-ins added after v4: the liquidation price arrived with
+    // margin in v5, and trade comments in 2023.
+    "strategy.margin_liquidation_price", "strategy.closedtrades.exit_comment",
+    "strategy.max_drawdown", "strategy.max_drawdown_percent", "strategy.max_runup",
+    "strategy.max_runup_percent", "strategy.convert_to_symbol", "strategy.convert_to_account",
+    "strategy.default_entry_qty",
+
+    // Drawing, array, symbol and ticker members added through v5's life.
+    "table.all", "table.set_border_color", "table.set_border_width",
+    "table.set_frame_color", "table.set_frame_width",
+    "label.style_text_outline", "label.set_text_font_family",
+    "array.new_linefill", "array.percentile_nearest_rank", "array.percentile_linear_interpolation",
+    "syminfo.pricescale", "syminfo.minmove", "syminfo.sector", "syminfo.industry",
+    "syminfo.country", "syminfo.expiration_date",
+    "ticker.standard", "syminfo.volumetype",
+    "strategy.avg_trade_percent", "strategy.openprofit_percent",
+    "syminfo.shares_outstanding_float", "syminfo.shares_outstanding_total", "syminfo.employees",
+    "syminfo.shareholders", "syminfo.recommendations_buy", "syminfo.recommendations_buy_strong",
+    "syminfo.recommendations_date", "syminfo.recommendations_hold", "syminfo.recommendations_sell",
+    "syminfo.recommendations_sell_strong", "syminfo.recommendations_total",
+    "syminfo.target_price_average", "syminfo.target_price_date", "syminfo.target_price_estimates",
+    "syminfo.target_price_high", "syminfo.target_price_low", "syminfo.target_price_median",
 
     "input.int", "input.float", "input.bool", "input.string", "input.color",
     "input.timeframe", "input.session", "input.symbol", "input.source",
@@ -230,6 +256,8 @@ export const V5_ONLY_NAMES: readonly string[] = [
  */
 const PLOT_STYLES_V5: RenameSpec[] = [
     { to: "plot.style_stepline_diamond", value: "stepline_diamond" },
+    // A step line that, like `linebr`, leaves a gap across `na`.
+    { to: "plot.style_steplinebr", value: "steplinebr" },
 ];
 
 export const V5_RENAMES: readonly RenameSpec[] = [
@@ -297,3 +325,50 @@ export const V5_REMOVED: readonly string[] = (() => {
 
     return [...removed];
 })();
+
+/**
+ * v5 positional orders that differ from the order of this engine's
+ * parameters, mapped by NAME the way V6_POSITIONAL is for v6.
+ *
+ * `strategy.exit`: v5's reference puts `comment_profit`, `comment_loss` and
+ * `comment_trailing` between `comment` and `when`. The engine's signature keeps
+ * v4's order, where `when` follows `comment`, and appends the three — so
+ * without this a v5 call passing them by position bound the first to `when`
+ * and the second to `alert_message`.
+ */
+export const V5_POSITIONAL: Readonly<Record<string, readonly string[]>> = {
+    // `plotshape`/`plotchar` have no `transp` in v5: the sixth positional
+    // argument is `offset`. The engine's shared signature keeps v4's `transp`
+    // there, so `plotshape(x, "t", shape.labelup, location.absolute, col, -4)`
+    // bound -4 to a transparency nothing reads and the markers stayed on the
+    // bar their value was computed on, four bars late. TradingView draws them
+    // shifted (LuxAlgo "Trendlines with Breaks", OpenChartingView screenshot
+    // 15.png: each "B" sits on the breakout bar, `length` bars before the
+    // confirmation).
+    "plotshape": ["series", "title", "style", "location", "color", "offset", "text",
+                  "textcolor", "editable", "size", "show_last", "display", "format",
+                  "precision", "force_overlay"],
+    "plotchar": ["series", "title", "char", "location", "color", "offset", "text",
+                 "textcolor", "editable", "size", "show_last", "display", "format",
+                 "precision", "force_overlay"],
+    "strategy.exit": ["id", "from_entry", "qty", "qty_percent", "profit", "limit", "loss",
+                      "stop", "trail_price", "trail_points", "trail_offset", "oca_name",
+                      "comment", "comment_profit", "comment_loss", "comment_trailing",
+                      "when", "alert_message"],
+};
+
+/**
+ * Keyword names that v5 renamed, by the name a v1-v4 script wrote, mapped to
+ * the engine's parameter. Read by Context.call when binding keywords below v5.
+ *
+ * docs/common/VERSIONS.md §4b, from the migration guide:
+ * `strategy.entry(long=)` -> `strategy.entry(direction=)`, and the same for
+ * `strategy.order`. The engine's `strategy.order` calls the parameter `dir`.
+ * Positionally nothing moved, so only keyword use needs this; before it
+ * `strategy.entry(id = "L", long = false)` dropped the direction and opened a
+ * long, or, with the argument recorded and ignored, nothing at all.
+ */
+export const V4_RENAMED_PARAMS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+    "strategy.entry": { long: "direction" },
+    "strategy.order": { long: "dir" },
+};

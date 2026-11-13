@@ -10,6 +10,8 @@ early or a `linreg` off by a half-period.
 the export needs a logged-in session, and scripting the UI would breach their
 terms. A human has to do it once per harness. It takes about ten minutes.
 
+What each run proved, and what is still unverified, is recorded in [`tradingview-findings.md`](tradingview-findings.md).
+
 ## Two routes
 
 | | Route A — Export chart data | Route B — Pine Logs |
@@ -106,6 +108,37 @@ Two things the generator does that are easy to miss when reading the output:
 | `v3/harness_control` | v3 | **entire history** | Counters and a state machine run from bar 0 |
 | `v3/harness_strategy` | v3 | **entire history** | Equity and position size accumulate from the first fill |
 | `v4/harness_builtins` | **v4** | ≥ 400 bars, anywhere | `bb`/`wpr`/`mfi` do not exist before v4 |
+| `v5/harness_v5_gaps` | **v5** | a 24/7 UTC market, **intraday** | `time("D")` only differs from `time` intraday. Logs lists and exact integers, so it is compared string-for-string by `v5_gaps_golden.test.ts`, not by the numeric comparer |
+| `v6/harness_v6_language` | **v6** | `BINANCE:BTCUSDT`, **1-minute**, ≤ 10,000 bars | See [v6 probes](#v6-probes) |
+| `v6/harness_v6_strategy` | **v6** | same; strategy Properties left at their defaults | See [v6 probes](#v6-probes) |
+| `v6/harness_v6_footprint` | **v6** | same, on a **Premium or Ultimate** plan | Optional: other plans stop on bar 0. See [v6 probes](#v6-probes) |
+
+### v6 probes
+
+Three scripts decide whether v6 is ready. Each logs one dense row per bar, and
+[`v6_golden.test.ts`](v6_golden.test.ts) replays TradingView's own candles and
+compares every column after OHLCV:
+
+| Probe | Covers |
+|---|---|
+| `harness_v6_language` | lazy `and`/`or` (and the `ta.*` state they skip), bools that cannot be `na`, `int / int`, negative array indices, loop bounds re-evaluated, the 17 colour constants, `timeframe.from_seconds`, `timeframe_bars_back`, multiline and 40,960-char strings, `once`, `sort_field`, `(obj[1]).field`, `box.set_xloc`, dynamic `request.security` |
+| `harness_v6_strategy` | `strategy.exit()` parameter pairs on both sides, two exits sharing one entry, the 100% default margin, margin calls, trailing pairs, commission |
+| `harness_v6_footprint` | POC, Value Area, imbalances and totals from TradingView's own row volumes |
+
+The collection steps are in each script's header. The same three rules apply
+to all of them:
+
+- **`BINANCE:BTCUSDT` on 1 minute.** A 24/7 UTC market lets the replay
+  rebuild the 5/15/60-minute bars `request.security` asks for from the chart's
+  own, exactly.
+- **At most 10,000 bars on the chart.** The pane keeps the last 10,000
+  messages, and the replay needs bar 0 (it checks).
+- **Copy the whole pane**, including the `OPSMETA` line: it carries the symbol
+  facts (`mintick`, `mincontract`, …) the engine is given as input.
+
+Save as `conformance/v6/golden/<probe>.BTCUSDT.1.log`. Until a probe's log
+lands its replay is a todo; the probe still has to compile and run here, so a
+broken probe is caught before it reaches a browser.
 
 ### Why there is a `v4/` folder
 

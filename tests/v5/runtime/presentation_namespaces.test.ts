@@ -75,11 +75,12 @@ describe("chart.*", () => {
 
 describe("format.*", () => {
   it("str.tostring(x, format.mintick) rounds to the tick size first", () => {
+    // TradingView prints exactly the tick's decimals (probes: dev-docs/tv-parity/_probes/formats2/).
     // "use str.tostring(myValue, format.mintick) to first round the number to
     //  tick precision and then return its string representation."
     expect(run(HEAD + "s = str.tostring(1.23456, format.mintick)\n", "s", 1)).toBe("1.23");
     expect(run(HEAD + "s = str.tostring(1.23456, format.mintick)\n", "s", 1,
-      ctx => { ctx.mintick = 0.5; })).toBe("1");
+      ctx => { ctx.mintick = 0.5; })).toBe("1.0");
   });
 
   it("a format STRING still takes the digit-mask path", () => {
@@ -91,9 +92,10 @@ describe("format.*", () => {
 
   it("the axis-formatting constants render the value plainly", () => {
     // format.price/volume/percent describe the price axis and Data Window,
-    // neither of which exists here.
-    expect(run(HEAD + "s = str.tostring(5183, format.volume)\n", "s", 1)).toBe("5183");
-    expect(run(HEAD + "s = str.tostring(0.25, format.percent)\n", "s", 1)).toBe("0.25");
+    // neither of which exists here. TradingView does give them a suffix (probes:
+    // dev-docs/tv-parity/_probes/formats2/ and _probes/udt-cond-formats/tv-run/).
+    expect(run(HEAD + "s = str.tostring(5183, format.volume)\n", "s", 1)).toBe("5.183K");
+    expect(run(HEAD + "s = str.tostring(0.25, format.percent)\n", "s", 1)).toBe("0.25%");
   });
 
   it("is accepted as indicator()'s format argument", () => {
@@ -215,13 +217,19 @@ describe("`session` is a CONSTANT at v1–v3 and a NAMESPACE at v5", () => {
   });
 });
 
-describe("four of the five are v5-only", () => {
+describe("three of the five are v5-only", () => {
+  // `format` is NOT: TradingView v4 compiles `tostring(close, format.mintick)`,
+  // `format.volume`, `format.percent`, `format.price` and `format.inherit`
+  // (dev-docs/tv-parity/_probes/version-scope/v4-draw-fmt, 2026-11-12).
   const CASES: Array<[string, string]> = [
     ["chart", "x = chart.fg_color"],
-    ["format", "x = format.price"],
     ["display", "x = display.all"],
     ["font", "x = font.family_default"],
   ];
+
+  it("format.* is accepted at v4 (TradingView compiles it)", () => {
+    expect(() => transpile(`//@version=4\nstudy("t")\nx = tostring(close, format.price)\nplot(close)\n`)).not.toThrow();
+  });
 
   for (const [name, body] of CASES) {
     it(`${name}.* is refused at v4`, () => {

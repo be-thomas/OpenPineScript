@@ -1,0 +1,194 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// OPS golden harness: strategy order semantics with pyramiding = 3.
+//
+// RUN ON : BINANCE:BTCUSDT, 1D (daily), at least 300 bars loaded.
+// SAVE AS: conformance/v5/parity/harness_strategy_pyr3.BTCUSDT.1D.csv
+//
+// Phases (tag column), each answering one question:
+//   a   entry("L",1) on lc 1, 2, 3, 4, 5: the 4th and 5th are ignored?
+//   b   entry A lc 1, B lc 2, A lc 3, B lc 4 (all long, qty 1): do ids A and B
+//       count together towards the limit (is the 4th ignored)?
+//   c   entry("A") qty 1, 2, 3 on lc 1, 2, 3; ONE close("A") on lc 7: three
+//       closed trades (one per entry) or one merged trade? (OPSCLOSED, with
+//       sizes 1, 2, 3 and entry bars 1, 2, 3 identifying each)
+//   d   A qty 1 (lc 1), B qty 2 (lc 2), A qty 3 (lc 3); close("A") lc 7:
+//       does B stay open? (position_size 2 and opentrades per bar after lc 8)
+//   e   three longs (L lc 1, 2, 3), then entry("S", short, qty 2) lc 6 while
+//       pyramided: resulting position size and the three closed trades
+//   f   three longs qty 1 (lc 1, 2, 3); close("L", qty=2) lc 6: which entries
+//       close (FIFO?); close("L", qty_percent=50) lc 9 on what is left
+//   g   entry L on lc 1, 2, 3, then strategy.order("O") on lc 4 and 5, then a
+//       4th entry("L") on lc 6: is order exempt from the limit, and does it
+//       count towards it?
+//   Every bar of every phase logs position_size, avg_price, opentrades,
+//   closedtrades and netprofit.
+//
+// Fixed quantities (qty is always explicit), commission 0,
+// process_orders_on_close=false.
+// Collect it like this:
+//   1. Pine Editor -> paste -> Add to chart. Don't scroll back, don't change the
+//      timeframe afterwards.
+//   2. Wait for the chart to finish loading (the script reads bars 0-299 only, so
+//      any chart with at least 300 bars works; BINANCE:BTCUSDT daily has ~3,000).
+//   3. More (...) -> Pine Logs -> export (or select all and copy) and save as
+//      the filename below.
+//
+//   OPSMETA / OPSHEAD   script, symbol facts, then the column names, once
+//   OPS|row|row|...     every bar 0-299, as many as fit in 4,000 characters:
+//                       time,open,high,low,close,volume,bar_index,tag,
+//                       position_size,avg_price,opentrades,closedtrades,netprofit
+//   OPSLAST             bar 299 again
+//   OPSCOUNT            closed / open trade counts, net profit, position size
+//   OPSCLOSED           every closed trade, entry_id:exit_id:entry_bar:exit_bar:
+//                       entry_price:exit_price:size:profit
+//   OPSOPEN             every open trade, entry_id:entry_bar:entry_price:size:profit
+//
+// Everything happens on bar_index, not price. Phases are 20 bars: phase k owns
+// bars 20k..20k+19; lc below is bar_index % 20. Each phase starts flat and ends
+// with strategy.close_all() on lc 12 (fills lc 13); lc 14-19 are the gap.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("OPS strategy pyr3 v6", overlay = true, default_qty_type = strategy.fixed, default_qty_value = 1,
+     pyramiding = 3, commission_type = strategy.commission.percent, commission_value = 0, initial_capital = 1000000,
+     process_orders_on_close = false)
+
+OPS_SCRIPT = "strategy_pyr3"
+OPS_LAST = 299
+
+ph = math.floor(bar_index / 20)
+lc = bar_index % 20
+var tags = array.from("a", "b", "c", "d", "e", "f", "g")
+string ops_tag = ph < tags.size() ? tags.get(ph) : "-"
+
+// a) five of the same entry
+if ph == 0 and lc >= 1 and lc <= 5
+    strategy.entry("L", strategy.long, qty = 1)
+
+// b) two ids
+if ph == 1 and lc == 1
+    strategy.entry("A", strategy.long, qty = 1)
+if ph == 1 and lc == 2
+    strategy.entry("B", strategy.long, qty = 1)
+if ph == 1 and lc == 3
+    strategy.entry("A", strategy.long, qty = 1)
+if ph == 1 and lc == 4
+    strategy.entry("B", strategy.long, qty = 1)
+
+// c) three entries of A, one close("A")
+if ph == 2 and lc == 1
+    strategy.entry("A", strategy.long, qty = 1)
+if ph == 2 and lc == 2
+    strategy.entry("A", strategy.long, qty = 2)
+if ph == 2 and lc == 3
+    strategy.entry("A", strategy.long, qty = 3)
+if ph == 2 and lc == 7
+    strategy.close("A")
+
+// d) close("A") leaves B
+if ph == 3 and lc == 1
+    strategy.entry("A", strategy.long, qty = 1)
+if ph == 3 and lc == 2
+    strategy.entry("B", strategy.long, qty = 2)
+if ph == 3 and lc == 3
+    strategy.entry("A", strategy.long, qty = 3)
+if ph == 3 and lc == 7
+    strategy.close("A")
+
+// e) reversal while pyramided
+if ph == 4 and lc >= 1 and lc <= 3
+    strategy.entry("L", strategy.long, qty = 1)
+if ph == 4 and lc == 6
+    strategy.entry("S", strategy.short, qty = 2)
+
+// f) partial closes across several entries
+if ph == 5 and lc >= 1 and lc <= 3
+    strategy.entry("L", strategy.long, qty = 1)
+if ph == 5 and lc == 6
+    strategy.close("L", qty = 2)
+if ph == 5 and lc == 9
+    strategy.close("L", qty_percent = 50)
+
+// g) strategy.order against the limit
+if ph == 6 and lc >= 1 and lc <= 3
+    strategy.entry("L", strategy.long, qty = 1)
+if ph == 6 and (lc == 4 or lc == 5)
+    strategy.order("O", strategy.long, qty = 1)
+if ph == 6 and lc == 6
+    strategy.entry("L", strategy.long, qty = 1)
+
+if lc == 12
+    strategy.close_all()
+
+// ── OPS logging block ───────────────────────────────────────────────────────
+ops_f(x) => str.tostring(x, "#.##########")
+
+var ops_heads = array.new_string(0)
+ops_vals = array.new_string(0)
+ops_col(string name, string v) =>
+    if barstate.isfirst
+        ops_heads.push(name)
+    ops_vals.push(v)
+
+ops_col("time", str.tostring(time, "#"))
+ops_col("open", ops_f(open))
+ops_col("high", ops_f(high))
+ops_col("low", ops_f(low))
+ops_col("close", ops_f(close))
+ops_col("volume", ops_f(volume))
+ops_col("bar_index", str.tostring(bar_index))
+ops_col("tag", ops_tag)
+ops_col("position_size", ops_f(strategy.position_size))
+ops_col("avg_price", ops_f(strategy.position_avg_price))
+ops_col("opentrades", str.tostring(strategy.opentrades))
+ops_col("closedtrades", str.tostring(strategy.closedtrades))
+ops_col("netprofit", ops_f(strategy.netprofit))
+
+if barstate.isfirst
+    log.info("OPSMETA|script=" + OPS_SCRIPT + ",version=5,tickerid=" + syminfo.tickerid + ",mintick=" + ops_f(syminfo.mintick) +
+         ",timezone=" + syminfo.timezone + ",timeframe=" + timeframe.period + ",type=" + syminfo.type)
+    log.info("OPSHEAD|" + ops_heads.join(","))
+
+// Pine v5 strings stop at 4,096 characters: a message goes out before the
+// next row would take it past 4,000.
+var string ops_buf = ""
+ops_active = OPS_LAST < 0 or bar_index <= OPS_LAST
+ops_final = OPS_LAST < 0 ? barstate.islast : bar_index == OPS_LAST
+if barstate.isconfirmed and ops_active
+    ops_next = "|" + ops_vals.join(",")
+    if str.length(ops_buf) + str.length(ops_next) > 4000
+        log.info("OPS" + ops_buf)
+        ops_buf := ""
+    ops_buf := ops_buf + ops_next
+if str.length(ops_buf) > 0 and (barstate.islastconfirmedhistory or barstate.isrealtime or ops_final)
+    log.info("OPS" + ops_buf)
+    ops_buf := ""
+
+// The trade dump, once, on the final bar. Entries are ;-separated, fields :-separated:
+//   closed: entry_id : exit_id : entry_bar_index : exit_bar_index : entry_price : exit_price : size : profit
+//   open:   entry_id : entry_bar_index : entry_price : size : profit
+varip bool ops_dumped = false
+if ops_final and not ops_dumped
+    ops_dumped := true
+    log.info("OPSLAST|" + ops_vals.join(","))
+    ops_nc = strategy.closedtrades
+    ops_no = strategy.opentrades
+    log.info("OPSCOUNT|closed=" + str.tostring(ops_nc) + ",open=" + str.tostring(ops_no) +
+         ",netprofit=" + ops_f(strategy.netprofit) + ",position_size=" + ops_f(strategy.position_size))
+    ops_row = ""
+    if ops_nc > 0
+        for k = 0 to ops_nc - 1
+            ops_row += ";" + strategy.closedtrades.entry_id(k) + ":" + strategy.closedtrades.exit_id(k) + ":" +
+                 str.tostring(strategy.closedtrades.entry_bar_index(k)) + ":" + str.tostring(strategy.closedtrades.exit_bar_index(k)) + ":" +
+                 ops_f(strategy.closedtrades.entry_price(k)) + ":" + ops_f(strategy.closedtrades.exit_price(k)) + ":" +
+                 ops_f(strategy.closedtrades.size(k)) + ":" + ops_f(strategy.closedtrades.profit(k))
+            if str.length(ops_row) > 3700 or k == ops_nc - 1
+                log.info("OPSCLOSED|" + str.tostring(k) + ops_row)
+                ops_row := ""
+    if ops_no > 0
+        for k = 0 to ops_no - 1
+            ops_row += ";" + strategy.opentrades.entry_id(k) + ":" + str.tostring(strategy.opentrades.entry_bar_index(k)) + ":" +
+                 ops_f(strategy.opentrades.entry_price(k)) + ":" + ops_f(strategy.opentrades.size(k)) + ":" +
+                 ops_f(strategy.opentrades.profit(k))
+            if str.length(ops_row) > 3700 or k == ops_no - 1
+                log.info("OPSOPEN|" + str.tostring(k) + ops_row)
+                ops_row := ""

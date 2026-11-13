@@ -8,7 +8,7 @@
  * v5 removes them as values and makes them FUNCTIONS: `input.int(14)`.
  *
  * Two of them also change name in the process — `integer` becomes `int` and
- * `resolution` becomes `timeframe` (dev-docs/01-version-delta-spec.md §4c).
+ * `resolution` becomes `timeframe` (docs/common/VERSIONS.md §4c).
  *
  * ── Six of these names collide with v4's constants ──────────────────────────
  *
@@ -52,67 +52,79 @@ const register = (
     ctx: Context, defval: any, title: any, type: string, meta: Record<string, any> = {},
 ): any => {
     const clean: Record<string, any> = { defval: val(defval) };
-    for (const [k, v] of Object.entries(meta)) if (v !== undefined) clean[k] = val(v);
+    for (const k in meta) { const v = meta[k]; if (v !== undefined) clean[k] = val(v); }
     return ctx.registerInput(val(defval), text(title), type, clean);
 };
 
 export const input = {
     int: (ctx: Context, defval: any, title?: any, minval?: any, maxval?: any, step?: any,
           tooltip?: any, inline?: any, group?: any, confirm?: any, display?: any,
-          options?: any) =>
+          options?: any,
+          active?: any) =>
         register(ctx, defval, title, "integer",
-                 { minval, maxval, step, tooltip, inline, group, confirm, display, options }),
+                 { minval, maxval, step, tooltip, inline, group, confirm, display, options, active }),
 
     float: (ctx: Context, defval: any, title?: any, minval?: any, maxval?: any, step?: any,
             tooltip?: any, inline?: any, group?: any, confirm?: any, display?: any,
-            options?: any) =>
+            options?: any,
+            active?: any) =>
         register(ctx, defval, title, "float",
-                 { minval, maxval, step, tooltip, inline, group, confirm, display, options }),
+                 { minval, maxval, step, tooltip, inline, group, confirm, display, options, active }),
 
     bool: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
-           group?: any, confirm?: any, display?: any) =>
-        register(ctx, defval, title, "bool", { tooltip, inline, group, confirm, display }),
+           group?: any, confirm?: any, display?: any,
+           active?: any) =>
+        register(ctx, defval, title, "bool", { tooltip, inline, group, confirm, display, active }),
 
     string: (ctx: Context, defval: any, title?: any, options?: any, tooltip?: any,
-             inline?: any, group?: any, confirm?: any, display?: any) =>
+             inline?: any, group?: any, confirm?: any, display?: any,
+             active?: any) =>
         register(ctx, defval, title, "string",
-                 { options, tooltip, inline, group, confirm, display }),
+                 { options, tooltip, inline, group, confirm, display, active }),
 
     color: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
-            group?: any, confirm?: any, display?: any) =>
-        register(ctx, defval, title, "color", { tooltip, inline, group, confirm, display }),
+            group?: any, confirm?: any, display?: any,
+            active?: any) =>
+        register(ctx, defval, title, "color", { tooltip, inline, group, confirm, display, active }),
 
     /** v5's rename of v4's `input.resolution`. */
     timeframe: (ctx: Context, defval: any, title?: any, options?: any, tooltip?: any,
-                inline?: any, group?: any, confirm?: any, display?: any) =>
+                inline?: any, group?: any, confirm?: any, display?: any,
+                active?: any) =>
         register(ctx, defval, title, "resolution",
-                 { options, tooltip, inline, group, confirm, display }),
+                 { options, tooltip, inline, group, confirm, display, active }),
 
     session: (ctx: Context, defval: any, title?: any, options?: any, tooltip?: any,
-              inline?: any, group?: any, confirm?: any, display?: any) =>
+              inline?: any, group?: any, confirm?: any, display?: any,
+              active?: any) =>
         register(ctx, defval, title, "session",
-                 { options, tooltip, inline, group, confirm, display }),
+                 { options, tooltip, inline, group, confirm, display, active }),
 
     symbol: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
-             group?: any, confirm?: any, display?: any) =>
-        register(ctx, defval, title, "symbol", { tooltip, inline, group, confirm, display }),
+             group?: any, confirm?: any, display?: any,
+             active?: any) =>
+        register(ctx, defval, title, "symbol", { tooltip, inline, group, confirm, display, active }),
 
     /** The chart series an indicator runs on — `close`, `hl2`, another plot. */
     source: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
-             group?: any, display?: any) =>
-        register(ctx, defval, title, "source", { tooltip, inline, group, display }),
+             group?: any, display?: any,
+             active?: any) =>
+        register(ctx, defval, title, "source", { tooltip, inline, group, display, active }),
 
     time: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
-           group?: any, confirm?: any, display?: any) =>
-        register(ctx, defval, title, "time", { tooltip, inline, group, confirm, display }),
+           group?: any, confirm?: any, display?: any,
+           active?: any) =>
+        register(ctx, defval, title, "time", { tooltip, inline, group, confirm, display, active }),
 
     price: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
-            group?: any, confirm?: any, display?: any) =>
-        register(ctx, defval, title, "float", { tooltip, inline, group, confirm, display }),
+            group?: any, confirm?: any, display?: any,
+            active?: any) =>
+        register(ctx, defval, title, "float", { tooltip, inline, group, confirm, display, active }),
 
     text_area: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
-                group?: any, confirm?: any, display?: any) =>
-        register(ctx, defval, title, "string", { tooltip, inline, group, confirm, display }),
+                group?: any, confirm?: any, display?: any,
+                active?: any) =>
+        register(ctx, defval, title, "string", { tooltip, inline, group, confirm, display, active }),
 
     /**
      * `input.enum(defaultValue, title, options, …)` — a dropdown of enum members.
@@ -128,9 +140,10 @@ export const input = {
      * offer a free-text box for a value that must be one of a fixed set.
      */
     enum: (ctx: Context, defval: any, title?: any, options?: any, tooltip?: any,
-           inline?: any, group?: any, confirm?: any, display?: any) =>
+           inline?: any, group?: any, confirm?: any, display?: any,
+           active?: any) =>
         register(ctx, defval, title, "enum",
-                 { options, tooltip, inline, group, confirm, display }),
+                 { options, tooltip, inline, group, confirm, display, active }),
 };
 
 // NOTE FOR ANYONE EDITING THIS FILE: every member above must be written as an

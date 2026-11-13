@@ -3,7 +3,7 @@
  *
  * v5 moved string handling into its own namespace: `tostring(x)` became
  * `str.tostring(value, format)` and `tonumber(x)` became `str.tonumber(string)`
- * (dev-docs/01-version-delta-spec.md §4a). The rest of the namespace —
+ * (docs/common/VERSIONS.md §4a). The rest of the namespace —
  * `str.format`, `str.length`, `str.split` and friends — has no v1–v4 spelling
  * at all and exists only here.
  *
@@ -31,61 +31,112 @@
 import { val } from "../../../utils/v2/common";
 import { Context } from "../context";
 import { FORMAT_PREFIX, format as formatConstants } from "./format";
+import { CONST_DEFAULT } from "../constDefault";
 
 /** Pine renders every flavour of "no value" as the string `NaN`. */
 function isNa(v: any): boolean {
     return v === null || v === undefined || (typeof v === "number" && Number.isNaN(v));
 }
 
-/** The digit rules a Pine format string encodes, for one side of the dot. */
-interface DigitSpec {
-    /** Count of '0' — digits that must be printed even when they are zero. */
-    readonly required: number;
-    /** Count of '0' + '#' — the most digits that may be printed. */
-    readonly maximum: number;
-}
-
-function digitsOf(section: string): DigitSpec {
-    let required = 0, maximum = 0;
-    for (const ch of section) {
-        if (ch === "0") { required++; maximum++; }
-        else if (ch === "#") { maximum++; }
-    }
-    return { required, maximum };
-}
-
 /**
- * Formats `n` under a Pine number-format string.
+ * Formats `n` under a Pine number-format string (Java `DecimalFormat` style).
  *
- * Only the digit placeholders are honoured. Pine's format strings also admit
- * literal text, a grouping comma and a percent suffix; none of those appear in
- * any harness, and silently mis-rendering them would be worse than the plain
- * numeric result this returns.
+ *   '0' a REQUIRED digit, '#' an OPTIONAL digit, ',' grouping, '.' the point,
+ *   '%' multiplies by 100 and is printed, ';' separates the positive pattern
+ *   from the negative one, any other character is a literal.
+ *
+ * Rounding is HALF-UP on the shortest decimal representation of the number
+ * (what TradingView prints), not on its binary value: 1.005 with "0.00" is
+ * "1.01", where toFixed would say "1.00".
  */
 function formatNumber(n: number, format: string): string {
     if (!Number.isFinite(n)) return "NaN";
 
-    const dot = format.indexOf(".");
-    const fraction = dot === -1 ? { required: 0, maximum: 0 } : digitsOf(format.slice(dot + 1));
-    const integer = digitsOf(dot === -1 ? format : format.slice(0, dot));
+    const semi = format.indexOf(";");
+    const positive = semi === -1 ? format : format.slice(0, semi);
+    const negative = semi === -1 ? undefined : format.slice(semi + 1);
 
-    // toFixed rounds half away from zero for the decimal cases that matter here
-    // and, unlike a manual scale-and-round, does not lose precision on values
-    // whose scaled form exceeds 2^53.
-    let text = Math.abs(n).toFixed(fraction.maximum);
+    // Digits of |n| as a decimal string, from the shortest round-trip form.
+    const [mantissa, exponent] = Math.abs(n).toExponential().split("e");
+    const digits = mantissa.replace(".", "");
+    const percentOf = (p: string) => p.includes("%");
 
-    let [whole, decimals = ""] = text.split(".");
+    const render = (pattern: string, forceMinus: boolean): string => {
+        const start = pattern.search(/[0#,.]/);
+        const prefix = start === -1 ? pattern : pattern.slice(0, start);
+        let end = start === -1 ? pattern.length : start;
+        while (end < pattern.length && /[0#,.]/.test(pattern[end])) end++;
+        const core = start === -1 ? "" : pattern.slice(start, end);
+        const suffix = pattern.slice(end);
 
-    // Trim optional trailing zeros back to the required minimum.
-    while (decimals.length > fraction.required && decimals.endsWith("0")) {
-        decimals = decimals.slice(0, -1);
+        const dot = core.indexOf(".");
+        const intSpec = dot === -1 ? core : core.slice(0, dot);
+        const fracSpec = dot === -1 ? "" : core.slice(dot + 1);
+        const minInt = (intSpec.match(/0/g) ?? []).length;
+        const minFrac = (fracSpec.match(/0/g) ?? []).length;
+        const maxFrac = (fracSpec.match(/[0#]/g) ?? []).length;
+        const comma = intSpec.lastIndexOf(",");
+        const group = comma === -1 ? 0 : intSpec.length - comma - 1;
+
+        // Place the decimal point: `digits` is d.ddd × 10^exponent.
+        const pointAt = Number(exponent) + 1 + (percentOf(prefix + suffix) ? 2 : 0);
+        let whole = pointAt > 0 ? digits.slice(0, pointAt).padEnd(pointAt, "0") : "";
+        let frac = pointAt >= digits.length ? "" : (pointAt >= 0 ? digits.slice(pointAt) : "0".repeat(-pointAt) + digits);
+
+        if (frac.length > maxFrac) {
+            const up = frac[maxFrac] >= "5";
+            const kept = whole + frac.slice(0, maxFrac);
+            let next = kept;
+            if (up) next = (BigInt(kept === "" ? "0" : kept) + 1n).toString().padStart(kept.length, "0");
+            const wholeLen = next.length - maxFrac;
+            whole = next.slice(0, wholeLen);
+            frac = next.slice(wholeLen);
+        }
+        while (frac.length > minFrac && frac.endsWith("0")) frac = frac.slice(0, -1);
+        frac = frac.padEnd(minFrac, "0");
+        whole = whole.replace(/^0+/, "");
+        while (whole.length < minInt) whole = "0" + whole;
+        // Java prints the integer 0 when no fraction digit is required.
+        if (whole === "" && minFrac === 0) whole = "0";
+
+        if (group > 0) {
+            let grouped = "";
+            for (let i = 0; i < whole.length; i++) {
+                if (i > 0 && (whole.length - i) % group === 0) grouped += ",";
+                grouped += whole[i];
+            }
+            whole = grouped;
+        }
+
+        const literal = (t: string) => t.replace(/'/g, "");
+        const body = frac.length > 0 ? `${whole}.${frac}` : whole;
+        const zero = !/[1-9]/.test(whole + frac);
+        const sign = forceMinus && !zero ? "-" : "";
+        return `${sign}${literal(prefix)}${body}${literal(suffix)}`;
+    };
+
+    if (n < 0 && negative !== undefined) {
+        const text = render(negative, false);
+        return /[1-9]/.test(text.replace(/[^0-9]/g, "")) ? text : render(positive, false);
     }
+    return render(positive, n < 0);
+}
 
-    // Pad the integer side up to its required digits ("00" renders 7 as "07").
-    while (whole.length < integer.required) whole = "0" + whole;
+/** Decimal places in a tick size such as 0.0001 or 5e-7. */
+function decimalsOf(tick: number): number {
+    const [m, e = "0"] = tick.toExponential().split("e");
+    const mantissaDecimals = (m.split(".")[1] ?? "").length;
+    return Math.max(0, mantissaDecimals - Number(e));
+}
 
-    const sign = n < 0 && Number(text) !== 0 ? "-" : "";
-    return decimals.length > 0 ? `${sign}${whole}.${decimals}` : `${sign}${whole}`;
+/** `format.volume`: integers below 1000, otherwise K/M/B/T with up to 3 decimals. */
+function formatVolume(v: number): string {
+    if (!Number.isFinite(v)) return "NaN";
+    const abs = Math.abs(v);
+    if (abs < 1000) return formatNumber(v, "#");
+    const units: Array<[number, string]> = [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]];
+    const [scale, suffix] = units.find(([s]) => abs >= s)!;
+    return formatNumber(v / scale, "#.###") + suffix;
 }
 
 /**
@@ -98,6 +149,80 @@ function formatNumber(n: number, format: string): string {
 function defaultString(v: any): string {
     if (isNa(v)) return "NaN";
     return String(v);
+}
+
+/**
+ * `str.tostring(x)` for a number, as TradingView prints it with no format
+ * (dev-docs/tv-parity/_probes/version-scope: v5-tostring-consts,
+ * v5-tostring-series, v6-tostring-bounds, v6-tostring-bounds2,
+ * v4-tostring-default).
+ *
+ * A NON-constant float (a series, an input, `syminfo.*`), in every version from
+ * v4: ten decimals, rounded, trailing zeros dropped — `0.3` for `0.1 + 0.2`,
+ * `0` at or below 5e-11 in magnitude. From 1e21 up it is JavaScript's own
+ * exponent form with an upper-case `E`: `1E21`.
+ *
+ * A constant (literal, constant expression, `math.pi`, a global bound to one):
+ * v4 and v5 print the full double — `0.30000000000000004`, `1e-7`, `1e+21`. v6
+ * prints what it prints for a series, except that from 1e21 up the exponent is
+ * lower-case: `1e+21`.
+ */
+function numberToString(v: number, version: number, isConst: boolean): string {
+    if (Number.isNaN(v)) return "NaN";
+    if (isConst && version < 6) return String(v);
+    if (!Number.isFinite(v)) return String(v);
+    const abs = Math.abs(v);
+    if (abs >= 1e21) {
+        const text = String(v);
+        return isConst ? text : text.replace("e+", "E");
+    }
+    if (abs <= 5e-11) return "0";
+    const fixed = v.toFixed(10);
+    const trimmed = fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed;
+    return trimmed === "-0" ? "0" : trimmed;
+}
+
+/**
+ * A number in a `{n}` placeholder with no format spec, as TradingView prints it
+ * (probes v5/v6-str-format-numbers): Java `DecimalFormat("#,##0.###")` with
+ * HALF_EVEN rounding applied to the EXACT binary value, so `0.0025` (a hair
+ * above the tie) gives `0.003` and `1.0625` (an exact tie) gives `1.062`. The
+ * sign survives rounding to zero (`-0`), and large values keep every integer
+ * digit (`1e21` is `1,000,000,000,000,000,000,000`).
+ *
+ * One probed exception to the exact rule: `-0.0005`, whose binary value is a
+ * hair above the tie at the first decimal place, prints `-0`, not `-0.001`
+ * (the shortest decimal `5e-4` is treated as the tie and rounds to even). Only
+ * that value is known; neighbours such as 0.00051 round up as the rule says.
+ *
+ * Done on the double's mantissa and exponent as BigInts, so nothing rounds twice.
+ */
+function defaultNumberFormat(v: number): string {
+    if (Number.isNaN(v)) return "NaN";
+    if (!Number.isFinite(v)) return String(v);
+    const buf = new DataView(new ArrayBuffer(8));
+    buf.setFloat64(0, Math.abs(v));
+    const bits = buf.getBigUint64(0);
+    const rawExp = Number((bits >> 52n) & 0x7ffn);
+    const frac = bits & ((1n << 52n) - 1n);
+    const mant = rawExp === 0 ? frac : frac | (1n << 52n);
+    const exp = (rawExp === 0 ? 1 : rawExp) - 1075;          // |v| = mant * 2^exp
+    // thousandths = |v| * 1000, rounded half-even to an integer
+    let num = mant * 1000n;
+    let thousandths: bigint;
+    if (exp >= 0) {
+        thousandths = num << BigInt(exp);
+    } else {
+        const shift = BigInt(-exp);
+        const q = num >> shift;
+        const rem = num - (q << shift);
+        const half = 1n << (shift - 1n);
+        thousandths = rem > half || (rem === half && (q & 1n) === 1n) ? q + 1n : q;
+    }
+    if (Math.abs(v) === 0.0005) thousandths = 0n;
+    const whole = (thousandths / 1000n).toString().replace(/\B(?=(\d{3})+$)/g, ",");
+    const decimals = (thousandths % 1000n).toString().padStart(3, "0").replace(/0+$/, "");
+    return (v < 0 ? "-" : "") + whole + (decimals ? "." + decimals : "");
 }
 
 /**
@@ -117,6 +242,7 @@ function format(template: any, args: any[]): string {
             if (i < 0 || i >= args.length) return whole;
             const v = val(args[i]);
             if (fmt !== undefined && typeof v === "number") return formatNumber(v, fmt.trim());
+            if (typeof v === "number") return defaultNumberFormat(v);
             return defaultString(v);
         });
 }
@@ -267,15 +393,34 @@ export const str = {
         if (title !== undefined) return title;
 
         if (Array.isArray(v)) return `[${v.map(defaultString).join(", ")}]`;
-        if (format === undefined || format === null) return defaultString(v);
+        const isConst = format === CONST_DEFAULT;
+        if (format === undefined || format === null || isConst) {
+            const version = ctx?.profile?.version;
+            // v1–v3 were never probed: their one-argument `tostring` is
+            // ./core.ts's, and anything that reaches here without a version
+            // keeps the plain rendering too.
+            if (typeof v !== "number" || version === undefined || version < 4) return defaultString(v);
+            return numberToString(v, version, isConst);
+        }
         if (typeof v !== "number") return defaultString(v);
 
         const spec = String(val(format));
         if (spec.startsWith(FORMAT_PREFIX)) {
-            if (spec !== formatConstants.mintick) return defaultString(v);
-            const tick = Number(ctx.mintick);
-            if (!Number.isFinite(tick) || tick <= 0) return defaultString(v);
-            return defaultString(Math.round(v / tick) * tick);
+            // On TradingView only mintick, volume and percent are special; the
+            // other constants are plain pattern strings with no digit
+            // placeholders ("price", "inherit"), so the number is rounded to an
+            // integer and appended to the literal.
+            switch (spec) {
+                case formatConstants.mintick: {
+                    const tick = Number(ctx.mintick);
+                    if (!Number.isFinite(tick) || tick <= 0) return defaultString(v);
+                    const places = decimalsOf(tick);
+                    return formatNumber(Math.round(v / tick) * tick, places > 0 ? `0.${"0".repeat(places)}` : "0");
+                }
+                case formatConstants.volume: return formatVolume(v);
+                case formatConstants.percent: return formatNumber(v, "0.00") + "%";
+                default: return formatNumber(v, spec.slice(FORMAT_PREFIX.length));
+            }
         }
 
         return formatNumber(v, spec);

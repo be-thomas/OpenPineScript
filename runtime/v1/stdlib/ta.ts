@@ -36,7 +36,7 @@ interface CrossState { prevX: number; prevY: number; }
 interface BarsSinceState { counter: number; }
 interface ValueWhenState { history: number[]; }
 interface AtrState { prevClose: number; }
-interface VwapState { sumVol: number; sumSrcVol: number; }
+interface VwapState { sumVol: number; sumSrcVol: number; sumSrc2Vol: number; }
 interface SarState {
     /** Bars this call site has seen, so the seed lands on `bar_index == 1`. */
     bars: number;
@@ -772,19 +772,32 @@ export function atr(ctx: Context, lengthInput: any): number {
  *
  * @returns series float
  */
-export function vwap(ctx: Context, sourceInput: any): number {
+export function vwap(ctx: Context, sourceInput: any, anchor?: any, stdev_mult?: any): number | number[] {
     const source = val(sourceInput);
     const volume = (ctx as any).volume !== undefined ? val((ctx as any).volume) : 0;
 
-    const state = ctx.getPersistentState<VwapState>(() => ({ sumVol: 0, sumSrcVol: 0 }));
+    const state = ctx.getPersistentState<VwapState>(() => ({ sumVol: 0, sumSrcVol: 0, sumSrc2Vol: 0 }));
 
-    if (opensDay(ctx)) { state.sumVol = 0; state.sumSrcVol = 0; }
+    // "anchor: The condition that triggers the reset of VWAP calculations ...
+    // The default is equal to timeframe.change("1D")" — v5, February 2023.
+    const resets = anchor === undefined || anchor === null ? opensDay(ctx) : Boolean(val(anchor));
+    if (resets) { state.sumVol = 0; state.sumSrcVol = 0; state.sumSrc2Vol = 0; }
 
     state.sumVol += volume;
     state.sumSrcVol += source * volume;
+    state.sumSrc2Vol += source * source * volume;
 
-    if (state.sumVol === 0) return NaN;
-    return state.sumSrcVol / state.sumVol;
+    const value = state.sumVol === 0 ? NaN : state.sumSrcVol / state.sumVol;
+    if (stdev_mult === undefined || stdev_mult === null) return value;
+
+    // "If specified, the function will calculate the standard deviation bands
+    // based on the main VWAP series and return a [vwap, upper_band, lower_band]
+    // tuple." The deviation is volume-weighted, the way TradingView's own VWAP
+    // indicator draws its bands.
+    const mult = Number(val(stdev_mult));
+    const variance = state.sumVol === 0 ? NaN : state.sumSrc2Vol / state.sumVol - value * value;
+    const dev = Math.sqrt(Math.max(variance, 0)) * mult;
+    return [value, value + dev, value - dev];
 }
 
 /**
@@ -1180,12 +1193,14 @@ export function mfi(ctx: Context, sourceInput: any, lengthInput: any): number {
     const volume = ctx.volume;
     const mf = source * volume;
 
+    // TradingView's float tolerance (float-eq-versions, v1-v6).
+    const tol = 1e-10;
     let pos = 0, neg = 0;
     if (isNaN(state.prevSrc)) {
         // first bar — neutral
-    } else if (source > state.prevSrc) {
+    } else if (source - state.prevSrc > tol) {
         pos = mf;
-    } else if (source < state.prevSrc) {
+    } else if (source - state.prevSrc < -tol) {
         neg = mf;
     }
     state.prevSrc = source;
@@ -1353,8 +1368,12 @@ export function pivothigh(ctx: Context, sourceInput: any, leftbarsInput: any, ri
     if (state.buffer.length < totalLen) return NaN;
     const pivotIdx = state.buffer.length - 1 - rightbars;
     const pivotVal = state.buffer[pivotIdx];
+    // Ties: equal to a bar on its LEFT is still a pivot, equal to one on its
+    // right is not -- of two equal highs, the later one is the pivot.
+    // TradingView logs it so: conformance/v5/parity/harness_trendlines.BTCUSDT.5.csv
+    // (bars 97 and 98 share a high; the pivot is 98).
     for (let i = pivotIdx - leftbars; i < pivotIdx; i++) {
-        if (state.buffer[i] >= pivotVal) return NaN;
+        if (state.buffer[i] > pivotVal) return NaN;
     }
     for (let i = pivotIdx + 1; i <= pivotIdx + rightbars; i++) {
         if (state.buffer[i] >= pivotVal) return NaN;
@@ -1379,8 +1398,10 @@ export function pivotlow(ctx: Context, sourceInput: any, leftbarsInput: any, rig
     if (state.buffer.length < totalLen) return NaN;
     const pivotIdx = state.buffer.length - 1 - rightbars;
     const pivotVal = state.buffer[pivotIdx];
+    // The same tie rule as pivothigh: equal on the left is allowed (bars 278
+    // and 279 share a low in harness_trendlines; the pivot is 279).
     for (let i = pivotIdx - leftbars; i < pivotIdx; i++) {
-        if (state.buffer[i] <= pivotVal) return NaN;
+        if (state.buffer[i] < pivotVal) return NaN;
     }
     for (let i = pivotIdx + 1; i <= pivotIdx + rightbars; i++) {
         if (state.buffer[i] <= pivotVal) return NaN;

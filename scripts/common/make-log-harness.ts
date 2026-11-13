@@ -129,7 +129,7 @@ function splitTopLevel(inner: string): string[] {
 /**
  * `iff(cond, t, f)` → `(cond ? t : f)`.
  *
- * v5 REMOVED `iff` (dev-docs/01-version-delta-spec.md §4c), so it cannot be
+ * v5 REMOVED `iff` (docs/common/VERSIONS.md §4c), so it cannot be
  * renamed like the rest — the replacement is a different construct. Rewriting
  * it here rather than marking the source line `@nov5` keeps the column: the v3
  * harness tests `iff` and the v5 one tests the ternary it became, and the two

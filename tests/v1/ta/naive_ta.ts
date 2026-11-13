@@ -61,8 +61,8 @@ export class NaiveTA {
      *
      * Derived from TradingView's documented behaviour rather than from the
      * engine's source: an oracle that copies the implementation it checks
-     * cannot catch it being wrong. dev-docs/PROGRESS.md records the same trap
-     * springing once already, on `NaiveTA.wma()`.
+     * cannot catch it being wrong. The same trap has sprung once already,
+     * on `NaiveTA.wma()`.
      */
     private smooth(key: string, source: number, length: number, alpha: number): number {
         // A leading `na` DELAYS the average rather than killing it: it is not a

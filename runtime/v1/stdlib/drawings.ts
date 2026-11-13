@@ -25,6 +25,7 @@
 
 import { Context } from "../context";
 import { val } from "../../../utils/v2/common";
+import { paletteColor } from "../palette";
 
 const v = (x: any): any => val(x);
 const n = (x: any): number => Number(val(x));
@@ -50,6 +51,22 @@ const n = (x: any): number => Number(val(x));
 /** Assigns a property on a drawing, coercing through `val`. */
 function setProp(ctx: Context, id: any, fn: string, prop: string, value: any): void {
     ctx.getDrawing(id, fn).props[prop] = v(value);
+}
+
+/**
+ * An x coordinate under its drawing's `xloc`. A bar index is whole: TradingView
+ * places `label.new(bar_index + 1.5, …)` on bar int(x), so fractions truncate
+ * toward zero. A time is left as given. `na` stays `na`.
+ */
+function nx(x: any, xloc: any): number {
+    const num = n(x);
+    return val(xloc) === "bar_time" ? num : Math.trunc(num);
+}
+
+/** Assigns an x coordinate, truncated when the drawing is placed by bar index. */
+function setX(ctx: Context, id: any, fn: string, prop: string, value: any): void {
+    const p = ctx.getDrawing(id, fn).props;
+    p[prop] = nx(value, p.xloc);
 }
 
 /** Assigns a NUMERIC property — coordinates and widths. */
@@ -150,9 +167,33 @@ function pointTail(
 const LINE_TAIL = ["xloc", "extend", "color", "style", "width"] as const;
 const BOX_TAIL = ["border_color", "border_width", "border_style", "extend", "xloc",
                   "bgcolor", "text", "text_size", "text_color", "text_halign",
-                  "text_valign", "text_wrap", "text_font_family"] as const;
+                  "text_valign", "text_wrap", "text_font_family", "force_overlay",
+                  "text_formatting"] as const;
 const LABEL_TAIL = ["text", "xloc", "yloc", "color", "style", "textcolor", "size",
-                    "textalign", "tooltip", "text_font_family"] as const;
+                    "textalign", "tooltip", "text_font_family", "force_overlay",
+                    "text_formatting"] as const;
+
+/**
+ * `text_formatting`, v6 (November 2024) — recorded only when SUPPLIED.
+ *
+ * A drawing without it renders as `text.format_none`, so leaving the key off
+ * says the same thing, and it keeps every earlier version's render model
+ * byte-identical: a v5 label has exactly the properties it always had.
+ */
+function formatting(supplied: any): Record<string, number> {
+    return supplied === undefined ? {} : { text_formatting: Number(v(supplied)) || 0 };
+}
+
+/**
+ * `force_overlay` (v5, 2024) — draw on the main chart pane whatever pane the
+ * script is in. Recorded only when supplied, for the same reason as
+ * `text_formatting`. It precedes `text_formatting` in the v6 reference's
+ * signatures, which is why it had to exist: without it a positional
+ * `force_overlay = true` landed in `text_formatting` and made the text bold.
+ */
+function overlay(supplied: any): Record<string, boolean> {
+    return supplied === undefined ? {} : { force_overlay: Boolean(v(supplied)) };
+}
 
 /** A supplied argument, or the manual's default when there is none. */
 function or(supplied: any, fallback: any): any {
@@ -162,7 +203,7 @@ function or(supplied: any, fallback: any): any {
 /** The x a point contributes, given the drawing's own `xloc`. */
 function pointX(point: any, xloc: any): number {
     const at = val(point) ?? {};
-    return n(val(xloc) === "bar_time" ? at.time : at.index);
+    return nx(val(xloc) === "bar_time" ? at.time : at.index, xloc);
 }
 
 /** The price a point carries. */
@@ -184,8 +225,17 @@ function setEndpoint(ctx: Context, id: any, fn: string, point: any,
                      xKey: string, yKey: string): void {
     const p = ctx.getDrawing(id, fn).props;
     const at = v(point) ?? {};
-    p[xKey] = n(p.xloc === "bar_time" ? at.time : at.index);
+    p[xKey] = nx(p.xloc === "bar_time" ? at.time : at.index, p.xloc);
     p[yKey] = n(at.price);
+}
+
+/**
+ * label.new's default textcolor: the version's black on v4/v5 (#363A45 on v5),
+ * but WHITE on v6 (TradingView probes v4-draw-fmt, v5-draw-defaults,
+ * v6-draw-defaults under dev-docs/tv-parity/_probes/version-scope/).
+ */
+function labelTextColor(ctx: Context): string {
+    return ctx.profile.version >= 6 ? paletteColor(ctx, "white") : paletteColor(ctx, "black");
 }
 
 export const line = {
@@ -205,21 +255,36 @@ export const line = {
             : [xloc, extend, color, style, width];
         const where = or(xl, "bar_index");
         return ctx.newDrawing("line", {
-            x1: points ? pointX(x1, where) : n(x1),
+            x1: points ? pointX(x1, where) : nx(x1, where),
             y1: points ? pointY(x1)        : n(y1),
-            x2: points ? pointX(y1, where) : n(x2),
+            x2: points ? pointX(y1, where) : nx(x2, where),
             y2: points ? pointY(y1)        : n(y2),
-            xloc: v(where), extend: v(or(ex, "none")), color: v(or(co, "#2196F3")),
+            xloc: v(where), extend: v(or(ex, "none")), color: v(or(co, paletteColor(ctx, "blue"))),
             style: v(or(st, "solid")), width: n(or(wd, 1)),
         });
     },
 
-    set_x1: (ctx: Context, id: any, x: any) => setNum(ctx, id, "line.set_x1", "x1", x),
+    set_x1: (ctx: Context, id: any, x: any) => setX(ctx, id, "line.set_x1", "x1", x),
     set_y1: (ctx: Context, id: any, y: any) => setNum(ctx, id, "line.set_y1", "y1", y),
-    set_x2: (ctx: Context, id: any, x: any) => setNum(ctx, id, "line.set_x2", "x2", x),
+    set_x2: (ctx: Context, id: any, x: any) => setX(ctx, id, "line.set_x2", "x2", x),
     set_y2: (ctx: Context, id: any, y: any) => setNum(ctx, id, "line.set_y2", "y2", y),
     set_width: (ctx: Context, id: any, width: any) => setNum(ctx, id, "line.set_width", "width", width),
-    set_xloc: (ctx: Context, id: any, xloc: any) => setProp(ctx, id, "line.set_xloc", "xloc", xloc),
+    /**
+     * `line.set_xloc(id, x1, x2, xloc)` — both x coordinates AND what they
+     * mean, in one call, because changing `xloc` alone would reinterpret bar
+     * indices as timestamps or the reverse.
+     *
+     * This took `(id, xloc)`, so the documented four-argument call put `x1`
+     * into `xloc` and left the line where it was. TradingView's log settles
+     * it — conformance/common/v5_gaps_golden.test.ts — and the signature is the
+     * same at every version that has lines.
+     */
+    set_xloc: (ctx: Context, id: any, x1: any, x2: any, xloc: any) => {
+        const p = ctx.getDrawing(id, "line.set_xloc").props;
+        p.x1 = nx(x1, xloc);
+        p.x2 = nx(x2, xloc);
+        p.xloc = v(xloc);
+    },
     set_extend: (ctx: Context, id: any, extend: any) => setProp(ctx, id, "line.set_extend", "extend", extend),
     set_color: (ctx: Context, id: any, color: any) => setProp(ctx, id, "line.set_color", "color", color),
     set_style: (ctx: Context, id: any, style: any) => setProp(ctx, id, "line.set_style", "style", style),
@@ -232,11 +297,11 @@ export const line = {
     /** Both endpoints at once — one call in Pine, so one call here. */
     set_xy1: (ctx: Context, id: any, x: any, y: any) => {
         const p = ctx.getDrawing(id, "line.set_xy1").props;
-        p.x1 = n(x); p.y1 = n(y);
+        p.x1 = nx(x, p.xloc); p.y1 = n(y);
     },
     set_xy2: (ctx: Context, id: any, x: any, y: any) => {
         const p = ctx.getDrawing(id, "line.set_xy2").props;
-        p.x2 = n(x); p.y2 = n(y);
+        p.x2 = nx(x, p.xloc); p.y2 = n(y);
     },
 
     /**
@@ -312,37 +377,53 @@ export const label = {
         ctx: Context, x: any, y: any, text?: any,
         xloc?: any, yloc?: any, color?: any, style?: any,
         textcolor?: any, size?: any, textalign?: any, tooltip?: any,
-        text_font_family?: any,
+        text_font_family?: any, force_overlay?: any, text_formatting?: any,
     ) => {
         const point = isChartPoint(x);
         const all = [x, y, text, xloc, yloc, color, style, textcolor, size,
-                     textalign, tooltip, text_font_family];
-        const [tx, xl, yl, co, st, tc, sz, ta, tt, ff] = point
+                     textalign, tooltip, text_font_family, force_overlay, text_formatting];
+        const [tx, xl, yl, co, st, tc, sz, ta, tt, ff, fo, tf] = point
             ? pointTail(ctx, all, 1, 1, LABEL_TAIL)
             : [text, xloc, yloc, color, style, textcolor, size, textalign,
-               tooltip, text_font_family];
+               tooltip, text_font_family, force_overlay, text_formatting];
         const where = or(xl, "bar_index");
         return ctx.newDrawing("label", {
-            x: point ? pointX(x, where) : n(x),
+            x: point ? pointX(x, where) : nx(x, where),
             y: point ? pointY(x)        : n(y),
             text: String(v(or(tx, "")) ?? ""),
-            xloc: v(where), yloc: v(or(yl, "price")), color: v(or(co, "#2196F3")),
-            style: v(or(st, "label_down")), textcolor: v(or(tc, "#FFFFFF")),
+            xloc: v(where), yloc: v(or(yl, "price")), color: v(or(co, paletteColor(ctx, "blue"))),
+            style: v(or(st, "label_down")), textcolor: v(or(tc, labelTextColor(ctx))),
             size: v(or(sz, "normal")), textalign: v(or(ta, "center")),
             tooltip: String(v(or(tt, "")) ?? ""),
             text_font_family: v(or(ff, "default")),
+            ...overlay(fo),
+            ...formatting(tf),
         });
     },
 
-    set_x: (ctx: Context, id: any, x: any) => setNum(ctx, id, "label.set_x", "x", x),
+    set_x: (ctx: Context, id: any, x: any) => setX(ctx, id, "label.set_x", "x", x),
     set_y: (ctx: Context, id: any, y: any) => setNum(ctx, id, "label.set_y", "y", y),
     set_text: (ctx: Context, id: any, text: any) => setProp(ctx, id, "label.set_text", "text", text),
-    set_xloc: (ctx: Context, id: any, xloc: any) => setProp(ctx, id, "label.set_xloc", "xloc", xloc),
+    /**
+     * `label.set_xloc(id, x, xloc)` — the reference's signature. The same
+     * defect `line.set_xloc` had: this took `(id, xloc)`. Fixed from the
+     * reference rather than from a log, as the line's twin.
+     */
+    set_xloc: (ctx: Context, id: any, x: any, xloc: any) => {
+        const p = ctx.getDrawing(id, "label.set_xloc").props;
+        p.x = nx(x, xloc);
+        p.xloc = v(xloc);
+    },
     set_yloc: (ctx: Context, id: any, yloc: any) => setProp(ctx, id, "label.set_yloc", "yloc", yloc),
     set_color: (ctx: Context, id: any, color: any) => setProp(ctx, id, "label.set_color", "color", color),
     set_style: (ctx: Context, id: any, style: any) => setProp(ctx, id, "label.set_style", "style", style),
     set_textcolor: (ctx: Context, id: any, textcolor: any) => setProp(ctx, id, "label.set_textcolor", "textcolor", textcolor),
     set_size: (ctx: Context, id: any, size: any) => setProp(ctx, id, "label.set_size", "size", size),
+    /** v6. See `formatting` above for the value. */
+    set_text_font_family: (ctx: Context, id: any, text_font_family: any) =>
+        setProp(ctx, id, "label.set_text_font_family", "text_font_family", text_font_family),
+    set_text_formatting: (ctx: Context, id: any, text_formatting: any) =>
+        setProp(ctx, id, "label.set_text_formatting", "text_formatting", Number(v(text_formatting)) || 0),
     set_textalign: (ctx: Context, id: any, textalign: any) => setProp(ctx, id, "label.set_textalign", "textalign", textalign),
     set_tooltip: (ctx: Context, id: any, tooltip: any) => setProp(ctx, id, "label.set_tooltip", "tooltip", tooltip),
 
@@ -356,7 +437,7 @@ export const label = {
 
     set_xy: (ctx: Context, id: any, x: any, y: any) => {
         const p = ctx.getDrawing(id, "label.set_xy").props;
-        p.x = n(x); p.y = n(y);
+        p.x = nx(x, p.xloc); p.y = n(y);
     },
 
     delete: (ctx: Context, id: any) => {
@@ -397,6 +478,8 @@ export const label = {
     style_label_upper_left: "label_upper_left",
     style_label_upper_right: "label_upper_right",
     style_label_center: "label_center",
+    /** Text drawn with an outline and no bubble — v5, 2024. */
+    style_text_outline: "text_outline",
     style_square: "square",
     style_diamond: "diamond",
 };
@@ -428,41 +511,58 @@ export const box = {
         xloc?: any, bgcolor?: any,
         text?: any, text_size?: any, text_color?: any,
         text_halign?: any, text_valign?: any,
-        text_wrap?: any, text_font_family?: any,
+        text_wrap?: any, text_font_family?: any, force_overlay?: any, text_formatting?: any,
     ) => {
         const points = isChartPoint(left);
         const all = [left, top, right, bottom, border_color, border_width,
                      border_style, extend, xloc, bgcolor, text, text_size,
                      text_color, text_halign, text_valign, text_wrap,
-                     text_font_family];
-        const [bc, bw, bs, ex, xl, bg, tx, ts, tc, th, tv, tw, ff] = points
+                     text_font_family, force_overlay, text_formatting];
+        const [bc, bw, bs, ex, xl, bg, tx, ts, tc, th, tv, tw, ff, fo, tf] = points
             ? pointTail(ctx, all, 2, 2, BOX_TAIL)
             : all.slice(4);
         const where = or(xl, "bar_index");
         return ctx.newDrawing("box", {
-            left:   points ? pointX(left, where) : n(left),
+            left:   points ? pointX(left, where) : nx(left, where),
             top:    points ? pointY(left)        : n(top),
-            right:  points ? pointX(top, where)  : n(right),
+            right:  points ? pointX(top, where)  : nx(right, where),
             bottom: points ? pointY(top)         : n(bottom),
-            border_color: v(or(bc, "#2196F3")), border_width: n(or(bw, 1)),
+            border_color: v(or(bc, paletteColor(ctx, "blue"))), border_width: n(or(bw, 1)),
             border_style: v(or(bs, "solid")), extend: v(or(ex, "none")),
-            xloc: v(where), bgcolor: v(or(bg, null)),
+            xloc: v(where), bgcolor: v(or(bg, paletteColor(ctx, "blue"))),
             text: v(or(tx, "")), text_size: v(or(ts, "auto")),
-            text_color: v(or(tc, "#000000")), text_halign: v(or(th, "center")),
+            text_color: v(or(tc, paletteColor(ctx, "black"))), text_halign: v(or(th, "center")),
             text_valign: v(or(tv, "center")), text_wrap: v(or(tw, "none")),
             text_font_family: v(or(ff, "default")),
+            ...overlay(fo),
+            ...formatting(tf),
         });
     },
 
-    set_left: (ctx: Context, id: any, left: any) => setNum(ctx, id, "box.set_left", "left", left),
+    set_left: (ctx: Context, id: any, left: any) => setX(ctx, id, "box.set_left", "left", left),
     set_top: (ctx: Context, id: any, top: any) => setNum(ctx, id, "box.set_top", "top", top),
-    set_right: (ctx: Context, id: any, right: any) => setNum(ctx, id, "box.set_right", "right", right),
+    set_right: (ctx: Context, id: any, right: any) => setX(ctx, id, "box.set_right", "right", right),
     set_bottom: (ctx: Context, id: any, bottom: any) => setNum(ctx, id, "box.set_bottom", "bottom", bottom),
     set_border_width: (ctx: Context, id: any, width: any) => setNum(ctx, id, "box.set_border_width", "border_width", width),
     set_border_color: (ctx: Context, id: any, color: any) => setProp(ctx, id, "box.set_border_color", "border_color", color),
     set_border_style: (ctx: Context, id: any, style: any) => setProp(ctx, id, "box.set_border_style", "border_style", style),
     set_extend: (ctx: Context, id: any, extend: any) => setProp(ctx, id, "box.set_extend", "extend", extend),
     set_bgcolor: (ctx: Context, id: any, bgcolor: any) => setProp(ctx, id, "box.set_bgcolor", "bgcolor", bgcolor),
+
+    /**
+     * v6, March 2025: "Sets the left and right border coordinates of a box
+     * and whether they are bar indices or UNIX timestamps. It works like the
+     * set_xloc() functions for lines and labels" — so the shape TradingView
+     * documents for `line.set_xloc`, `(id, x1, x2, xloc)`, with a box's
+     * horizontal coordinates being `left` and `right`.
+     *
+     */
+    set_xloc: (ctx: Context, id: any, left: any, right: any, xloc: any) => {
+        const p = ctx.getDrawing(id, "box.set_xloc").props;
+        p.left = nx(left, xloc);
+        p.right = nx(right, xloc);
+        p.xloc = v(xloc);
+    },
 
     /**
      * A box holds TEXT, and the seven setters that write it.
@@ -479,6 +579,9 @@ export const box = {
      */
     set_text: (ctx: Context, id: any, text: any) => setProp(ctx, id, "box.set_text", "text", text),
     set_text_size: (ctx: Context, id: any, text_size: any) => setProp(ctx, id, "box.set_text_size", "text_size", text_size),
+    /** v6. */
+    set_text_formatting: (ctx: Context, id: any, text_formatting: any) =>
+        setProp(ctx, id, "box.set_text_formatting", "text_formatting", Number(v(text_formatting)) || 0),
     set_text_color: (ctx: Context, id: any, text_color: any) => setProp(ctx, id, "box.set_text_color", "text_color", text_color),
     set_text_halign: (ctx: Context, id: any, text_halign: any) => setProp(ctx, id, "box.set_text_halign", "text_halign", text_halign),
     set_text_valign: (ctx: Context, id: any, text_valign: any) => setProp(ctx, id, "box.set_text_valign", "text_valign", text_valign),
@@ -492,7 +595,7 @@ export const box = {
 
     set_lefttop: (ctx: Context, id: any, left: any, top: any) => {
         const p = ctx.getDrawing(id, "box.set_lefttop").props;
-        p.left = n(left); p.top = n(top);
+        p.left = nx(left, p.xloc); p.top = n(top);
     },
     /** The `chart.point` spellings of the two corner setters. */
     set_top_left_point: (ctx: Context, id: any, point: any) =>
@@ -502,7 +605,7 @@ export const box = {
 
     set_rightbottom: (ctx: Context, id: any, right: any, bottom: any) => {
         const p = ctx.getDrawing(id, "box.set_rightbottom").props;
-        p.right = n(right); p.bottom = n(bottom);
+        p.right = nx(right, p.xloc); p.bottom = n(bottom);
     },
 
     delete: (ctx: Context, id: any) => {
@@ -562,6 +665,7 @@ export const table = {
         text_halign: any = "center", text_valign: any = "center",
         text_size: any = "normal", bgcolor: any = null,
         tooltip: any = "", text_font_family: any = "default",
+        text_formatting: any = undefined,
     ) => {
         const p = ctx.getDrawing(table_id, "table.cell").props;
         p.cells.set(`${n(column)},${n(row)}`, {
@@ -569,6 +673,7 @@ export const table = {
             text_color: v(text_color), text_halign: v(text_halign),
             text_valign: v(text_valign), text_size: v(text_size), bgcolor: v(bgcolor),
             tooltip: String(v(tooltip) ?? ""), text_font_family: v(text_font_family),
+            ...formatting(text_formatting),
         });
     },
 
@@ -618,6 +723,11 @@ export const table = {
     cell_set_text_valign: (ctx: Context, table_id: any, column: any, row: any, text_valign: any) =>
         setCell(ctx, table_id, "cell_set_text_valign", column, row, "text_valign", v(text_valign)),
 
+    /** v6. */
+    cell_set_text_formatting: (ctx: Context, table_id: any, column: any, row: any, text_formatting: any) =>
+        setCell(ctx, table_id, "cell_set_text_formatting", column, row, "text_formatting",
+                Number(v(text_formatting)) || 0),
+
     cell_set_width: (ctx: Context, table_id: any, column: any, row: any, width: any) =>
         setCell(ctx, table_id, "cell_set_width", column, row, "width", n(width)),
 
@@ -643,6 +753,17 @@ export const table = {
     set_bgcolor: (ctx: Context, id: any, bgcolor: any) => {
         ctx.getDrawing(id, "table.set_bgcolor").props.bgcolor = v(bgcolor);
     },
+    set_border_color: (ctx: Context, id: any, border_color: any) =>
+        setProp(ctx, id, "table.set_border_color", "border_color", border_color),
+    set_border_width: (ctx: Context, id: any, border_width: any) =>
+        setNum(ctx, id, "table.set_border_width", "border_width", border_width),
+    set_frame_color: (ctx: Context, id: any, frame_color: any) =>
+        setProp(ctx, id, "table.set_frame_color", "frame_color", frame_color),
+    set_frame_width: (ctx: Context, id: any, frame_width: any) =>
+        setNum(ctx, id, "table.set_frame_width", "frame_width", frame_width),
+
+    /** Every table the script has made and not deleted, oldest first. @getter */
+    all: (ctx: Context): string[] => ctx.drawingIds("table"),
 
     clear: (ctx: Context, id: any) => {
         ctx.getDrawing(id, "table.clear").props.cells.clear();
@@ -710,6 +831,17 @@ export const text = {
      */
     wrap_auto: "auto",
     wrap_none: "none",
+
+    /**
+     * `text.format_*` — v6 (November 2024): "whether displayed text is bold,
+     * italic, or both". Both is the SUM of the two, which is why these are bit
+     * flags rather than names: `text.format_bold + text.format_italic` is how a
+     * script asks for it, and 1 + 2 = 3 is unambiguous where "bold" + "italic"
+     * would not be. Gated by name in V6_ONLY_NAMES.
+     */
+    format_none: 0,
+    format_bold: 1,
+    format_italic: 2,
 };
 
 // ── polyline ────────────────────────────────────────────────────────────────
@@ -743,7 +875,7 @@ export const text = {
 export const polyline = {
     new: (
         ctx: Context, points: any, curved: any = false, closed: any = false,
-        xloc: any = "bar_index", line_color: any = "#2196F3", fill_color: any = undefined,
+        xloc: any = "bar_index", line_color: any = undefined, fill_color: any = undefined,
         line_style: any = "solid", line_width: any = 1, force_overlay: any = false,
     ) => {
         const raw = v(points);
@@ -753,7 +885,7 @@ export const polyline = {
         return ctx.newDrawing("polyline", {
             points: raw.map(p => ({ ...v(p) })),
             curved: Boolean(v(curved)), closed: Boolean(v(closed)),
-            xloc: v(xloc), line_color: v(line_color), fill_color: v(fill_color),
+            xloc: v(xloc), line_color: v(or(line_color, paletteColor(ctx, "blue"))), fill_color: v(fill_color),
             line_style: v(line_style), line_width: n(line_width),
             force_overlay: Boolean(v(force_overlay)),
         });
@@ -782,9 +914,22 @@ export const polyline = {
 //   linefill.all      "a read-only array containing the IDs of all linefills"
 
 export const linefill = {
-    new: (ctx: Context, line1: any, line2: any, color: any) => ctx.newDrawing("linefill", {
-        line1: v(line1), line2: v(line2), color: v(color),
-    }),
+    /**
+     * A linefill on an `na` line is `na` and creates nothing.
+     *
+     * Logged on TradingView with `line nl = na; linefill.new(nl, nl, color.red)`:
+     * `linefill.all.size()` is 0 before and after
+     * (conformance/v5/parity/probe_drawing_limits.BTCUSDT.5.csv, `LF|0|0`).
+     * The case where only ONE line is `na` was not logged; it is INFERRED from
+     * that, since a fill is the space between two lines and has none with one.
+     */
+    new: (ctx: Context, line1: any, line2: any, color: any) => {
+        const l1 = v(line1);
+        const l2 = v(line2);
+        const isNa = (x: any) => x === null || x === undefined || (typeof x === "number" && Number.isNaN(x));
+        if (isNa(l1) || isNa(l2)) return NaN;
+        return ctx.newDrawing("linefill", { line1: l1, line2: l2, color: v(color) });
+    },
 
     set_color: (ctx: Context, id: any, color: any) =>
         setProp(ctx, id, "linefill.set_color", "color", color),

@@ -11,6 +11,7 @@
 - [Parity: 763 real scripts from TradingView's docs](#parity-763-real-scripts-from-tradingviews-docs)
 - [Testing](#testing)
 - [Deliberate deviations from TradingView](#deliberate-deviations-from-tradingview)
+- [Restrictions the engine does not enforce](#restrictions-the-engine-does-not-enforce)
 
 ## Verified against TradingView itself
 
@@ -229,7 +230,7 @@ this repository's licence.
 npm test
 ```
 
-2,396 tests pass across 87 files. None fail.
+4,482 tests pass across 203 files. None fail.
 
 Three patterns carry most of the weight:
 
@@ -257,5 +258,61 @@ those limits are not parity — they are rationing. The engine skips them:
 - **No script size limits.**
 
 Semantic rules — the ones that would silently change your numbers — are enforced,
-not skipped. Every skipped item is recorded with its blast radius in
-`dev-docs/04-skipped-restrictions.md`.
+not skipped. Every skipped item is recorded, with its blast radius, in the next
+section.
+
+## Restrictions the engine does not enforce
+
+Nothing may be skipped without an entry here. Each states what TradingView does
+and what a script that relies on it will see locally, so a hosted deployment that
+needs a limit can add it back.
+
+### Execution and resource limits (skipped on purpose)
+
+| Restriction | TradingView | Here |
+|---|---|---|
+| 500 ms loop timeout per bar | A loop body over 500 ms aborts compilation | Runs to completion. A genuine infinite loop hangs the thread, so a host running untrusted scripts should use a worker with a watchdog ([integration guide](integration/06-recipes.md#run-it-in-a-web-worker)) |
+| Cumulative execution cap (~20-40 s) | Script terminated | Long backtests on large datasets simply work |
+| `max_bars_back` default and explicit-declaration requirement | Runtime error *"Pine cannot determine the referencing length of series"* | Any lookback depth resolves. `max_bars_back=` is **accepted and ignored**, so v4/v5 sources still parse |
+| Script size limits (local scopes, variables, compiled size) | Compilation error | No effect on correct scripts |
+| 40 `request.*` / `security()` calls per script | Compilation error | No ceiling |
+| 64 `plot()` outputs per script | Compilation error | No ceiling; the render model returns any number of series (70 plots run) |
+| ~100k historical bars (fewer on lower plans) | Data truncated | Whatever the host supplies |
+
+Drawing-object caps are **not** in this table: they are implemented, because
+auto-deletion is observable behaviour. Each of `line`, `label`, `box`, `polyline`
+and `linefill` keeps 50 by default, or the script's `max_*_count`, with
+TradingView's measured limit + 5 slack
+([integration guide](integration/03-plotting.md#drawings-are-capped-as-on-tradingview)).
+
+### Platform-coupled features (stubbed or host-supplied)
+
+| Feature | State |
+|---|---|
+| `alertcondition()`, `alert()` | Signature-compatible so scripts run, but nothing is delivered and `SimResult.alerts` is always `[]`. There is no alert system to integrate with |
+| `request.financial()`, `.dividends()`, `.splits()`, `.earnings()`, `.quandl()` | No bundled dataset. A request the host did not supply raises a runtime error naming the key it wanted. Data goes in through `Context.provideRequestData`; `Session` has no method for it yet |
+| `ticker.renko`, `.kagi`, `.linebreak`, `.pointfigure` | A `request.security` on one raises a runtime error: the bricks cannot be built from OHLCV bars. `heikinashi` works |
+| `syminfo.*` fields the exchange owns (`mintick`, `pointvalue`, `currency`, `session`, `timezone`, `type`) | Host-provided through `Session.setChart`, defaulting to sane values; not discoverable from a CSV |
+| The default session of `time()` | Not modelled; the real default is the symbol's session, which needs an exchange calendar ([VERSIONS.md §4d](VERSIONS.md#4d-behaviour-changes)) |
+| Margin calls (forced liquidation) | Entries beyond margin are blocked from v6, as on TradingView; liquidation itself is documented but not verified against a TradingView log |
+| Display concerns: transparency clamping, plot `precision` rounding, `format.*`, label and table pixel positioning, font sizes | Values are carried through the render model verbatim; the host decides presentation. `overlay` is reported as `pane`, and honoured by the host |
+
+### Compile-time checks TradingView makes that the engine does not
+
+The rule here is that wrongly *rejecting* a valid script is worse than accepting
+an invalid one, so a check is added only when it can be made exactly.
+
+| Check | Blast radius |
+|---|---|
+| **`simple` / `series` qualifier on parameters.** TradingView: `for i = 1 to 2` then `ta.rma(close, i)` is *"An argument of 'series int' type was used but a 'simple int' is expected"* | The registry carries parameter names, not qualifiers, so v1-v5 accept it. v6 enforces the one case it can read from a table: a reassigned (`:=`) variable passed as a length of a listed built-in. A loop variable is still accepted at every version. To do it fully, the qualifier must be sourced per parameter |
+| **Mutual recursion** (`f` calls `g`, `g` calls `f`) | Not rejected at any version. Direct self-recursion, the case that appears, is |
+| **`transp=` on plotting functions at v5** (removed in favour of `color.new`) | Accepted and ignored at v5. TradingView rejects it. v6 refuses it (*"'plot' has no 'transp' parameter in Pine Script v6"*) |
+
+When one of these is made, delete its row.
+
+### Deferred
+
+| Item | Note |
+|---|---|
+| Renko / Kagi / Point-and-Figure / Line-Break bar re-aggregation | Needs intrabar data the engine is not given |
+| `strategy.risk.*` intraday rules under non-UTC exchange sessions | Not verified |

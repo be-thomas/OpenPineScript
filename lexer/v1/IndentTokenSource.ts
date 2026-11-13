@@ -70,7 +70,7 @@ type GeneratedLexerCtor = new (...args: any[]) => LexerLike;
  * every multi-line function definition.
  */
 const CONTINUATION_TOKEN_NAMES = [
-  "DEFINE", "ASSIGN", "COMMA",
+  "DEFINE", "ASSIGN", "COMMA", "DOT",
   "PLUS", "MINUS", "MUL", "DIV", "MOD",
   "COND", "COND_ELSE",
   "AND", "OR", "NOT",
@@ -92,7 +92,27 @@ const BLOCK_OPENER_NAMES = [
   "IF_COND", "IF_COND_ELSE", "FOR_STMT", "WHILE", "SWITCH", "ARROW",
 ];
 
-export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase) {
+/** Per-version behaviour of the shared indentation logic. */
+export interface IndentOptions {
+  /**
+   * TradingView's line-wrapping rule, applied literally: a line indented by a
+   * number of spaces that is NOT a multiple of four continues the line above,
+   * wherever the lines around it sit. Off, the lexer keeps its older
+   * permissive reading: 2-space blocks are blocks.
+   */
+  readonly strictContinuation?: boolean;
+  /**
+   * A line at column 0 ends the statement even inside open parentheses, so an
+   * unclosed call is an error. TradingView does this on v1 to v5 (probes
+   * version-scope/v{1,2,3,4}-col0-paren; v5 KAMA, ENGINE-BUGS 3) but accepts a
+   * column-0 `)` at v6 (run 75178dcf), so only v6 leaves it off.
+   */
+  readonly columnZeroEndsCall?: boolean;
+}
+
+export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase, options: IndentOptions = {}) {
+  const STRICT = options.strictContinuation === true;
+  const COL0_ENDS_CALL = options.columnZeroEndsCall === true;
   // Resolved once per version, from that version's own generated lexer.
   const T = Base as unknown as IndentTokenIds;
 
@@ -105,6 +125,11 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
   const CONTINUATION_IDS = idsOf(CONTINUATION_TOKEN_NAMES);
   // A version that lacks one of these — v4 has no WHILE — simply skips it.
   const BLOCK_OPENER_IDS = idsOf(BLOCK_OPENER_NAMES);
+  // `type P` and `enum E` open a body too, but only as a declaration — the
+  // first word of the line, or the second after `export`. Elsewhere they are
+  // ordinary names (`x = type`), and a line using one may still wrap.
+  const DECLARATION_OPENER_IDS = idsOf(["TYPE", "ENUM"]);
+  const EXPORT_ID = (Base as unknown as Record<string, number>)["EXPORT"];
 
   return class IndentAwareTokenSource extends Base {
     private pendingTokens: Token[] = [];
@@ -114,6 +139,8 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
     private indentUnit: number | null = null;
     /** Inside ( ) or [ ], newlines are plain whitespace. */
     private parenLevel: number = 0;
+    /** Position of each open ( or [, innermost last, for the column-0 error. */
+    private openBrackets: { line: number; column: number }[] = [];
     /** Type of the last real (non-virtual) token, for continuation detection. */
     private lastRealToken: number = -1;
 
@@ -125,6 +152,8 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
      * a continuation is absorbed, because that is still the same line.
      */
     private lineOpensBlock: boolean = false;
+    /** No real token yet on this line, or only `export`. */
+    private atLineStart: boolean = true;
 
     /**
      * Structural indentation errors, drained by createParser.
@@ -163,13 +192,19 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
       if (t.type !== T.LBEG && t.type !== Token.EOF) {
         this.lastRealToken = t.type;
         if (BLOCK_OPENER_IDS.has(t.type)) this.lineOpensBlock = true;
+        if (this.atLineStart && DECLARATION_OPENER_IDS.has(t.type)) this.lineOpensBlock = true;
+        this.atLineStart = t.type === EXPORT_ID && this.atLineStart;
+      } else if (t.type === T.LBEG && this.parenLevel === 0) {
+        this.atLineStart = true;
       }
 
       // 2. Track Parentheses/Brackets (Ignore indentation inside parens)
       if (t.type === T.LPAR || t.type === T.LSQBR) {
         this.parenLevel++;
+        this.openBrackets.push({ line: t.line, column: t.column });
       } else if (t.type === T.RPAR || t.type === T.RSQBR) {
         if (this.parenLevel > 0) this.parenLevel--;
+        this.openBrackets.pop();
       }
 
       // 3. Handle Explicit Indentation (LBEG)
@@ -183,6 +218,18 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
         // "this.getChannel is not a function". Emitting the LBEG instead is not an
         // option either: no parser rule matches LBEG, so it would be a syntax error.
         if (this.parenLevel > 0) {
+          if (COL0_ENDS_CALL && this.startsAtColumnZero(t)) {
+            const open = this.openBrackets[this.openBrackets.length - 1];
+            this.indentErrors.push({
+              line: open?.line ?? t.line,
+              column: open?.column ?? 0,
+              message:
+                `mismatched input 'end of line without line continuation' ` +
+                `expecting ')': the line at column 0 (line ${t.line + this.newlinesIn(t)}) ` +
+                `starts a new statement, so the call opened here is never closed. ` +
+                `Indent a wrapped line by a number of spaces that is not a multiple of four.`,
+            });
+          }
           return this.nextToken();
         }
 
@@ -278,8 +325,16 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
         // Both are an indent after a line ending in a complete expression, so
         // nothing about the previous line's LAST token separates them. Whether
         // the line contained `if`, `for`, `while`, `switch` or `=>` does.
+        // TradingView's rule, literally (see IndentOptions): a space-indented
+        // line off the four-space grid is a continuation, even right after a
+        // block opener and even when it is not deeper than the line above.
+        if (STRICT && indentLength % 4 !== 0 && !indentStr.includes("\t")) {
+          return this.nextToken();
+        }
+
         const indented = indentLength > this.indentStack[this.indentStack.length - 1];
-        if (indented && !this.lineOpensBlock && this.nextLineStartsWithArithmetic()) {
+        if (indented && !this.lineOpensBlock &&
+            (this.nextLineStartsWithArithmetic() || this.isContinuationIndent(indentLength))) {
           return this.nextToken();
         }
 
@@ -302,6 +357,25 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
       }
 
       return t;
+    }
+
+    /** Is the line that LBEG token `t` introduces flush against column 0? */
+    private startsAtColumnZero(t: Token): boolean {
+      const text = t.text ?? this.inputStream?.getText(new Interval(t.start, t.stop)) ?? "";
+      const nl = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
+      if (text.substring(nl + 1).length !== 0) return false;
+      // A blank or comment-only line carries no indentation information.
+      const c = this.inputStream?.LA(1);
+      const c2 = this.inputStream?.LA(2);
+      if (c === 0x0a || c === 0x0d || c === -1) return false;
+      if (c === 0x2f && (c2 === 0x2f || c2 === 0x2a)) return false;
+      return true;
+    }
+
+    /** Line number of the last line an LBEG token spans. */
+    private newlinesIn(t: Token): number {
+      const text = t.text ?? this.inputStream?.getText(new Interval(t.start, t.stop)) ?? "";
+      return (text.match(/\n|\r(?!\n)/g) ?? []).length;
     }
 
     private handleIndentation(indentLength: number, triggerToken: Token, isEOF = false): Token {
@@ -423,12 +497,38 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase)
       if (c1 === 0x3f /* ? */ || c1 === 0x3a /* : */) return true;
 
       const at = (n: number) => String.fromCharCode(s.LA(n));
+      // Nothing can START a statement with these, so a line that does
+      // continues the one above: `, false`, `.style(…)`, `>= limit`,
+      // `/ count`, `!= x`, `== y`. A leading `=>` is a switch's default arm
+      // and `//` a comment, so both are left alone; `.5` is a number.
+      const c2 = at(2);
+      if (c1 === 0x2c /* , */) return true;
+      if (c1 === 0x2e /* . */ && !/[0-9]/.test(c2)) return true;
+      if (c1 === 0x2f /* / */ && c2 !== "/" && c2 !== "*") return true;
+      if (c1 === 0x3e /* > */ || c1 === 0x3c /* < */) return true;
+      if ((c1 === 0x21 /* ! */ || c1 === 0x3d /* = */) && c2 === "=") return true;
       const word = at(1) + at(2) + at(3) + at(4);
       // Require a following space or '(' so identifiers like `android` or
       // `orders` are not mistaken for the operators.
       if (/^and[\s(]/.test(word)) return true;
       if (/^or[\s(]/.test(word)) return true;
       return false;
+    }
+
+    /**
+     * The manual's rule for a wrapped line: "Lines that are continuations ...
+     * must be indented with any number of spaces which isn't a multiple of
+     * four", because four is how a block is opened. So a deeper line that is
+     * not on the four-space grid continues the line above, whatever that line
+     * ended with or this one starts with — `>= x`, `math.min(`, `.style(…)`.
+     *
+     * Only while the script's blocks are on that grid: a script indenting its
+     * blocks by two (which TradingView rejects, and this engine has always
+     * accepted) keeps being read as blocks.
+     */
+    private isContinuationIndent(indentLength: number): boolean {
+      if (indentLength % 4 === 0) return false;
+      return this.indentUnit === null || this.indentUnit % 4 === 0;
     }
 
     /**

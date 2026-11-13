@@ -1,0 +1,3 @@
+//@version=5//@version=5
+indicator("PE doubled version")
+plot(close)

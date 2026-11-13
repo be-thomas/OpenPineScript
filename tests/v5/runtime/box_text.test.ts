@@ -83,7 +83,7 @@ describe("a fractional array index is floored", () => {
 
   it("a genuinely out-of-range index is still refused", () => {
     expect(() => build(HEAD + "xs = array.from(1.0)\nx = array.get(xs, 3.2)\n").exec())
-      .toThrow(/index 3 is out of bounds \(size 1\)/);
+      .toThrow(/Index 3 is out of bounds, array size is 1\./);
   });
 
   it("na as an index is refused rather than floored to something", () => {

@@ -101,17 +101,19 @@ describe("where the receiver's type comes from", () => {
   });
 });
 
-describe("what it refuses, and why that is the right answer", () => {
+describe("what it resolves without a written type, and what it still refuses", () => {
+  // These four used to assert a compile error whenever the receiver's type was
+  // not written down. TradingView compiles such scripts — published libraries
+  // call overloaded methods on parameters, fields and call results — so a type
+  // the source settles is resolved here, and the rest at run time by the
+  // value's own type (Context.pickOverload).
   const PAIR =
     'method tag(int self) =>\n    "int"\n' +
     'method tag(float self) =>\n    "float"\n';
 
-  it("an unprovable receiver type is an error, not a guess", () => {
-    // `close * 2` is a series float in Pine, but this pass does not model
-    // arithmetic and will not pretend to. Refusing names both candidates.
+  it("arithmetic on a price series is a float receiver", () => {
     const src = HEAD + PAIR + "x = close * 2\nv = x.tag()\n";
-    expect(() => compileScript(src))
-      .toThrow(/'tag' is declared 2 times, for 'int', 'float' receivers.*cannot be determined/s);
+    expect(value(src, "v")).toBe("float");
   });
 
   it("a receiver whose type matches no overload says which type it has", () => {
@@ -120,22 +122,33 @@ describe("what it refuses, and why that is the right answer", () => {
       .toThrow(/is 'string', which none of them takes/);
   });
 
-  it("the message says how to fix it", () => {
-    const src = HEAD + PAIR + "x = close * 2\nv = x.tag()\n";
-    expect(() => compileScript(src)).toThrow(/Declare it — 'float x = …'/);
+  it("an int receiver widens to the float overload when there is no int one", () => {
+    const src = HEAD + 'method tag(float self) =>\n    "float"\nmethod tag(string self) =>\n    "string"\n' +
+      "n = 3\nv = n.tag()\n";
+    expect(value(src, "v")).toBe("float");
   });
 
-  it("a chained receiver is a VALUE, so an overload cannot be chosen", () => {
+  it("a chained receiver is a VALUE, and its own type picks the overload", () => {
     // `f().tag()` — there is no name to look a declared type up by.
-    const src = HEAD + PAIR + "f() =>\n    1\nv = f().tag()\n";
-    expect(() => compileScript(src)).toThrow(/'tag' is declared 2 times/);
+    const src = HEAD + 'type A\n    int v\ntype B\n    int v\n' +
+      'method tag(A self) =>\n    "A"\nmethod tag(B self) =>\n    "B"\n' +
+      "f() =>\n    B.new(1)\nv = f().tag()\n";
+    expect(value(src, "v")).toBe("B");
   });
 
-  it("two declarations sharing a receiver type are still refused", () => {
+  it("two declarations sharing a receiver type AND parameters are still refused", () => {
     const src = HEAD + 'method tag(int self) =>\n    "a"\nmethod tag(int self) =>\n    "b"\n' +
       "x = 1\nv = x.tag()\n";
     expect(() => compileScript(src))
       .toThrow(/method 'tag' is already defined for a 'int' receiver/);
+  });
+
+  it("one receiver may carry several declarations with different parameters", () => {
+    const src = HEAD + 'type A\n    float v\n' +
+      "method add(A self, float x) =>\n    self.v + x\n" +
+      "method add(A self, float x, float y) =>\n    self.v + x + y\n" +
+      "a = A.new(5)\nv = a.add(1) * 100 + a.add(1, 2)\n";
+    expect(value(src, "v")).toBe(608);
   });
 });
 

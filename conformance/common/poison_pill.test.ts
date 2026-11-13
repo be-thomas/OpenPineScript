@@ -96,12 +96,12 @@ describe("names this engine deliberately does not implement", () => {
   for (const name of VOLUME_FAMILY) {
     it(`v4 refuses '${name}' by name`, () => {
       expect(() => runWith(LANGUAGE_PROFILES[4], `val = ${name}\n`))
-        .toThrow(new RegExp(`'${name}' is a Pine built-in that OpenPineScript does not implement`));
+        .toThrow(new RegExp(`'${name}' is a Pine built-in that this engine does not implement`));
     });
 
     it(`v5 refuses 'ta.${name}' by name`, () => {
       expect(() => runWith(LANGUAGE_PROFILES[5], `val = ta.${name}\n`))
-        .toThrow(new RegExp(`'ta\\.${name}' is a Pine built-in that OpenPineScript does not implement`));
+        .toThrow(new RegExp(`'ta\\.${name}' is a Pine built-in that this engine does not implement`));
     });
   }
 

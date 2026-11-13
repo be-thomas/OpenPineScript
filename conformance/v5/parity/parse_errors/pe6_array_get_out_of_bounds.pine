@@ -1,0 +1,6 @@
+//@version=5
+indicator("PE array.get out of bounds")
+a = array.new_float(3, 1.0)
+plot(close)
+if bar_index == 10
+    plot_value = array.get(a, 5)

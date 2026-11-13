@@ -66,16 +66,18 @@ export function isfirst(ctx: Context): boolean {
  * namespace does not error, so `if barstate.isconfirmed` was silently never
  * taken and the scripts drew nothing.
  *
- * "The last (closing) update of a realtime bar" is not a script execution in
- * this engine: `Context.commitBar` settles the forming bar AFTER the script has
- * run, so a bar is either history — settled — or forming. That makes the test
- * exactly `not realtime`, which is the first half of the definition and the
- * whole of it here.
+ * TradingView runs the script ONE MORE time on a realtime bar when it closes
+ * (a rollback re-execution like a tick, on the bar's final OHLCV, with
+ * `isnew` false) and `isconfirmed` is true only there. `Session.commit` does
+ * that execution and sets `Context.is_confirmed` for it. Verified:
+ * dev-docs/tv-parity/_probes/realtime/rt-confirmed-v6/run-20261113-042353 and
+ * rt-confirmed-v5/run-20261113-043223. History is always confirmed.
  *
  * @getter
  */
 export function isconfirmed(ctx: Context): boolean {
-    return !ctx.is_realtime;
+    // The closing execution exists on v5 and v6 only (Context.realtimeBarStates); is_confirmed is never set below that.
+    return !ctx.is_realtime || ctx.is_confirmed;
 }
 
 /**

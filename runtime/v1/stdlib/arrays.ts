@@ -1,3 +1,5 @@
+import type { Context } from "../context";
+import { byField, sortKey, compareKeys, isObject } from "./sort_field";
 /**
  * Pine Script arrays — the `array.*` namespace.
  *
@@ -50,13 +52,64 @@ function arr(id: any, fn: string): any[] {
  * `math.min(lastHiBar / (lookbackInput / 5), 4)`, an ordinary float. Requiring
  * an integer rejected the script at its first bar.
  */
-function bounds(a: any[], index: any, fn: string): number {
-    const i = Math.floor(Number(val(index)));
+function bounds(a: any[], index: any, fn: string, negative = false): number {
+    let i = Math.floor(Number(val(index)));
+    // v6, MG §"Negative indices in arrays": "-1 addresses the last element",
+    // and "indices must stay within the array size" — so -1 … -size map onto
+    // size-1 … 0, and anything further is still out of bounds. The error names
+    // the index the SCRIPT wrote, which is the one its author can find.
+    const written = i;
+    if (negative && i < 0) i += a.length;
     if (!Number.isFinite(i) || i < 0 || i >= a.length) {
-        throw new Error(`array.${fn}: index ${i} is out of bounds (size ${a.length})`);
+        i = written;
+        throw new Error(`In 'array.${fn}()' function. Index ${i} is out of bounds, array size is ${a.length}.`);
     }
     return i;
 }
+
+/** Marks a search over plain values rather than objects' fields. */
+const NO_FIELD = Symbol("no sort field");
+
+/**
+ * Binary search over an ascending array, by `sort_field` when the elements are
+ * objects. `value` may be an object too, in which case its own field is the
+ * target — so `arr.binary_search(probe, "timestamp")` works either way.
+ */
+function searchByField(a: any[], value: any, sortField: any, mode: "exact" | "left" | "right"): number {
+    const key = (x: any) => (sortField === NO_FIELD ? val(x) : sortKey(x, sortField));
+    const target = isObject(val(value)) && sortField !== NO_FIELD ? key(val(value)) : val(value);
+    // First index whose key is >= target, and first whose key is > target.
+    const bound = (strict: boolean) => {
+        let lo = 0, hi = a.length;
+        while (lo < hi) {
+            const mid = (lo + hi) >> 1;
+            const c = compareKeys(key(a[mid]), target);
+            if (c < 0 || (strict && c === 0)) lo = mid + 1; else hi = mid;
+        }
+        return lo;
+    };
+    if (mode === "exact") {
+        // The plain midpoint search, as `binary_search` on plain values does:
+        // among duplicates it returns whichever one the probe lands on —
+        // TradingView answers 2 for 2 in [1, 2, 2, 2, 3, 5], not 1.
+        let lo = 0, hi = a.length - 1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            const c = compareKeys(key(a[mid]), target);
+            if (c === 0) return mid;
+            if (c < 0) lo = mid + 1; else hi = mid - 1;
+        }
+        return -1;
+    }
+    const lower = bound(false), upper = bound(true);
+    const found = lower < upper;
+    if (mode === "left") return found ? lower : Math.max(0, lower - 1);
+    return found ? upper - 1 : upper;
+}
+
+/** v6 reads a negative index from the end. Profile flag; see LanguageProfile. */
+const negativeIndices = (ctx: Context): boolean =>
+    ctx?.profile?.defaults.negativeArrayIndices === true;
 
 const num = (x: any): number => Number(val(x));
 
@@ -80,6 +133,32 @@ export const array = {
     new_string: (size: any = 0, initial_value: any = "") => sized(size, initial_value ?? ""),
     new_color: (size: any = 0, initial_value: any = null) => sized(size, initial_value ?? null),
     new_line: (size: any = 0, initial_value: any = null) => sized(size, initial_value ?? null),
+    new_linefill: (size: any = 0, initial_value: any = null) => sized(size, initial_value ?? null),
+
+    /**
+     * The value `percentage` percent of the array's values are at or below,
+     * by nearest rank: `ceil(P/100 * N)` over the ascending values, so the
+     * answer is always one of them. The rule `ta.percentile_nearest_rank`
+     * applies to a window. `na` values are left out.
+     */
+    percentile_nearest_rank: (id: any, percentage: any): number => {
+        const xs = arr(id, "array.percentile").map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+        if (xs.length === 0) return NaN;
+        const rank = Math.ceil((Number(val(percentage)) / 100) * xs.length);
+        return xs[Math.min(Math.max(rank, 1), xs.length) - 1];
+    },
+
+    /**
+     * The same percentile, interpolating linearly between the two values that
+     * straddle it — the rule `ta.percentile_linear_interpolation` applies.
+     */
+    percentile_linear_interpolation: (id: any, percentage: any): number => {
+        const xs = arr(id, "array.percentile").map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+        if (xs.length === 0) return NaN;
+        const pos = (Number(val(percentage)) / 100) * (xs.length - 1);
+        const lo = Math.floor(pos), hi = Math.ceil(pos);
+        return xs[lo] + (xs[hi] - xs[lo]) * (pos - lo);
+    },
     new_label: (size: any = 0, initial_value: any = null) => sized(size, initial_value ?? null),
     new_box: (size: any = 0, initial_value: any = null) => sized(size, initial_value ?? null),
     new_table: (size: any = 0, initial_value: any = null) => sized(size, initial_value ?? null),
@@ -88,13 +167,16 @@ export const array = {
     from: (...items: any[]) => items.map(val),
 
     // --- Access ------------------------------------------------------------
-    get: (id: any, index: any) => {
+    // `ctx` first on the four accessors v6 lets count from the end, so the
+    // version can decide; the parameter NAMES after it are unchanged, which is
+    // what keeps every version's named arguments working.
+    get: (ctx: Context, id: any, index: any) => {
         const a = arr(id, "get");
-        return a[bounds(a, index, "get")];
+        return a[bounds(a, index, "get", negativeIndices(ctx))];
     },
-    set: (id: any, index: any, value: any) => {
+    set: (ctx: Context, id: any, index: any, value: any) => {
         const a = arr(id, "set");
-        a[bounds(a, index, "set")] = val(value);
+        a[bounds(a, index, "set", negativeIndices(ctx))] = val(value);
     },
     size: (id: any) => arr(id, "size").length,
 
@@ -128,8 +210,10 @@ export const array = {
      * on an unsorted one they are a wrong one. This engine does not verify the
      * ordering — checking it would cost the very thing the function is for.
      */
-    binary_search: (id: any, value: any) => {
+    binary_search: (ctx: Context, id: any, value: any, sort_field?: any) => {
         const a = arr(id, "binary_search");
+        // v6, August 2026: an array of objects is searched by `sort_field`.
+        if (byField(ctx, a)) return searchByField(a, value, sort_field, "exact");
         const target = val(value);
         let lo = 0;
         let hi = a.length - 1;
@@ -156,17 +240,22 @@ export const array = {
         return a.shift();
     },
     unshift: (id: any, value: any) => { arr(id, "unshift").unshift(val(value)); },
-    insert: (id: any, index: any, value: any) => {
+    insert: (ctx: Context, id: any, index: any, value: any) => {
         const a = arr(id, "insert");
-        const i = Number(val(index));
+        let i = Number(val(index));
+        const written = i;
+        // v6: "-1 addresses the last element". insert(-1, x) therefore places
+        // x BEFORE the current last element, exactly as insert(size - 1, x).
+        if (negativeIndices(ctx) && i < 0) i += a.length;
         if (!Number.isInteger(i) || i < 0 || i > a.length) {
-            throw new Error(`array.insert: index ${i} is out of bounds (size ${a.length})`);
+            i = written;
+            throw new Error(`In 'array.insert()' function. Index ${i} is out of bounds, array size is ${a.length}.`);
         }
         a.splice(i, 0, val(value));
     },
-    remove: (id: any, index: any) => {
+    remove: (ctx: Context, id: any, index: any) => {
         const a = arr(id, "remove");
-        return a.splice(bounds(a, index, "remove"), 1)[0];
+        return a.splice(bounds(a, index, "remove", negativeIndices(ctx)), 1)[0];
     },
     clear: (id: any) => { arr(id, "clear").length = 0; },
     /**
@@ -210,12 +299,63 @@ export const array = {
         return a;
     },
     reverse: (id: any) => { arr(id, "reverse").reverse(); },
-    sort: (id: any, order: any = "asc") => {
+    /**
+     * `array.sort_indices(id, order, sort_field)` — the indices that WOULD
+     * sort the array, which is left as it is. v6 (April 2026) adds
+     * `sort_field` for arrays of objects.
+     *
+     * TradingView's log (conformance/common/v5_gaps_golden.test.ts) settles the
+     * two things the reference leaves open: ascending is a STABLE sort with
+     * `na` last, and descending is exactly that order REVERSED — so `na` comes
+     * first, and equal values come out in reverse index order.
+     */
+    sort_indices: (ctx: Context, id: any, order: any = "asc", sort_field?: any) => {
+        const a = arr(id, "sort_indices");
+        const desc = String(val(order) ?? "asc").includes("desc");
+        // Decided ONCE: `byField` scans the array, and inside the key function
+        // that scan ran per element — quadratic, on every bar.
+        const fieldMode = byField(ctx, a);
+        const key = (x: any) => (fieldMode ? sortKey(x, sort_field) : val(x));
+        const keys = a.map(key);
+        const isNa = (k: any) => k === null || k === undefined || (typeof k === "number" && Number.isNaN(k));
+        const asc = keys.map((_, i) => i).sort((i, j) => {
+            const ni = isNa(keys[i]), nj = isNa(keys[j]);
+            if (ni || nj) return ni === nj ? i - j : ni ? 1 : -1;
+            return compareKeys(keys[i], keys[j]) || i - j;
+        });
+        return desc ? asc.reverse() : asc;
+    },
+
+    sort: (ctx: Context, id: any, order: any = "asc", sort_field?: any) => {
         const a = arr(id, "sort");
         const desc = String(val(order) ?? "asc").includes("desc");
+        // v6, April 2026: an array of objects sorts by `sort_field`.
+        if (byField(ctx, a)) {
+            a.sort((x, y) => (desc ? -1 : 1) * compareKeys(sortKey(x, sort_field), sortKey(y, sort_field)));
+            return;
+        }
         // Numeric compare, NOT JavaScript's default lexicographic sort — which
         // would order [2, 10] as [10, 2].
         a.sort((x, y) => (desc ? num(y) - num(x) : num(x) - num(y)));
+    },
+
+    /**
+     * `binary_search_leftmost` / `_rightmost`. v6 (August 2026) adds
+     * `sort_field` for arrays of objects.
+     *
+     * From the reference: the index of the value when it is found; otherwise
+     * leftmost gives "the index of the next smallest element to the left of
+     * where the value would lie", rightmost the element to its right. With
+     * duplicates, each returns the occurrence its name says — and below the
+     * whole array leftmost answers 0, not -1. Both pinned by TradingView's log.
+     */
+    binary_search_leftmost: (ctx: Context, id: any, value: any, sort_field?: any) => {
+        const a = arr(id, "binary_search_leftmost");
+        return searchByField(a, value, byField(ctx, a) ? sort_field : NO_FIELD, "left");
+    },
+    binary_search_rightmost: (ctx: Context, id: any, value: any, sort_field?: any) => {
+        const a = arr(id, "binary_search_rightmost");
+        return searchByField(a, value, byField(ctx, a) ? sort_field : NO_FIELD, "right");
     },
 
     // --- Search ------------------------------------------------------------

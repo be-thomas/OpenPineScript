@@ -38,15 +38,15 @@ When you run the JS in a VM, read/write globals and inject helpers using these p
 
 ### Option 1: Node `vm` (sandbox)
 
-Use a sandbox object as the global; top-level bindings will appear as properties. Use `var` instead of `let` if you want those bindings on the sandbox (the transpiler emits `let`).
+Use a sandbox object as the global; top-level bindings will appear as properties. Use `var` instead of `let` if you want those bindings on the sandbox (the transpiler emits `let`). Convert with `letToVar` (exported by the package), not a `/\blet\b/` regex: the regex also rewrites `let` inside string literals, template literals and comments, so a script's "let it be" would become "var it be".
 
 ```ts
 import * as vm from "node:vm";
 import { transpile } from "./transpiler/v2";
+import { letToVar } from "open-pinescript";
 
 const pine = "a = 1\nb = 2\nc = a + b\n";
-let js = transpile(pine);
-js = js.replace(/\blet\b/g, "var");
+const js = letToVar(transpile(pine));
 
 const sandbox: Record<string, unknown> = Object.create(null);
 vm.createContext(sandbox);
@@ -67,7 +67,7 @@ const sandbox: Record<string, unknown> = {
   opsv2_plot: (x: number, opts?: { opsv2_width?: number }) => { /* ... */ },
 };
 vm.createContext(sandbox);
-vm.runInContext(transpile("[a,b,c] = getArr()\n").replace(/\blet\b/g, "var"), sandbox);
+vm.runInContext(letToVar(transpile("[a,b,c] = getArr()\n")), sandbox);
 // sandbox.opsv2_a === 1, sandbox.opsv2_b === 2, sandbox.opsv2_c === 3
 ```
 
@@ -92,7 +92,7 @@ console.log(js);
 
 // Run in VM and read result
 import * as vm from "node:vm";
-let runnable = js.replace(/\blet\b/g, "var");
+const runnable = letToVar(js);
 const sandbox: Record<string, unknown> = Object.create(null);
 vm.createContext(sandbox);
 vm.runInContext(runnable, sandbox);

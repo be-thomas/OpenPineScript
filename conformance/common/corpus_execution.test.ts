@@ -223,14 +223,25 @@ const PLOTS_NOTHING_BY_DESIGN: Record<string, string> = {
   "conformance/v1/corpus/lbr_paintbars.pine":
     "both plots are `svb ? band : na`, and svb is input(false) — the volatility " +
     "bands are off unless the user turns them on. Its real output is barcolor().",
-  "conformance/v3/corpus/breakout.pine":
-    "every plot is `not isinsession ? na : x`, and isinsession is " +
-    "`not na(time('1', '0400-0700,...'))` — the sample bars are daily stamps at " +
-    "00:00 UTC, which fall in no intraday session.",
   "conformance/v3/corpus/strategy_template.pine":
     "every plot is gated on isTS/isTP/isSL, which are inputs defaulting to off.",
 };
 
+
+/**
+ * Corpus files TradingView itself refuses to compile, checked by pasting the file
+ * unchanged into a chart (dev-docs/tv-parity/_probes/version-scope/, 2026-11-12).
+ * The engine must refuse them too; they are not gaps.
+ */
+const REFUSED_BY_TRADINGVIEW: Record<string, string> = {
+  "conformance/v1/corpus/squeeze_indicator.pine":
+    "a damaged scrape: several statements share a line (\"Script could not be translated from: " +
+    "useHAC = input(true, title\"; v1-corpus-squeeze)",
+  "conformance/v3/corpus/breakout.pine":
+    "`strategy(` is closed by a `)` at column 0, which ends the statement on every version " +
+    "before v6 (\"syntax error at input 'end of line without line continuation'\", line 2; " +
+    "v3-corpus-breakout)",
+};
 
 /**
  * Scripts that do not PARSE. Separated from the runtime gaps because they fail a
@@ -252,7 +263,7 @@ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
 describe("gap inventories", () => {
   it("have no stale entries", () => {
-    const all = { ...KNOWN_RUNTIME_GAPS, ...KNOWN_PARSE_GAPS };
+    const all = { ...KNOWN_RUNTIME_GAPS, ...KNOWN_PARSE_GAPS, ...REFUSED_BY_TRADINGVIEW };
     const missing = Object.keys(all).filter(f => !fs.existsSync(path.join(ROOT, f)));
     expect(missing, `listed but not on disk:\n${missing.join("\n")}`).toEqual([]);
   });
@@ -354,6 +365,14 @@ function describeCorpus(version: PineVersion, minFiles: number) {
       const needs247 = SEVEN_DAY_INSTRUMENT[rel];
       const bars = needs247 ? SEVEN_DAY_BARS : BARS;
       const silentBy = PLOTS_NOTHING_BY_DESIGN[rel];
+
+      const refused = REFUSED_BY_TRADINGVIEW[rel];
+      if (refused) {
+        it(`${name} is refused, as TradingView refuses it — ${refused}`, () => {
+          expect(() => compileScript(read(rel))).toThrow();
+        });
+        continue;
+      }
 
       if (silentBy) {
         it(`${name} correctly plots nothing — ${silentBy}`, () => {

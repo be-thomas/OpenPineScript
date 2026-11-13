@@ -36,8 +36,9 @@ const drawingsOf = (ctx: Context, kind: string) =>
   [...(ctx as any).drawings.values()].filter((d: any) => d.kind === kind);
 
 describe("chart.point", () => {
-  it("new() takes index, time and price", () => {
-    const ctx = run("p = chart.point.new(7, 1234, 55.5)\npl = polyline.new(array.from(p))");
+  it("new() takes time, index and price", () => {
+    // chart.point.new(time, index, price); TradingView probe: dev-docs/tv-parity/_probes/udt-cond-formats/chartpoint.mts
+    const ctx = run("p = chart.point.new(1234, 7, 55.5)\npl = polyline.new(array.from(p))");
     expect(drawingsOf(ctx, "polyline")[0].props.points[0])
       .toEqual({ index: 7, time: 1234, price: 55.5 });
   });
@@ -63,7 +64,7 @@ describe("chart.point", () => {
 
   it("copy() produces an equal but separate point", () => {
     const ctx = run(
-      "a = chart.point.new(1, 2, 3.0)\n" +
+      "a = chart.point.new(2, 1, 3.0)\n" +
       "b = chart.point.copy(a)\n" +
       "pl = polyline.new(array.from(a, b))",
     );
@@ -72,7 +73,7 @@ describe("chart.point", () => {
   });
 
   it("its fields are readable from the script", () => {
-    const ctx = run("p = chart.point.new(7, 1234, 55.5)\nx = p.price\n");
+    const ctx = run("p = chart.point.new(1234, 7, 55.5)\nx = p.price\n");
     expect(ctx.vars.get("opsv2_x")?.valueOf()).toBe(55.5);
   });
 });

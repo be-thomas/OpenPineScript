@@ -24,10 +24,11 @@ import { transpile, compileScript } from "../../../transpiler/common";
 import { compile, Context } from "../../../runtime/v4";
 
 /** Daily candles, distinct in every field so a mixed-up tuple is visible. */
+const DAY = 86_400_000;
 const DAILY = [
   { time: 0, open: 1, high: 11, low: 21, close: 31, volume: 1 },
-  { time: 100, open: 2, high: 12, low: 22, close: 32, volume: 1 },
-  { time: 200, open: 3, high: 13, low: 23, close: 33, volume: 1 },
+  { time: DAY, open: 2, high: 12, low: 22, close: 32, volume: 1 },
+  { time: 2 * DAY, open: 3, high: 13, low: 23, close: 33, volume: 1 },
 ];
 
 /** Runs three chart bars over the fixture and reads several variables back. */
@@ -35,10 +36,15 @@ function trace(body: string, names: string[], version = 4): any[][] {
   const directive = version === 5 ? 'indicator("t")' : 'study("t")';
   const { js, profile } = compileScript(`//@version=${version}\n${directive}\n${body}`);
   const ctx = new Context(profile);
+  // A 6-hour chart with one bar inside each day: a requested bar closes on the
+  // chart bar that ENDS it (TradingView's log,
+  // conformance/v5/parity/harness_security_tf.BTCUSDT.5.csv, bars 4475, 4487, ...),
+  // so chart bars need a real span next to the daily candles' real length.
+  ctx.resolution = "360";
   ctx.provideSecurityData("AAPL", "D", DAILY);
   const exec = compile(js.replace(/\blet\b/g, "var "), ctx, Object.create(null));
   const out: any[][] = [];
-  for (const t of [50, 150, 250]) {
+  for (const t of [DAY / 4, DAY + DAY / 4, 2 * DAY + DAY / 4]) {
     ctx.setBar(t, 5, 5, 5, 5, 1);
     exec();
     out.push(names.map(n => ctx.vars.get("opsv2_" + n)?.valueOf()));

@@ -180,7 +180,7 @@ describe("a library may import another", () => {
       'export f(float x) =>', '    l.f(x)',
     ].join("\n") + "\n";
     expect(() => run("import me/Loop/1 as l\nv = l.f(1.0)\n", { "me/Loop/1": cyclic }))
-      .toThrow(/nested more than \d+ deep/);
+      .toThrow(/the library 'me\/Loop\/1' imports itself/);
   });
 });
 

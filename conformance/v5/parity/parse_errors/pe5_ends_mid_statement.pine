@@ -1,0 +1,4 @@
+//@version=5
+indicator("PE ends mid-statement")
+plot(close)
+x = ta.sma(close,

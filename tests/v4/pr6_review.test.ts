@@ -116,7 +116,9 @@ describe("drawings are capped, oldest evicted — as Pine does", () => {
     const { ctx, exec } = build(HEAD + "lb = label.new(bar_index, close, \"x\")\n");
     for (let i = 0; i < 60; i++) { ctx.setBar(i, 10, 12, 9, 11, 100); exec(); ctx.finalizeBar(); }
     const bars = [...ctx.drawings.values()].map(d => d.bar);
-    expect(Math.min(...bars)).toBe(10);
+    // TradingView cuts to the limit only past limit + 5 (conformance/v5/parity/probe_drawing_limits.BTCUSDT.5.csv):
+    // the 56th label (bar 55) cuts to 50, deleting bars 0-5, so bars 6-59 survive.
+    expect(Math.min(...bars)).toBe(6);
     expect(Math.max(...bars)).toBe(59);
   });
 
@@ -125,7 +127,10 @@ describe("drawings are capped, oldest evicted — as Pine does", () => {
       HEAD + "l = line.new(0, 1.0, 5, 2.0)\nlb = label.new(bar_index, close, \"x\")\n",
     );
     for (let i = 0; i < 100; i++) { ctx.setBar(i, 10, 12, 9, 11, 100); exec(); ctx.finalizeBar(); }
-    expect(ctx.drawings.size).toBe(100);
+    // Per kind: the 56th creation cuts to 50, then it climbs 51..55 and cuts again every 6th
+    // creation (conformance/v5/parity/probe_drawing_limits.BTCUSDT.5.csv). The 98th leaves 50,
+    // so the 100th leaves 52 of each kind.
+    expect(ctx.drawings.size).toBe(104);
   });
 
   it("tables are NOT capped — Pine limits them by position, not count", () => {

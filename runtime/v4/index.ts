@@ -5,7 +5,7 @@
  *
  *   - `var` / `varip` persistence is `Context.var_def`, on the shared base. The
  *     runtime is one implementation across versions by design
- *     (dev-docs/00-architecture-assessment.md §5.6), and only V4ToJsVisitor can
+ *     (docs/common/ARCHITECTURE.md ("Design rules")), and only V4ToJsVisitor can
  *     emit a call to it — v1–v3 have no `var` token to reach it with.
  *
  *   - The rename table (`n` → `bar_index`, `red` → `color.red`, …) is DATA on

@@ -1,9 +1,15 @@
+import { cloneState } from "./stateClone";
 import { PREFIX, removePrefix, extractFunctionName } from "../../utils/v2/common";
 import { Series, SeriesSnapshot } from "./Series";
 import { REGISTRY, viewFor } from "./stdlib";
+import { legacyFromGradient } from "./stdlib/color";
 import { MATRIX_TAG } from "./stdlib/matrix";
-import { aggregate, periodIndex, specSeconds } from "./timeframes";
-import { processPendingOrders, fillMarketOrders, MarketOrder } from "./stdlib/strategy";
+import { DerivedSeries, canonicalTimeframe, periodIndex, specSeconds } from "./timeframes";
+import { processPendingOrders, MarketOrder } from "./stdlib/strategy";
+import { brokerFor } from "./broker";
+import { V6_ONLY_PARAMS, V6_POSITIONAL } from "./stdlib/renames6";
+import { V5_POSITIONAL, V4_RENAMED_PARAMS } from "./stdlib/renames5";
+import type { FootprintLevel } from "./footprint";
 import { LanguageProfile, DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 
 // Define Trade Types
@@ -49,6 +55,15 @@ export interface Trade {
     drawdown?: number;
     /** Commission charged on the round turn, already deducted from `pnl`. */
     commission?: number;
+    /**
+     * `strategy.closedtrades.exit_id` and `.exit_comment`, as TradingView
+     * names them: the exit's own id, "Close entry(s) order <entry>" for
+     * `strategy.close`, "Close position order" for `close_all` and a margin
+     * call. Absent where no version records them yet, and the accessors fall
+     * back to `id`.
+     */
+    exitId?: string;
+    exitComment?: string;
 }
 
 /**
@@ -66,6 +81,21 @@ export interface EquityPoint {
     equity: number;
     /** Unrealized P&L of the position held at this bar's close; 0 while flat. */
     openPL: number;
+}
+
+/** One entry still open inside a position. See Position.entries. */
+export interface OpenEntry {
+    id: string;
+    /** Still open, and as filled. `qty_percent` exits are a share of `opened`. */
+    qty: number;
+    opened: number;
+    price: number;
+    bar: number;
+    time: number;
+    /** Entry commission not yet claimed by a closing trade. */
+    commission: number;
+    /** Identifies the trade for as long as it lives: the bar and the fill's order count. */
+    uid?: string;
 }
 
 export interface Position {
@@ -101,6 +131,28 @@ export interface Position {
      * accident and this changes nothing for them.
      */
     entryCommission?: number;
+    /**
+     * The largest size this position has held since it opened: what a v6
+     * `qty_percent` exit is a percentage OF. Half of a 0.731 entry is 0.3655
+     * whether or not another exit has already sold part of it.
+     */
+    openedQty?: number;
+    /**
+     * The entries that make up the position, oldest first — what TradingView
+     * calls its open trades. Kept by every broker and READ only where the
+     * broker tracks trades (V6Broker): `strategy.close(id)` and an exit's
+     * `from_entry` act on the entries with that id, and a close records one
+     * trade per entry it consumes, at that entry's own price.
+     */
+    entries?: OpenEntry[];
+    /**
+     * The id ledger, apart from `entries` (the trades, first in first out):
+     * what each entry id still owns, and what it opened with. An exit with
+     * `from_entry` and `close(id)` draw on an id's quantity, but what they sell
+     * comes off the OLDEST trades whatever their id (TradingView's log,
+     * harness_strategy_exit_mix and harness_strategy_pyr3 phase d).
+     */
+    ledger?: Record<string, { qty: number; opened: number }>;
 }
 
 /**
@@ -155,11 +207,30 @@ export interface ColorDirective extends PlotBase {
 
 export type PlotData = LinePlot | OHLCPlot | MarkerPlot | ColorDirective;
 
+/** Where in the Pine source a runtime error was raised; see `Context.locateError`. */
+export interface PineLocation {
+    line: number;
+    col: number;
+    /** The alias of the imported library the error was raised in, if it was in one. */
+    library?: string;
+    /** For an error inside a library: the call in the script that led there. */
+    caller?: { line: number; col: number };
+}
+
 export interface FillData {
     plotId1: string; // The ID of the first line
     plotId2: string; // The ID of the second line
     color: string;
     title: string;
+    /** `fill(show_last)`: draw only the last N bars. Absent when the script gave none. */
+    showLast?: number;
+    /** The gradient overload, `fill(p1, p2, top_value, bottom_value, top_color, bottom_color)`. */
+    gradient?: true;
+    /** `top_color` is drawn at the price `top_value`, `bottom_color` at `bottom_value`; this bar's. */
+    top_value?: number;
+    bottom_value?: number;
+    top_color?: string;
+    bottom_color?: string;
 }
 
 export interface InputDef {
@@ -193,11 +264,19 @@ export type ScriptKind = 'study' | 'indicator' | 'strategy' | 'library';
  * TradingView's own figure, read off its own output: the golden strategy
  * export passes no `initial_capital` and its `strategy.equity` reads exactly
  * 1000000 on every bar before the first fill
- * (conformance/v5/golden/harness_strategy.BTCUSDT.1D.log). The engine used to
+ * (conformance/v5/parity/harness_strategy.BTCUSDT.1D.log). The engine used to
  * start at 100000, which put every equity-derived figure — `netprofit_percent`,
  * `grossprofit_percent` — out by a factor of ten.
  */
 export const DEFAULT_INITIAL_CAPITAL = 1_000_000;
+
+/**
+ * ...but only for Pine v5. Read off TradingView with a strategy that passes no
+ * `initial_capital`: v2, v3, v4 and v6 start at 100,000, v5 at 1,000,000.
+ */
+export function defaultInitialCapital(version: number): number {
+    return version === 5 ? DEFAULT_INITIAL_CAPITAL : 100_000;
+}
 
 export interface ScriptMeta {
     kind: ScriptKind;
@@ -229,6 +308,13 @@ export interface ScriptMeta {
     margin_short?: number;
     process_orders_on_close?: boolean;
     risk_free_rate?: number;
+    /**
+     * v6, July 2026: run once per tick of every HISTORICAL bar. Recorded for a
+     * host to display; this engine is given bars, not their ticks, so it has
+     * nothing to run per tick and computes exactly as if this were false.
+     * Present only when a v6 script declares it.
+     */
+    calc_on_every_history_tick?: boolean;
 }
 
 /**
@@ -250,11 +336,17 @@ interface RuntimeSnapshot {
     positionDrawdown: number;
     maxContractsHeld: number;
     commissionPaid: number;
+    filledOrderCount: number;
+    netProfitSum: number;
     orders: any[];
     marketOrders: MarketOrder[];
     pendingEntries: Map<string, any>;
     pendingExits: Map<string, any>;
     riskState: any;
+    /** Live drawings and their eviction queues: a re-run of the bar re-creates its own. */
+    drawings: Map<string, Drawing>;
+    drawingOrder: Map<Drawing["kind"], string[]>;
+    drawingCounter: number;
 }
 
 /**
@@ -294,6 +386,21 @@ function plainValue(v: any): any {
     return v;
 }
 
+/**
+ * A drawing with its own copy of `props`: one level deep, and the cells of a
+ * table (a Map of records), which is as deep as any drawing's props go. Cost
+ * is one small object per live drawing (at most ~50 of each kind) per snapshot.
+ */
+function cloneDrawing(d: Drawing): Drawing {
+    const props: Record<string, any> = { ...d.props };
+    for (const k in props) {
+        const v = props[k];
+        if (v instanceof Map) props[k] = new Map([...v].map(([ck, cv]) => [ck, cv && typeof cv === "object" ? { ...cv } : cv]));
+        else if (Array.isArray(v)) props[k] = v.slice();
+    }
+    return { ...d, props };
+}
+
 export interface Drawing {
     id: string;
     kind: 'line' | 'label' | 'box' | 'table' | 'polyline' | 'linefill';
@@ -318,8 +425,19 @@ export interface RequestSample {
 /** A higher-timeframe candle supplied for `security()` evaluation (P1). */
 export interface SecurityCandle {
     time: number; open: number; high: number; low: number; close: number; volume: number;
+    /**
+     * When the bar closes, if the host knows it. A stock's hourly and daily bars end
+     * where the SESSION ends, not on a clock boundary (the last hourly bar of a
+     * 09:30-16:00 session is 15:30-16:00); without it the end is the calendar's.
+     * `request.security` closes a bar with the chart bar that ends it, so a host
+     * with a session calendar should give this (TradingView's `time_close`).
+     */
+    closeTime?: number;
 }
 
+
+/** The marker `heikinashi()` puts on a symbol; see stdlib/chart.ts. */
+const HEIKINASHI = "heikinashi:";
 
 /**
  * Heikin-Ashi transform.
@@ -332,33 +450,120 @@ export interface SecurityCandle {
  * haOpen is RECURSIVE, so the series must be built forward from the first
  * candle; taking a window in isolation gives different numbers.
  */
-function toHeikinAshi(candles: SecurityCandle[]): SecurityCandle[] {
-    const out: SecurityCandle[] = [];
-    let prevOpen = NaN;
-    let prevClose = NaN;
+class HeikinAshiSeries {
+    readonly out: SecurityCandle[] = [];
+    private src: SecurityCandle[] | null = null;
 
-    for (const c of candles) {
-        const haClose = (c.open + c.high + c.low + c.close) / 4;
-        const haOpen = Number.isFinite(prevOpen) && Number.isFinite(prevClose)
-            ? (prevOpen + prevClose) / 2
-            : (c.open + c.close) / 2;
-        out.push({
-            time: c.time,
-            open: haOpen,
-            high: Math.max(c.high, haOpen, haClose),
-            low: Math.min(c.low, haOpen, haClose),
-            close: haClose,
-            volume: c.volume,
-        });
-        prevOpen = haOpen;
-        prevClose = haClose;
+    /**
+     * The transform of `candles`, built forward from where it last stopped. The
+     * last candle is always done again: it may have been re-ticked, or it is
+     * the forming candle of a derived series. A different array, or a shorter
+     * one, is another series and starts over.
+     */
+    of(candles: SecurityCandle[]): SecurityCandle[] {
+        const out = this.out;
+        if (candles !== this.src || candles.length < out.length) { out.length = 0; this.src = candles; }
+        let i = Math.max(0, out.length - 1);
+        out.length = i;
+        for (; i < candles.length; i++) {
+            const c = candles[i];
+            const prev = out[i - 1];
+            const haClose = (c.open + c.high + c.low + c.close) / 4;
+            const haOpen = prev && Number.isFinite(prev.open) && Number.isFinite(prev.close)
+                ? (prev.open + prev.close) / 2
+                : (c.open + c.close) / 2;
+            out.push({
+                time: c.time,
+                open: haOpen,
+                high: Math.max(c.high, haOpen, haClose),
+                low: Math.min(c.low, haOpen, haClose),
+                close: haClose,
+                volume: c.volume,
+            });
+        }
+        return out;
     }
-    return out;
 }
+
+/**
+ * The stack of call ids being executed, with the joined key of every depth
+ * kept as it moves.
+ *
+ * A call site's key was rebuilt by joining the whole stack on every call,
+ * which was a tenth of a run's time. The keys are interned, so each is one
+ * string whose hash is computed once. A built-in that names a frame of its own
+ * (`ta.ts` pushes "rsi_gain" and the like) pushes through the same methods.
+ */
+class CallStack {
+    private ids: string[] = [];
+    /** `keys[i]` is the first `i + 1` ids joined with "/". */
+    readonly keys: string[] = [];
+    private intern: Map<string, Map<string, string>> = new Map();
+
+    get length(): number { return this.ids.length; }
+    /** The innermost id. */
+    get top(): string | undefined { return this.ids[this.ids.length - 1]; }
+    /** The whole stack joined with "/", "" when empty. */
+    get path(): string { return this.keys.length > 0 ? this.keys[this.keys.length - 1] : ""; }
+
+    /** Returns the new path. */
+    push(id: string): string {
+        const parent = this.path;
+        let children = this.intern.get(parent);
+        if (!children) this.intern.set(parent, children = new Map());
+        let key = children.get(id);
+        if (key === undefined) children.set(id, key = parent ? `${parent}/${id}` : id);
+        this.ids.push(id);
+        this.keys.push(key);
+        return key;
+    }
+
+    pop(): void {
+        this.ids.pop();
+        this.keys.pop();
+    }
+
+    join(sep: string): string { return this.ids.join(sep); }
+    [Symbol.iterator](): Iterator<string> { return this.ids[Symbol.iterator](); }
+}
+
+const INPUT_IDS: string[] = [];
+
+/** A value that cannot change under the same identity: not an object, not a Series. */
+function isPlainInput(v: any): boolean {
+    const t = typeof v;
+    return t !== "function" && (t !== "object" || v === null);
+}
+
+/** The arguments of two `input()` calls are the same plain values. */
+function sameInputArgs(a: Record<string, any>, b: Record<string, any>): boolean {
+    let count = 0;
+    for (const k in b) {
+        count++;
+        const x = a[k], y = b[k];
+        if (x === y) { if (!isPlainInput(x)) return false; continue; }
+        if (!Array.isArray(x) || !Array.isArray(y) || x.length !== y.length) return false;
+        for (let i = 0; i < x.length; i++) if (x[i] !== y[i] || !isPlainInput(x[i])) return false;
+    }
+    for (const _ in a) count--;
+    return count === 0;
+}
+
+/** The keyword names of a call that passed none. Never mutated. */
+const EMPTY_NAMES: Set<string> = new Set();
+
+/** The built-in series every context registers; their history stays bar-indexed everywhere. */
+const BASE_SERIES: Set<string> = new Set(
+    ["open", "high", "low", "close", "volume", "time", "bar_index"].map((n) => `opsv2_${n}`),
+);
 
 export class Context {
     // 1. Internal Execution State (Private)
-    protected callStack: string[] = [];
+    protected callStack: CallStack = new CallStack();
+
+    /** What a call id says about itself, which never changes: its name and whether it is a user frame. */
+    private callIds: Map<string, { fname: string; userFrame: boolean; entry: any; resolved: boolean; plan?: { keys: string[]; indices: number[]; named: Set<string> } }> = new Map();
+
 
     /**
      * Keyword arguments passed to a built-in whose signature does not name them.
@@ -402,6 +607,13 @@ export class Context {
      */
     private seriesScope = "";
     private seriesScopes: string[] = [];
+    /** Which user-function CALL is running: a fresh number per call, 0 at script scope. */
+    private frameSeq = 0;
+    private frameSeqs: number[] = [];
+    private frameSeqCounter = 0;
+    /** The series the running user call was handed as arguments: a parameter's history stays bar-indexed. */
+    private argSeries: any[] = [];
+    private frameArgs: any[][] = [];
 
     /** A series key in the frame that is running — the plain name at script scope. */
     private scoped(name: string): string {
@@ -483,12 +695,78 @@ export class Context {
     public pointvalue: number = 1;
     public sessionSpec: string = "regular";
 
+    // v6 additions. The defaults are those of the same US equity the rest
+    // assume: whole shares, no ISIN on record, not a continuous future.
+    public mincontract: number = 1;
+    /** True once the host supplied `mincontract`; only then are order quantities floored to it. */
+    public mincontractSupplied: boolean = false;
+    public isin: string = "";
+    public currentContract: string | null = null;
+
+    /** The live quote, for `bid` / `ask` (v6). Not in an OHLCV bar. */
+    public bid: number = NaN;
+    public ask: number = NaN;
+
+    /**
+     * Volume at price, per bar, for `request.footprint()` (v6). Keyed by bar
+     * open time. `null` until a host supplies any — see getFootprintLevels.
+     */
+    private footprints: Map<number, FootprintLevel[]> | null = null;
+
+    /** Supplies footprint data: for each bar, its volume per price level. */
+    public provideFootprints(bars: ReadonlyArray<{ time: number; levels: FootprintLevel[] }>): void {
+        this.footprints ??= new Map();
+        for (const b of bars) this.footprints.set(Number(b.time), b.levels);
+    }
+
+    /**
+     * This bar's levels, `null` when the host has none for it, and a refusal
+     * when the host has supplied no footprints at all — the `request.*` rule:
+     * a series this engine cannot fetch is asked for, not silently `na`.
+     */
+    public getFootprintLevels(): FootprintLevel[] | null {
+        if (this.footprints === null) {
+            throw new Error(
+                "request.footprint: no footprint data was supplied. This engine " +
+                "cannot fetch volume at price — provide it with ctx.provideFootprints(bars).",
+            );
+        }
+        return this.footprints.get(this.time) ?? null;
+    }
+
+    /** The source location of the one `request.footprint()` call, once seen. */
+    private footprintSite: string | null = null;
+
+    /**
+     * "Scripts can make only one request.footprint() call. Multiple calls
+     * cause a runtime error." A CALL is a place in the source: the innermost
+     * call id, which carries its location. Counting executions instead
+     * rejected one call inside a `for` loop on the first bar.
+     */
+    public countFootprintRequest(): void {
+        const site = this.callStack.top ?? "";
+        if (this.footprintSite === null) this.footprintSite = site;
+        else if (this.footprintSite !== site) {
+            throw new Error("request.footprint: a script can make only one request.footprint() call.");
+        }
+    }
+
+    /** Declares the current bid and ask. See `bid` in stdlib/v6_members.ts. */
+    public provideQuote(quote: { bid?: number; ask?: number }): void {
+        if (quote.bid !== undefined) this.bid = Number(quote.bid);
+        if (quote.ask !== undefined) this.ask = Number(quote.ask);
+    }
+
     /** Declares the instrument's metadata. Every field is optional. */
     public provideSymbolInfo(info: {
         symbol?: string; mintick?: number; currency?: string; basecurrency?: string;
         description?: string; type?: string; root?: string; timezone?: string;
         pointvalue?: number; session?: string;
+        mincontract?: number; isin?: string; current_contract?: string;
     }): void {
+        if (info.mincontract !== undefined) { this.mincontract = Number(info.mincontract); this.mincontractSupplied = true; }
+        if (info.isin !== undefined) this.isin = String(info.isin);
+        if (info.current_contract !== undefined) this.currentContract = String(info.current_contract);
         if (info.symbol !== undefined) this.symbol = String(info.symbol);
         if (info.mintick !== undefined) this.mintick = Number(info.mintick);
         if (info.currency !== undefined) this.currency = String(info.currency);
@@ -691,19 +969,42 @@ export class Context {
     private drawingOrder: Map<Drawing["kind"], string[]> = new Map();
 
     /**
-     * How many drawings of each kind survive.
+     * How many drawings of each kind survive, and when the rest are deleted.
      *
-     * Pine caps these — `max_lines_count`, `max_labels_count` and
-     * `max_boxes_count` all default to 50 — and DELETES THE OLDEST past the
-     * cap. Without that, `label.new` on every bar of a 6,000-bar chart retains
-     * 6,000 records here while TradingView is showing 50, so a script that
+     * The limit is the script's own: `max_lines_count`, `max_labels_count`,
+     * `max_boxes_count` and `max_polylines_count` on `indicator()` /
+     * `study()` / `strategy()`, each defaulting to 50 (`declareScript` applies
+     * them). Linefills are fixed at 50. Tables are absent deliberately: Pine
+     * limits them by POSITION (one per slot), not by count, so an eviction rule
+     * would be the wrong shape.
+     *
+     * ── The rule, as TradingView applies it ─────────────────────────────────
+     *
+     * It does NOT hold the count at `limit`. Drawings pile up past the limit
+     * and are then cut back in one go: when creating a drawing makes the live
+     * count of that kind exceed `limit + 5`, the oldest are deleted until the
+     * count equals `limit`. It happens at the creation itself, so it also
+     * happens in the middle of one bar's execution.
+     *
+     * Measured with conformance/v5/parity/probe_drawing_limits.pine:
+     *
+     *   limit 10, one line per bar   the count after each bar goes
+     *                                1, 2, ... 15, then 10, 11 ... 15, 10, ...
+     *   limit 10, 30 labels in one   the same sawtooth, per label.new
+     *   execution
+     *   limit 500, 1003 lines        505 remain, the newest 505
+     *     (harness_trader_club)
+     *
+     * Log: conformance/v5/parity/probe_drawing_limits.BTCUSDT.5.csv. Only
+     * limits 10 and 500 were measured; the +5 slack is assumed to be constant
+     * in between and at the default of 50.
+     *
+     * Without any cap, `label.new` on every bar of a 6,000-bar chart retains
+     * 6,000 records here while TradingView shows about 50, so a script that
      * reads its own drawings back diverges, and memory grows without bound on
      * exactly the scripts most likely to be long-running.
-     *
-     * Tables are absent deliberately: Pine limits them by POSITION (one per
-     * slot), not by count, so an eviction rule would be the wrong shape.
      */
-    private static readonly DRAWING_LIMITS: Partial<Record<Drawing["kind"], number>> = {
+    private drawingLimits: Partial<Record<Drawing["kind"], number>> = {
         line: 50,
         label: 50,
         box: 50,
@@ -720,16 +1021,72 @@ export class Context {
 
         const order = this.drawingOrder.get(kind) ?? [];
         order.push(id);
-
-        const limit = Context.DRAWING_LIMITS[kind];
-        if (limit !== undefined) {
-            while (order.length > limit) {
-                this.drawings.delete(order.shift()!);
-            }
-        }
         this.drawingOrder.set(kind, order);
 
+        const limit = this.drawingLimits[kind];
+        if (limit !== undefined && order.length > limit + 5) {
+            if (this.profile.version >= 5) {
+                this.evictDrawings(order, limit);
+            } else {
+                // The same bookkeeping `deleteDrawing` uses: shifting the ids
+                // off the queue and out of `drawings` together.
+                while (order.length > limit) {
+                    this.drawings.delete(order.shift()!);
+                }
+            }
+        }
+
         return id;
+    }
+
+    /**
+     * v5 and v6: who goes when a kind passes `limit + 5`.
+     *
+     * Measured on TradingView (dev-docs/tv-parity/_probes/version-scope/
+     * v6-gc-order-1, -2, -3 and v5-gc-order, limit 10; golden test
+     * tests/v6/runtime/drawing_eviction_tv.test.ts):
+     *
+     *   - A drawing a `var` / `varip` variable holds RIGHT NOW is never
+     *     evicted. One held only inside an array is not protected. UDT fields,
+     *     maps and plain variables were not probed and are treated as not
+     *     protected.
+     *   - On a historical bar the oldest unprotected drawings go, whatever bar
+     *     they were drawn on, until the count is `limit`.
+     *   - On the realtime bar a pass first removes unprotected drawings from
+     *     EARLIER bars, oldest first, and stops there, even with the count
+     *     still above `limit`. Only a pass that finds no such drawing removes
+     *     the current bar's own, oldest first, down to `limit`.
+     *
+     * v4 and earlier were not probed and keep the plain oldest-first cut.
+     */
+    private evictDrawings(order: string[], limit: number): void {
+        const protectedIds = this.varHeldDrawings();
+        const evict = (candidate: (d: Drawing) => boolean, stopAtLimit: boolean): boolean => {
+            let removed = false;
+            for (let i = 0; i < order.length && (!stopAtLimit || order.length > limit);) {
+                const d = this.drawings.get(order[i]);
+                if (d && (protectedIds.has(d.id) || !candidate(d))) { i++; continue; }
+                this.drawings.delete(order[i]);
+                order.splice(i, 1);
+                removed = true;
+            }
+            return removed;
+        };
+        if (this.is_realtime) {
+            const now = this.currentBarIndex;
+            if (evict(d => d.bar < now, true)) return;
+        }
+        evict(() => true, true);
+    }
+
+    /** Ids of drawings that a `var` / `varip` variable holds at this moment, in any frame. */
+    private varHeldDrawings(): Set<string> {
+        const held = new Set<string>();
+        for (const name of this.varSeries) {
+            const v = this.vars.get(name)?.valueOf();
+            if (typeof v === "string" && this.drawings.has(v)) held.add(v);
+        }
+        return held;
     }
 
     /**
@@ -756,7 +1113,7 @@ export class Context {
     //
     // Lives on the shared base for the same reason `var_def` does: the runtime
     // is one implementation across versions by design
-    // (dev-docs/00-architecture-assessment.md §5.6), and only V5ToJsVisitor can
+    // (docs/common/ARCHITECTURE.md ("Design rules")), and only V5ToJsVisitor can
     // emit a call to any of it — no earlier version has a `type` keyword or the
     // `receiver.method()` form to reach it with.
 
@@ -788,6 +1145,25 @@ export class Context {
      * write would leave a script that looks like it is accumulating state and
      * is not — the failure this engine exists to prevent.
      */
+    /**
+     * The value a UDT field stores: a series argument's value on this bar.
+     *
+     * `Item.new(bx, bar_index, t)` with `box bx = box.new(…)` and `float t =
+     * high` hands the constructor SERIES -- the variables' wrappers -- and an
+     * object that kept the wrapper would read whatever the variable holds on
+     * the bar it is READ, not the one it was built on. A `var` array of such
+     * objects then saw every element change together: all reported the latest
+     * bar's values, and `box.delete(oldest.bx)` deleted the NEWEST box.
+     * TradingView stores the value (checked with Pine Logs:
+     * dev-docs/tv-parity/_probes/na-drawings/parity-udt-fields.pine), as `setField` already did for writes.
+     *
+     * Arrays, maps, matrices, drawings and nested objects are values that are
+     * references, so unwrapping keeps sharing them exactly as Pine does.
+     */
+    public fieldValue(value: any): any {
+        return value instanceof Series ? value.valueOf() : value;
+    }
+
     public setField(target: any, name: string, value: any): any {
         const o = target instanceof Series ? target.valueOf() : target;
         if (o === null || o === undefined || typeof o !== "object") {
@@ -827,6 +1203,62 @@ export class Context {
      * array of arrays, which is also a valid array — so `matrix.new` marks its
      * result. See `MATRIX_TAG` in runtime/v1/stdlib/matrix.ts.
      */
+    /**
+     * Which declaration of an overloaded user function or method a call
+     * reaches, chosen from the VALUES: the emitted dispatcher's job when the
+     * types are not written down where the call is (see
+     * V5ToJsVisitor.emitOverloadDispatcher).
+     *
+     * Candidates are `[fn, min, max, declared parameter types]`. Those whose
+     * arity fits are scored by how well each argument's own type matches the
+     * declared one — a user-defined object by its `__type`, a drawing by its
+     * `__builtin`, an array by its first element, a number as int or float —
+     * and the best wins; a tie goes to the first declared.
+     */
+    public pickOverload(name: string, args: any[], candidates: Array<[Function, number, number, Array<string | null>]>): Function | null {
+        const last = args[args.length - 1];
+        const kwargs = last && typeof last === "object" && !Array.isArray(last) && last.constructor === Object
+            && Object.keys(last).length > 0 && Object.keys(last).every(k => k.startsWith("opsv"));
+        // Keyword arguments arrive as one trailing bundle; each counts.
+        const positional = args.length - (kwargs ? 1 : 0);
+        const count = positional + (kwargs ? Object.keys(last).length : 0);
+        // A keyword names a parameter: an overload without that name cannot be it.
+        const names = kwargs ? Object.keys(last).map(k => k.replace(/^opsv\d*_/, "")) : [];
+        const fitting = candidates.filter(c => count >= c[1] && count <= c[2]
+            && names.every(n => !Array.isArray((c[0] as any).__params) || (c[0] as any).__params.includes(n)));
+        const pool = fitting.length > 0 ? fitting : candidates;
+        let best = pool[0], bestScore = -Infinity;
+        for (const c of pool) {
+            let score = 0;
+            c[3].forEach((declared, i) => {
+                if (i >= positional || declared === null) return;
+                score += typeFit(declared, args[i]);
+            });
+            if (score > bestScore) { best = c; bestScore = score; }
+        }
+        if (!best) throw new Error(`'${name}': no declaration takes ${count} argument(s).`);
+        // Every declaration disagrees with the receiver's own type: not one of
+        // ours. The dispatcher hands the call to the built-in method.
+        if (bestScore < 0 && fitting.length > 0 && valueType(args[0]) !== null) {
+            const receiverFits = fitting.some(c => c[3][0] === null || typeFit(c[3][0]!, args[0]) >= 0);
+            if (!receiverFits) return null;
+        }
+        return best[0];
+    }
+
+    /** Calls the overload a dispatcher picked, binding keyword arguments by its own parameter names. */
+    public callPicked(fn: Function, args: any[], name: string): any {
+        const params: unknown = (fn as any).__params;
+        if (Array.isArray(params) && params.length > 0) {
+            return fn(...this.bindKeywordArguments(args, params as string[], name));
+        }
+        return fn(...args);
+    }
+
+    /** Loop signals thrown across a `switch` arm's function boundary. */
+    public readonly LOOP_BREAK = Object.freeze({ loopSignal: "break" });
+    public readonly LOOP_CONTINUE = Object.freeze({ loopSignal: "continue" });
+
     public builtinMethod(id: string, receiver: any, name: string, ...args: any[]): any {
         const v = receiver instanceof Series ? receiver.valueOf() : receiver;
 
@@ -902,6 +1334,12 @@ export class Context {
     /** Which built-in namespace owns this value's methods, or null. */
     private static receiverNamespace(v: any): string | null {
         if (v instanceof Map) return "map";
+        // v6's built-in object types — `footprint` and `volume_row` — carry
+        // their namespace on the object. `__builtin`, not `__type`, so they can
+        // never be mistaken for a user-defined type.
+        if (v && typeof v === "object" && (v.__builtin === "footprint" || v.__builtin === "volume_row")) {
+            return v.__builtin;
+        }
         if (Array.isArray(v)) return (v as any)[MATRIX_TAG] ? "matrix" : "array";
         if (typeof v === "string") {
             const kind = /^(line|label|box|table|polyline|linefill)_\d+$/.exec(v);
@@ -1025,7 +1463,13 @@ export class Context {
 
         const key = String(raw);
         const drawing = this.drawings.get(key);
-        if (!drawing) throw new Error(`${fn}: no such drawing '${key}' (it may have been deleted)`);
+        // Deleted -- by the script, or evicted past max_*_count -- behaves like
+        // `na`: setters do nothing and getters return na. TradingView does not
+        // raise an error here (Pine Logs, dev-docs/tv-parity/_probes/na-drawings/parity-udt-fields.pine: a
+        // deleted box's set_right is ignored and get_top gives NaN), and a
+        // script that keeps ids of drawings the cap has since removed is
+        // ordinary Pine, not a mistake to stop the run for.
+        if (!drawing) return Context.naDrawing();
         return drawing;
     }
 
@@ -1033,6 +1477,8 @@ export class Context {
     public is_history: boolean = true;
     public is_realtime: boolean = false;
     public is_new: boolean = true;
+    /** True only during a realtime bar's closing execution (`Session.commit`); see `barstate.isconfirmed`. */
+    public is_confirmed: boolean = false;
     public is_last: boolean = false;
 
     // 5. Strategy State (Public)
@@ -1124,6 +1570,10 @@ export class Context {
      * market order does not fill on the bar that places it.
      */
     public marketOrders: MarketOrder[] = [];
+    /** Orders filled this run: entries and exits. See `Broker.countOrder`. */
+    public filledOrderCount = 0;
+    /** The closed trades' profit, summed as they close, in order: `netProfit()` reads it instead of re-adding every trade. */
+    public netProfitSum = 0;
 
     // --- INPUT SYSTEM ---
     public inputDefs: InputDef[] = []; 
@@ -1181,13 +1631,15 @@ export class Context {
      */
     public reset() {
         // 1. Reset Execution State
-        this.callStack = [];
+        this.callStack = new CallStack();
+        this.footprintSite = null;
         this.states.clear();
         this.inputCounter = 0;
         // A `var` initialiser must run again on a fresh pass, or a re-run would
         // carry the previous pass's value in and never re-evaluate it.
         this.varInitialised.clear();
         this.varipSeries.clear();
+        this.varSeries.clear();
 
         // 2. Reset Registry & Re-initialize built-ins
         this.vars.clear();
@@ -1224,8 +1676,10 @@ export class Context {
         this.cash = DEFAULT_INITIAL_CAPITAL;
         this.initialCapital = DEFAULT_INITIAL_CAPITAL;
         this.trades = [];
+        this.netProfitSum = 0;
         this.orders = [];
         this.marketOrders = [];
+        this.filledOrderCount = 0;
         this.equityCurve = [];
         this.positionRunup = 0;
         this.positionDrawdown = 0;
@@ -1243,13 +1697,26 @@ export class Context {
         //    previous run's inputs.
         this.committedSnapshot = null;
         this.forgetBarProgress();
-        this.everReached.clear();
+        this.siteReach.clear();
+        this.missedRepeat = null;
         this.statefulSites.clear();
         this.stateKeysBySite.clear();
+        this.indexedStateKeys.clear();
+        this.inputMemo = [];
 
         // 8. Reset MTF eval state (keep provided securityData — it's supplied input)
         this.htfStates.clear();
         this.requestedSecurities.clear();
+        this.chartBars = [];
+        this.chartAhead = null;
+        this.derivedSeries.clear();
+        this.heikinAshi.clear();
+
+        // 9. Forget what was learned about the previous script's call sites. The
+        //    ids are positional (`ta.sma#3`), so a second script reuses them
+        //    for different calls, and a cached entry or argument plan from the
+        //    first ran the wrong function with the wrong arguments.
+        this.callIds.clear();
     }
 
     /**
@@ -1285,6 +1752,18 @@ export class Context {
             if (this.propertyOverrides[name] !== undefined) return this.propertyOverrides[name];
             return declared(name);
         };
+
+        // Drawing limits, read the way the other declaration arguments are.
+        // Keyword-only in practice, so they are not in `order`.
+        for (const [kind, name] of [
+            ['line', 'max_lines_count'], ['label', 'max_labels_count'],
+            ['box', 'max_boxes_count'], ['polyline', 'max_polylines_count'],
+        ] as const) {
+            const n = Number(arg(name));
+            if (arg(name) !== undefined && Number.isFinite(n) && n > 0) {
+                this.drawingLimits[kind] = Math.floor(n);
+            }
+        }
 
         const title = arg('title') !== undefined ? String(arg('title')) : '';
         const shorttitle = arg('shorttitle') !== undefined ? String(arg('shorttitle')) : title;
@@ -1327,6 +1806,9 @@ export class Context {
                 margin_long: num('margin_long', 100),
                 margin_short: num('margin_short', 100),
                 process_orders_on_close: Boolean(arg('process_orders_on_close')),
+                ...(this.profile.version >= 6 && declared('calc_on_every_history_tick') !== undefined
+                    ? { calc_on_every_history_tick: Boolean(declared('calc_on_every_history_tick')) }
+                    : {}),
                 risk_free_rate: num('risk_free_rate', 2),
             };
 
@@ -1337,7 +1819,7 @@ export class Context {
             //
             // `cash` moves with the first fill, so it can only be seeded here,
             // before the script's first bar.
-            const capital = arg('initial_capital');
+            const capital = arg('initial_capital') ?? defaultInitialCapital(this.profile.version);
             if (capital !== undefined && Number.isFinite(Number(capital))) {
                 this.initialCapital = Number(capital);
                 // ONLY on the first bar. `strategy()` is a statement in the
@@ -1346,7 +1828,14 @@ export class Context {
                 // every trade, leaving it permanently equal to the starting
                 // capital. Nothing read `cash` closely enough to notice until
                 // the equity curve plotted it.
-                if (this.currentBarIndex === 0) this.cash = Number(capital);
+                if (this.currentBarIndex === 0) {
+                    this.cash = Number(capital);
+                    // The broker's order pass ran before the script on this bar and
+                    // seeded the `strategy.risk` baselines from the default capital:
+                    // a 10,000 account then read as a 90% drawdown from a 100,000 peak.
+                    const rs = (this as any)._riskState;
+                    if (rs) rs.start_equity = rs.peak_equity = rs.prev_day_equity = this.cash;
+                }
             }
 
             // Recorded before any override so a host can offer the script's
@@ -1355,7 +1844,7 @@ export class Context {
             this.declaredProperties.initial_capital =
                 declaredCapital !== undefined && Number.isFinite(Number(declaredCapital))
                     ? Number(declaredCapital)
-                    : DEFAULT_INITIAL_CAPITAL;
+                    : defaultInitialCapital(this.profile.version);
             this.declaredProperties.pyramiding =
                 declared('pyramiding') !== undefined ? Number(declared('pyramiding')) : 0;
 
@@ -1391,7 +1880,21 @@ export class Context {
         defval: any, title: string = "", type: string = "float",
         meta: Record<string, any> = {},
     ): any {
-        const currentId = `input_${this.inputCounter++}`;
+        const n = this.inputCounter++;
+        const currentId = INPUT_IDS[n] ??= `input_${n}`;
+
+        // Where every bar after the first lands: the same call, handed the same
+        // arguments, with the same override, answers the same value. The work
+        // below (unwrapping, building the definition, clamping) is for the
+        // first time, and for a call whose arguments are not plain values.
+        const userSet = currentId in this.userInputs;
+        const userVal = userSet ? this.userInputs[currentId] : undefined;
+        const memo = this.inputMemo[n];
+        if (memo && memo.defval === defval && memo.title === title && memo.type === type
+            && memo.userSet === userSet && memo.userVal === userVal
+            && isPlainInput(defval) && isPlainInput(userVal) && sameInputArgs(memo.meta, meta)) {
+            return memo.result;
+        }
 
         // Everything recorded here leaves the engine — a host reads `inputDefs`
         // to build its settings dialog, across a postMessage. And these values
@@ -1420,8 +1923,14 @@ export class Context {
 
         // Return user override if it exists, otherwise return the default
         const raw = currentId in this.userInputs ? this.userInputs[currentId] : plainValue(defval);
-        return Context.constrainInput(raw, { ...plainMeta, defval: plainValue(defval) });
+        const result = Context.constrainInput(raw, { ...plainMeta, defval: plainValue(defval) });
+        this.inputMemo[n] = { defval, title, type, meta, userSet, userVal, result };
+        return result;
     }
+
+    /** `registerInput`'s last answer for each input, by its position in the run. */
+    private inputMemo: Array<{ defval: any; title: string; type: string; meta: Record<string, any>;
+        userSet: boolean; userVal: any; result: any } | undefined> = [];
 
     /** Clamp to `minval`/`maxval` and fall back to the default outside `options`. */
     private static constrainInput(value: any, meta: Record<string, any>): any {
@@ -1491,6 +2000,63 @@ export class Context {
         return out;
     }
 
+    /**
+     * Does `fname` have a parameter called `name` at THIS version?
+     *
+     * The stdlib is one implementation across versions, so a parameter added
+     * for v6 — `active` on every input, `text_formatting` on labels — is on
+     * the shared function. V6_ONLY_PARAMS says which those are, and below v6
+     * they are treated as absent.
+     */
+    private parameterExists(fname: string, name: string): boolean {
+        if (this.profile.version >= 6) return true;
+        return !V6_ONLY_PARAMS[fname]?.includes(name);
+    }
+
+    /**
+     * Positional arguments, re-slotted for the signature THIS version has.
+     *
+     * The stdlib keeps one signature per function, the union of every
+     * version's, and two kinds of version difference sit in the middle of one:
+     *
+     *   below v6   a parameter v6 ADDED (V6_ONLY_PARAMS). Filled by position
+     *              it is cleared, so it does what it did before it existed:
+     *              nothing. Keyword use is refused separately, in the binding
+     *              below.
+     *   at v6      a function whose v6 order differs from the shared one —
+     *              v6 removed `transp` and `when` from the middle of several.
+     *              Positional arguments are placed BY NAME from V6_POSITIONAL:
+     *              v6 `plot(close, "p", c, 2, style, false)` means trackprice =
+     *              false, not transp. A name the shared signature lacks is
+     *              dropped and recorded, like an unknown keyword.
+     */
+    private positionalForVersion(fname: string, params: readonly string[], positional: any[]): any[] {
+        const byName = this.profile.version >= 6 ? V6_POSITIONAL[fname]
+            : this.profile.version === 5 ? V5_POSITIONAL[fname] : undefined;
+        if (this.profile.version >= 6 || byName) {
+            const order = byName;
+            if (!order) return positional;
+            const out: any[] = [];
+            positional.forEach((value, i) => {
+                const name = order[i];
+                const at = name === undefined ? -1 : params.indexOf(name);
+                if (at < 0) { this.droppedArguments.add(`${fname}(${name ?? `#${i + 1}`})`); return; }
+                while (out.length < at) out.push(undefined);
+                out[at] = value;
+            });
+            return out;
+        }
+        let out = positional;
+        for (const name of V6_ONLY_PARAMS[fname] ?? []) {
+            const at = params.indexOf(name);
+            if (at >= 0 && at < out.length) {
+                if (out === positional) out = [...positional];
+                out[at] = undefined;
+            }
+        }
+        return out;
+    }
+
     public call(id: string, fn: Function, ...args: any[]) {
         // DIAGNOSTIC: If this triggers, the transpiler passed a null function reference
         if (typeof fn !== 'function') {
@@ -1498,17 +2064,25 @@ export class Context {
         }
 
         const identity = id; 
-        this.callStack.push(identity);
+        const path = this.callStack.push(identity);
+        let info = this.callIds.get(id);
+        if (!info) {
+            this.callIds.set(id, info = { fname: removePrefix(extractFunctionName(id)), userFrame: id.includes("$fn_"), entry: undefined, resolved: false });
+        }
 
         // A USER function's frame opens a series namespace; a built-in's does
         // not, because a built-in holds its state in a closure rather than in
         // `vars`. The emitter names every user function `<prefix>$fn_<name>`
         // and puts that name in the call id, which is what makes the two
         // tellable apart here.
-        const userFrame = id.includes("$fn_");
+        const userFrame = info.userFrame;
         if (userFrame) {
             this.seriesScopes.push(this.seriesScope);
             this.seriesScope = `${this.seriesScope}${identity}|`;
+            this.frameSeqs.push(this.frameSeq);
+            this.frameSeq = ++this.frameSeqCounter;
+            this.frameArgs.push(this.argSeries);
+            this.argSeries = args.filter((a) => a && typeof a.get === "function" && typeof a.id === "string");
         }
 
         // A BUILT-IN reached again on one bar overwrites that bar's slot
@@ -1516,12 +2090,22 @@ export class Context {
         // frames are excluded: that is the rule for a series function's own
         // history, and a user function is an ordinary call that may
         // legitimately return two different things on one bar.
-        const siteKey = userFrame ? "" : this.callStack.join("/");
+        const siteKey = userFrame ? "" : path;
         if (siteKey) {
-            if (this.reachedAtBar.get(siteKey) === this.currentBarIndex) {
+            let reach = this.siteReach.get(siteKey);
+            if (!reach) this.siteReach.set(siteKey, reach = { bar: -1, pass: -1, ever: false, probed: false, skipped: false });
+            if (reach.bar === this.currentBarIndex && reach.pass === this.barPass) {
+                if (reach.skipped) {
+                    // A history run that takes rollback points only where the
+                    // script is known to repeat a call: this is one it did not
+                    // know. The run starts over knowing it (`Session.runHistory`).
+                    this.missedRepeat = siteKey;
+                    throw new Error(`'${removePrefix(extractFunctionName(id))}' was reached twice on bar ${this.currentBarIndex} without a rollback point.`);
+                }
                 this.restoreCallState(siteKey);
             } else {
-                this.reachedAtBar.set(siteKey, this.currentBarIndex);
+                reach.bar = this.currentBarIndex;
+                reach.pass = this.barPass;
                 // Every site that owns series state gets a rollback point on
                 // every bar, whether or not it has ever repeated.
                 //
@@ -1536,18 +2120,42 @@ export class Context {
                 // A site that has run and never asked for state is skipped,
                 // which is what makes this affordable: the stateless builtins
                 // are the ones called in bulk.
-                if (!this.everReached.has(siteKey)) {
-                    this.everReached.add(siteKey);
+                //
+                // Performance: a history run may be told where the script
+                // repeats a call (`repeatingSites`), and then only those sites
+                // keep the snapshot on every bar: a site that never repeats
+                // never reads it, and cloning a 5,000-value buffer per site per
+                // bar was most of a long run (77 s, now 11.8 s). A site is
+                // still snapshotted once while stateful, so state that cannot
+                // be cloned is refused as ever.
+                //
+                // Invariant: a site reached twice on a bar without a snapshot
+                // throws (above) rather than rolling back to the wrong state,
+                // and `Session.runHistory` restarts with it added, so results
+                // equal those of a run that snapshots everything. Whatever
+                // changes what a snapshot holds or when a site counts as
+                // reached twice must keep that throw reachable.
+                // Guarded by tests/v1/runtime/lazy_rollback_points.test.ts
+                // (results) and rollback_snapshot_work.test.ts (cloning spared).
+                reach.skipped = false;
+                if (!reach.ever) {
+                    reach.ever = true;
                     this.snapshotCallState(siteKey, id);
                 } else if (this.statefulSites.has(siteKey)) {
-                    this.snapshotCallState(siteKey, id);
+                    if (!this.repeatingSites || !reach.probed || this.repeatingSites.has(siteKey)) {
+                        reach.probed = true;
+                        this.snapshotCallState(siteKey, id);
+                    } else {
+                        reach.skipped = true;
+                    }
                 }
             }
         }
 
         try {
-            const fname = removePrefix(extractFunctionName(id)); 
-            const entry = this.entryFor(fname);
+            const fname = info.fname;
+            if (!info.resolved) { info.entry = this.entryFor(fname); info.resolved = true; }
+            const entry = info.entry;
 
             // 1. Check if the entry exists. If not, we default to standard call (fail-safe)
             if (!entry) {
@@ -1599,41 +2207,62 @@ export class Context {
                             && bundleKeys.length > 0
                             && bundleKeys.every(k => k.startsWith(PREFIX));
 
-            let finalArgs = args;
-            const namedHere = new Set<string>();
-            let positionalHere = args.length;
+            // The positional arguments, mapped onto THIS version's signature
+            // before any keyword is placed — see positionalForVersion.
+            const positionalArgs = this.positionalForVersion(
+                fname, entry.args, hasKwargs ? args.slice(0, -1) : args);
+            let finalArgs = positionalArgs;
+            // Only a keyword call names anything; the others share one empty set.
+            let namedHere: Set<string> = EMPTY_NAMES;
+            let positionalHere = positionalArgs.length;
 
             if (hasKwargs) {
-                const positionalArgs = args.slice(0, -1);
                 const kwargs = lastArg;
-                positionalHere = positionalArgs.length;
 
                 if (entry.args.length > 0) {
-                    finalArgs = [...positionalArgs];
-                    const params = entry.args; 
-                    
-                    for (const [_key, val] of Object.entries(kwargs)) {
-                        const cleanKey = removePrefix(_key); 
-                        const index = params.indexOf(cleanKey);
-                        // A keyword the signature does not name is DROPPED, and
-                        // silence is how that class of bug stayed hidden:
-                        // `strategy.entry(when = …)` fired unconditionally,
-                        // `input.int(minval = 1)` clamped nothing, `bgcolor(title
-                        // = …)` named nothing, `plot(offset = …)` did not shift.
-                        // Recording it makes the class visible — the corpus
-                        // execution suite asserts this set is empty across 742
-                        // scripts, so a signature that falls behind is caught
-                        // rather than quietly ignoring what it is handed.
-                        if (index === -1) this.droppedArguments.add(`${fname}(${cleanKey})`);
-                        else namedHere.add(cleanKey);
-                        
-                        if (index !== -1) {
-                            while (finalArgs.length <= index) {
-                                finalArgs.push(undefined);
-                            }
-                            finalArgs[index] = val;
+                    // Which parameter each keyword names depends on the call
+                    // SITE alone: the names are written in the source. So the
+                    // binding is worked out the first time the site runs, and
+                    // the other bars only copy values across.
+                    let plan = info.plan;
+                    if (!plan) {
+                        plan = { keys: [], indices: [], named: new Set<string>() };
+                        const params = entry.args;
+                        for (const key of Object.keys(kwargs)) {
+                            let cleanKey = removePrefix(key);
+                            // v1-v4 spelled a few keywords differently; see
+                            // V4_RENAMED_PARAMS.
+                            if (this.profile.version < 5) cleanKey = V4_RENAMED_PARAMS[fname]?.[cleanKey] ?? cleanKey;
+                            // A parameter v6 ADDED to a function earlier versions
+                            // share is not part of their signature: it is dropped
+                            // and recorded below exactly as before it existed, so
+                            // a v5 script naming it behaves as it always did.
+                            const index = this.parameterExists(fname, cleanKey)
+                                ? params.indexOf(cleanKey) : -1;
+                            // A keyword the signature does not name is DROPPED, and
+                            // silence is how that class of bug stayed hidden:
+                            // `strategy.entry(when = …)` fired unconditionally,
+                            // `input.int(minval = 1)` clamped nothing, `bgcolor(title
+                            // = …)` named nothing, `plot(offset = …)` did not shift.
+                            // Recording it makes the class visible — the corpus
+                            // execution suite asserts this set is empty across 742
+                            // scripts, so a signature that falls behind is caught
+                            // rather than quietly ignoring what it is handed.
+                            if (index === -1) this.droppedArguments.add(`${fname}(${cleanKey})`);
+                            else plan.named.add(cleanKey);
+                            plan.keys.push(key);
+                            plan.indices.push(index);
                         }
+                        info.plan = plan;
                     }
+                    finalArgs = [...positionalArgs];
+                    for (let k = 0; k < plan.keys.length; k++) {
+                        const index = plan.indices[k];
+                        if (index === -1) continue;
+                        while (finalArgs.length <= index) finalArgs.push(undefined);
+                        finalArgs[index] = kwargs[plan.keys[k]];
+                    }
+                    namedHere = plan.named;
                 } else {
                     finalArgs = positionalArgs; 
                 }
@@ -1657,9 +2286,46 @@ export class Context {
                 this.positionalArguments = outerPositional;
             }
 
+        } catch (e) {
+            this.locateError(e, identity);
+            throw e;
         } finally {
-            if (userFrame) this.seriesScope = this.seriesScopes.pop()!;
+            if (userFrame) {
+                this.seriesScope = this.seriesScopes.pop()!;
+                this.frameSeq = this.frameSeqs.pop()!;
+                this.argSeries = this.frameArgs.pop()!;
+            }
             this.callStack.pop();
+        }
+    }
+
+    /**
+     * Pins a runtime error to the Pine source position of the call it passed
+     * through, so the host can say WHERE the script failed.
+     *
+     * Every call id carries its position -- `array.get@L45:C12`, and
+     * `array.get@L4:C14@L` for a call inside the library imported as `L` -- so
+     * the position costs nothing until something throws: this runs only on
+     * the way out, once per frame, and the first frame an error passes through
+     * is the innermost call, which is the one that raised it. It is a property
+     * of the error rather than text in its message, which other code matches.
+     *
+     * An error inside a library is located at the library's own line, and
+     * the first frame outside it -- the call in the user's own script, the
+     * line an editor can show -- is kept as `caller`.
+     *
+     * Not covered: an error raised in script code that is not inside any call
+     * (nothing the stdlib throws is), which has no position to report.
+     */
+    private locateError(e: unknown, id: string): void {
+        if (e === null || typeof e !== "object") return;
+        const err = e as { pine?: PineLocation };
+        const at = /@L(\d+):C(\d+)(?:@(.+))?$/.exec(id);
+        if (!at) return;
+        if (!err.pine) {
+            err.pine = { line: Number(at[1]), col: Number(at[2]), ...(at[3] ? { library: at[3] } : {}) };
+        } else if (err.pine.library && !err.pine.caller && !at[3]) {
+            err.pine.caller = { line: Number(at[1]), col: Number(at[2]) };
         }
     }
 
@@ -1690,8 +2356,20 @@ export class Context {
      * second time.
      */
     private entryFor(name: string) {
-        return viewFor(this.profile.version)[name] ?? REGISTRY[name];
+        let entry = this.entries.get(name);
+        if (entry === undefined && !this.entries.has(name)) {
+            entry = viewFor(this.profile.version)[name] ?? REGISTRY[name];
+            // color.from_gradient truncates RGB on v5 and v6 (probed); v4 was not, and keeps rounding.
+            if (entry && name === "color.from_gradient" && this.profile.version === 4) {
+                entry = { ...entry, ref: legacyFromGradient };
+            }
+            this.entries.set(name, entry);
+        }
+        return entry;
     }
+
+    /** `entryFor`'s answers: the registries are large and the same few names are asked for on every bar. */
+    private entries: Map<string, any> = new Map();
 
     public builtin(name: string): any {
         return this.entryFor(name)?.ref;
@@ -1716,8 +2394,32 @@ export class Context {
         return false;
     }
 
-    /** Call sites that have run at least once, ever. */
-    private everReached: Set<string> = new Set();
+    /**
+     * Per call site: the bar and pass it was last reached on, and whether it
+     * has run at all. One lookup per call where there were three.
+     */
+    private siteReach: Map<string, { bar: number; pass: number; ever: boolean; probed: boolean; skipped: boolean }> = new Map();
+
+    /**
+     * The call sites a script is known to reach more than once on a bar. Null
+     * (the default, and always for a forming bar) takes a rollback point at
+     * every stateful site on every bar; a set takes one only at the sites in it,
+     * and `missedRepeat` reports the first site that needed one and had none.
+     *
+     * Performance: only `Session.runHistory` sets it, for the history bars,
+     * which are never re-ticked. A live or forming bar is re-ticked and rolled
+     * back at every site, so it must keep this null: `runHistoryOnce` resets it
+     * before returning, and anything else that runs bars must not set it.
+     * Guarded by tests/v1/runtime/rollback_snapshot_work.test.ts. See
+     * docs/common/ARCHITECTURE.md ("Performance invariants").
+     */
+    public repeatingSites: Set<string> | null = null;
+
+    /** The site that was reached again on a bar with no rollback point; see `repeatingSites`. */
+    public missedRepeat: string | null = null;
+
+    /** Counts passes over a bar: `forgetBarProgress` starts a new one. */
+    private barPass = 0;
 
     /**
      * Call sites that own series state, learned the first time one asks for it.
@@ -1738,15 +2440,9 @@ export class Context {
      */
     private stateKeysBySite: Map<string, Set<string>> = new Map();
 
-    /**
-     * The bar each call site was last reached on.
-     *
-     * Keyed by bar INDEX rather than cleared by `setBar`, so the rule holds
-     * for any host that advances `currentBarIndex` — including the TA
-     * differential suites, which drive the stdlib directly and never call
-     * `setBar` at all.
-     */
-    private reachedAtBar: Map<string, number> = new Map();
+    /** State keys already indexed in `stateKeysBySite`. */
+    private indexedStateKeys: Set<string> = new Set();
+
 
     /**
      * Rollback points for the sites in `repeatableCalls`, taken at their first
@@ -1803,7 +2499,7 @@ export class Context {
      * about the SCRIPT, not about the bar.
      */
     private forgetBarProgress(): void {
-        this.reachedAtBar.clear();
+        this.barPass++;
         this.barStateSnapshot.clear();
         this._marketOrdersFilledBar = -1;
         (this as any)._ordersProcessedBar = undefined;
@@ -1835,7 +2531,7 @@ export class Context {
         const copy = new Map<string, any>();
         for (const [k, v] of live) {
             try {
-                copy.set(k, structuredClone(v));
+                copy.set(k, cloneState(v));
             } catch {
                 // Refusing beats rolling back half a state. A built-in whose
                 // state holds something uncloneable cannot take part in this,
@@ -1858,21 +2554,23 @@ export class Context {
         // this one: the bar it belonged to has been committed.
         if (!saved || saved.bar !== this.currentBarIndex) return;
         for (const k of this.stateKeysBySite.get(key) ?? []) this.states.delete(k);
-        for (const [k, v] of saved.states) this.states.set(k, structuredClone(v));
+        for (const [k, v] of saved.states) this.states.set(k, cloneState(v));
     }
 
     public getPersistentState<T>(initFn: () => T): T {
-        const key = this.callStack.length > 0 ? this.callStack.join("/") : "global";
+        const key = this.callStack.length > 0 ? this.callStack.path : "global";
 
         // Index the key under its own site and every site it nests inside, so
-        // `collectCallState` is a lookup rather than a scan.
-        let prefix = "";
-        for (const frame of this.callStack) {
-            prefix = prefix ? `${prefix}/${frame}` : frame;
-            this.statefulSites.add(prefix);
-            let owned = this.stateKeysBySite.get(prefix);
-            if (!owned) { owned = new Set(); this.stateKeysBySite.set(prefix, owned); }
-            owned.add(key);
+        // `collectCallState` is a lookup rather than a scan. Once per key: the
+        // index only ever grows, and is emptied with `reset`.
+        if (!this.indexedStateKeys.has(key)) {
+            this.indexedStateKeys.add(key);
+            for (const prefix of this.callStack.keys) {
+                this.statefulSites.add(prefix);
+                let owned = this.stateKeysBySite.get(prefix);
+                if (!owned) { owned = new Set(); this.stateKeysBySite.set(prefix, owned); }
+                owned.add(key);
+            }
         }
 
         if (!this.states.has(key)) {
@@ -1885,7 +2583,7 @@ export class Context {
     //
     // Lives on the shared base rather than in runtime/v4/ because the runtime is
     // one implementation across versions by design
-    // (dev-docs/00-architecture-assessment.md §5.6). Only V4ToJsVisitor can emit
+    // (docs/common/ARCHITECTURE.md ("Design rules")). Only V4ToJsVisitor can emit
     // a call to it: v1–v3 have no `var` token, so their scripts cannot reach it.
 
     /** Declaration sites whose initialiser has already run, keyed by @L:C. */
@@ -1893,6 +2591,9 @@ export class Context {
 
     /** Series declared `varip`, exempt from intra-bar rollback. */
     private varipSeries: Set<string> = new Set();
+
+    /** Every series declared `var` or `varip`, by scoped name: what drawing eviction treats as a holder. */
+    private varSeries: Set<string> = new Set();
 
     /**
      * `var x = expr` — initialise ONCE, then persist across bars.
@@ -1950,6 +2651,7 @@ export class Context {
         const scopedName = this.scoped(name);
         const scopedKey = this.scoped(key);
         if (ip) this.varipSeries.add(scopedName);
+        this.varSeries.add(scopedName);
 
         if (this.varInitialised.has(scopedKey)) {
             const held = this.vars.get(scopedName);
@@ -2016,6 +2718,23 @@ export class Context {
         }
 
         return series.update(resolvedVal);
+    }
+
+    /**
+     * `new_var` for the series behind a history reference on an expression,
+     * `(close + 0)[3]`: bar-indexed, carrying its last value over the bars the
+     * expression was not evaluated on. See `Series.updateCarry`.
+     */
+    public new_anon(name: string, val: any): Series {
+        const key = this.scoped(name);
+        let series = this.vars.get(key);
+        if (!series) {
+            series = new Series(this, key);
+            this.vars.set(key, series);
+        }
+        const resolvedVal = val && typeof val.get === 'function' && typeof val.valueOf === 'function'
+            ? val.valueOf() : val;
+        return series.updateCarry(resolvedVal);
     }
 
     /**
@@ -2127,26 +2846,95 @@ export class Context {
      */
     public get(target: any, offset: number, id: string): number {
         // Case A: Series Object (Duck Typing check for speed)
-        if (target && typeof target.get === 'function') {
-            return target.get(offset);
-        }
-
         // Case B: Raw Number (Expression) -> Fallback to Local History Lookup
-        return this.getSeries(id, offset);
+        //
+        // The series is resolved ONCE and kept, because the v6 rule below
+        // needs it again: re-resolving it by name repeated the scoped map
+        // search on every na history read, float and int series included.
+        const series = target && typeof target.get === 'function' ? target : this.findSeries(id);
+        // The call-site path returns here too, but through the bool rule below.
+        const found = series && series === target && this.seriesScope !== "" && this.isOuterUserSeries(series)
+            ? this.callSiteHistory(series, offset)
+            : series ? series.get(offset) : NaN;
+
+        // v6, MG §"Boolean values cannot be na": "`[]` on a bool variable on
+        // the first bar returns false in v6, not na." A bool series is
+        // recognised by its CURRENT value, which is the only one guaranteed to
+        // exist when history runs out.
+        //
+        // Decided at run time rather than by the emitter, so a bool that the
+        // static pass cannot see — a function local, a UDT field read into a
+        // variable — is covered too. Gated on the profile flag, so v1–v5 keep
+        // their `na`. History past the start reads back as null from a Series
+        // and NaN from the fallback, so both count as "ran out".
+        if (this.profile.defaults.boolsCanBeNa === false && series
+            && (found === null || found === undefined || (typeof found === "number" && Number.isNaN(found)))
+            && typeof series.get(0) === "boolean") {
+            return false as any;
+        }
+        return found;
+    }
+
+    /**
+     * A user variable declared OUTSIDE the running function: not one of its own
+     * locals (their ids carry the frame's scope) and not a built-in series.
+     */
+    private isOuterUserSeries(series: any): boolean {
+        const id = series.id;
+        return typeof id === "string" && !id.startsWith(this.seriesScope) && !BASE_SERIES.has(id)
+            && !id.startsWith("opsv2_builtin_hist_")   // a built-in's history, kept every bar
+            && !this.argSeries.includes(series);
+    }
+
+    /**
+     * `v[n]` on a variable from outside the running function. TradingView keeps
+     * a history of it per CALL SITE, recorded only when that call runs
+     * (Pine Logs, dev-docs/tv-parity/_probes/fn-history): `[n]` is its value at
+     * the n-th previous call of this site, not on the n-th previous bar. Before
+     * that many calls it is na. The probe's first calls (bars 0, 0) log na, and
+     * the next ones read the value the variable had at those first calls.
+     */
+    private callSiteHistory(series: any, offset: number): any {
+        const key = `${this.seriesScope}|hist|${series.id}`;
+        let rec = this.states.get(key);
+        if (!rec) this.states.set(key, rec = { seq: -1, vals: [], max: 0 });
+        // The deepest offset this site has asked for: older entries can never be read.
+        if (offset > rec.max) rec.max = offset;
+        // Once per call: a second `v[k]` in the same call must not push again.
+        if (rec.seq !== this.frameSeq) {
+            rec.seq = this.frameSeq;
+            rec.vals.push(series.get(0));
+            // Trimmed in batches, not per call. The record is cloned on every realtime tick and
+            // every calc_on_order_fills re-run, so it must not grow with the chart.
+            const keep = rec.max + 1;
+            if (rec.vals.length > 2 * keep + 16) rec.vals.splice(0, rec.vals.length - keep);
+        }
+        const at = rec.vals.length - 1 - offset;
+        return at >= 0 ? rec.vals[at] : NaN;
+    }
+
+    /** The series registered under `name`, this frame's instance first. */
+    private findSeries(name: string): any {
+        // The frame first — a self-referential local (`s = nz(s[1]) + close`)
+        // reaches this while its own `let` is still in the temporal dead zone,
+        // and must find ITS instance rather than another call site's.
+        return this.vars.get(this.scoped(name)) ?? this.vars.get(name);
     }
 
     /**
      * Internal helper for fallback lookups
      */
     public getSeries(name: string, offset: number): number {
-        // The frame first — a self-referential local (`s = nz(s[1]) + close`)
-        // reaches this while its own `let` is still in the temporal dead zone,
-        // and must find ITS instance rather than another call site's.
-        const series = this.vars.get(this.scoped(name)) ?? this.vars.get(name);
+        const series = this.findSeries(name);
         return series ? series.get(offset) : NaN;
     }
 
-    public setBar(time: number, open: number, high: number, low: number, close: number, volume: number) {
+    public setBar(
+        time: number, open: number, high: number, low: number, close: number, volume: number,
+        // `calc_on_order_fills`: the caller fills this bar's orders itself, in
+        // path order, see `runBarWithFills`.
+        deferFills: boolean = false,
+    ) {
         // A new bar — or a re-tick of this one — starts with nothing reached.
         this.forgetBarProgress();
 
@@ -2184,9 +2972,9 @@ export class Context {
         //
         // Guarded per bar because a realtime bar is re-ticked: without it the
         // same order would fill on every tick of the bar it fills on.
-        if (this._marketOrdersFilledBar !== this.currentBarIndex) {
+        if (!deferFills && this._marketOrdersFilledBar !== this.currentBarIndex) {
             this._marketOrdersFilledBar = this.currentBarIndex;
-            fillMarketOrders(this);
+            brokerFor(this).fillMarketOrders();
 
             // 5. Then match the standing limit and stop orders against this
             //    bar's range.
@@ -2199,6 +2987,67 @@ export class Context {
             // every such fill one row late.
             processPendingOrders(this, this.high, this.low);
         }
+    }
+
+    /** Whether the script asked to be re-run after each order fill. */
+    public get calcOnOrderFills(): boolean {
+        // TradingView evidence on v4 (version-scope/v4-cof), v5 (calc-on-fills) and v6 (v6-cof).
+        // The parameter does not exist before v4.
+        return this.profile.version >= 4 && Boolean((this.scriptMeta as any)?.calc_on_order_fills);
+    }
+
+    /**
+     * Set while a bar is being replayed for `calc_on_order_fills`: how far along
+     * the bar's price path (segment index plus the share of it covered) the
+     * last fill was, and the price there. Null otherwise.
+     */
+    public intrabar: { cursor: number; price: number } | null = null;
+
+    /** The most times one bar is re-run after fills; TradingView's own limit is unknown. */
+    private static readonly MAX_FILL_RERUNS = 100;
+
+    /**
+     * Runs one historical bar of a `calc_on_order_fills` strategy.
+     *
+     * Each fill, in the order it happens along the bar's path, re-runs the
+     * script on the whole bar with `var` and series state put back to the bar's
+     * start (as a realtime tick does; `varip` keeps its value), while the broker
+     * keeps what filled. A market order the re-run places fills at once at the
+     * price of the fill that triggered it, and a limit or stop order it places
+     * can fill later on the same bar. The ordinary run comes last, and its
+     * effects are what the next bar sees. Verified on TradingView's probe
+     * calc-on-fills (dev-docs/tv-parity/_probes/calc-on-fills) and the 12/26-IT
+     * strategy (ENGINE-BUGS.md section 1).
+     */
+    public runBarWithFills(
+        time: number, open: number, high: number, low: number, close: number, volume: number,
+        exec: () => void,
+    ): void {
+        this.setBar(time, open, high, low, close, volume, true);
+        const broker = brokerFor(this);
+        this.intrabar = { cursor: 0, price: open };
+        let base: RuntimeSnapshot | null = null;
+        try {
+            const settle = (): boolean => {
+                const before = this.filledOrderCount;
+                if (this.marketOrders.length > 0) {
+                    broker.fillMarketOrders(this.intrabar!.price);
+                    if (this.filledOrderCount !== before) return true;
+                }
+                return broker.processIntrabarStep();
+            };
+            let more = settle();
+            for (let reruns = 0; more && reruns < Context.MAX_FILL_RERUNS; reruns++) {
+                if (!base) base = this.captureSnapshot();
+                else this.restoreSnapshot(base, true);
+                exec();
+                more = settle();
+            }
+            if (base) this.restoreSnapshot(base, true);
+        } finally {
+            this.intrabar = null;
+        }
+        exec();
     }
 
     /** The bar `fillMarketOrders` last ran on, so a re-tick does not refill. */
@@ -2256,7 +3105,7 @@ export class Context {
         // This ensures that "plot(close)" and "plot(open)" don't overwrite each other
         // just because they both default to title="Plot".
         const id = this.callStack.length > 0
-            ? this.callStack[this.callStack.length - 1]
+            ? this.callStack.top
             : data.title;
 
         // 2. Use ID to retrieve the series
@@ -2288,7 +3137,7 @@ export class Context {
         }
     }
 
-    public registerFill(id1: any, id2: any, options: { color?: string, title?: string } = {}) {
+    public registerFill(id1: any, id2: any, options: { color?: string, title?: string, [k: string]: any } = {}) {
         // See `plainPlotData`: a plot id reaches here as a Series whenever the
         // script stored it in a variable, which is the documented way to use
         // `fill()` at all.
@@ -2312,6 +3161,15 @@ export class Context {
             color: options.color || "#00000000",
             title: title
         };
+        if (options.gradient) {
+            data.gradient = true;
+            data.top_value = options.top_value;
+            data.bottom_value = options.bottom_value;
+            data.top_color = options.top_color;
+            data.bottom_color = options.bottom_color;
+        }
+        const showLast = Number((options as any).show_last);
+        if (Number.isFinite(showLast) && showLast >= 0) data.showLast = Math.trunc(showLast);
 
         // `offset` moves the value to a DIFFERENT BAR, which changes the series
         // rather than its appearance — "Shifts the plot to the left or right on
@@ -2348,6 +3206,14 @@ export class Context {
                 series.push(null);
             }
         });
+        // `process_orders_on_close`: market orders fill at the close of the bar
+        // that placed them, once the script has run, rather than at the next
+        // open. TradingView's log: the first trade of harness_strategy_pooc
+        // enters at bar 1's close, 4108.37, where without it bar 2's open
+        // fills the same order. `immediately` changes nothing there: every
+        // market order already fills on the placing bar. Below v6 a close
+        // placed with `immediately` fills here too.
+        if (this.marketOrders.length > 0) brokerFor(this).fillAtClose();
         this.sampleEquity();
         this.currentBarIndex++;
     }
@@ -2375,7 +3241,30 @@ export class Context {
     openProfitAt(price: number): number {
         return this.position.size === 0
             ? 0
-            : (price - this.position.avgPrice) * this.position.size;
+            : (price - this.position.avgPrice) * this.position.size * this.accountRate();
+    }
+
+    /**
+     * What one unit of the symbol's currency is worth in the strategy's
+     * currency (`strategy(currency = ...)`) on this bar: the latest sample of
+     * the host's `currency_rate` series at or before the bar's time. 1 when the
+     * script asked for no other currency, or the host supplied no series, so
+     * nothing converts and nothing throws.
+     *
+     * TradingView converts each closed trade at the exit bar's rate
+     * (_probes/currency-usd-1btc). Open profit converted at the current bar's
+     * rate, and sizing (percent_of_equity, cash qty) left unconverted, are
+     * unverified against TradingView.
+     */
+    accountRate(): number {
+        const to = this.scriptMeta?.currency;
+        if (!to || to === this.currency) return 1;
+        const samples = this.getRequestData("currency_rate", `${this.currency}|${to}`);
+        if (!samples) return 1;
+        for (let i = samples.length - 1; i >= 0; i--) {
+            if (samples[i].time <= this.time) return Number.isFinite(samples[i].value) ? samples[i].value : 1;
+        }
+        return 1;
     }
 
     private sampleEquity() {
@@ -2417,12 +3306,24 @@ export class Context {
      * The caller runs the compiled script after this, then reads provisional
      * output. Finalize with `commitBar()` when the bar closes.
      */
+    /**
+     * `barstate.isnew` / `isconfirmed` follow TradingView's realtime bar states, and `Session.commit`
+     * runs the closing execution. Probed on v5 (rt-confirmed-v5) and v6 (rt-semantics-v6,
+     * rt-confirmed-v6); v1-v4 keep the older reading (isnew always true, isconfirmed = not realtime).
+     */
+    public get realtimeBarStates(): boolean { return this.profile.version >= 5; }
+
     public applyTick(time: number, open: number, high: number, low: number, close: number, volume: number) {
         if (this.committedSnapshot === null) {
             this.committedSnapshot = this.captureSnapshot(); // baseline = state after last commit
+            if (this.realtimeBarStates) this.is_new = true;  // first execution of this bar
         } else {
             this.restoreSnapshot(this.committedSnapshot);    // roll back the previous tick
+            // Every later tick of the bar, rollback or not. Verified on TradingView:
+            // dev-docs/tv-parity/_probes/realtime/rt-semantics-v6/run-20261113-040218.
+            if (this.realtimeBarStates) this.is_new = false;
         }
+        this.is_confirmed = false;
         this.is_history = false;
         this.is_realtime = true;
         this.is_last = true;
@@ -2436,7 +3337,15 @@ export class Context {
     public commitBar() {
         this.finalizeBar();
         this.committedSnapshot = null;
+        if (this.realtimeBarStates) this.is_new = true; // the next bar's first execution
+        this.is_confirmed = false;
     }
+
+    /** A rollback point for a sub-context (see `request.security_lower_tf`): opaque to the caller. */
+    public checkpoint(): unknown { return this.captureSnapshot(); }
+
+    /** Rolls this context back to a `checkpoint()`. */
+    public rollbackTo(cp: unknown): void { this.restoreSnapshot(cp as RuntimeSnapshot); }
 
     private captureSnapshot(): RuntimeSnapshot {
         const varMeta = new Map<string, SeriesSnapshot>();
@@ -2461,15 +3370,25 @@ export class Context {
             positionDrawdown: this.positionDrawdown,
             maxContractsHeld: this.maxContractsHeld,
             commissionPaid: this.commissionPaid,
+            filledOrderCount: this.filledOrderCount,
+            netProfitSum: this.netProfitSum,
             orders: structuredClone(this.orders),
             marketOrders: structuredClone(this.marketOrders),
             pendingEntries: structuredClone((this as any)._pendingEntries ?? new Map()),
             pendingExits: structuredClone((this as any)._pendingExits ?? new Map()),
             riskState: structuredClone((this as any)._riskState ?? null),
+            // A tick re-runs the bar: the drawings it made must go, an evicted one comes
+            // back, and a setter's change (`set_x2`, `set_text`) is undone, so each
+            // drawing's props are copied (see `cloneDrawing`).
+            drawings: new Map([...this.drawings].map(([k, d]) => [k, cloneDrawing(d)])),
+            drawingOrder: new Map([...this.drawingOrder].map(([k, v]) => [k, [...v]])),
+            drawingCounter: this.drawingCounter,
         };
     }
 
-    private restoreSnapshot(s: RuntimeSnapshot) {
+    // `scriptOnly` puts back what the SCRIPT owns (series, `var` state, plots)
+    // and keeps the broker as it is: a re-run after a fill must not undo the fill.
+    private restoreSnapshot(s: RuntimeSnapshot, scriptOnly: boolean = false) {
         // Part of restoring the baseline: per-bar progress is context state
         // like any other, and leaving it behind would say the bar had already
         // been worked on. `applyTick` calls `setBar` straight after this, which
@@ -2500,6 +3419,11 @@ export class Context {
         for (const [k, len] of s.fillLens) {
             const a = this.fills.get(k); if (a) a.length = len;
         }
+        // Cloned again so the baseline stays pristine across repeated ticks.
+        this.drawings = new Map([...s.drawings].map(([k, d]) => [k, cloneDrawing(d)]));
+        this.drawingOrder = new Map([...s.drawingOrder].map(([k, v]) => [k, [...v]]));
+        this.drawingCounter = s.drawingCounter;
+        if (scriptOnly) return;
         this.position = structuredClone(s.position);
         this.cash = s.cash;
         this.trades = structuredClone(s.trades);
@@ -2508,6 +3432,8 @@ export class Context {
         this.positionDrawdown = s.positionDrawdown;
         this.maxContractsHeld = s.maxContractsHeld;
         this.commissionPaid = s.commissionPaid;
+        this.filledOrderCount = s.filledOrderCount;
+        this.netProfitSum = s.netProfitSum;
         this.orders = structuredClone(s.orders);
         this.marketOrders = structuredClone(s.marketOrders);
         (this as any)._pendingEntries = structuredClone(s.pendingEntries);
@@ -2518,7 +3444,9 @@ export class Context {
     // --- Multi-timeframe / security() (P1) ---
 
     private secKey(symbol: string, resolution: string): string {
-        return `${symbol}@${resolution}`;
+        // "D" and "1D" are one timeframe, so data supplied for one answers a
+        // request for the other, and a missing one is reported once.
+        return `${symbol}@${canonicalTimeframe(resolution)}`;
     }
 
     /** Supplies HTF candles for a (symbol, resolution); called by the session layer. */
@@ -2587,8 +3515,18 @@ export class Context {
     /** The chart's own bars, as they arrive. The basis of a derived request. */
     private chartBars: SecurityCandle[] = [];
 
+    /**
+     * The history run's whole dataset, set by `Session.runHistory`: only the TIMES
+     * of the bars after the current one are read, to tell where a session or a
+     * higher-timeframe bar ends. No price is ever taken from it.
+     */
+    public chartAhead: readonly { time: number }[] | null = null;
+
     /** Derived higher-timeframe series, keyed by resolution, extended as bars arrive. */
-    private derivedSeries: Map<string, { candles: SecurityCandle[]; upto: number }> = new Map();
+    private derivedSeries: Map<string, DerivedSeries> = new Map();
+
+    /** Heikin-Ashi transforms of a request's candles, keyed like `securityData`. */
+    private heikinAshi: Map<string, HeikinAshiSeries> = new Map();
 
     /**
      * Does `symbol` name the chart's OWN instrument?
@@ -2599,6 +3537,9 @@ export class Context {
      * `syminfo.ticker` gives bare. An empty symbol means the chart's too.
      */
     private isChartSymbol(symbol: string): boolean {
+        // `ticker.heikinashi(syminfo.tickerid)` names the chart's instrument
+        // too; only its candles differ, and `getSecurityData` transforms them.
+        if (symbol.startsWith(HEIKINASHI)) symbol = symbol.slice(HEIKINASHI.length);
         if (symbol === "") return true;
         // `this.symbol` holds the TICKER ID — "NASDAQ:AAPL" if the host gave a
         // prefix — and `syminfo.ticker` is that with the exchange stripped, so
@@ -2640,20 +3581,45 @@ export class Context {
      * then applies its own closed-bar rule on top of a series that is already
      * causal.
      */
-    private deriveSecurityData(symbol: string, resolution: string): SecurityCandle[] | undefined {
+    private deriveSecurityData(symbol: string, resolution: string, lookaheadOn = false): SecurityCandle[] | undefined {
         if (!this.isChartSymbol(symbol)) return undefined;
 
         const want = specSeconds(resolution);
         const have = specSeconds(String(this.resolution));
         if (!Number.isFinite(want) || !Number.isFinite(have) || want < have) return undefined;
 
-        const seen = this.currentBarIndex + 1;
-        const cached = this.derivedSeries.get(resolution);
-        if (cached && cached.upto === seen) return cached.candles;
+        // lookahead_on on a historical bar: TradingView gives the chart bar the
+        // WHOLE higher-timeframe bar it belongs to, chart bars still to come
+        // included, and a history run has them all. The live bar has no future,
+        // so it keeps the causal fold below.
+        const ahead = this.chartAhead as readonly SecurityCandle[] | null;
+        if (lookaheadOn && !this.is_realtime && ahead && ahead.length > this.currentBarIndex
+            && ahead[this.currentBarIndex].time === this.chartBars[this.currentBarIndex]?.time) {
+            const key = resolution + "|ahead";
+            let full = this.derivedSeries.get(key);
+            if (!full || full.upto !== ahead.length) {
+                const chartSeconds = specSeconds(String(this.resolution));
+                this.derivedSeries.set(key, full = new DerivedSeries(resolution, Number.isFinite(chartSeconds) ? chartSeconds * 1000 : undefined));
+                full.extend(ahead as SecurityCandle[], ahead.length);
+            }
+            return full.candles;
+        }
 
-        const candles = aggregate(this.chartBars.slice(0, seen), resolution);
-        this.derivedSeries.set(resolution, { candles, upto: seen });
-        return candles;
+        const seen = this.currentBarIndex + 1;
+        let derived = this.derivedSeries.get(resolution);
+        // A live bar is re-ticked with the same `seen`, but its candle has moved.
+        if (derived && derived.upto === seen && !this.is_realtime) return derived.candles;
+
+        // Extended by the bars that arrived since; started again when the run
+        // has gone back to an earlier bar.
+        if (!derived || derived.upto > seen) {
+            const chartSeconds = specSeconds(String(this.resolution));
+            this.derivedSeries.set(resolution, derived = new DerivedSeries(resolution, Number.isFinite(chartSeconds) ? chartSeconds * 1000 : undefined));
+        }
+        // A history run has the dataset in hand, so the chart bar after this one is
+        // known and says whether a derived bar ends here; the live bar has none.
+        derived.extend(this.chartBars, seen, this.chartAhead?.[seen]?.time);
+        return derived.candles;
     }
 
     /**
@@ -2678,17 +3644,50 @@ export class Context {
         return Number.isFinite(want) && Number.isFinite(have) && want === have;
     }
 
-    public getSecurityData(symbol: string, resolution: string): SecurityCandle[] | undefined {
+    /**
+     * Where a request's history starts: always the first bar. `calc_bars_count`
+     * ("the maximum number of recent historical bars the function can request")
+     * is accepted and has NO observable effect, which TradingView's own log
+     * shows (conformance/v5/parity/harness_security_cbc, BTCUSDT 5m, 5,464 bars):
+     * `request.security("60", bar_index, calc_bars_count = 50)` equals the same
+     * call without it on every row, and `ta.cum(1)` inside it is 6984 at chart
+     * bar 0; `security_lower_tf("1", bar_index, calc_bars_count = 200)` likewise
+     * equals the call without it. 50 and 200 limited nothing.
+     *
+     * (A data-supply fact for hosts, not a broker rule: the hourly context's
+     * history starts long before the chart's first bar, with 6,983 hourly bars
+     * ahead of it there, while the 1-minute lower-timeframe context starts at the
+     * chart's first bar.)
+     */
+    public securityFirstBar(_symbol: string, _resolution: string, _calcBarsCount: any, _fname: string): number {
+        return 0;
+    }
+
+    public getSecurityData(symbol: string, resolution: string, lookaheadOn = false): SecurityCandle[] | undefined {
         // Host-supplied data always wins: it is real data for the context the
         // script asked for, and a derivation is only ever a fallback.
+        //
+        // The chart's own symbol at the chart's own timeframe is the chart
+        // series itself, bar for bar. It is not aggregated: grouping bars into
+        // periods of their own length is the identity only while every bar
+        // sits on its period's boundary, and a feed with its own session
+        // offset does not.
         const candles = this.securityData.get(this.secKey(symbol, resolution))
-            ?? this.deriveSecurityData(symbol, resolution);
+            ?? (this.isOwnChartSeries(symbol, resolution)
+                ? this.chartBars
+                : this.deriveSecurityData(symbol, resolution, lookaheadOn));
         if (!candles) return candles;
         // heikinashi(tickerid) marks the symbol rather than wrapping the series,
         // which is how Pine models it — so the transform belongs here, at the
         // point the candles are read, and every security() behaviour above it
         // (alignment, no-lookahead, per-call-site state) is unchanged.
-        return symbol.startsWith("heikinashi:") ? toHeikinAshi(candles) : candles;
+        if (!symbol.startsWith(HEIKINASHI)) return candles;
+        // Built forward as bars arrive, not again from the first on every read:
+        // a Heikin-Ashi request on the chart's own series is read on every bar.
+        const key = this.secKey(symbol, resolution);
+        let ha = this.heikinAshi.get(key);
+        if (!ha) this.heikinAshi.set(key, ha = new HeikinAshiSeries());
+        return ha.of(candles);
     }
 
     /** Records a (symbol, resolution) the script needs but hasn't been given. */
@@ -2696,9 +3695,41 @@ export class Context {
         this.requestedSecurities.add(this.secKey(symbol, resolution));
     }
 
+    /**
+     * The chart's context, for a sub-context that evaluates a requested
+     * expression; null on the chart's own. `syminfo.main_tickerid` and
+     * `timeframe.main_period` read it.
+     */
+    public main: Context | null = null;
+
+    /**
+     * A context to evaluate a `request.security` expression in: the requested
+     * timeframe and symbol, and the chart's symbol facts when it is the
+     * chart's symbol — `timeframe.period` inside the request is "5" for a
+     * 5-minute request, as TradingView logs it, where a bare context said "1D".
+     */
+    public securitySubContext(symbol: string, resolution: string): Context {
+        const sub = new (this.constructor as new (p: any) => Context)(this.profile);
+        sub.main = this.main ?? this;
+        sub.resolution = resolution === "" ? this.resolution : resolution;
+        sub.timezone = this.timezone;
+        // Every spelling of the chart's own symbol — the ticker id, the bare
+        // ticker, "" — gets the chart's facts and reports the chart's ticker id,
+        // the rule getSecurityData already uses to serve it the chart's bars.
+        const chart = this.isChartSymbol(symbol);
+        if (chart) {
+            sub.mintick = this.mintick; sub.currency = this.currency; sub.basecurrency = this.basecurrency;
+            sub.description = this.description; sub.symbolType = this.symbolType; sub.symbolRoot = this.symbolRoot;
+            sub.pointvalue = this.pointvalue; sub.sessionSpec = this.sessionSpec; sub.mincontract = this.mincontract;
+            sub.isin = this.isin; sub.currentContract = this.currentContract;
+        }
+        sub.symbol = chart ? this.symbol : symbol;
+        return sub;
+    }
+
     /** Stable key for the current call site (used for per-`security()` HTF state). */
     public currentCallKey(): string {
-        return this.callStack.length > 0 ? this.callStack.join("/") : "global";
+        return this.callStack.length > 0 ? this.callStack.path : "global";
     }
 
     /** Per-call-site HTF state, exempt from live-tick snapshot/rollback. */
@@ -2712,7 +3743,7 @@ export class Context {
      * sub-context, by rebinding the VM's global series (open/high/.../close) and
      * `ctx` to the sub-context for the duration of the thunk. Restores on exit.
      */
-    public evalSecurityBar(sub: Context, bar: SecurityCandle, thunk: () => any): any {
+    public evalSecurityBar(sub: Context, bar: SecurityCandle, thunk: () => any, provisional = false): any {
         const sb = this.__sandbox;
         if (!sb) return NaN;
         const P = "opsv2_";
@@ -2729,12 +3760,19 @@ export class Context {
         sb[P + "volume"] = sub.vars.get(P + "volume");
         sb[P + "time"] = sub.vars.get(P + "time");
         try {
-            sub.setBar(bar.time, bar.open, bar.high, bar.low, bar.close, bar.volume);
+            // A provisional bar is a forming bar of the sub-context: rolled back to
+            // the state before it on every evaluation (`applyTick`), and committed
+            // (`commitBar`) when it is evaluated for good.
+            const forming = provisional || sub.committedSnapshot !== null;
+            if (forming) sub.applyTick(bar.time, bar.open, bar.high, bar.low, bar.close, bar.volume);
+            else sub.setBar(bar.time, bar.open, bar.high, bar.low, bar.close, bar.volume);
             const r = thunk();
             const unwrap = (x: any) =>
                 (x !== null && x !== undefined && typeof x.valueOf === "function") ? x.valueOf() : x;
             const num = unwrap(r);
-            sub.finalizeBar();
+            if (provisional) { /* stays forming */ }
+            else if (forming) sub.commitBar();
+            else sub.finalizeBar();
 
             // A TUPLE expression — `security(sym, "D", [close, open])`, v4,
             // May 2020 — comes back as an array, and a STRING expression
@@ -2749,4 +3787,68 @@ export class Context {
             sb[P + "close"] = saved.close; sb[P + "volume"] = saved.volume; sb[P + "time"] = saved.time;
         }
     }
+}
+
+
+/** The type a runtime value shows: `Point`, `label`, `array<float>`, `int`. */
+function valueType(x: any, depth = 0): string | null {
+    const v = x instanceof Series ? x.valueOf() : x;
+    if (v === null || v === undefined || (typeof v === "number" && Number.isNaN(v))) return null;
+    if (typeof v === "number") return Number.isInteger(v) ? "int" : "float";
+    if (typeof v === "boolean") return "bool";
+    if (typeof v === "string") {
+        // A drawing is held by its id, `<kind>_<n>` (Context.newDrawing).
+        const drawing = /^(line|label|box|table|linefill|polyline)_\d+$/.exec(v);
+        if (drawing) return drawing[1];
+        return /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(v) ? "color" : "string";
+    }
+    if (typeof v !== "object") return null;
+    if (typeof v.__type === "string") return v.__type;
+    if (typeof v.__builtin === "string") return v.__builtin;
+    if (v instanceof Map) return "map";
+    if (Array.isArray(v)) {
+        if ((v as any)[MATRIX_TAG]) return "matrix";
+        if (depth > 0) return "array";
+        const first = v.find(e => valueType(e, 1) !== null);
+        return `array<${first === undefined ? "?" : valueType(first, 1)}>`;
+    }
+    return null;
+}
+
+/**
+ * How well a value fits a declared parameter type: 3 exact, 1 compatible
+ * (int as float, a colour as a string, an empty array as any array), 0 for
+ * na, which fits anything, and a large negative for a mismatch.
+ *
+ * A whole number fits `float` better than `int`: it may be a float that
+ * happens to be whole (`close` of 11.0), and the float body accepts an int,
+ * as Pine widens every int, while the int body is wrong for a float. The
+ * emitter resolves every int/float choice whose type it can see, so this
+ * only decides the ones it cannot.
+ */
+function typeFit(declared: string, value: any): number {
+    // The qualifier is a whole word: `seriesData` is a type, not `Data`.
+    const want = declared.replace(/^\s*(series|simple|const)\s+/, "").replace(/\s+/g, "").replace(/\b[A-Za-z_]\w*\./g, "");
+    const got = valueType(value);
+    if (got === null) return 0;
+    if (got === "int") return want === "float" ? 2 : want === "int" ? 1 : -100;
+    if (want === got) return 3;
+    // An enum member is the string "<Enum>.<member>" (Context.declareEnum).
+    if (got === "string") {
+        const member = /(?:^|\.)([A-Za-z_]\w*)\.[A-Za-z_]\w*$/.exec(String(value instanceof Series ? value.valueOf() : value));
+        if (member && member[1] === want) return 3;
+    }
+    if (want === "string" && got === "color") return 1;
+    if (want === "color" && got === "string") return 0;
+    const arr = /^array<(.+)>$/.exec(want) ?? (/^(\w+)\[\]$/.exec(want));
+    if (arr && got.startsWith("array<")) {
+        const inner = got.slice(6, -1);
+        if (inner === "?") return 1;
+        // Whole-number elements, as for a whole number above.
+        if (inner === "int") return arr[1] === "float" ? 2 : arr[1] === "int" ? 1 : -100;
+        if (inner === arr[1]) return 3;
+        return -100;
+    }
+    if (/^(map|matrix)</.test(want) && got === want.slice(0, want.indexOf("<"))) return 2;
+    return -100;
 }

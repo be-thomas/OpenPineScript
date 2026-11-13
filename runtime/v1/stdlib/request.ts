@@ -34,6 +34,46 @@
 
 import { Context } from "../context";
 import { val } from "../../../utils/v2/common";
+import { specSeconds, periodEnd } from "../timeframes";
+
+/** One `security_lower_tf` call site's state: see `getHtfState`. */
+interface LtfState {
+    sub: Context;
+    /** Index of the last lower-timeframe bar already evaluated. */
+    done: number;
+    /** The chart bar `out` was built for. */
+    barTime: number;
+    out: any;
+    /** The lower-timeframe series `done` indexes, and how long it was. */
+    data: readonly any[];
+    len: number;
+    /**
+     * Live chart bar: a rollback point of `sub` taken before the bar's first
+     * intrabar, `done` at that point, the bar it is for, and the last intrabar
+     * the last tick saw. The forming bar's intrabars are re-evaluated from it
+     * each tick, because the host keeps changing them.
+     */
+    cp?: unknown;
+    cpDone?: number;
+    cpBar?: number;
+    sig?: string;
+}
+
+/** Whether `next` still begins with the `len` bars `prev` held: same bars, only more of them. */
+function extendsSeries(prev: readonly any[], len: number, next: readonly any[]): boolean {
+    if (next.length < len) return false;
+    if (prev === next) return true;
+    return [0, len - 1].every(i => {
+        const a = prev[i], b = next[i];
+        return a.time === b.time && a.open === b.open && a.high === b.high
+            && a.low === b.low && a.close === b.close && a.volume === b.volume;
+    });
+}
+
+/** The cached answer, copied (tuple elements too): a script may push to or sort what it is handed. */
+function copyOut(out: any[], arity: number): any[] {
+    return arity < 0 ? out.slice() : out.map(a => a.slice());
+}
 
 const text = (x: any): string => String(val(x) ?? "");
 
@@ -68,7 +108,7 @@ function resolve(
             ? (ignore_invalid_symbol as any).valueOf() : ignore_invalid_symbol;
         if (ignore === true) return NaN;
         throw new Error(
-            `request.${kind}: no data was supplied for '${key}'. OpenPineScript ` +
+            `request.${kind}: no data was supplied for '${key}'. This engine ` +
             `cannot fetch it from TradingView — provide it with ` +
             `ctx.provideRequestData(${JSON.stringify(kind)}, ${JSON.stringify(key)}, samples).`,
         );
@@ -107,13 +147,20 @@ export const request = {
         resolve(ctx, "earnings", [ticker, field]),
 
     /**
-     * `request.security_lower_tf(symbol, timeframe, expression, …)` — Sept 2023.
+     * `request.security_lower_tf(symbol, timeframe, expression,
+     * ignore_invalid_symbol, currency, ignore_invalid_timeframe,
+     * calc_bars_count)` — Sept 2023.
      *
      * Evaluates `expression` on EVERY intrabar of the chart bar and returns them
      * all, as an array — or, when the expression is a tuple, as a tuple of arrays.
      * That is what makes it different from `request.security`, which returns one
      * value: a chart bar contains many lower-timeframe bars, and this hands back
      * all of them so a script can sum, count or measure within the bar.
+     *
+     * The intrabars of a chart bar are the lower-timeframe bars that open
+     * inside it, from its open to its close. The expression is evaluated on
+     * every lower-timeframe bar in order, in one sub-context per call site, so
+     * a `ta.*` call inside it warms up on the lower timeframe's own history.
      *
      * ── With no intrabar data, the answer is EMPTY, not approximate ─────────────
      *
@@ -126,29 +173,156 @@ export const request = {
      *
      * `security` answers `na` in the same situation for the same reason, and asks
      * the session layer for the data the same way.
+     *
+     * ── The three arguments ─────────────────────────────────────────────────────
+     *
+     * ignore_invalid_timeframe: "Determines the behavior of the function when
+     *   the chart's timeframe is smaller than the timeframe used in the function
+     *   call. If false, the script will halt and throw a runtime error. If true,
+     *   the function will return na and execution will continue."
+     *
+     * ignore_invalid_symbol: "If false, the script will halt and throw a runtime
+     *   error [when the symbol is not found]. If true, the function will return
+     *   na and execution will continue." This engine cannot tell a symbol that
+     *   does not exist from data the host has not supplied, and the second is
+     *   not an error: the request is recorded for the host and the answer is the
+     *   empty one above, whichever way the argument is set. It is accepted so it
+     *   is not reported as dropped.
+     *
+     * calc_bars_count: accepted, with no observable effect: TradingView's log
+     *   (conformance/v5/parity/harness_security_cbc) shows a call with
+     *   calc_bars_count = 200 equal to the call without it on every bar.
      */
     security_lower_tf: (
         ctx: Context,
-        symbolInput: any,
-        timeframeInput: any,
+        symbol: any,
+        timeframe: any,
         expression: () => any,
-        ..._rest: any[]
+        ignore_invalid_symbol?: any,
+        currency?: any,
+        ignore_invalid_timeframe?: any,
+        calc_bars_count?: any,
     ): any => {
+        void ignore_invalid_symbol; void currency;
         if (typeof expression !== "function") return [];
 
-        const symbol = String(val(symbolInput) ?? "");
-        const timeframe = String(val(timeframeInput) ?? "");
-
-        const data = ctx.getSecurityData(symbol, timeframe);
-        if (!data || data.length === 0) ctx.requestSecurity(symbol, timeframe);
+        const symbolName = String(val(symbol) ?? "");
+        // "" is the chart's own timeframe, as for `request.security`.
+        const requested = String(val(timeframe) ?? "");
+        const tfName = requested === "" ? String(ctx.resolution) : requested;
 
         // The expression's SHAPE decides the return's: a tuple in, a tuple of
         // arrays out. Evaluating it once on the chart bar is how the arity is
         // learned — nothing else states it, and `security` faces the same problem
         // through `tupleArityFromArgument` at compile time.
-        const shape = expression();
-        if (Array.isArray(shape)) return shape.map(() => [] as any[]);
-        return [];
+        const key = `${ctx.currentCallKey()}|ltf|${symbolName}@${tfName}`;
+        const shape = ctx.getHtfState<{ arity: number }>(`${key}|shape`, () => {
+            const probe = expression();
+            return { arity: Array.isArray(probe) ? probe.length : -1 };
+        });
+        const arity = shape.arity;
+        const empty = (): any => arity < 0 ? [] : Array.from({ length: arity }, () => [] as any[]);
+
+        const want = specSeconds(tfName), have = specSeconds(String(ctx.resolution));
+        if (Number.isFinite(want) && Number.isFinite(have) && want > have) {
+            const ignore = val(ignore_invalid_timeframe);
+            if (ignore !== true && ignore !== 1) {
+                throw new Error(
+                    `request.security_lower_tf: the requested timeframe '${tfName}' is higher than the chart's ` +
+                    `'${ctx.resolution}'. Pass ignore_invalid_timeframe = true to get na instead.`);
+            }
+            return arity < 0 ? NaN : Array.from({ length: arity }, () => NaN);
+        }
+
+        const data = ctx.getSecurityData(symbolName, tfName);
+        if (!data || data.length === 0) {
+            ctx.requestSecurity(symbolName, tfName);
+            return empty();
+        }
+
+        const fresh = (): LtfState => ({
+            sub: ctx.securitySubContext(symbolName, tfName),
+            done: ctx.securityFirstBar(symbolName, tfName, calc_bars_count, "request.security_lower_tf") - 1,
+            barTime: NaN,
+            out: empty(),
+            data,
+            len: data.length,
+        });
+        let st = ctx.getHtfState<LtfState>(key, fresh);
+        const open = ctx.time;
+        // The chart bar runs from its open to the next bar's open.
+        const close = periodEnd(open, String(ctx.resolution));
+        const end = Number.isFinite(close) ? close : open + have * 1000;
+        const live = ctx.is_realtime;
+
+        // Intrabars the host supplied after this site last ran: more of the same
+        // series is picked up where evaluation stopped, but a different series
+        // starts over in a new sub-context, so the expression's own history
+        // is not fed the same bar twice. Only the committed prefix is compared:
+        // on a live bar the intrabars of the forming chart bar are meant to move.
+        const committed = live && st.cpBar !== undefined && st.cpDone !== undefined ? st.cpDone + 1 : st.len;
+        if (!extendsSeries(st.data, committed, data)) {
+            const again = fresh();
+            Object.assign(st, again, { cp: undefined, cpDone: undefined, cpBar: undefined, sig: undefined });
+        }
+
+        const evalInto = (out: any, from: number) => {
+            while (st.done + 1 < data.length && data[st.done + 1].time < end) {
+                const j = ++st.done;
+                // Every bar is evaluated, in order, so the expression's own history
+                // is complete; only those inside this chart bar are returned.
+                const v = ctx.evalSecurityBar(st.sub, data[j], expression);
+                if (data[j].time < from) continue;
+                if (arity < 0) out.push(v);
+                else for (let k = 0; k < arity; k++) out[k].push(Array.isArray(v) ? v[k] : NaN);
+            }
+        };
+
+        if (live) {
+            // The last intrabar this chart bar holds, as the host has it now. If
+            // nothing about it changed since the last tick, the answer stands.
+            let lastIdx = -1;
+            for (let j = Math.max(0, data.length - 1); j >= 0; j--) if (data[j].time < end) { lastIdx = j; break; }
+            const lb = lastIdx >= 0 ? data[lastIdx] : undefined;
+            const sig = lb ? `${lastIdx}|${lb.time}|${lb.open}|${lb.high}|${lb.low}|${lb.close}|${lb.volume}` : "-";
+            if (st.cpBar === open && st.sig === sig) return copyOut(st.out, arity);
+
+            if (st.cpBar !== open) {
+                // A new chart bar: what came before it is final. Take the rollback
+                // point before this bar's first intrabar.
+                while (st.done + 1 < data.length && data[st.done + 1].time < open) {
+                    ctx.evalSecurityBar(st.sub, data[++st.done], expression);
+                }
+                st.cp = st.sub.checkpoint();
+                st.cpDone = st.done;
+                st.cpBar = open;
+            } else {
+                st.sub.rollbackTo(st.cp);
+                st.done = st.cpDone!;
+            }
+            const out = empty();
+            evalInto(out, open);
+            st.sig = sig;
+            st.barTime = open;
+            st.data = data;
+            st.len = data.length;
+            st.out = out;
+            return copyOut(out, arity);
+        }
+
+        // The same chart bar again has the same intrabars, unless more of them
+        // have arrived. Always a copy: the script owns what it is returned and may
+        // change it.
+        if (st.barTime === open && st.len === data.length) return copyOut(st.out, arity);
+
+        // Intrabars found already for this chart bar stay; new ones are added.
+        const out = st.barTime === open ? st.out : empty();
+        evalInto(out, open);
+        st.barTime = open;
+        st.data = data;
+        st.len = data.length;
+        st.out = out;
+        return copyOut(out, arity);
     },
 
     /**
@@ -227,6 +401,16 @@ export const request = {
 export const dividends = {
     gross: "dividends_gross",
     net: "dividends_net",
+    /**
+     * The NEXT dividend: "na if the data is not available". This engine has
+     * no corporate calendar, so it always is.
+     * @getter
+     */
+    future_amount: (_ctx: Context): number => NaN,
+    /** @getter */
+    future_ex_date: (_ctx: Context): number => NaN,
+    /** @getter */
+    future_pay_date: (_ctx: Context): number => NaN,
 };
 
 /** Which half of the split ratio `request.splits` returns. */
@@ -240,6 +424,31 @@ export const earnings = {
     actual: "earnings_actual",
     estimate: "earnings_estimate",
     standardized: "earnings_standardized",
+    /** The NEXT report, `na` without a corporate calendar. @getter */
+    future_time: (_ctx: Context): number => NaN,
+    /** @getter */
+    future_eps: (_ctx: Context): number => NaN,
+    /** @getter */
+    future_revenue: (_ctx: Context): number => NaN,
+    /** @getter */
+    future_period_end_time: (_ctx: Context): number => NaN,
+};
+
+/**
+ * Whether a futures ticker id's history is back-adjusted, and whether its
+ * daily close is the settlement price — `ticker.new` / `ticker.modify`
+ * arguments (v5, 2024). Carried like `adjustment`: one price series runs here.
+ */
+export const backadjustment = {
+    inherit: "backadjustment_inherit",
+    on: "backadjustment_on",
+    off: "backadjustment_off",
+};
+
+export const settlement_as_close = {
+    inherit: "settlement_as_close_inherit",
+    on: "settlement_as_close_on",
+    off: "settlement_as_close_off",
 };
 
 /**
