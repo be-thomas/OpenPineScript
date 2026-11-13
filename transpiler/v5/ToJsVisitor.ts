@@ -640,6 +640,26 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       throw this.err(ctx, `No value assigned to the ${q("transp")} parameter in color.new()`);
     }
 
+    // TradingView compiler, 2026-11-13 (v5 and v6): the `stdev_mult` overload of
+    // ta.vwap(source, anchor, stdev_mult) has no default for `anchor`.
+    if (name === "ta.vwap" && kwValue("stdev_mult")
+        && pos.length < 2 && !kwValue("anchor")) {
+      throw this.err(ctx, `No value assigned to the ${q("anchor")} parameter in ta.vwap()`);
+    }
+
+    // TradingView compiler, 2026-11-13 (v5 and v6): hline()'s `display` takes only
+    // display.all / display.none.
+    if (name === "hline") {
+      const display = pos[6] ?? kwValue("display");
+      if (display && [...display.getText().matchAll(/\bdisplay\.(\w+)/g)].some(m => m[1] !== "all" && m[1] !== "none")) {
+        const qq = this.version === 5 ? "'" : '"';
+        throw this.err(
+          ctx,
+          `Invalid argument ${qq}display${qq} in ${qq}hline${qq} call. Possible values: [display.none, display.all]`,
+        );
+      }
+    }
+
     if (name === "input.string") {
       const defval = pos[0] ?? kwValue("defval");
       if (defval && isColorExpression(defval)) {

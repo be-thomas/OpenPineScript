@@ -33,6 +33,15 @@ export function nz(x: any, y?: any): any {
 }
 
 
+/**
+ * $pick: the v1-v3 ternary. The transpiler emits `opsv2_$pick(ctx.truthy(c), T, F)`, so JS
+ * evaluates the condition and then BOTH branches, in order (see `ternaryRunsBothBranches`),
+ * and this keeps the one the condition picks. Internal: no allocation per evaluation.
+ */
+export function $pick(cond: boolean, t: any, f: any): any {
+    return cond ? t : f;
+}
+
 // iff(cond, trueVal, falseVal): Functional ternary operator
 export function iff(cond: any, t: any, f: any): any {
     return val(cond) ? val(t) : val(f);
@@ -130,14 +139,25 @@ export function safe_eq(a: any, b: any): boolean {
     return x == y;
 }
 
+/**
+ * `a != b` is false when either side is `na`, at every version v1-v6. TradingView,
+ * `x = bar_index % 2 == 0 ? na : close` (`n` at v1-v3): on all 150 na bars of each
+ * of v1-v6, `x != 0`, `x == 0`, `x > 0`, `x < 0`, `x != x` and `x != 1` gave 0
+ * (dev-docs/tv-parity/_probes/run-20261113-na-hma, run-20261113-na-v1v3). Where a
+ * bool can be na (v1-v5) a ternary reads na as false, so those runs cannot tell
+ * "false" from "na bool"; either way `true` was wrong. In a script, a guard like
+ * `x != 0 ? a / x : 0.0` with `x` na therefore takes the `0.0` branch.
+ */
 export function safe_ne(a: any, b: any): boolean {
     if (typeof a === "number" && typeof b === "number") {
         const d = a - b;
+        if (d !== d) return false;
         return !(d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE);
     }
     const x = val(a), y = val(b);
     if (typeof x === "number" && typeof y === "number") {
         const d = x - y;
+        if (d !== d) return false;
         return !(d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE);
     }
     return x != y;

@@ -58,20 +58,19 @@ const group = (namespace: string, names: readonly string[]): RenameSpec[] =>
  *
  * The migration guide lists ~65 members; only the ones this engine actually
  * implements are named, because a rename pointing at a missing source is an
- * error (see V5_REGISTRY in ./index.ts) rather than a placeholder. The absent
- * ones are the volume family — accdist, iii, nvi, obv, pvi, pvt, wad, wvad —
- * whose published definitions disagree on the seed value; see the note in
- * ./renames.ts.
+ * error (see V5_REGISTRY in ./index.ts) rather than a placeholder. The volume
+ * family — accdist, iii, nvi, obv, pvi, pvt, wad, wvad — is here from v4's
+ * flat names, as probed on TradingView at v4, v5 and v6.
  */
 const TA = group("ta", [
-    "alma", "atr", "barssince", "bb", "bbw", "cci", "change", "cmo", "cog",
+    "accdist", "alma", "atr", "barssince", "bb", "bbw", "cci", "change", "cmo", "cog",
     "correlation", "cross", "crossover", "crossunder", "cum", "dev", "dmi",
-    "ema", "falling", "highest", "highestbars", "hma", "kc", "kcw",
-    "linreg", "lowest", "lowestbars", "macd", "median", "mfi", "mode", "mom",
+    "ema", "falling", "highest", "highestbars", "hma", "iii", "kc", "kcw",
+    "linreg", "lowest", "lowestbars", "macd", "median", "mfi", "mode", "mom", "nvi", "obv",
     "percentile_linear_interpolation", "percentile_nearest_rank", "percentrank",
-    "pivothigh", "pivotlow", "range", "rising", "rma", "roc", "rsi", "sar",
+    "pivothigh", "pivotlow", "pvi", "pvt", "range", "rising", "rma", "roc", "rsi", "sar",
     "sma", "stdev", "stoch", "supertrend", "swma", "tr", "trix", "tsi",
-    "valuewhen", "variance", "vwap", "vwma", "wma", "wpr",
+    "valuewhen", "variance", "vwap", "vwma", "wad", "wma", "wpr", "wvad",
 ]);
 
 /**

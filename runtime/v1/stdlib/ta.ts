@@ -1,5 +1,6 @@
 import { Context } from "../context";
 import { opensDay } from "../sessions";
+import { PREFIX } from "../../../utils/v2/common";
 
 /**
  * ta.ts - Production Grade (Fully Dynamic & Safe)
@@ -620,7 +621,7 @@ function windowIsWarm(state: DequeState, lengthInput: any): boolean {
  * @returns series float
  */
 export function highest(ctx: Context, source: any, length?: any): number {
-    if (length === undefined) { length = source; source = ctx.vars.get("opsv2_high"); }
+    if (length === undefined) { length = source; source = ctx.vars.get(PREFIX + "high"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false); 
     return windowIsWarm(state, length) ? state.dequeVals[0] : NaN;
@@ -635,7 +636,7 @@ export function highest(ctx: Context, source: any, length?: any): number {
  * @returns series float
  */
 export function lowest(ctx: Context, source: any, length?: any): number {
-    if (length === undefined) { length = source; source = ctx.vars.get("opsv2_low"); }
+    if (length === undefined) { length = source; source = ctx.vars.get(PREFIX + "low"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true); 
     return windowIsWarm(state, length) ? state.dequeVals[0] : NaN;
@@ -647,7 +648,7 @@ export function lowest(ctx: Context, source: any, length?: any): number {
  */
 export function highestbars(ctx: Context, source: any, length?: any): number {
     // One-argument form defaults the source to `high`, as highest()/lowest() do.
-    if (length === undefined) { length = source; source = ctx.vars.get("opsv2_high"); }
+    if (length === undefined) { length = source; source = ctx.vars.get(PREFIX + "high"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false);
     return windowIsWarm(state, length) ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
@@ -659,7 +660,7 @@ export function highestbars(ctx: Context, source: any, length?: any): number {
  */
 export function lowestbars(ctx: Context, source: any, length?: any): number {
     // One-argument form defaults the source to `low`, as highest()/lowest() do.
-    if (length === undefined) { length = source; source = ctx.vars.get("opsv2_low"); }
+    if (length === undefined) { length = source; source = ctx.vars.get(PREFIX + "low"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true);
     return windowIsWarm(state, length) ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
@@ -725,6 +726,29 @@ export function barssince(ctx: Context, conditionInput: any): number {
 }
 
 /**
+ * True range from the previous CHART bar's close, whether or not the call ran on that
+ * bar. TradingView, `ta.atr(3)` and `ta.tr(true)` called every 3rd bar inside an `if`
+ * (dev-docs/tv-parity/_probes/atr-branch/run-20261113, v4, v5 and v6): the range
+ * matched exactly (max error 0) and the rma advanced only on the bars the call ran
+ * on; measuring from the last bar the call ran on was off by ~1000 on `tr` and ~351
+ * on `atr`. The first bar has no previous close, so its range is high - low
+ * (`ta.tr(true)`). A strategy that sizes its orders off such an `ta.atr` depends on
+ * it. v1-v3 keep the last-called-bar close: their ternaries run both
+ * branches every bar (see `ternaryRunsBothBranches`), so a call there never skips a bar.
+ */
+function rangeFromPreviousBar(ctx: Context): number {
+    if (ctx.currentBarIndex < 1) return ctx.high - ctx.low;
+    const prevClose = val(ctx.vars.get(PREFIX + "close").get(1));
+    // An na previous close leaves no gap to measure: the range is the bar's own.
+    if (isNaN(prevClose)) return ctx.high - ctx.low;
+    return Math.max(
+        ctx.high - ctx.low,
+        Math.abs(ctx.high - prevClose),
+        Math.abs(ctx.low - prevClose)
+    );
+}
+
+/**
  * atr: Average True Range (requires contextual high/low/close data)
  * @returns series float
  */
@@ -736,13 +760,18 @@ export function atr(ctx: Context, lengthInput: any): number {
     const currentLow = ctx.low;
     const currentClose = ctx.close;
 
-    const prevC = isNaN(state.prevClose) ? currentClose : state.prevClose;
-    const trueRange = Math.max(
-        currentHigh - currentLow,
-        Math.abs(currentHigh - prevC),
-        Math.abs(currentLow - prevC)
-    );
-    
+    let trueRange: number;
+    if (ctx.profile.version >= 4) {
+        trueRange = rangeFromPreviousBar(ctx);
+    } else {
+        const prevC = isNaN(state.prevClose) ? currentClose : state.prevClose;
+        trueRange = Math.max(
+            currentHigh - currentLow,
+            Math.abs(currentHigh - prevC),
+            Math.abs(currentLow - prevC)
+        );
+    }
+
     state.prevClose = currentClose;
     
     // MANUAL STACK PUSH: Ensures isolation without triggering registry-based injection
@@ -1433,11 +1462,176 @@ export function tr(ctx: Context): number {
     const state = ctx.getPersistentState<{ prevClose: number }>(() => ({ prevClose: NaN }));
     const prevC = isNaN(state.prevClose) ? ctx.close : state.prevClose;
     state.prevClose = ctx.close;
+    if (ctx.profile.version >= 4) return rangeFromPreviousBar(ctx);
     return Math.max(
         ctx.high - ctx.low,
         Math.abs(ctx.high - prevC),
         Math.abs(ctx.low - prevC)
     );
+}
+
+// --- The volume family: accdist, iii, nvi, obv, pvi, pvt, wad, wvad ---
+//
+// Variables, not functions, and TradingView evaluates them on every bar
+// whether or not the script reads them. A getter here runs only when read, so
+// the cumulative ones are rebuilt from the chart's own open/high/low/close/
+// volume history rather than from a per-call-site state: a read inside an `if`
+// still sees every bar. `state` is the value after the LAST COMPLETED bar and
+// is caught up lazily, so a re-tick of the forming bar does not double count.
+//
+// Seeds and na handling are TradingView's, from Pine Logs and plots on
+// BINANCE:BTCUSDT 1D (dev-docs/tv-parity/_probes/volume-builtins, v4/v5/v6):
+//   - obv and pvt are na on bar 0 (change(close) is na) and start from 0 on
+//     bar 1; accdist is defined on bar 0; wad is 0 on bar 0.
+//   - nvi and pvi start at 1 and do not move on bar 0.
+// A cumulative sum skips an na term and stays na until its first non-na term.
+
+interface VolumeFamily {
+    /** Last bar folded into the running totals; -1 before any. */
+    upTo: number;
+    accdist: number; obv: number; pvt: number; wad: number; nvi: number; pvi: number;
+    /** The forming bar's folded result, reused by the other getters on the same tick. */
+    forming?: { now: number; bar: FamilyBar; result: { state: VolumeFamily; bar: FamilyBar } };
+}
+
+interface FamilyBar {
+    open: number; high: number; low: number; close: number; volume: number;
+    prevClose: number; prevVolume: number;
+}
+
+const VOLUME_FAMILY = new WeakMap<Context, VolumeFamily>();
+
+/** `ta.cum`'s step: na terms are skipped, and the total is na until the first real one. */
+function cumStep(total: number, term: number): number {
+    if (isNaN(term)) return total;
+    return (isNaN(total) ? 0 : total) + term;
+}
+
+function familyStep(s: VolumeFamily, b: FamilyBar, first: boolean): void {
+    const { high, low, close, volume } = b;
+    // A bar that closes on both its high and its low, or has no range, adds 0.
+    s.accdist = cumStep(s.accdist,
+        (close === high && close === low) || high === low
+            ? 0 : ((2 * close - low - high) / (high - low)) * volume);
+    const change = close - b.prevClose;
+    s.obv = cumStep(s.obv, Math.sign(change) * volume);
+    s.pvt = cumStep(s.pvt, change / b.prevClose * volume);
+    const trueHigh = Math.max(high, b.prevClose);
+    const trueLow = Math.min(low, b.prevClose);
+    const gain = change > 0 ? close - trueLow : change < 0 ? close - trueHigh : 0;
+    s.wad = (isNaN(s.wad) ? 0 : s.wad) + (isNaN(gain) ? 0 : gain);
+    // TradingView: `na(close) or na(close[1]) or close[1] == 0 ? prev : volume < nz(volume[1]) ? ...`.
+    // An na volume compares false, so it never moves the index; an unusable close keeps the previous value.
+    if (!first && !isNaN(close) && !isNaN(b.prevClose) && b.prevClose !== 0) {
+        const pv = isNaN(b.prevVolume) ? 0 : b.prevVolume;
+        const r = change / b.prevClose;
+        if (volume < pv) s.nvi = s.nvi + r * s.nvi;
+        if (volume > pv) s.pvi = s.pvi + r * s.pvi;
+    }
+}
+
+function volumeFamily(ctx: Context): { state: VolumeFamily; bar: FamilyBar } {
+    const now = ctx.currentBarIndex;
+    let state = VOLUME_FAMILY.get(ctx);
+    if (!state || state.upTo >= now) {
+        state = { upTo: -1, accdist: NaN, obv: NaN, pvt: NaN, wad: NaN, nvi: 1, pvi: 1 };
+        VOLUME_FAMILY.set(ctx, state);
+    }
+    const o = ctx.vars.get(PREFIX + "open"), h = ctx.vars.get(PREFIX + "high"), l = ctx.vars.get(PREFIX + "low"),
+        c = ctx.vars.get(PREFIX + "close"), v = ctx.vars.get(PREFIX + "volume");
+    const barAt = (at: number): FamilyBar => {
+        const back = now - at;
+        return {
+            open: val(o.get(back)), high: val(h.get(back)), low: val(l.get(back)),
+            close: val(c.get(back)), volume: val(v.get(back)),
+            prevClose: at > 0 ? val(c.get(back + 1)) : NaN,
+            prevVolume: at > 0 ? val(v.get(back + 1)) : NaN,
+        };
+    };
+    for (let at = state.upTo + 1; at < now; at++) {
+        familyStep(state, barAt(at), at === 0);
+        state.upTo = at;
+    }
+    const bar = barAt(now);
+    // The eight getters read the same forming bar, and a re-tick can change its OHLCV, so
+    // the folded copy is reused only while the bar index and all five values are unchanged
+    // (NaN compares equal to NaN here). It lives on `state`, which is rebuilt on a rerun.
+    const hit = state.forming;
+    if (hit && hit.now === now && sameBar(hit.bar, bar)) return hit.result;
+    // The forming bar is folded into a copy, never into the committed totals.
+    const current = { ...state, forming: undefined };
+    familyStep(current, bar, now === 0);
+    const result = { state: current, bar };
+    state.forming = { now, bar, result };
+    return result;
+}
+
+const sameValue = (a: number, b: number): boolean => a === b || (a !== a && b !== b);
+function sameBar(a: FamilyBar, b: FamilyBar): boolean {
+    return sameValue(a.open, b.open) && sameValue(a.high, b.high) && sameValue(a.low, b.low)
+        && sameValue(a.close, b.close) && sameValue(a.volume, b.volume);
+}
+
+/**
+ * `accdist` / `ta.accdist` — Accumulation/Distribution.
+ * @getter
+ * @returns {series float} cum(close == high and close == low or high == low ? 0 : ((2 * close - low - high) / (high - low)) * volume)
+ */
+export function accdist(ctx: Context): number { return volumeFamily(ctx).state.accdist; }
+
+/**
+ * `iii` / `ta.iii` — Intraday Intensity Index. Not cumulative, and na on a bar with no range.
+ * @getter
+ * @returns {series float} (2 * close - high - low) / (high - low) * volume
+ */
+export function iii(ctx: Context): number {
+    const { bar } = volumeFamily(ctx);
+    return (2 * bar.close - bar.high - bar.low) / (bar.high - bar.low) * bar.volume;
+}
+
+/**
+ * `nvi` / `ta.nvi` — Negative Volume Index. Starts at 1.
+ * @getter
+ * @returns {series float} The index, moved by the close's percentage change on bars whose volume fell.
+ */
+export function nvi(ctx: Context): number { return volumeFamily(ctx).state.nvi; }
+
+/**
+ * `obv` / `ta.obv` — On Balance Volume.
+ * @getter
+ * @returns {series float} cum(sign(change(close)) * volume)
+ */
+export function obv(ctx: Context): number { return volumeFamily(ctx).state.obv; }
+
+/**
+ * `pvi` / `ta.pvi` — Positive Volume Index. Starts at 1.
+ * @getter
+ * @returns {series float} The index, moved by the close's percentage change on bars whose volume rose.
+ */
+export function pvi(ctx: Context): number { return volumeFamily(ctx).state.pvi; }
+
+/**
+ * `pvt` / `ta.pvt` — Price-Volume Trend.
+ * @getter
+ * @returns {series float} cum(change(close) / close[1] * volume)
+ */
+export function pvt(ctx: Context): number { return volumeFamily(ctx).state.pvt; }
+
+/**
+ * `wad` / `ta.wad` — Williams Accumulation/Distribution.
+ * @getter
+ * @returns {series float} cum of close - min(low, close[1]) on up bars, close - max(high, close[1]) on down bars
+ */
+export function wad(ctx: Context): number { return volumeFamily(ctx).state.wad; }
+
+/**
+ * `wvad` / `ta.wvad` — Williams Variable Accumulation/Distribution. Not cumulative.
+ * @getter
+ * @returns {series float} (close - open) / (high - low) * volume
+ */
+export function wvad(ctx: Context): number {
+    const { bar } = volumeFamily(ctx);
+    return (bar.close - bar.open) / (bar.high - bar.low) * bar.volume;
 }
 
 /**
@@ -1643,7 +1837,10 @@ export function kcw(
 /**
  * hma: Hull Moving Average.
  *
- *   wma(2 * wma(src, len/2) - wma(src, len), round(sqrt(len)))
+ *   wma(2 * wma(src, len/2) - wma(src, len), floor(sqrt(len)))
+ *
+ * The published definition says round(sqrt(len)); TradingView's own hma floors it
+ * (v4, v5 and v6, lengths 8 and 21: floor exact, round off by 1e-2).
  *
  * The doubled short WMA minus the long one is what removes the lag; the final
  * smoothing over sqrt(len) is what removes the noise that leaves behind.
@@ -1657,7 +1854,7 @@ export function hma(ctx: Context, sourceInput: any, lengthInput: any): number {
     const half = sub(ctx, "hma_half", () => wma(ctx, source, Math.floor(length / 2)));
     const full = sub(ctx, "hma_full", () => wma(ctx, source, length));
     return sub(ctx, "hma_smooth", () =>
-        wma(ctx, 2 * half - full, Math.round(Math.sqrt(length))));
+        wma(ctx, 2 * half - full, Math.floor(Math.sqrt(length))));
 }
 
 /**

@@ -1349,6 +1349,14 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
 
   // --- Math ---
 // --- Math ---
+  /**
+   * v1-v3: a stateful call in either branch of `c ? a : b` runs on every bar.
+   * TradingView, `a = n % 3 == 0 ? atr(3) : na` on v1, v2 and v3: `a` equalled the
+   * every-bar `atr(3)` exactly on the called bars (dev-docs/tv-parity/_probes/atr-branch/
+   * run-20261113-v1v3). v4 overrides this: v4-v6 ternaries are not probed and stay lazy.
+   */
+  protected ternaryRunsBothBranches(): boolean { return true; }
+
   visitTernary_expr(ctx: Ternary_exprContext): string {
     const cond = this.visit(ctx.or_expr());
 
@@ -1358,6 +1366,10 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
       const falseBranch = this.visit(ctx.ternary_expr(1));
       // ctx.truthy, not the raw value: a condition held in a variable is a
       // Series object, and every object is truthy in JS. See Context.truthy.
+      if (this.ternaryRunsBothBranches()) {
+        // Both branches are evaluated, the condition first, then the one it picks is kept.
+        return `${this.PREFIX}$pick(ctx.truthy(${cond}), ${trueBranch}, ${falseBranch})`;
+      }
       return `(ctx.truthy(${cond}) ? ${trueBranch} : ${falseBranch})`;
     }
     
@@ -2185,9 +2197,18 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
         //
         // `ctx.builtin` reaches the registry directly, so nothing in the
         // script's scope can stand in front of it.
+        // A getter-backed member (`timeframe.period`) is READ through the same
+        // `ctx.call` the unshadowed form gets; the bare `ctx.builtin` would hand
+        // back the getter function itself, which then reached request.security
+        // as its own source text.
         const root = text.slice(0, text.indexOf("."));
         if (this.scopes.bound.has(root) || this.scopes.declared.has(root)) {
-            return `ctx.builtin(${JSON.stringify(text)})`;
+            const read = `ctx.builtin(${JSON.stringify(text)})`;
+            const member = this.registry[text];
+            if (member && member.is_getter && !this.isKeywordArgumentName(ctx)) {
+                return `ctx.call("${text}${this.getLocId(ctx)}", ${read})`;
+            }
+            return read;
         }
         transpiledName = text.split('.').map(p => `${this.PREFIX}${p}`).join('.');
     } else {

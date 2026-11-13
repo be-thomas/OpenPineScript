@@ -98,6 +98,10 @@
     document.querySelector(".choice.human").focus();
   });
 
+  // Back/Forward can restore this page from the browser's cache exactly as it was left:
+  // mid fade-out, with .gate-main at opacity 0, so the page looked empty. Undo it on every show.
+  window.addEventListener("pageshow", () => document.body.classList.remove("leaving"));
+
   function go(choice) {
     remember(choice);
     document.body.classList.add("leaving");

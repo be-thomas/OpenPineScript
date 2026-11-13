@@ -90,20 +90,25 @@ describe("undeclared identifiers are rejected at compile time", () => {
   });
 });
 
-describe("built-ins that are Pine but deliberately unimplemented", () => {
-  it("compiles rather than rejecting — the read may never happen", () => {
+describe("built-ins TradingView has at one version and not another", () => {
+  it("compiles `accdist` at v3, where TradingView has it", () => {
     // conformance/v3/corpus/cci_commodity_channel_index.pine mentions `accdist`
-    // in one branch of an input-selected chain; every other branch still works.
+    // in one branch of an input-selected chain.
     expect(() => compileScript(v(3,
       'study("t")\nsrc = close\nif close > open\n    src := accdist\nplot(src)\n',
     ))).not.toThrow();
   });
 
-  it("throws a NAMED error when the read actually happens", () => {
+  it("runs `accdist` at v3", () => {
     const { js, profile } = compileScript(v(3, 'study("t")\nplot(accdist)\n'));
     const ctx = new Context(profile);
     const exec = compile(js, ctx, { ctx });
     ctx.setBar(0, 10, 12, 8, 11, 100);
-    expect(() => exec()).toThrow(/'accdist' is a Pine built-in that this engine does not implement/);
+    expect(() => exec()).not.toThrow();
+  });
+
+  it("rejects `obv` at v3 at compile time, where TradingView has no such name", () => {
+    expect(() => compileScript(v(3, 'study("t")\nplot(obv)\n')))
+      .toThrow(/'obv' is not available in Pine Script v3/);
   });
 });

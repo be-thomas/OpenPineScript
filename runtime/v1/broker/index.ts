@@ -88,6 +88,9 @@ export class V4Broker extends V3Broker {
     protected override sizesWithCommissionRoom(): boolean { return true; }
 }
 export class V5Broker extends V4Broker {
+    /** A stop or limit already passed by the close fills at that close under `process_orders_on_close` (v5 and v6, _probes/pooc-stop-breach). */
+    protected override fillsBreachedExitAtClose(): boolean { return true; }
+
     // v5 inherits v4's sizing rules (_probes/v5-sizing).
     /**
      * `strategy.risk.max_drawdown` on TradingView (v5, BINANCE:BTCUSDT 1h; dev-docs/tv-parity/

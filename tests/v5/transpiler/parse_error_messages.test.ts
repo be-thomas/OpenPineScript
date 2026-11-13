@@ -61,7 +61,7 @@ describe("no //@version line", () => {
     expect(e.message.endsWith(hint)).toBe(true);
   });
   it("adds the hint to an error the dry run finds in the script: a built-in v1 lacks", () => {
-    const e = first("study(\"t\")\nplot(accdist)\n");
+    const e = first("study(\"t\")\nplot(obv)\n");
     expect(e.phase).toBe("transpile");
     expect(e.message.endsWith(hint)).toBe(true);
   });

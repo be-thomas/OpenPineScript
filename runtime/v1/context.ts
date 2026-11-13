@@ -3214,6 +3214,9 @@ export class Context {
         // market order already fills on the placing bar. Below v6 a close
         // placed with `immediately` fills here too.
         if (this.marketOrders.length > 0) brokerFor(this).fillAtClose();
+        // After them: TradingView filled a scale-out market order at the close first and
+        // then the stop that took the rest (see `Broker.fillBreachedExitsAtClose`).
+        brokerFor(this).fillBreachedExitsAtClose();
         this.sampleEquity();
         this.currentBarIndex++;
     }

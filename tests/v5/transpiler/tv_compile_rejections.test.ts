@@ -76,3 +76,43 @@ describe("an indicator with no output", () => {
   it("strategy() is exempt", () => accepts(`${V5}strategy("x")\nx = close\n`));
   it("library() is exempt", () => accepts(`${V5}library("x")\nexport f(float a) => a\n`));
 });
+
+// TradingView compiler, 2026-11-13: v5 and v6 both refuse these, each in its own quoting.
+describe("ta.vwap with stdev_mult but no anchor", () => {
+  const MSG6 = 'No value assigned to the "anchor" parameter in ta.vwap()';
+  const MSG5 = "No value assigned to the `anchor` parameter in ta.vwap()";
+  const head = `${V6}indicator("x")\n`;
+  it("v6 keyword stdev_mult, no anchor", () =>
+    rejects(`${head}[v, u, l] = ta.vwap(hlc3, stdev_mult=3.0)\nplot(v)\n`, MSG6));
+  it("v5 keyword stdev_mult, no anchor", () =>
+    rejects(`${V5}indicator("x")\n[v, u, l] = ta.vwap(hlc3, stdev_mult=3.0)\nplot(v)\n`, MSG5));
+  it("is refused outside a destructuring too", () =>
+    rejects(`${head}x = ta.vwap(hlc3, stdev_mult = 2)\nplot(close)\n`, MSG6));
+  it("ta.vwap(source) compiles", () => accepts(`${head}plot(ta.vwap(hlc3))\n`));
+  it("ta.vwap(source, anchor) compiles", () =>
+    accepts(`${head}plot(ta.vwap(hlc3, timeframe.change("D")))\n`));
+  it("the 3-argument tuple with anchor compiles", () =>
+    accepts(`${head}[v, u, l] = ta.vwap(hlc3, timeframe.change("D"), 3.0)\nplot(v)\nplot(u)\nplot(l)\n`));
+  it("v5 3-argument tuple with anchor compiles", () =>
+    accepts(`${V5}indicator("x")\n[v, u, l] = ta.vwap(hlc3, timeframe.change("D"), 3.0)\nplot(v)\n`));
+  it("keyword anchor with stdev_mult compiles", () =>
+    accepts(`${head}[v, u, l] = ta.vwap(hlc3, anchor = timeframe.change("D"), stdev_mult = 3.0)\nplot(v)\n`));
+});
+
+describe("hline display", () => {
+  const MSG6 = 'Invalid argument "display" in "hline" call. Possible values: [display.none, display.all]';
+  const MSG5 = "Invalid argument 'display' in 'hline' call. Possible values: [display.none, display.all]";
+  const head = `${V6}indicator("x")\n`;
+  it("v6 display.data_window is refused", () =>
+    rejects(`${head}hline(1.0, "Neutral Line", color = color.gray, display = display.data_window)\n`, MSG6));
+  it("v5 display.data_window is refused", () =>
+    rejects(`${V5}indicator("x")\nhline(1.0, "n", display = display.data_window)\n`, MSG5));
+  it("display.status_line is refused", () =>
+    rejects(`${head}hline(1.0, "n", display = display.status_line)\n`, MSG6));
+  it("display.all compiles", () => accepts(`${head}hline(1.0, "n", display = display.all)\n`));
+  it("display.none compiles", () => accepts(`${head}hline(1.0, "n", display = display.none)\n`));
+  it("v5 display.all and none compile", () =>
+    accepts(`${V5}indicator("x")\nhline(1.0, "n", display = display.all)\nhline(2.0, "m", display = display.none)\n`));
+  it("no display argument compiles", () =>
+    accepts(`${head}hline(1.0, "Neutral Line", color = color.gray)\n`));
+});

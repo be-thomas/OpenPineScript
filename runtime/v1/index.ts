@@ -4,7 +4,7 @@
  * - Injects Standard Library (UI, TA, Math)
  * - Bridges Context Data to Sandbox
  */
-import { createStdlib } from "./stdlib";
+import { createStdlib, viewFor } from "./stdlib";
 import { Context } from "./context";
 import { PREFIX } from "../../utils/v2/common";
 import { UNIMPLEMENTED_BUILTINS } from "./stdlib/renames";
@@ -103,9 +103,9 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         sandbox[`${PREFIX}bar_index`] = barCounter;
 
         // POISON PILLS, part 1: Pine names this engine knowingly does not
-        // implement. The volume family — accdist, obv, pvt and the rest — has
-        // published variants that disagree on the seed value, so no
-        // implementation is offered rather than a plausible wrong one.
+        // implement. The volume family — accdist, obv, pvt and the rest — is
+        // implemented at v4–v6, where TradingView was probed; v1–v3 were not,
+        // so there the flat names are refused rather than guessed.
         //
         // They are BOUND rather than left absent so that the emitter can tell
         // "real Pine, not implemented here" from "not a Pine name at all" and
@@ -125,7 +125,10 @@ function initializeSandbox(sandbox: any, ctx: Context) {
         // — TradingView's own Chaikin oscillator example — was NaN, with no
         // diagnostic, while the v4 script one page over correctly refused. The
         // whole point of the register is that the two cases differ.
+        const view = viewFor(ctx.profile.version);
         for (const name of UNIMPLEMENTED_BUILTINS) {
+            // A version that implements the name keeps its binding.
+            if (view[name]) continue;
             const dot = name.indexOf(".");
             const target = dot < 0 ? sandbox : sandbox[`${PREFIX}${name.slice(0, dot)}`];
             const key = `${PREFIX}${dot < 0 ? name : name.slice(dot + 1)}`;
@@ -134,9 +137,8 @@ function initializeSandbox(sandbox: any, ctx: Context) {
                 get() {
                     throw compileTimeError(
                         `'${name}' is a Pine built-in that this engine does not ` +
-                        `implement. Its published definitions disagree on the seed ` +
-                        `value, and a wrong seed produces a series that is the right ` +
-                        `shape and the wrong number forever. See ` +
+                        `implement at Pine Script v${ctx.profile.version}; it is not ` +
+                        `yet verified against TradingView there. See ` +
                         `runtime/v1/stdlib/renames.ts.`,
                     );
                 },

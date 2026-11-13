@@ -82,11 +82,10 @@ describe("what the check must NOT refuse", () => {
     expect(compile(3, "plot(close, style = line)")).not.toThrow();
   });
 
-  it("a name deliberately left unimplemented, which reports its own reason", () => {
-    // `ta.accdist` is real Pine that this engine refuses to approximate. Saying
-    // it does not exist would be a lie, and would fire on a script that never
-    // reaches it.
-    expect(compile(5, "x = ta.accdist")).not.toThrow();
+  it("a flat built-in that exists at v3 and is also a ta member from v5", () => {
+    // TradingView has `accdist` at v1–v3 with v4's values
+    // (dev-docs/tv-parity/_probes/volume-builtins).
+    expect(compile(3, "x = accdist")).not.toThrow();
   });
 
   it("a method called on a namespace member's VALUE", () => {

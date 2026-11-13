@@ -1060,6 +1060,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: core.nz
       },
+      "$pick": {
+          uses_context: false,
+          args: ["cond","t","f"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.$pick
+      },
       "iff": {
           uses_context: false,
           args: ["cond","t","f"],
@@ -5443,6 +5451,70 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"float} The bar's true range."},
           is_value: false,
           ref: ta.tr
+      },
+      "accdist": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} cum(close == high and close == low or high == low ? 0 : ((2 * close - low - high) / (high - low)) * volume)"},
+          is_value: false,
+          ref: ta.accdist
+      },
+      "iii": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} (2 * close - high - low) / (high - low) * volume"},
+          is_value: false,
+          ref: ta.iii
+      },
+      "nvi": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} The index, moved by the close's percentage change on bars whose volume fell."},
+          is_value: false,
+          ref: ta.nvi
+      },
+      "obv": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} cum(sign(change(close)) * volume)"},
+          is_value: false,
+          ref: ta.obv
+      },
+      "pvi": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} The index, moved by the close's percentage change on bars whose volume rose."},
+          is_value: false,
+          ref: ta.pvi
+      },
+      "pvt": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} cum(change(close) / close[1] * volume)"},
+          is_value: false,
+          ref: ta.pvt
+      },
+      "wad": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} cum of close - min(low, close[1]) on up bars, close - max(high, close[1]) on down bars"},
+          is_value: false,
+          ref: ta.wad
+      },
+      "wvad": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"float} (close - open) / (high - low) * volume"},
+          is_value: false,
+          ref: ta.wvad
       },
       "sum": {
           uses_context: true,

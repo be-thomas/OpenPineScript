@@ -172,16 +172,17 @@ export const V4_ONLY_NAMESPACES: readonly string[] = [
  * golden/v4/harness_builtins.pine unrunnable while v4 had no pipeline. It has
  * one now, so the gate costs nothing.
  *
- * The volume family — obv, pvt, nvi, pvi, accdist, iii, wad, wvad — is still
- * absent from the registry, so there is nothing to gate for those. Each has
- * published variants that disagree on the SEED value, and a seed guessed wrong
- * produces a series that is the right shape and the wrong number forever;
- * an absent name is refused instead.
+ * The volume family — obv, pvt, nvi, pvi, iii, wad, wvad — is gated here too.
+ * TradingView probes (dev-docs/tv-parity/_probes/volume-builtins, run-20261113-v1v3)
+ * show these seven are `Undeclared identifier` at v1–v3 and exist from v4.
+ * `accdist` is NOT here: it exists at v1–v3 with values identical to v4's, so
+ * every version shares one implementation.
  */
 export const V4_ONLY_NAMES: readonly string[] = [
     "bb", "wpr", "mfi",
     "bbw", "kc", "kcw", "hma", "cmo", "dmi", "supertrend",
     "range", "median", "mode",
+    "iii", "nvi", "obv", "pvi", "pvt", "wad", "wvad",
 
     // The rest of the March-2020 and 2021 batches, from the v4 release notes:
     //
@@ -286,25 +287,18 @@ export const V4_REMOVED: readonly string[] = (() => {
 /**
  * Pine names this engine knows about and deliberately does NOT implement.
  *
- * The volume family has published variants that disagree on the SEED value,
- * and a seed guessed wrong produces a series that is the right shape and the
- * wrong number forever — so no implementation is offered. See the note in
- * runtime/v1/stdlib/renames.ts.
+ * Empty. It held the volume family (accdist, iii, nvi, obv, pvi, pvt, wad,
+ * wvad) while v1–v3 were unprobed. TradingView probes
+ * (dev-docs/tv-parity/_probes/volume-builtins, run-20261113-v1v3 and
+ * run-20261113-accdist-v1v3) settled it: at v1–v3 `accdist` exists with values
+ * identical to v4's, and the other seven are compile errors (TradingView says
+ * `Undeclared identifier`; the V4_ONLY_NAMES gate here says the name "is not
+ * available in Pine Script v3", which is also a compile-time refusal).
  *
- * They are listed here because "absent from the registry" and "not a Pine name
- * at all" must not produce the same diagnostic. `accdist` is real Pine, so
- * `Undeclared identifier` would be a lie; it also cannot be allowed to compile
- * into a silent `undefined`. runtime/v1/index.ts binds each one as a poison pill that
- * throws only when READ, which is what lets
- * conformance/v3/corpus/cci_commodity_channel_index.pine keep running: it
- * mentions `accdist` in a branch selected by an input, and every other branch
- * still works.
+ * The mechanism stays: runtime/v1/index.ts binds a name listed here as a poison
+ * pill that throws only when READ, and the transpiler skips its
+ * undeclared-identifier check for it. A name goes here when it is real Pine but
+ * this engine cannot yet run it, because "absent from the registry" and "not a
+ * Pine name at all" must not produce the same diagnostic.
  */
-export const UNIMPLEMENTED_BUILTINS: ReadonlySet<string> = new Set([
-  "accdist", "iii", "nvi", "obv", "pvi", "pvt", "wad", "wvad",
-  // ...and their v5 spellings. The flat name is what v1–v4 write and the
-  // dotted one is what v5 writes; both must reach the poison pill rather than
-  // one of them reading as an absent namespace member.
-  "ta.accdist", "ta.iii", "ta.nvi", "ta.obv", "ta.pvi", "ta.pvt",
-  "ta.wad", "ta.wvad",
-]);
+export const UNIMPLEMENTED_BUILTINS: ReadonlySet<string> = new Set<string>();

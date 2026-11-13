@@ -176,12 +176,12 @@ worse, reading as `undefined` and taking a branch nobody meant.
 
 | Running all 741 over the sample dataset | |
 |---|---|
-| produces output — plots, drawings, trades or logs | 658 |
+| produces output — plots, drawings, trades or logs | 660 |
 | plots only `na`, and draws nothing | 36 |
 | produces nothing at all | 8 |
-| raises a runtime error | 39 |
+| raises a runtime error | 37 |
 
-215 of the 658 have no `plot()` call at all: they draw lines, labels and boxes,
+215 of the 660 have no `plot()` call at all: they draw lines, labels and boxes,
 or open positions, or log.
 
 The other two columns are accounted for one file at a time rather than assumed.
@@ -196,14 +196,13 @@ kind, and named as such: `v5-language-type-system-47` and
 not, one for a `series string` where a `simple string` is required and one for
 the 40-call `request.*()` limit.
 
-Every one of the 39 runtime errors is pinned by CAUSE in
+Every one of the 37 runtime errors is pinned by CAUSE in
 [`conformance/common/docs_corpus_execution.test.ts`](../../conformance/common/docs_corpus_execution.test.ts),
 so a new one cannot arrive quietly. Seventeen are the script's own error — a
 `runtime.error()` call, or an index the page is written to show failing; eleven
 need host data this engine cannot fetch (`request.financial`, `request.economic`
-and the rest); eleven are deliberate refusals (`renko`, `linebreak`, `kagi`,
-`pointfigure` cannot be rebuilt from OHLCV bars, and `accdist`'s published
-definitions disagree on a seed).
+and the rest); the rest are deliberate refusals (`renko`, `linebreak`, `kagi`,
+`pointfigure` cannot be rebuilt from OHLCV bars).
 
 The same suite asserts that **no keyword argument is silently dropped** across
 all 741. `Context.call` binds a keyword by looking its name up in the callee's

@@ -1120,15 +1120,7 @@ export class Broker {
         const exits = this.getPendingExits();
         if (ctx.position.size !== 0 && exits.size > 0) {
             const isLong = ctx.position.size > 0;
-            for (const pendingExit of exits.values()) {
-                const units = (pendingExit.units ??= []);
-                for (const t of ctx.position.entries ?? []) {
-                    const armed = pendingExit.arms?.[t.id];
-                    if (armed === undefined || (pendingExit.from_entry && pendingExit.from_entry !== t.id)) continue;
-                    if (this.hasUnit(units, t.uid)) continue;
-                    units.push({ uid: t.uid!, id: t.id, basis: t.price, opened: t.opened, placedBar: armed, trail_peak: Number.NaN, filled: false });
-                }
-            }
+            this.armExitUnits(exits);
             for (const [exitId, exit] of exits) {
                 for (const unit of exit.units ?? []) {
                     if (unit.filled || !this.livesYet(unit.placedBar) || this.openQty(unit.id) <= 0) continue;
@@ -1296,17 +1288,7 @@ export class Broker {
 
         const isLong = ctx.position.size > 0;
 
-        // An entry that was pending when the exit was called gets its unit when
-        // it fills, live from the bar after that call.
-        for (const pendingExit of exits.values()) {
-            const units = (pendingExit.units ??= []);
-            for (const t of ctx.position.entries ?? []) {
-                const armed = pendingExit.arms?.[t.id];
-                if (armed === undefined || (pendingExit.from_entry && pendingExit.from_entry !== t.id)) continue;
-                if (this.hasUnit(units, t.uid)) continue;
-                units.push({ uid: t.uid!, id: t.id, basis: t.price, opened: t.opened, placedBar: armed, trail_peak: Number.NaN, filled: false });
-            }
-        }
+        this.armExitUnits(exits);
 
         // Every live unit walks the bar and says where along the broker emulator's
         // path (open, the nearer extreme, the other, close) it is reached. The fills
@@ -1348,6 +1330,82 @@ export class Broker {
             if (ctx.position.size === 0) return;
             if (unit.filled || this.openQty(unit.id) <= 0) continue;
             this.fillExitHit(rs, exits, exitId, pendingExit, unit, hit, isLong);
+        }
+    }
+
+    /**
+     * An entry that was pending when the exit was called gets its unit when
+     * it fills, live from the bar after that call.
+     */
+    protected armExitUnits(exits: Map<string, PendingExit>): void {
+        const ctx = this.ctx;
+        for (const pendingExit of exits.values()) {
+            const units = (pendingExit.units ??= []);
+            for (const t of ctx.position.entries ?? []) {
+                const armed = pendingExit.arms?.[t.id];
+                if (armed === undefined || (pendingExit.from_entry && pendingExit.from_entry !== t.id)) continue;
+                if (this.hasUnit(units, t.uid)) continue;
+                units.push({ uid: t.uid!, id: t.id, basis: t.price, opened: t.opened, placedBar: armed, trail_peak: Number.NaN, filled: false });
+            }
+        }
+    }
+
+    /**
+     * Whether, under `process_orders_on_close`, a `strategy.exit` stop or limit that
+     * the bar's close has already passed fills at that close, on the bar that placed it
+     * (v5, v6). v4 and earlier are not probed: their orders wait for the next bar and fill
+     * at its open.
+     */
+    protected fillsBreachedExitAtClose(): boolean { return false; }
+
+    /**
+     * The close-of-bar pass of `process_orders_on_close` for exits: a stop or limit whose
+     * level the close is already beyond fills at the close, as the close's market fills do.
+     * TradingView, a position entered at the close of every 20th bar and given a
+     * `strategy.exit` already beyond the close on the next bar, 380 trades per run, every exit
+     * on the bar that placed the order at that bar's close:
+     *   v6: long stop, long limit, short stop, short limit (dev-docs/tv-parity/_probes/
+     *       pooc-stop-breach/run-20261113);
+     *   v5: long stop (same run), long limit, short stop, short limit (run-20261113-review).
+     * An exit placed on the SAME bar as the entry is live at that close too: with the exit
+     * issued right after the entry, already beyond the close, TradingView closes the trade at
+     * the entry's own close, a zero-length trade, 380/380 for v5 long stop and long limit and
+     * v6 long stop, long limit and short stop (run-20261113-review). That is why this pass has
+     * no `livesYet` gate: at the close, an order placed on this bar counts.
+     * Also a v6 strategy capture with a `strategy.exit` stop re-issued every bar: a bar whose
+     * high lifted the stop well above its close closed every open entry at that close (with
+     * the script's 2 ticks of slippage), after the same close had filled a scale-out market
+     * order.
+     *
+     * An exit with a trailing stop (`trail_price` / `trail_points`) is left to the bar walk,
+     * as before this pass existed: no capture shows how TradingView treats one at the close.
+     */
+    fillBreachedExitsAtClose(): void {
+        if (!this.fillsBreachedExitAtClose() || !this.fillsOnClose()) return;
+        const ctx = this.ctx;
+        if (ctx.position.size === 0) return;
+        const exits = this.getPendingExits();
+        if (exits.size === 0) return;
+        const rs = this.syncRiskState();
+        if (rs.is_halted) return;
+        this.armExitUnits(exits);
+        const isLong = ctx.position.size > 0;
+        const tick = ctx.mintick > 0 ? ctx.mintick : 0.01;
+        const s = isLong ? 1 : -1;
+        for (const [exitId, exit] of exits) {
+            for (const unit of exit.units ?? []) {
+                if (ctx.position.size === 0) return;
+                if (unit.filled || this.openQty(unit.id) <= 0) continue;
+                // Not probed with a trail: keep the bar walk's answer (see above).
+                if (!Number.isNaN(exit.trail_price) || !Number.isNaN(exit.trail_points)) continue;
+                // The same levels `walkExit` reads, on the favourable (limit) and adverse (stop) side.
+                const stop = this.levelToTick(this.pairLevel(exit.stop, unit.basis - s * exit.loss * tick, isLong, false), !isLong);
+                const limit = this.levelToTick(this.pairLevel(exit.limit, unit.basis + s * exit.profit * tick, isLong, true), isLong);
+                const stopHit = !Number.isNaN(stop) && s * ctx.close <= s * stop;
+                const limitHit = !Number.isNaN(limit) && s * ctx.close >= s * limit;
+                if (!stopHit && !limitHit) continue;
+                this.fillExitHit(rs, exits, exitId, exit, unit, { price: ctx.close, kind: stopHit ? "stop" : "limit" }, isLong);
+            }
         }
     }
 
