@@ -8,13 +8,17 @@
 No TradingView account. No cloud. No execution quota. No 500 ms loop timeout.
 
 [![TradingView parity](https://img.shields.io/badge/TradingView_parity-112_columns_×_2%2C474_bars-7B3FE4?style=for-the-badge)](docs/common/CONFORMANCE.md)
-[![Tests](https://img.shields.io/badge/tests-2%2C396_passing-22C55E?style=for-the-badge)](docs/common/CONFORMANCE.md#testing)
+[![Tests](https://img.shields.io/badge/tests-4%2C400%2B_passing-22C55E?style=for-the-badge)](docs/common/CONFORMANCE.md#testing)
 [![Pine Script](https://img.shields.io/badge/Pine_Script-v1_→_v6-F97316?style=for-the-badge)](#-supported-pine-script-versions)
+[![Docs](https://img.shields.io/badge/docs-be--thomas.github.io%2FOpenPineScript-0EA5E9?style=for-the-badge)](https://be-thomas.github.io/OpenPineScript/)
+[![npm](https://img.shields.io/npm/v/openpinescript?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/openpinescript)
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/node-≥20-339933.svg?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Docs corpus](https://img.shields.io/badge/docs_corpus-741%2F763_compile-0EA5E9.svg?style=flat-square)](docs/common/CONFORMANCE.md#parity-763-real-scripts-from-tradingviews-docs)
+
+### [📖 Documentation and an interactive tutorial: **be-thomas.github.io/OpenPineScript**](https://be-thomas.github.io/OpenPineScript/)
 
 ### [▶ Open Beta: try it in your browser at **zealterminal.com**](https://zealterminal.com) — no install, no CSV
 
@@ -105,26 +109,6 @@ npm install openpinescript
 import { Session } from "openpinescript";
 ```
 
-To work on the engine itself, run it from a clone:
-
-```bash
-git clone https://github.com/be-thomas/OpenPineScript.git
-cd OpenPineScript
-npm install
-```
-
-Then run a bundled example:
-
-```bash
-npm run opsv2 -- examples/v1/sma_crossover.pine --data mock_data/common/AAPL_mock.csv
-```
-
-Or explore interactively:
-
-```bash
-npm run replv2
-```
-
 ![OpenPineScript REPL evaluating Pine Script expressions in a terminal session](https://raw.githubusercontent.com/be-thomas/OpenPineScript/main/images/common/repl-1.png)
 
 ---
@@ -138,7 +122,7 @@ npm run replv2
 | 🗂️ **Six language versions** | v1 → v6, each with its own grammar and emitter, so a v2 script is parsed by a parser that has never heard of `var`. |
 | 🔁 **Pine → JavaScript** | Emit readable JS and embed it anywhere — a worker, a server, a browser, a CI job. |
 | 🤖 **Built for automation** | JSON output, exit codes, input overrides, and a comparison mode that diffs your run against a TradingView export. |
-| 🧪 **3,389 tests** | Differential testing against an independent oracle, a full version matrix, 763 real scripts from TradingView's docs, and the parity suites above. |
+| 🧪 **4,400+ tests** | Differential testing against an independent oracle, a full version matrix, 763 real scripts from TradingView's docs, and the parity suites above. |
 
 ---
 
@@ -198,7 +182,7 @@ broker emulator, multi-timeframe `security()`, and the real-time tick model.
 - **Put it behind a chart** — [zealterminal.com](https://zealterminal.com) is this engine in a browser tab, in open beta, if you want to see that shape working before you build it
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results --json
+npx openpinescript strategy.pine --data data.csv --out-dir ./results
 ```
 
 > 📖 **[Full CLI reference →](CLI-Usage.md)** — output flags, comparison mode,
@@ -210,6 +194,7 @@ npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results --json
 
 | Doc | What it answers |
 |---|---|
+| **[Docs site](https://be-thomas.github.io/OpenPineScript/)** | The CLI guide, a five-lesson tutorial that runs the real engine in your browser, and a guide written for AI agents |
 | **[Conformance report](docs/common/CONFORMANCE.md)** | How the numbers are verified, what that caught, what is not covered |
 | **[CLI usage](CLI-Usage.md)** | Every flag, with worked examples |
 | **[Architecture](docs/common/ARCHITECTURE.md)** | The compile pipeline and the repository layout |
@@ -307,8 +292,9 @@ bar by bar against a runtime that provides the standard library.
 <summary><b>How do I convert Pine Script to JavaScript?</b></summary>
 <br>
 
-`npm run opsv2 -- script.pine --emit-js out.js`, or call `compileScript(src)`
-from `transpiler/common` to get the emitted source back as a string.
+`npx openpinescript script.pine --data data.csv --show-transpiled` prints the
+compiled JavaScript before running it, or call `compileScript(src)` from the
+library (`import { compileScript } from "openpinescript"`) to get it as a string.
 </details>
 
 ---

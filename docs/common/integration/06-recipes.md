@@ -91,7 +91,7 @@ the process with it.
 
 The published `dist/` is already bundled and needs no special configuration.
 
-If you build the engine **from source** (a monorepo, a vendored copy), keep class
+If you bundle the engine into your own build (a monorepo, a vendored copy), keep class
 names intact. The emitters dispatch on `node.constructor.name`, and every
 version's generated parser declares its own `Kw_argContext`, so a bundler that
 renames them silently breaks v2 to v6: keyword arguments are read as variables and

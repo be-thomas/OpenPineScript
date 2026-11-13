@@ -81,6 +81,8 @@ async function freshVfs() {
 
 const bin = fs.mkdtempSync(path.join(os.tmpdir(), "ops-bin-"));
 fs.writeFileSync(path.join(bin, "openpinescript"), `#!/bin/sh\nexec node ${JSON.stringify(CLI)} "$@"\n`, { mode: 0o755 });
+// `npx openpinescript ...` runs the same file (the real npx would fetch it from the registry).
+fs.writeFileSync(path.join(bin, "npx"), `#!/bin/sh\nif [ "$1" = "-y" ] || [ "$1" = "--yes" ]; then shift; fi\nif [ "$1" = "openpinescript" ]; then shift; exec node ${JSON.stringify(CLI)} "$@"; fi\necho "npx: unsupported in this test" >&2; exit 127\n`, { mode: 0o755 });
 
 /** A temp directory holding the emulator's files, with dist/ and friends linked in for the npm forms. */
 function makeSandbox(vfs) {
@@ -203,6 +205,11 @@ for (const L of LESSONS) {
     `openpinescript examples/sma_cross.pine --data nope.csv`,
     `openpinescript examples/nope.pine --data ${A}`,
     `openpinescript examples/rsi.pine`,
+    `openpinescript --help`,
+    `openpinescript -h`,
+    `npx openpinescript --help`,
+    `npx openpinescript examples/rsi.pine --data ${A} --out-chart results/npx.csv`,
+    `npx -y openpinescript examples/rsi.pine --data ${A} --dry-run 2>/dev/null`,
     `openpinescript --data ${A}`,
     `openpinescript examples/rsi.pine --data ${A} --out-chart`,
     `openpinescript examples/sma_cross.pine --data ${A} --compare-dir results/node --out-comparison results/cmp`,
