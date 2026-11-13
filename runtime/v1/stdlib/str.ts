@@ -3,7 +3,7 @@
  *
  * v5 moved string handling into its own namespace: `tostring(x)` became
  * `str.tostring(value, format)` and `tonumber(x)` became `str.tonumber(string)`
- * (dev-docs/01-version-delta-spec.md §4a). The rest of the namespace —
+ * (docs/common/VERSIONS.md §4a). The rest of the namespace —
  * `str.format`, `str.length`, `str.split` and friends — has no v1–v4 spelling
  * at all and exists only here.
  *

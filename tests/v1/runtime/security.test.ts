@@ -6,7 +6,7 @@
  *
  * How far it may see is the `lookahead` argument, and its DEFAULT is
  * version-dependent — the one v2→v3 change that is a behaviour flip rather than
- * a rejection rule (dev-docs/01-version-delta-spec.md §2 D3.1):
+ * a rejection rule (docs/common/VERSIONS.md §2 D3.1):
  *
  *   v1 / v2 → barmerge.lookahead_on   (sees the HTF bar it is inside; repaints)
  *   v3      → barmerge.lookahead_off  (only HTF bars that have closed)

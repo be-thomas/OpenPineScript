@@ -1113,7 +1113,7 @@ export class Context {
     //
     // Lives on the shared base for the same reason `var_def` does: the runtime
     // is one implementation across versions by design
-    // (dev-docs/00-architecture-assessment.md §5.6), and only V5ToJsVisitor can
+    // (docs/common/ARCHITECTURE.md ("Design rules")), and only V5ToJsVisitor can
     // emit a call to any of it — no earlier version has a `type` keyword or the
     // `receiver.method()` form to reach it with.
 
@@ -2583,7 +2583,7 @@ export class Context {
     //
     // Lives on the shared base rather than in runtime/v4/ because the runtime is
     // one implementation across versions by design
-    // (dev-docs/00-architecture-assessment.md §5.6). Only V4ToJsVisitor can emit
+    // (docs/common/ARCHITECTURE.md ("Design rules")). Only V4ToJsVisitor can emit
     // a call to it: v1–v3 have no `var` token, so their scripts cannot reach it.
 
     /** Declaration sites whose initialiser has already run, keyed by @L:C. */

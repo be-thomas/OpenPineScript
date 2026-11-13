@@ -2,7 +2,7 @@
 
 One grammar pair per Pine Script version, arranged as an inheritance chain:
 **v1 is the base, and each later version imports the one before it and declares
-only its own delta.** See [dev-docs/00-architecture-assessment.md](../dev-docs/00-architecture-assessment.md) §5.
+only its own delta.** See [docs/common/ARCHITECTURE.md](../../docs/common/ARCHITECTURE.md#design-rules).
 
 ## Layout
 

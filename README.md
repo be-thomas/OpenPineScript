@@ -196,8 +196,9 @@ npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results --json
 | **[CLI usage](CLI-Usage.md)** | Every flag, with worked examples |
 | **[Architecture](docs/common/ARCHITECTURE.md)** | The compile pipeline and the repository layout |
 | **[Golden-data recipe](conformance/common/golden.md)** | How to collect a new TradingView export |
-| **[Integration guide](dev-docs/integration/README.md)** | Embedding the engine in a charting UI: plotting, strategies, live ticks |
-| **[Development docs](dev-docs/README.md)** | Version delta spec, roadmap, deliberate omissions |
+| **[Integration guide](docs/common/integration/README.md)** | Embedding the engine in a charting UI: plotting, strategies, live ticks |
+| **[Pine versions](docs/common/VERSIONS.md)** | What each version, v1 to v6, changes and where the engine implements it |
+| **[Deliberate omissions](docs/common/CONFORMANCE.md#restrictions-the-engine-does-not-enforce)** | The TradingView limits and checks the engine does not apply |
 
 ---
 

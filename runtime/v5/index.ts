@@ -10,7 +10,7 @@
  *   - The genuinely new namespaces (`str.*`, `matrix.*`, `map.*`, `log.*`,
  *     `runtime.*`, the typed `input.*`) are ordinary stdlib modules. They live
  *     beside the v1 ones because the runtime is one implementation across
- *     versions by design (dev-docs/00-architecture-assessment.md §5.6); the
+ *     versions by design (docs/common/ARCHITECTURE.md ("Design rules")); the
  *     registry split is what makes them v5-only.
  *
  *   - The default session change (§4d) is DATA on the v5 LanguageProfile, read

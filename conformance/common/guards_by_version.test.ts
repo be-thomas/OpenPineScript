@@ -36,7 +36,7 @@
  * and the row would pass while asserting nothing. Those rows carry a `sources`
  * override for v5.
  *
- * Source for each rule: dev-docs/01-version-delta-spec.md §5.
+ * Source for each rule: docs/common/VERSIONS.md §5.
  */
 import { describe, it, expect } from "vitest";
 import {

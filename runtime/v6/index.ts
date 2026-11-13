@@ -14,7 +14,7 @@
  *     runtime/v1/broker/index.ts
  *
  * Both keep one implementation serving every version, which is the standing
- * design here: dev-docs/00-architecture-assessment.md §5.6, and the note at
+ * design here: docs/common/ARCHITECTURE.md ("Design rules"), and the note at
  * the top of ../v5/index.ts.
  *
  * A v6-only run-time behaviour with no earlier counterpart would be added

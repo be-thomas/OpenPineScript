@@ -22,7 +22,7 @@
  * rule that does not apply to v1 simply is not written here.
  *
  * See transpiler/v3/ToJsVisitor.ts for a worked example, and
- * dev-docs/00-architecture-assessment.md for the rationale.
+ * docs/common/ARCHITECTURE.md ("Design rules") for the rationale.
  */
 
 import { ParseTreeVisitor } from "antlr4ng";
@@ -270,7 +270,7 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
    * v1–v3 get the generated registry unchanged. v4 overrides this with its own
    * view. Nothing about v4 appears in this file, which is the point: adding a
    * version must never mean editing an earlier one
-   * (dev-docs/00-architecture-assessment.md §5).
+   * (docs/common/ARCHITECTURE.md ("Design rules")).
    */
   protected get registry(): Record<string, StdlibEntry> {
     return BASE_REGISTRY;
@@ -353,13 +353,13 @@ export class V1ToJsVisitor extends ParseTreeVisitor<string> {
   //
   // A later version that LIFTS one of these overrides the enforce* method to a
   // no-op. A later version that ADDS a rule declares it in its own subclass —
-  // never here. See dev-docs/00-architecture-assessment.md.
+  // never here. See docs/common/ARCHITECTURE.md ("Design rules").
   //
   // NOTE: v1's two other restrictions are enforced by the GRAMMAR, not here.
   // `x := expr` and `else if` have no rule in PineV1Parser.g4, so they are
   // syntax errors — which is what TradingView reports.
   //
-  // See dev-docs/01-version-delta-spec.md for the source of each rule.
+  // See docs/common/VERSIONS.md for the source of each rule.
   // ───────────────────────────────────────────────────────────────────────
 
   /** '==' / '!=' against 'na' silently misbehaves — require the na(x) function. */

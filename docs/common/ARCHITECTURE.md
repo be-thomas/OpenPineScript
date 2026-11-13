@@ -1,8 +1,9 @@
 # Architecture and repository layout
 
-> How a `.pine` file becomes JavaScript and then numbers. For the development
-> plan and iteration history see [dev-docs/](../../dev-docs/README.md); for the
-> parity evidence see [CONFORMANCE.md](CONFORMANCE.md).
+> How a `.pine` file becomes JavaScript and then numbers. For what each Pine
+> version changes see [VERSIONS.md](VERSIONS.md); for the parity evidence see
+> [CONFORMANCE.md](CONFORMANCE.md); to embed the engine in an application see
+> the [integration guide](integration/README.md).
 
 ## The pipeline
 
@@ -18,14 +19,36 @@ flowchart LR
 ```
 
 Each version has its **own grammar and its own emitter**, and the emitters
-inherit: `V1ToJsVisitor ← V2 ← V3 ← V4 ← V5`. Adding a version does not mean
+inherit: `V1ToJsVisitor ← V2 ← V3 ← V4 ← V5 ← V6`. Adding a version does not mean
 editing an earlier one, which is what keeps a v5 feature from silently
 relaxing a v2 rule.
 
 The **runtime is shared**. There is one implementation of each built-in, in
 `runtime/v1/stdlib/`, and the version machinery decides which *names* resolve
-to it — `BASE_REGISTRY` (v1–v3) → `V4_VIEW` → `V5_VIEW`. A fix to an indicator
-is therefore a fix at every version at once.
+to it — `BASE_REGISTRY` (v1–v3) → `V4_VIEW` → `V5_VIEW` → `V6_VIEW`. A fix to an
+indicator is therefore a fix at every version at once.
+
+## Design rules
+
+Three rules hold the layout together; code comments cite them.
+
+1. **A version owns only its own delta.** Each version has its own grammar
+   (`grammar/vN`, importing the one before it) and its own emitter subclass
+   (`transpiler/vN`). Adding a version never means editing an earlier one, so a
+   later feature cannot relax an earlier rule. A later version that *lifts* a
+   restriction overrides the `enforce*` method to a no-op; one that *adds* a rule
+   declares it in its own subclass. [`conformance/common/grammar_layering.test.ts`](../../conformance/common/grammar_layering.test.ts)
+   asserts the grammar chain.
+2. **The runtime is one implementation across versions.** A built-in is written
+   once in `runtime/v1/stdlib/`; the transpiler, through the registry views
+   (`BASE_REGISTRY` to `V4_VIEW` to `V5_VIEW` to `V6_VIEW`), decides which *names* a
+   version may spell and refuses to emit anything else. The runtime is not the
+   gatekeeper, and a `runtime/vN/` entry point only wraps what `v1` exports. A
+   v-specific run-time behaviour is a profile flag or a subclass (the v6 broker),
+   not a version branch inside the base.
+3. **Tests are organised by version, and a behaviour is asserted at every
+   version**, including the versions where it is illegal
+   ([`conformance/common/repo_structure.test.ts`](../../conformance/common/repo_structure.test.ts)).
 
 ## Repository layout
 
@@ -51,7 +74,7 @@ every `.g4` into one temporary folder at build time and deletes it afterwards.
 | [`examples/`](../../examples/) | Hand-written samples and the TradingView documentation corpus |
 | [`validation/`](../../validation/) | Real-world Pine scripts used for parity checking |
 | [`spec/`](../../spec/) | Language specification and per-version progress checklists |
-| `dev-docs/` | Development plans (local only, not published) |
+| [`docs/`](../) | These documents, and the [integration guide](integration/README.md) |
 | [`mock_data/`](../../mock_data/) | Sample OHLCV data |
 
 ## Performance invariants

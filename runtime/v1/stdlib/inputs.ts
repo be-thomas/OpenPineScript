@@ -8,7 +8,7 @@
  * v5 removes them as values and makes them FUNCTIONS: `input.int(14)`.
  *
  * Two of them also change name in the process — `integer` becomes `int` and
- * `resolution` becomes `timeframe` (dev-docs/01-version-delta-spec.md §4c).
+ * `resolution` becomes `timeframe` (docs/common/VERSIONS.md §4c).
  *
  * ── Six of these names collide with v4's constants ──────────────────────────
  *

@@ -286,7 +286,7 @@ const UNSUPPORTED = new Map<string, string>([]);
 /**
  * Words v5 reserves. A script may not NAME anything one of these.
  *
- * Source: dev-docs/01-version-delta-spec.md §4e, from the v5 migration guide.
+ * Source: docs/common/VERSIONS.md §4e, from the v5 migration guide.
  *
  * `text` is on the list and is also a live namespace root, which is why the
  * check below only ever fires on an UNDOTTED identifier that is not a keyword
@@ -787,6 +787,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * Reported as "not implemented" rather than as a Pine error, because it is
    * not one: TradingView accepts all four. Saying so is the difference between
    * an author knowing to rewrite the script and an author hunting for a typo.
+   * The message reaches the script's author, so it names no repository path;
+   * the known gaps are in docs/common/VERSIONS.md §7.
    */
   protected enforceSupported(name: string, ctx: SourceLocated): void {
     const feature = UNSUPPORTED.get(name);
@@ -794,7 +796,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     throw this.err(
       ctx,
       `'${name}' introduces ${feature}, which this engine does not implement ` +
-      `at v5. Rewrite without it — see §8 of dev-docs/01-version-delta-spec.md.`,
+      `at v5. Rewrite the script without it.`,
     );
   }
 

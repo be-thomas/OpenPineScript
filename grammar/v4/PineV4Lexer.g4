@@ -5,7 +5,7 @@
 //
 // WHAT IT ADDS, AND WHAT IT DOES NOT
 //
-// An earlier draft of dev-docs/01-version-delta-spec.md listed `while` and
+// An earlier draft of the version spec (now docs/common/VERSIONS.md §3b) listed `while` and
 // `switch` as v4 additions. Both are wrong — neither appears in the v4 release
 // notes or the v4 manual, and both are listed as v5 additions. v4's only loop is
 // `for`, inherited from v2.

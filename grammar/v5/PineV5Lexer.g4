@@ -17,8 +17,8 @@
 //         => "other"
 //
 // Both were listed as v4 additions in an early draft of
-// dev-docs/01-version-delta-spec.md. Neither appears in the v4 release notes or
-// the v4 manual; both are documented v5 additions. See §3b of that document.
+// docs/common/VERSIONS.md. Neither appears in the v4 release notes or
+// the v4 manual; both are documented v5 additions. See §3b of docs/common/VERSIONS.md.
 //
 // It also adds `for … in`, which needs one keyword of its own — see IN below.
 //

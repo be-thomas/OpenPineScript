@@ -63,7 +63,7 @@ export function security(
     if (typeof expression !== "function") return NaN; // malformed call
 
     // Explicit argument wins; otherwise the version's default. v1/v2 default to
-    // lookahead_on, v3+ to lookahead_off (dev-docs/01-version-delta-spec.md D3.1).
+    // lookahead_on, v3+ to lookahead_off (docs/common/VERSIONS.md D3.1).
     const mode = resolveLookahead(lookaheadInput, ctx);
 
     const symbolName = String(unwrap(symbolInput));

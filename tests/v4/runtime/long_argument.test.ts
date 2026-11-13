@@ -2,7 +2,7 @@
  * v1-v4 `strategy.entry(id, long, ...)` and `strategy.order(id, long, ...)`.
  *
  * "long (bool) A boolean value indicating the direction of the order: true for
- * buy, false for sell." v5 renamed it `direction` (dev-docs/01-version-delta-spec.md
+ * buy, false for sell." v5 renamed it `direction` (docs/common/VERSIONS.md
  * §4b). The keyword form `long = false` named no parameter of the engine's,
  * was dropped, and the order was a long: a short-only v4 strategy opened
  * nothing but longs, or, with the argument ignored, nothing it meant to.

@@ -3,7 +3,7 @@
  *
  * The version matrix is the core testing idea: a behaviour is asserted at
  * EVERY version, including the versions where it is illegal. See
- * dev-docs/03-tdd-workflow.md.
+ * docs/common/CONFORMANCE.md ("Testing").
  */
 import {
   compileScript,

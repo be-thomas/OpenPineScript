@@ -14,7 +14,7 @@ import { V6_ONLY_NAMESPACES, V6_ONLY_NAMES, V6_REMOVED } from "./renames6";
  * ── Version-scoped registry views ───────────────────────────────────────────
  *
  * The stdlib is ONE implementation across versions (see
- * dev-docs/00-architecture-assessment.md §5.6), but it is not one VOCABULARY:
+ * docs/common/ARCHITECTURE.md ("Design rules")), but it is not one VOCABULARY:
  * `sma` is a v1–v4 spelling and `ta.sma` is the v5 one, `red` is v1–v3 and
  * `color.red` is v4+, and accepting both dialects everywhere would compile
  * scripts TradingView rejects. That divergence — too permissive, silently — is
@@ -315,7 +315,7 @@ export const V6_VIEW: Record<string, StdlibEntry> = {
  * Every name the RUNTIME can resolve, at any version.
  *
  * Deliberately the union. The runtime is shared across versions by design
- * (dev-docs/00-architecture-assessment.md §5.6) and is not the gatekeeper — the
+ * (docs/common/ARCHITECTURE.md ("Design rules")) and is not the gatekeeper — the
  * transpiler decides what a given version may spell and refuses to emit
  * anything else. A union here just means the sandbox can execute whatever the
  * transpiler let through.

@@ -3,7 +3,7 @@
 // ============================================================================
 // v4's entire syntactic delta is the DECLARATION form. No new statement, no new
 // loop, no new operator — `while` and `switch` are v5, not v4 (see the header of
-// PineV4Lexer.g4 and §3b of dev-docs/01-version-delta-spec.md).
+// PineV4Lexer.g4 and §3b of docs/common/VERSIONS.md).
 //
 //     var   float x = na
 //     varip int   c = 0

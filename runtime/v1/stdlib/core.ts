@@ -350,7 +350,7 @@ export function int(x: any): number {
  *
  * This engine has no such cap. Lookback depth is bounded by available memory,
  * which is one of the limits skipped on purpose — see the "Deliberate
- * deviations" section of the README and dev-docs/04-skipped-restrictions.md.
+ * deviations" section of docs/common/CONFORMANCE.md and the table that follows it.
  * Every buffer is therefore already at least as large as any `max_bars_back`
  * call could ask for, and honouring the request would mean SHRINKING history
  * to match a restriction that is not being modelled.

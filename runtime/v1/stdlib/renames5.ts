@@ -18,7 +18,7 @@
  *
  * ── The source list, and the two names that are not on it ───────────────────
  *
- * The lists below are transcribed from dev-docs/01-version-delta-spec.md §4a,
+ * The lists below are transcribed from docs/common/VERSIONS.md §4a,
  * which in turn is transcribed from TradingView's v4 → v5 migration guide.
  *
  * `trix` is the exception: it does not appear in the guide's enumeration and is
@@ -45,7 +45,7 @@
  * ── Source ──────────────────────────────────────────────────────────────────
  *
  * https://www.tradingview.com/pine-script-docs/migration-guides/to-pine-version-5/
- * transcribed into dev-docs/01-version-delta-spec.md §4.
+ * transcribed into docs/common/VERSIONS.md §4.
  */
 
 import type { RenameSpec } from "./renames";
@@ -361,7 +361,7 @@ export const V5_POSITIONAL: Readonly<Record<string, readonly string[]>> = {
  * Keyword names that v5 renamed, by the name a v1-v4 script wrote, mapped to
  * the engine's parameter. Read by Context.call when binding keywords below v5.
  *
- * dev-docs/01-version-delta-spec.md §4b, from the migration guide:
+ * docs/common/VERSIONS.md §4b, from the migration guide:
  * `strategy.entry(long=)` -> `strategy.entry(direction=)`, and the same for
  * `strategy.order`. The engine's `strategy.order` calls the parameter `dir`.
  * Positionally nothing moved, so only keyword use needs this; before it

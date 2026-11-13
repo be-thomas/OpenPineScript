@@ -17,7 +17,7 @@
  *         // result.trades   → the broker's fills, for a strategy
  *     }
  *
- * See dev-docs/integration/ for the full integration guide.
+ * See docs/common/integration/ for the full integration guide.
  */
 
 // ── The host API ───────────────────────────────────────────────────────────

@@ -9,6 +9,6 @@
  * This file exists so that the version hierarchy is uniform: every version has a
  * runtime entry point of its own, and a v2-only behaviour discovered later is
  * added HERE (wrapping or subclassing what v1 exports) rather than by putting a
- * version branch inside the base. See dev-docs/00-architecture-assessment.md §5.
+ * version branch inside the base. See docs/common/ARCHITECTURE.md ("Design rules")
  */
 export * from "../v1/index";

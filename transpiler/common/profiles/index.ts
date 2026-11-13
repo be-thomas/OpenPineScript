@@ -17,7 +17,7 @@
  * What remains is configuration the RUNTIME reads at execution time, which has
  * no parse tree to hang off: banned identifiers and behavioural defaults.
  *
- * Sources for every entry: dev-docs/01-version-delta-spec.md, which cites
+ * Sources for every entry: docs/common/VERSIONS.md, which cites
  * TradingView's official migration guides.
  */
 

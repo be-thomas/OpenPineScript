@@ -35,7 +35,7 @@
 // That was not always so. While this engine implemented v1–v3 only, every
 // harness was forced through the v3 pipeline — which still tested the
 // arithmetic, since the runtime is shared across versions by design
-// (dev-docs/00-architecture-assessment.md §5.6), but said nothing about whether
+// (docs/common/ARCHITECTURE.md ("Design rules")), but said nothing about whether
 // v4 resolved these names at all. Now both are tested.
 //
 // Convergent, so the standard warm-up allowance applies.

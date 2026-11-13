@@ -1,7 +1,7 @@
 /**
  * Grammar hierarchy integrity.
  *
- * The architectural law (dev-docs/00-architecture-assessment.md §5) is that v1
+ * The architectural law (docs/common/ARCHITECTURE.md ("Design rules")) is that v1
  * is the base and every later version imports the one before it. That law lives
  * in .g4 files, which no type checker reads — so it is asserted here.
  *
