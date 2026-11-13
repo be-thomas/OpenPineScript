@@ -3,8 +3,8 @@
  *
  * Four artefacts, from one entry point (index.ts):
  *
- *   dist/index.mjs         ESM, for `import { Session } from "open-pinescript"`
- *   dist/index.cjs         CJS, for `require("open-pinescript")`
+ *   dist/index.mjs         ESM, for `import { Session } from "openpinescript"`
+ *   dist/index.cjs         CJS, for `require("openpinescript")`
  *   dist/cli.mjs           the `openpinescript` command
  *   dist/types/index.d.ts  types, emitted by tsconfig.build.json
  *

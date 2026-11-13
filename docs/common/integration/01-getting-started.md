@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-npm install open-pinescript
+npm install openpinescript
 ```
 
 One runtime dependency (`antlr4ng`). Node 20 or newer; the library build is
@@ -21,11 +21,11 @@ The package ships **prebuilt**: no parser generation, no postinstall step.
 | `dist/cli.mjs` | The `openpinescript` command | `npx openpinescript …` |
 
 ```ts
-import { Session, runScript, compileScript } from "open-pinescript";   // ESM
+import { Session, runScript, compileScript } from "openpinescript";   // ESM
 ```
 
 ```js
-const { Session } = require("open-pinescript");                        // CJS
+const { Session } = require("openpinescript");                        // CJS
 ```
 
 **Always import from the package root.** Paths inside the package are not a
@@ -35,8 +35,8 @@ from [`index.ts`](../../../index.ts).
 ## A complete first run
 
 ```ts
-import { Session } from "open-pinescript";
-import type { Candle, SimResult } from "open-pinescript";
+import { Session } from "openpinescript";
+import type { Candle, SimResult } from "openpinescript";
 
 const candles: Candle[] = [
   { time: 1704067200000, open: 100, high: 104, low: 99,  close: 103, volume: 1200 },

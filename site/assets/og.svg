@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b6cff"/><stop offset="1" stop-color="#22d3a6"/></linearGradient>
+    <radialGradient id="r1" cx="85%" cy="0%" r="70%"><stop offset="0" stop-color="#8b6cff" stop-opacity=".45"/><stop offset="1" stop-color="#8b6cff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="r2" cx="0%" cy="100%" r="70%"><stop offset="0" stop-color="#22d3a6" stop-opacity=".3"/><stop offset="1" stop-color="#22d3a6" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#07080d"/>
+  <rect width="1200" height="630" fill="url(#r1)"/>
+  <rect width="1200" height="630" fill="url(#r2)"/>
+  <g transform="translate(690 330) scale(.82)">
+    <g stroke-linecap="round" stroke-width="5" stroke="#8f97b8" opacity=".9">
+      <path d="M40 -40v200M100 -120v220M160 -60v200M220 -150v230M280 -90v220M340 -190v250M400 -130v230M460 -220v260M520 -170v240"/>
+    </g>
+    <g>
+      <rect x="22" y="0" width="36" height="90" rx="5" fill="#ff5c7a"/>
+      <rect x="82" y="-60" width="36" height="110" rx="5" fill="#26d9a0"/>
+      <rect x="142" y="10" width="36" height="80" rx="5" fill="#ff5c7a"/>
+      <rect x="202" y="-90" width="36" height="120" rx="5" fill="#26d9a0"/>
+      <rect x="262" y="-30" width="36" height="90" rx="5" fill="#ff5c7a"/>
+      <rect x="322" y="-120" width="36" height="130" rx="5" fill="#26d9a0"/>
+      <rect x="382" y="-60" width="36" height="100" rx="5" fill="#26d9a0"/>
+      <rect x="442" y="-150" width="36" height="110" rx="5" fill="#26d9a0"/>
+      <rect x="502" y="-110" width="36" height="90" rx="5" fill="#ff5c7a"/>
+    </g>
+    <path d="M10 90 C120 40 200 70 300 -10 S450 -60 560 -140" fill="none" stroke="url(#g)" stroke-width="9" stroke-linecap="round"/>
+  </g>
+  <g font-family="Space Grotesk, Inter, Helvetica, Arial, sans-serif">
+    <text x="72" y="150" font-size="30" font-weight="600" fill="#aab1d6" letter-spacing="6">OPENPINESCRIPT</text>
+    <text x="72" y="270" font-size="92" font-weight="700" fill="#ffffff" letter-spacing="-3">Run Pine Script</text>
+    <text x="72" y="368" font-size="92" font-weight="700" fill="url(#g)" letter-spacing="-3">anywhere.</text>
+    <text x="72" y="450" font-size="34" fill="#aab1d6">The engine, running live in your browser.</text>
+    <text x="72" y="540" font-size="30" fill="#7f87ad">Interactive tutorial  ·  CLI guide  ·  Zeal Terminal</text>
+  </g>
+</svg>

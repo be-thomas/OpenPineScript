@@ -1,0 +1,2 @@
+indicator("No version line")
+plot(ta.sma(close, 20), title="SMA 20")

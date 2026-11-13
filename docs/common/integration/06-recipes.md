@@ -8,7 +8,7 @@ worker it is a worker you terminate.
 
 ```ts
 // engine.worker.ts
-import { Session } from "open-pinescript";
+import { Session } from "openpinescript";
 
 let session: Session | null = null;
 

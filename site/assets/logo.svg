@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="OpenPineScript">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b6cff"/><stop offset="1" stop-color="#22d3a6"/></linearGradient></defs>
+  <rect width="64" height="64" rx="15" fill="#0b0d16"/>
+  <rect x=".75" y=".75" width="62.5" height="62.5" rx="14.5" fill="none" stroke="url(#g)" stroke-width="1.5"/>
+  <g stroke-linecap="round">
+    <path d="M18 14v36M32 10v30M46 20v34" stroke="#8f97b8" stroke-width="2.5"/>
+    <rect x="13" y="24" width="10" height="18" rx="2" fill="#ff5c7a"/>
+    <rect x="27" y="18" width="10" height="16" rx="2" fill="#26d9a0"/>
+    <rect x="41" y="28" width="10" height="20" rx="2" fill="#26d9a0"/>
+  </g>
+  <path d="M8 44 L22 36 L34 40 L56 18" fill="none" stroke="url(#g)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

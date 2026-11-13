@@ -18,7 +18,7 @@ No TradingView account. No cloud. No execution quota. No 500 ms loop timeout.
 
 ### [▶ Open Beta: try it in your browser at **zealterminal.com**](https://zealterminal.com) — no install, no CSV
 
-[Try it online](#-try-it-online) · [Quick start](#-quick-start) · [Why](#-why-openpinescript) · [Parity](#-verified-against-tradingview-itself) · [Docs](#-documentation) · [FAQ](#-faq)
+[Docs](https://be-thomas.github.io/OpenPineScript/) · [Try it online](#-try-it-online) · [Quick start](#-quick-start) · [Why](#-why-openpinescript) · [Parity](#-verified-against-tradingview-itself) · [Guides](#-documentation) · [FAQ](#-faq)
 
 </div>
 
@@ -89,13 +89,31 @@ any backtest it shows you can be read here rather than taken on trust.
 
 ## ⚡ Quick start
 
+Run any Pine script against a CSV of bars, with nothing to install (Node.js 20 or newer):
+
+```bash
+npx openpinescript my_script.pine --data candles.csv
+```
+
+Use the engine from JavaScript:
+
+```bash
+npm install openpinescript
+```
+
+```js
+import { Session } from "openpinescript";
+```
+
+To work on the engine itself, run it from a clone:
+
 ```bash
 git clone https://github.com/be-thomas/OpenPineScript.git
 cd OpenPineScript
 npm install
 ```
 
-Run any Pine script against a CSV of bars:
+Then run a bundled example:
 
 ```bash
 npm run opsv2 -- examples/v1/sma_crossover.pine --data mock_data/common/AAPL_mock.csv

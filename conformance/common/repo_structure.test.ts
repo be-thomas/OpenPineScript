@@ -180,7 +180,8 @@ describe("test discovery", () => {
  */
 describe("every top-level folder follows the version layout", () => {
   const ALLOWED = new Set(["v1", "v2", "v3", "v4", "v5", "v6", "common"]);
-  const EXEMPT = new Set(["node_modules", "dev-docs", "results", "dist"]);
+  // site/ is the static GitHub Pages docs site (HTML/JS/CSS), not engine source, so it has no version layout.
+  const EXEMPT = new Set(["node_modules", "dev-docs", "results", "dist", "site"]);
 
   const topLevel = fs.readdirSync(ROOT, { withFileTypes: true })
     .filter(e => e.isDirectory() && !e.name.startsWith(".") && !EXEMPT.has(e.name))

@@ -328,7 +328,7 @@ For a host that drives the bar loop itself: a custom replay, a different tick
 model, a test harness. `Session` is built on exactly these:
 
 ```ts
-import { compileScript, Context, compile, buildRenderModel } from "open-pinescript";
+import { compileScript, Context, compile, buildRenderModel } from "openpinescript";
 
 const { js, profile } = compileScript(source);               // Pine → JavaScript
 const ctx = new Context(profile);                            // profile MUST match

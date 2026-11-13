@@ -53,7 +53,7 @@ session windows all read it.
 ## The shortest thing that works
 
 ```ts
-import { runScript } from "open-pinescript";
+import { runScript } from "openpinescript";
 
 const result = runScript(
   `//@version=5
