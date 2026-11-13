@@ -105,26 +105,6 @@ npm install openpinescript
 import { Session } from "openpinescript";
 ```
 
-To work on the engine itself, run it from a clone:
-
-```bash
-git clone https://github.com/be-thomas/OpenPineScript.git
-cd OpenPineScript
-npm install
-```
-
-Then run a bundled example:
-
-```bash
-npm run opsv2 -- examples/v1/sma_crossover.pine --data mock_data/common/AAPL_mock.csv
-```
-
-Or explore interactively:
-
-```bash
-npm run replv2
-```
-
 ![OpenPineScript REPL evaluating Pine Script expressions in a terminal session](https://raw.githubusercontent.com/be-thomas/OpenPineScript/main/images/common/repl-1.png)
 
 ---
@@ -198,7 +178,7 @@ broker emulator, multi-timeframe `security()`, and the real-time tick model.
 - **Put it behind a chart** — [zealterminal.com](https://zealterminal.com) is this engine in a browser tab, in open beta, if you want to see that shape working before you build it
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --out-dir ./results --json
+npx openpinescript strategy.pine --data data.csv --out-dir ./results
 ```
 
 > 📖 **[Full CLI reference →](CLI-Usage.md)** — output flags, comparison mode,
@@ -307,8 +287,9 @@ bar by bar against a runtime that provides the standard library.
 <summary><b>How do I convert Pine Script to JavaScript?</b></summary>
 <br>
 
-`npm run opsv2 -- script.pine --emit-js out.js`, or call `compileScript(src)`
-from `transpiler/common` to get the emitted source back as a string.
+`npx openpinescript script.pine --data data.csv --show-transpiled` prints the
+compiled JavaScript before running it, or call `compileScript(src)` from the
+library (`import { compileScript } from "openpinescript"`) to get it as a string.
 </details>
 
 ---

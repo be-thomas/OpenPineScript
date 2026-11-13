@@ -4,7 +4,7 @@
  *   With no args, parses the inline example.
  */
 
-import { CharStreams } from "antlr4ng";
+import { CharStream } from "antlr4ng";
 import { CommonTokenStream } from "antlr4ng";
 import { PineV2Lexer } from "./generated/PineV2Lexer.js";
 import { PineV2Parser } from "./generated/PineV2Parser.js";
@@ -12,7 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 function parse(source: string) {
-  const inputStream = CharStreams.fromString(source);
+  const inputStream = CharStream.fromString(source);
   const lexer = new PineV2Lexer(inputStream);
   const tokenStream = new CommonTokenStream(lexer);
   const parser = new PineV2Parser(tokenStream);

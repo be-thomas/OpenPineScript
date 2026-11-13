@@ -1,5 +1,5 @@
 
-import { ParseTreeVisitor } from "antlr4ng";
+import { AbstractParseTreeVisitor } from "antlr4ng";
 
 
 import { Once_exprContext } from "./PineV6Parser.js";
@@ -85,7 +85,7 @@ import { Num_literalContext } from "./PineV6Parser.js";
  * @param <Result> The return type of the visit operation. Use `void` for
  * operations with no return type.
  */
-export class PineV6ParserVisitor<Result> extends ParseTreeVisitor<Result> {
+export class PineV6ParserVisitor<Result> extends AbstractParseTreeVisitor<Result> {
     /**
      * Visit a parse tree produced by `PineV6Parser.once_expr`.
      * @param ctx the parse tree

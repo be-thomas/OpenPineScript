@@ -5,7 +5,7 @@ import { describe, it } from "vitest";
 import assert from "node:assert";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { CharStreams, CommonTokenStream, Lexer } from "antlr4ng";
+import { CharStream, CommonTokenStream, Lexer } from "antlr4ng";
 import { PineV2Lexer } from "../../../parser/v2/generated/PineV2Lexer.js";
 // IMPORT YOUR SMART LEXER
 import { PineV2TokenSource } from "../../../lexer/v2/PineV2TokenSource.js"; 
@@ -18,7 +18,7 @@ function loadFixture(name: string): string {
 }
 
 function tokenize(source: string): { types: string[]; tokens: import("antlr4ng").Token[] } {
-  const input = CharStreams.fromString(source);
+  const input = CharStream.fromString(source);
   
   // USE THE SMART LEXER, NOT THE RAW ONE
   // This ensures LEND, BEGIN, and END are generated.

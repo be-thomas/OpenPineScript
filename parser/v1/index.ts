@@ -6,7 +6,7 @@
  * as `createParser`, and each later version applies it to its own generated
  * classes. See parser/v2/index.ts and parser/v3/index.ts.
  */
-import { CharStreams, CommonTokenStream, BaseErrorListener, Lexer, Parser } from "antlr4ng";
+import { CharStream, CommonTokenStream, BaseErrorListener, Lexer, Parser } from "antlr4ng";
 import { PineV1Parser } from "./generated/PineV1Parser.js";
 import { PineV1TokenSource } from "../../lexer/v1/PineV1TokenSource.js";
 
@@ -26,7 +26,7 @@ export interface ParserError {
  * cannot satisfy both signatures nominally, and only `line`/`column`/`msg` are
  * read here.
  */
-export class ErrorCollector extends BaseErrorListener<any> {
+export class ErrorCollector extends BaseErrorListener {
   errors: ParserError[] = [];
 
   override syntaxError(
@@ -57,7 +57,7 @@ export function createParser<TParser extends Parser, TTree>(
   entry: (parser: TParser) => TTree,
 ): (source: string) => ParseResult<TTree> {
   return function parse(source: string): ParseResult<TTree> {
-    const inputStream = CharStreams.fromString(source);
+    const inputStream = CharStream.fromString(source);
 
     // The custom token source wraps the generated lexer and turns indentation
     // into the virtual BEGIN/END/LEND tokens the grammar expects.

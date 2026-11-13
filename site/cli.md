@@ -42,24 +42,8 @@ npx openpinescript examples/rsi.pine --data AAPL.csv 2>/dev/null
 ```
 
 Expected: a JSON document starting with `{ "script": "rsi.pine", "bars_processed": 506, ...`.
-`npx openpinescript --help` with no script prints the usage text and exits 1 (a missing script is an
-error); the usage text names `npm run opsv2`, which is the same program run from a source checkout.
-
-### Install from source (secondary)
-
-Only needed to work on the engine itself.
-
-```bash
-git clone https://github.com/be-thomas/OpenPineScript.git
-cd OpenPineScript
-npm install            # also generates the parsers (runs "npm run generate:parser")
-npm run build          # emits dist/cli.mjs, the same file the npm package ships
-node dist/cli.mjs <script.pine> --data <data.csv> [flags]
-npm run --silent opsv2 -- <script.pine> --data <data.csv> [flags]   # runs from source with tsx
-```
-
-Use `--silent` (or `-s`) with `npm run`, otherwise npm prints a 3-line banner to stdout that corrupts the
-JSON output. `node dist/cli.mjs` and `npx openpinescript` have clean stdout.
+`npx openpinescript --help` (or `-h`) prints the usage text to stdout and exits 0. A missing script or a
+missing `--data` prints an error and the usage text to stderr and exits 1.
 
 ---
 
@@ -295,7 +279,7 @@ Same shape as section 5: OHLCV plus one column per plot (`Fast`, `Slow` here).
 ## 7. Stdout JSON (the machine interface)
 
 With no `--out-*` / `--compare-*` flag, stdout is exactly one JSON document and nothing else (when invoked
-via `npx openpinescript`, `node dist/cli.mjs` or `npm run --silent`). Silence the human text with `2>/dev/null`.
+via `npx openpinescript` or `openpinescript`). Silence the human text with `2>/dev/null`.
 
 ```bash
 openpinescript examples/sma_cross.pine --data AAPL.csv 2>/dev/null

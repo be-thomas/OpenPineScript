@@ -1,5 +1,5 @@
 
-import { ParseTreeVisitor } from "antlr4ng";
+import { AbstractParseTreeVisitor } from "antlr4ng";
 
 
 import { Var_assignContext } from "./PineV2Parser.js";
@@ -56,7 +56,7 @@ import { IdContext } from "./PineV2Parser.js";
  * @param <Result> The return type of the visit operation. Use `void` for
  * operations with no return type.
  */
-export class PineV2ParserVisitor<Result> extends ParseTreeVisitor<Result> {
+export class PineV2ParserVisitor<Result> extends AbstractParseTreeVisitor<Result> {
     /**
      * Visit a parse tree produced by `PineV2Parser.var_assign`.
      * @param ctx the parse tree

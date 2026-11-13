@@ -46,7 +46,7 @@ export interface IndentTokenIds {
  */
 interface LexerLike {
   nextToken(): Token;
-  readonly inputStream: { getText(interval: Interval): string; LA(offset: number): number } | null;
+  readonly inputStream: { getTextFromInterval(interval: Interval): string; LA(offset: number): number } | null;
 }
 
 /** Mixin bases must accept `...args: any[]` — TS2545. */
@@ -170,7 +170,7 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
       super(args[0] as CharStream);
       this.tokenFactory = {
         create: (source, type, text, channel, start, stop, line, charPositionInLine) => {
-          const t = new CommonToken(source, type, channel, start, stop);
+          const t = CommonToken.fromSource(source, type, channel, start, stop);
           t.line = line;
           t.column = charPositionInLine;
           if (text !== undefined && text !== null) (t as any).text = text;
@@ -301,7 +301,7 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
         // Safe Text Retrieval:
         let text = t.text;
         if (!text && this.inputStream) {
-          text = this.inputStream.getText(new Interval(t.start, t.stop));
+          text = this.inputStream.getTextFromInterval(new Interval(t.start, t.stop));
         }
         text = text || "";
 
@@ -361,7 +361,7 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
 
     /** Is the line that LBEG token `t` introduces flush against column 0? */
     private startsAtColumnZero(t: Token): boolean {
-      const text = t.text ?? this.inputStream?.getText(new Interval(t.start, t.stop)) ?? "";
+      const text = t.text ?? this.inputStream?.getTextFromInterval(new Interval(t.start, t.stop)) ?? "";
       const nl = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
       if (text.substring(nl + 1).length !== 0) return false;
       // A blank or comment-only line carries no indentation information.
@@ -374,7 +374,7 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
 
     /** Line number of the last line an LBEG token spans. */
     private newlinesIn(t: Token): number {
-      const text = t.text ?? this.inputStream?.getText(new Interval(t.start, t.stop)) ?? "";
+      const text = t.text ?? this.inputStream?.getTextFromInterval(new Interval(t.start, t.stop)) ?? "";
       return (text.match(/\n|\r(?!\n)/g) ?? []).length;
     }
 

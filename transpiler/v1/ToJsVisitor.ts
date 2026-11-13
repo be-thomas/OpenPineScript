@@ -25,7 +25,7 @@
  * docs/common/ARCHITECTURE.md ("Design rules") for the rationale.
  */
 
-import { ParseTreeVisitor } from "antlr4ng";
+import { AbstractParseTreeVisitor } from "antlr4ng";
 import type { TerminalNode, ParserRuleContext, ParseTree } from "antlr4ng";
 import * as common from "../../utils/v2/common";
 import type { PineVersion } from "../common/version";
@@ -182,7 +182,7 @@ function isConstIntLiteral(node: any): boolean {
   }
 }
 
-export class V1ToJsVisitor extends ParseTreeVisitor<string> {
+export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   /**
    * Depth of user-function bodies currently being emitted.
    *

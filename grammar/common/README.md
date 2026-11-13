@@ -43,10 +43,9 @@ Output is written to `parser/v<N>/generated/` (Lexer, Parser, Visitor per
 version), for every version in the chain. You need **Node.js 20+** and the
 `antlr-ng` CLI (installed via `npm install`).
 
-Adding a version means three edits, and the layering test in
+Adding a version means two edits, and the layering test in
 [conformance/grammar_layering.test.ts](../conformance/grammar_layering.test.ts)
-checks the result: a `generate:parser:vN` script in `package.json`, an entry in
-`VERSIONS` in [scripts/common/patch-visitor.js](../scripts/common/patch-visitor.js), and a row
+checks the result: a `generate:parser:vN` script in `package.json`, and a row
 in that test's `CHAIN`.
 
 ## Run a quick parse

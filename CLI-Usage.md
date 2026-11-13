@@ -7,7 +7,7 @@
 ## Basic invocation
 
 ```bash
-npm run opsv2 -- <script.pine> --data <data.csv> [flags]
+npx openpinescript <script.pine> --data <data.csv> [flags]
 ```
 
 `script.pine` and `--data` are always required. All other flags are optional. With no output or comparison flags, a formatted summary is printed to the terminal and nothing is written to disk.
@@ -21,7 +21,7 @@ npm run opsv2 -- <script.pine> --data <data.csv> [flags]
 Writes a time-series CSV containing the OHLCV candle data plus one column per `plot()` call in the script.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --out-chart ./results/chart.csv
+npx openpinescript strategy.pine --data data.csv --out-chart ./results/chart.csv
 ```
 
 ```diff
@@ -48,7 +48,7 @@ Cells are empty (not `NaN`) during the indicator warm-up period.
 Writes the trade log as a CSV. Only meaningful for `strategy()` scripts.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --out-trades ./results/trades.csv
+npx openpinescript strategy.pine --data data.csv --out-trades ./results/trades.csv
 ```
 
 ```diff
@@ -85,7 +85,7 @@ Trade #,Type,Signal,Date/Time,Price,Contracts,Profit,Profit %,Cum. Profit
 Writes the strategy performance summary as a JSON file.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --out-summary ./results/summary.json
+npx openpinescript strategy.pine --data data.csv --out-summary ./results/summary.json
 ```
 
 ```diff
@@ -125,7 +125,7 @@ These compare `opsv2` output against reference data exported from TradingView.
 Compares the indicator/plot columns from `opsv2` against a TradingView chart export CSV. Rows are aligned by timestamp — handles both ISO strings and Unix epoch seconds. Columns are matched by name, with case-insensitive and positional fallbacks.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --compare-chart ./tv_exports/chart_data.csv
+npx openpinescript strategy.pine --data data.csv --compare-chart ./tv_exports/chart_data.csv
 ```
 
 When values are within tolerance:
@@ -160,7 +160,7 @@ When values exceed tolerance:
 Compares the trade log from `opsv2` against a TradingView trade export CSV. Checks trade count, then entry price, exit price, profit, and exit timestamp per trade.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --compare-trades ./tv_exports/trades.csv
+npx openpinescript strategy.pine --data data.csv --compare-trades ./tv_exports/trades.csv
 ```
 
 When all trades match:
@@ -190,7 +190,7 @@ When there is a count mismatch or price discrepancy:
 Compares the performance summary from `opsv2` against a TradingView summary export. Accepts both JSON and key-value CSV formats.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --compare-summary ./tv_exports/summary.json
+npx openpinescript strategy.pine --data data.csv --compare-summary ./tv_exports/summary.json
 ```
 
 Fields compared: `net_profit`, `net_profit_percent`, `gross_profit`, `gross_loss`, `total_closed_trades`, `win_rate`, `profit_factor`, `max_drawdown_percent`.
@@ -219,7 +219,7 @@ When a field diverges:
 Sets the epsilon for all floating-point comparisons. Defaults to `0.0001`. Any deviation `<= tolerance` counts as a pass.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv \
+npx openpinescript strategy.pine --data data.csv \
   --compare-chart ./tv_exports/chart_data.csv \
   --tolerance 0.1
 ```
@@ -241,7 +241,7 @@ Useful when TV exports have been rounded. Tightening or loosening the value chan
 Writes `comparison_report.json` to the specified directory. If `--out-dir` is also set, that takes priority. If neither is set, no file is written — the console output is always printed regardless.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv \
+npx openpinescript strategy.pine --data data.csv \
   --compare-chart ./tv_exports/chart_data.csv \
   --out-comparison ./reports
 ```
@@ -303,7 +303,7 @@ Override `input()` values without editing the `.pine` file. (Pine v2 has a singl
 Run the script once first to discover available input IDs:
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv
+npx openpinescript strategy.pine --data data.csv
 ```
 
 ```diff
@@ -318,7 +318,7 @@ npm run opsv2 -- strategy.pine --data data.csv
 Then pass the overrides on the next run:
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv \
+npx openpinescript strategy.pine --data data.csv \
   --input input_0=20 \
   --input input_1=50
 ```
@@ -344,7 +344,7 @@ stdout and the human-readable summary goes to stderr. Redirecting stderr gives
 you clean, pipeable JSON:
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv 2>/dev/null
+npx openpinescript strategy.pine --data data.csv 2>/dev/null
 ```
 
 ```json
@@ -368,12 +368,12 @@ Executes a **single bar** and emits the same JSON, then exits. Use it to
 discover a script's `input()` variables without paying for a full backtest.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null
+npx openpinescript strategy.pine --data data.csv --dry-run 2>/dev/null
 ```
 
 ```bash
 # Extract just the inputs for a UI to render
-npm run opsv2 -- strategy.pine --data data.csv --dry-run 2>/dev/null | jq '.inputs'
+npx openpinescript strategy.pine --data data.csv --dry-run 2>/dev/null | jq '.inputs'
 ```
 
 The `id` values are what `--input` expects.
@@ -387,7 +387,7 @@ The `id` values are what `--input` expects.
 Prints the JavaScript generated by the transpiler before execution. Useful for tracing unexpected behavior in complex scripts.
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv --show-transpiled
+npx openpinescript strategy.pine --data data.csv --show-transpiled
 ```
 
 ```diff
@@ -411,7 +411,7 @@ npm run opsv2 -- strategy.pine --data data.csv --show-transpiled
 ### Full export + comparison in one command
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv \
+npx openpinescript strategy.pine --data data.csv \
   --out-dir ./results \
   --compare-dir ./tv_exports \
   --tolerance 0.001
@@ -448,7 +448,7 @@ results/
 ### Catching a regression mid-comparison
 
 ```bash
-npm run opsv2 -- strategy.pine --data data.csv \
+npx openpinescript strategy.pine --data data.csv \
   --compare-dir ./tv_exports \
   --out-comparison ./reports
 ```

@@ -100,13 +100,3 @@ npx openpinescript script.pine --data candles.csv --json
 ```
 
 Full flag reference: [CLI-Usage.md](../../../CLI-Usage.md).
-
-## Running from the repository
-
-```bash
-git clone https://github.com/be-thomas/OpenPineScript.git
-cd OpenPineScript
-npm install          # `prepare` generates the ANTLR parsers
-npm test
-npm run build        # regenerate parsers + emit dist/
-```

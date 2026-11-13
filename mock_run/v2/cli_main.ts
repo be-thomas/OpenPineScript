@@ -6,7 +6,9 @@
  * for browser stand-ins and run the very same code in a Web Worker (site/src/sim.js).
  *
  * Usage:
- *   npm run opsv2 -- <script.pine> --data <data.csv> [flags]
+ *   openpinescript <script.pine> --data <data.csv> [flags]
+ *   npx openpinescript <script.pine> --data <data.csv> [flags]
+ *   (from a source checkout: npm run opsv2 -- <script.pine> --data <data.csv> [flags])
  *
  * Output flags:
  *   --out-dir <dir>        Write chart.csv, trades.csv, and summary.json to <dir>
@@ -80,17 +82,22 @@ function getFlag(args: string[], flag: string): string | null {
 function parseArgs(argv: string[]): CliArgs {
     const args = argv.slice(2);
 
+    if (args.includes("--help") || args.includes("-h")) {
+        printUsage(console.log);
+        process.exit(0);
+    }
+
     const scriptPath = args.find(a => a.endsWith(".pine")) ?? null;
     if (!scriptPath) {
         console.error(`${C.Red}Error:${C.Reset} No .pine script file specified.\n`);
-        printUsage();
+        printUsage(console.error);
         process.exit(1);
     }
 
     const dataPath = getFlag(args, "--data");
     if (!dataPath) {
         console.error(`${C.Red}Error:${C.Reset} --data <csv> is required.\n`);
-        printUsage();
+        printUsage(console.error);
         process.exit(1);
     }
 
@@ -135,9 +142,10 @@ function parseArgs(argv: string[]): CliArgs {
     };
 }
 
-function printUsage() {
-    console.log(
-`${C.Bold}Usage:${C.Reset} npm run opsv2 -- <script.pine> --data <data.csv> [flags]
+function printUsage(out: (text: string) => void) {
+    out(
+`${C.Bold}Usage:${C.Reset} openpinescript <script.pine> --data <data.csv> [flags]
+       npx openpinescript <script.pine> --data <data.csv> [flags]
 
 ${C.Bold}Output flags:${C.Reset}
   --out-dir <dir>        Write chart.csv, trades.csv, and summary.json to <dir>

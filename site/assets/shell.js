@@ -143,8 +143,7 @@ export function tokenize(line, lastCode = 0) {
 const HELP = `This is a practice terminal. It runs the real openpinescript CLI code on a
 small virtual file system, inside your browser.
 
-  openpinescript <script.pine> --data <csv> [flags]    also: node dist/cli.mjs ...
-                                                       and:  npm run --silent opsv2 -- ...
+  openpinescript <script.pine> --data <csv> [flags]    also: npx openpinescript ...
   ls [-l] [path...]   cat <file...>   head|tail [-n N] <file>   wc -l <file>
   mkdir -p <dir>      rm [-rf] <path> echo <text>   pwd   clear   help
 
@@ -263,12 +262,14 @@ export class Shell {
   }
 
   /**
-   * `openpinescript`, `node dist/cli.mjs` or `npm run [--silent] opsv2 --` followed by arguments
+   * `openpinescript`, `npx openpinescript`, `node dist/cli.mjs` or `npm run [--silent] opsv2 --` followed by arguments
    * -> { args, banner } (banner: npm prints its 3-line header unless --silent), else null.
    */
   opsArgs(words) {
     const [a, b] = words;
     if (a === "openpinescript") return { args: words.slice(1), banner: false };
+    if (a === "npx" && b === "openpinescript") return { args: words.slice(2), banner: false };
+    if (a === "npx" && (b === "-y" || b === "--yes") && words[2] === "openpinescript") return { args: words.slice(3), banner: false };
     if (a === "node" && (b === "dist/cli.mjs" || b === "./dist/cli.mjs")) return { args: words.slice(2), banner: false };
     if (a === "npm" && (b === "run" || b === "run-script")) {
       let i = 2, silent = false;
@@ -438,8 +439,8 @@ export class Shell {
     const before = head.trim().split(/\s+/).filter(Boolean);
     let cands;
     if (before.length === 0) {
-      cands = ["openpinescript", "node dist/cli.mjs", "npm run --silent opsv2 --", "ls", "cat", "head", "tail", "wc", "mkdir -p", "rm", "echo", "pwd", "clear", "help"].filter((c) => c.startsWith(word));
-    } else if (word.startsWith("-") && before.some((w) => w === "openpinescript" || w === "dist/cli.mjs" || w === "opsv2")) {
+      cands = ["openpinescript", "npx openpinescript", "node dist/cli.mjs", "npm run --silent opsv2 --", "ls", "cat", "head", "tail", "wc", "mkdir -p", "rm", "echo", "pwd", "clear", "help"].filter((c) => c.startsWith(word));
+    } else if (word.startsWith("-") && before.some((w) => w === "openpinescript" || w === "npx" || w === "dist/cli.mjs" || w === "opsv2")) {
       cands = CLI_FLAGS.filter((f) => f.startsWith(word));
     } else {
       const slash = word.lastIndexOf("/");

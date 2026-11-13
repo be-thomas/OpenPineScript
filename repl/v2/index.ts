@@ -6,7 +6,7 @@
 import * as repl from "node:repl";
 import * as vm from "node:vm";
 import * as util from "node:util"; 
-import { CharStreams, CommonTokenStream, Lexer, Token } from "antlr4ng";
+import { CharStream, CommonTokenStream, Lexer, Token } from "antlr4ng";
 import { PineV2Lexer } from "../../parser/v2/generated/PineV2Lexer";
 import { PineV2TokenSource } from "../../lexer/v2/PineV2TokenSource";
 import { parse } from "../../parser/v2";
@@ -74,7 +74,7 @@ function main(): void {
       let source = trimmed.endsWith("\n") ? trimmed : trimmed + "\n";
 
       // --- Lexer/Parser Step ---
-      const inputStream = CharStreams.fromString(source);
+      const inputStream = CharStream.fromString(source);
       const lexer = new PineV2TokenSource(inputStream);
       const tokenStream = new CommonTokenStream(lexer as unknown as Lexer);
       tokenStream.fill();

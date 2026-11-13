@@ -1,5 +1,5 @@
 
-import { ParseTreeVisitor } from "antlr4ng";
+import { AbstractParseTreeVisitor } from "antlr4ng";
 
 
 import { While_exprContext } from "./PineV5Parser.js";
@@ -84,7 +84,7 @@ import { Other_literalContext } from "./PineV5Parser.js";
  * @param <Result> The return type of the visit operation. Use `void` for
  * operations with no return type.
  */
-export class PineV5ParserVisitor<Result> extends ParseTreeVisitor<Result> {
+export class PineV5ParserVisitor<Result> extends AbstractParseTreeVisitor<Result> {
     /**
      * Visit a parse tree produced by `PineV5Parser.while_expr`.
      * @param ctx the parse tree
