@@ -17,19 +17,20 @@ function val(x: any): any {
 // --- Polymorphic Null Checks ---
 
 
-// na(x): Returns true if x is NaN (number) or null/undefined (string/bool)
+// na(x): Returns true if x is NaN or infinite (number) or null/undefined (string/bool).
+// Division by zero keeps its IEEE result (close / 0.0 is Infinity, 0.0 / 0.0 is NaN) and na()
+// is true for both (TradingView probe v2: na(close / 0.0), na(0.0 / 0.0), na(1 / 0) all true).
 export function na(x: any): boolean {
     const v = val(x);
-    return v === null || v === undefined || (typeof v === 'number' && isNaN(v));
+    return v === null || v === undefined || (typeof v === 'number' && !Number.isFinite(v));
 }
 
-// nz(x, y): Returns x if valid, otherwise y (default 0)
+// nz(x, y): Returns x if valid, otherwise y (default 0). Whatever na() calls na is replaced,
+// ±Infinity included (TradingView probe pr33-review/na-inf, v5 and v6: for x = close / 0,
+// na(x) is true and nz(x, -1) is -1).
 export function nz(x: any, y?: any): any {
-    const v = val(x);
-    if (v === null || v === undefined || (typeof v === 'number' && isNaN(v))) {
-        return y !== undefined ? val(y) : 0;
-    }
-    return v;
+    if (na(x)) return y !== undefined ? val(y) : 0;
+    return val(x);
 }
 
 
@@ -196,6 +197,81 @@ export function safe_ge(a: any, b: any): boolean {
     return x >= y;
 }
 
+/**
+ * v1-v5 comparisons: an `na` operand gives an na BOOL (NaN), not false. v6 bools are never
+ * na, so V6ToJsVisitor keeps the plain helpers above.
+ *
+ * TradingView: v4, bar 0, `c = close > close[1]` -> `na(c)` is true while `c ? 1 : 0` is 0
+ * (probe p2c_na_bool_plots). v2, `sum(close > close[1], 20)` is na through bar 19
+ * (n427 Psychological line: all 386 trades match only so). v1-v5, probes p_na_cmp_v1..v5
+ * (dev-docs/tv-parity/_probes/triage/r6/runs/nacmp, nacmp3): na(close > close[1]) and
+ * na(close == close[1]) are true on bar 0 at every version, a ternary on it gives the false arm,
+ * and `not c`, `c and true`, `c or false` are plain bools (never na). A condition reads NaN as false
+ * (Context.truthy, and/or/not, `if`), `na()` sees it, and arithmetic carries it.
+ *
+ * Same tolerance as the plain helpers; only a NaN difference (an na operand, or inf - inf)
+ * changes the result, from false to NaN.
+ */
+export function safe_eq_na(a: any, b: any): boolean | number {
+    if (typeof a === "number" && typeof b === "number") {
+        const d = a - b;
+        return d !== d ? NaN : d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE;
+    }
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") {
+        const d = x - y;
+        return d !== d ? NaN : d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE;
+    }
+    if (x !== x || y !== y) return NaN;   // an na bool against a bool
+    return x == y;
+}
+
+export function safe_ne_na(a: any, b: any): boolean | number {
+    if (typeof a === "number" && typeof b === "number") {
+        const d = a - b;
+        return d !== d ? NaN : !(d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE);
+    }
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") {
+        const d = x - y;
+        return d !== d ? NaN : !(d <= FLOAT_TOLERANCE && d >= -FLOAT_TOLERANCE);
+    }
+    if (x !== x || y !== y) return NaN;
+    return x != y;
+}
+
+export function safe_lt_na(a: any, b: any): boolean | number {
+    if (typeof a === "number" && typeof b === "number") { const d = a - b; return d !== d ? NaN : d < -FLOAT_TOLERANCE; }
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") { const d = x - y; return d !== d ? NaN : d < -FLOAT_TOLERANCE; }
+    if (x !== x || y !== y) return NaN;
+    return x < y;
+}
+
+export function safe_gt_na(a: any, b: any): boolean | number {
+    if (typeof a === "number" && typeof b === "number") { const d = a - b; return d !== d ? NaN : d > FLOAT_TOLERANCE; }
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") { const d = x - y; return d !== d ? NaN : d > FLOAT_TOLERANCE; }
+    if (x !== x || y !== y) return NaN;
+    return x > y;
+}
+
+export function safe_le_na(a: any, b: any): boolean | number {
+    if (typeof a === "number" && typeof b === "number") { const d = a - b; return d !== d ? NaN : d <= FLOAT_TOLERANCE; }
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") { const d = x - y; return d !== d ? NaN : d <= FLOAT_TOLERANCE; }
+    if (x !== x || y !== y) return NaN;
+    return x <= y;
+}
+
+export function safe_ge_na(a: any, b: any): boolean | number {
+    if (typeof a === "number" && typeof b === "number") { const d = a - b; return d !== d ? NaN : d >= -FLOAT_TOLERANCE; }
+    const x = val(a), y = val(b);
+    if (typeof x === "number" && typeof y === "number") { const d = x - y; return d !== d ? NaN : d >= -FLOAT_TOLERANCE; }
+    if (x !== x || y !== y) return NaN;
+    return x >= y;
+}
+
 // --- Type Conversion (v2 Only) ---
 
 // tostring(x): The ONLY casting function in v2
@@ -277,7 +353,12 @@ export function round(x: any, precision?: any): number {
     if (!Number.isFinite(n)) return n;
     const p = precision === undefined || precision === null ? 0 : Math.trunc(Number(val(precision)));
     if (!(p > 0)) return Math.sign(n) * Math.round(Math.abs(n));
-    return Math.sign(n) * decimalShift(Math.round(decimalShift(Math.abs(n), p)), -p);
+    // With digits, the shifted value is first taken to 10 decimals, so a value within ~1e-10 below a half
+    // rounds up: math.round(272.3649999999999, 2) = 272.37 and math.round(2.6749999999999, 2) = 2.68
+    // (r7_round_cutoff probes: x*10^p 1e-11 below .5 rounds up, 1e-10 below rounds down, for p = 1..4).
+    // Without digits there is no such snap: math.round(0.49999999999999989) = 0.
+    const shifted = Number(decimalShift(Math.abs(n), p).toFixed(10));
+    return Math.sign(n) * decimalShift(Math.round(shifted), -p);
 }
 
 /**

@@ -67,6 +67,15 @@ function isKeywordArgumentName(ctx: IdContext): boolean {
   return isRule(parent, "Kw_argContext") && parent.id?.() === ctx;
 }
 
+const SHADOW_BLOCKS = ["Local_stmts_multilineContext", "Fun_body_singlelineContext"];
+
+/** `findOuterDeclaration`'s lookup: declarations and `:=` targets by name, with their enclosing blocks (outermost first). */
+interface ShadowIndex {
+  root: any;
+  decls: Map<string, Array<{ node: any; blocks: any[] }>>;
+  assigns: Map<string, Array<{ node: any; blocks: any[] }>>;
+}
+
 export class V3ToJsVisitor extends V2ToJsVisitor {
   protected override readonly version: PineVersion = 3;
 
@@ -78,18 +87,225 @@ export class V3ToJsVisitor extends V2ToJsVisitor {
   /**
    * `s = nz(s[1]) + close` was the v1/v2 state idiom. v3 requires declaring
    * first (`s = 0.0`) and then assigning with ':='.
+   *
+   * What is NOT a self-reference (dev-docs/tv-parity/_probes/corpus98/p7_*,
+   * p9_*, p10_*, BINANCE:BTCUSDT 1h, 2026-11-14):
+   *
+   *   - A KEYWORD ARGUMENT's name: `type = input(defval = "A", type = string)`
+   *     names a parameter, never reads a variable.
+   *   - An `if` expression whose branches declare the name: `hh = if c` /
+   *     `hh = 1.0` / `else` / `hh = 2.0`. The branches' `hh` are their own.
+   *   - An inner declaration over an OUTER variable of the same name, in a
+   *     nested block or a function body: a new local whose initialiser reads the
+   *     outer one. See `allowsShadowOfOuter`.
    */
   protected enforceNoSelfReference(name: string, value: ParseTree, ctx: SourceLocated): void {
-    // `skipCallees`: Pine keeps functions and variables in separate namespaces,
-    // so `sma = sma(src, length)` binds a VARIABLE from the BUILTIN function and
-    // is not self-reference. It is a common published idiom. Arguments are still
-    // scanned, so `s = nz(s[1])` is still caught.
-    if (!this.referencesIdentifier(value, name, { skipCallees: true })) return;
+    if (!this.valueReadsName(name, value)) return;
+    if (this.allowsShadowOfOuter(name, ctx)) return;
     throw this.err(
       ctx,
       `'${name}' cannot reference itself in its own declaration. Declare it ` +
       `first (e.g. '${name} = 0.0'), then assign with ':='.`
     );
+  }
+
+  /**
+   * Does this initialiser read the variable being declared?
+   *
+   * `skipCallees`: Pine keeps functions and variables in separate namespaces,
+   * so `sma = sma(src, length)` binds a VARIABLE from the BUILTIN function and
+   * is not self-reference. It is a common published idiom. Arguments are still
+   * scanned, so `s = nz(s[1])` is still caught.
+   */
+  protected valueReadsName(name: string, node: ParseTree | null): boolean {
+    if (!node) return false;
+    const n = node as any;
+    if (isRule(n, "Call_suffixContext")) {
+      const args = n.fun_actual_args?.();
+      return args ? this.valueReadsName(name, args) : false;
+    }
+    if (isRule(n, "IdContext")) {
+      if (isKeywordArgumentName(n)) return false;
+      if (!this.readsDottedRoots()) return n.getText() === name;
+      // A dotted id: only its FIRST part names a variable, and only when
+      // that part is not a namespace, type, enum or library — in
+      // `position = position.middle_center` the variable does not exist yet,
+      // so the dotted name is the namespace's.
+      const text: string = n.getText();
+      if (text.includes(".") && this.isQualifierRoot(text.split(".")[0])) return false;
+      return text.split(".")[0] === name;
+    }
+    if (isRule(n, "Fun_callContext")) {
+      // The callee is a function name, in its own namespace; its arguments
+      // and any suffixes' arguments are read.
+      const callee = n.id?.()?.getText?.() ?? "";
+      const receiverRead = this.readsDottedRoots() && callee.includes(".") && callee.split(".")[0] === name
+        && !this.isQualifierRoot(name);
+      if (receiverRead) return true;
+      const calleeId = n.id?.();
+      for (let i = 0; i < (n.getChildCount?.() ?? 0); i++) {
+        const child = n.getChild(i);
+        if (child && child !== calleeId && this.valueReadsName(name, child)) return true;
+      }
+      return false;
+    }
+    // A block that declares the name binds its OWN: reads inside it are not ours.
+    if (isRule(n, "Local_stmts_multilineContext")) {
+      const declares = (n.local_stmts_list?.()?.local_stmt_multiline?.() ?? [])
+        .some((l: any) => (l.local_stmt_content?.() ?? [])
+          .some((c: any) => c.var_def?.()?.id?.()?.getText?.() === name));
+      if (declares) return false;
+    }
+    for (let i = 0; i < (n.getChildCount?.() ?? 0); i++) {
+      if (this.valueReadsName(name, n.getChild(i))) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Does a dotted id (`x.y`, `x.f()`) read the variable `x`? v5 added fields,
+   * methods and user types, so there it does unless `x` is a namespace, type,
+   * enum or library; before that a dotted name is always a built-in's.
+   */
+  protected readsDottedRoots(): boolean { return false; }
+
+  /** Is `root` a namespace, user type, enum or library alias — a qualifier, not a variable? */
+  protected isQualifierRoot(_root: string): boolean { return false; }
+
+  /** Does this version refuse a shadow whose outer initialiser is a constant? */
+  protected refusesShadowOfConstant(): boolean { return true; }
+
+  /**
+   * An inner `x = <expr using x>` over an outer `x` is a new local reading the
+   * outer one; the outer keeps its value. TradingView v3 and v4 compile that
+   * when the outer's initialiser is not a compile-time constant, and refuse
+   * with "Undeclared identifier" when it is (a literal or operators over
+   * literals); v5 and v6 compile either way.
+   *
+   * Returns true when the shadow is allowed, false when there is no outer
+   * variable (a true self-reference), and throws for the constant case.
+   */
+  protected allowsShadowOfOuter(name: string, ctx: SourceLocated): boolean {
+    const outer = this.findOuterDeclaration(name, ctx as any);
+    if (!outer) return false;
+    if (this.refusesShadowOfConstant() && this.isCompileTimeConstant(outer.arith_expr?.())
+        && !this.isReassigned(name, outer)) {
+      throw this.err(ctx, `Undeclared identifier '${name}'.`);
+    }
+    this.shadowPending = true;
+    return true;
+  }
+
+  /**
+   * Every `name = …` declaration and `name := …` assignment of the script, with
+   * the blocks around each, built once on first use: `findOuterDeclaration` and
+   * `isReassigned` run for every self-referencing declaration, and walking the
+   * whole tree for each was quadratic on a large script.
+   */
+  private shadowIndex: ShadowIndex | null = null;
+
+  private shadowIndexOf(ctx: any): ShadowIndex {
+    let root = ctx;
+    while (root.parent) root = root.parent;
+    if (this.shadowIndex?.root === root) return this.shadowIndex;
+    const index: ShadowIndex = { root, decls: new Map(), assigns: new Map() };
+    const blocks: any[] = [];
+    const walk = (node: any): void => {
+      const block = SHADOW_BLOCKS.some(b => isRule(node, b));
+      if (block) blocks.push(node);
+      const isDef = isRule(node, "Var_defContext");
+      if (isDef || isRule(node, "Var_assignContext")) {
+        const name = node.id?.()?.getText?.();
+        if (name !== undefined) {
+          const into = isDef ? index.decls : index.assigns;
+          const entry = { node, blocks: blocks.slice() };
+          const list = into.get(name);
+          if (list) list.push(entry); else into.set(name, [entry]);
+        }
+      }
+      for (let i = 0; i < (node.getChildCount?.() ?? 0); i++) walk(node.getChild(i));
+      if (block) blocks.pop();
+    };
+    walk(root);
+    this.shadowIndex = index;
+    return index;
+  }
+
+  /**
+   * The nearest earlier declaration of `name` in a scope that strictly
+   * encloses `ctx`'s: every block around it also surrounds `ctx`, and `ctx`
+   * sits in at least one more. The same block is a redeclaration, not a shadow.
+   */
+  private findOuterDeclaration(name: string, ctx: any): any | null {
+    const mine = new Set<any>();
+    for (let p = ctx.parent; p; p = p.parent) if (SHADOW_BLOCKS.some(b => isRule(p, b))) mine.add(p);
+    const at = ctx.start?.tokenIndex ?? 0;
+    let found: any = null;
+    for (const { node, blocks } of this.shadowIndexOf(ctx).decls.get(name) ?? []) {
+      // `blocks` is outermost first; the block set is the same one the tree gives.
+      if (node !== ctx && (node.start?.tokenIndex ?? 0) < at
+          && blocks.length < mine.size && blocks.every(b => mine.has(b))) found = node;
+    }
+    return found;
+  }
+
+  /**
+   * Is `name` the target of a `:=` anywhere in the scope `outer` was declared in
+   * (before or after it)? Such a variable is no longer a constant: TradingView
+   * v3 and v4 load a shadow over it (dev-docs/tv-parity/_probes/corpus98/
+   * p11_*, J and L).
+   *
+   * Only a `:=` that assigns `outer` counts: one under a nested declaration of
+   * the same name (an earlier `name = …` in a block between it and the scope),
+   * or inside a function or loop that binds the name, assigns that shadow.
+   */
+  private isReassigned(name: string, outer: any): boolean {
+    let scope = outer;
+    while (scope.parent && !SHADOW_BLOCKS.some(b => isRule(scope, b))) scope = scope.parent;
+    const index = this.shadowIndexOf(outer);
+    const decls = index.decls.get(name) ?? [];
+    for (const { node: assign } of index.assigns.get(name) ?? []) {
+      const between = new Set<any>();
+      let bound = false;
+      let p = assign.parent;
+      for (; p && p !== scope; p = p.parent) {
+        if (SHADOW_BLOCKS.some(b => isRule(p, b))) between.add(p);
+        else if (this.bindsName(p, name)) bound = true;
+      }
+      if (p !== scope) continue; // outside the scope `outer` lives in
+      if (bound) continue;
+      const at = assign.start?.tokenIndex ?? 0;
+      if (decls.some(d => d.node !== outer && (d.node.start?.tokenIndex ?? 0) < at
+          && d.blocks.length > 0 && between.has(d.blocks[d.blocks.length - 1]))) continue;
+      return true;
+    }
+    return false;
+  }
+
+  /** A function (its parameters) or `for` (its counter) that binds `name` for its body. */
+  private bindsName(node: any, name: string): boolean {
+    if (isRule(node, "Fun_def_singlelineContext") || isRule(node, "Fun_def_multilineContext")) {
+      const head = node.fun_head?.();
+      const params = head?.fun_param?.()?.map((q: any) => q.id?.()) ?? head?.id?.() ?? [];
+      return params.some((q: any) => q?.getText?.() === name);
+    }
+    return /^For_/.test(node?.constructor?.name ?? "") && node.id?.()?.getText?.() === name;
+  }
+
+  /**
+   * A literal, or operators over literals only. Conservative: any name, call or
+   * history reference makes it NOT constant, and a shadow of a non-constant is
+   * the allowed direction.
+   */
+  protected isCompileTimeConstant(node: ParseTree | null | undefined): boolean {
+    if (!node) return false;
+    const n = node as any;
+    if (isRule(n, "IdContext") || isRule(n, "Fun_callContext")) return false;
+    if (n.symbol) return n.getText() !== "[";
+    for (let i = 0; i < (n.getChildCount?.() ?? 0); i++) {
+      if (!this.isCompileTimeConstant(n.getChild(i))) return false;
+    }
+    return true;
   }
 
   override visitVar_def(ctx: Var_defContext): string {
@@ -147,7 +363,12 @@ export class V3ToJsVisitor extends V2ToJsVisitor {
    * reject valid code.
    */
   protected enforceNoBoolArithmetic(operand: ParseTree, ctx: SourceLocated, op: string): void {
-    if (!isStaticallyBool(operand, this.scopes.booleans)) return;
+    // `booleans` holds script-scope names. Inside a function body a name the
+    // function binds itself is the function's own, not the script's bool.
+    const booleans: ReadonlySet<string> = this.fnDepth > 0
+      ? { has: (n: string) => this.scopes.booleans.has(n) && !this.scopes.functionScoped.has(n) } as ReadonlySet<string>
+      : this.scopes.booleans;
+    if (!isStaticallyBool(operand, booleans)) return;
     throw this.err(
       ctx,
       `cannot use a bool as an operand of '${op}' (implicit bool-to-number ` +

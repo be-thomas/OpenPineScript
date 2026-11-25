@@ -40,6 +40,7 @@ import { compileScript } from "../../transpiler/common";
 import type { PineVersion } from "../../transpiler/common/version";
 import { DEFAULT_PROFILE } from "../../transpiler/common/profiles";
 import { runComparison } from "../../utils/v2/comparison_engine";
+import { buildPerformance } from "../../runtime/v1/session";
 
 // --- Terminal Colors ---
 const C = {
@@ -155,6 +156,11 @@ ${C.Bold}Output flags:${C.Reset}
 
   If no output flag is given, a formatted summary is printed to the terminal.
 
+${C.Bold}Data CSV:${C.Reset}
+  One bar per row, oldest first: time,open,high,low,close,volume (a header row is optional).
+  time may be ISO 8601 (2024-03-01T00:00:00Z; no zone means UTC), a date (2024-03-01 or 20240301),
+  or a Unix epoch number in seconds or milliseconds (micro- and nanoseconds too).
+
 ${C.Bold}Comparison flags (validate against TradingView exports):${C.Reset}
   --compare-dir <dir>    Directory with chart_data.csv, trades.csv, summary.json
   --compare-chart <file> Compare chart/indicator data against this TV export
@@ -184,27 +190,86 @@ interface Bar {
     volume: number;
 }
 
-function loadCsv(csvPath: string): Bar[] {
-    const content = fs.readFileSync(path.resolve(csvPath), "utf8").trim();
-    const lines = content.split(/\r?\n/);
-    // Auto-detect header row
-    const dataLines = lines[0].toLowerCase().includes("time") ? lines.slice(1) : lines;
+/** A data CSV the CLI cannot use, with a message fit to print as it is. */
+export class CsvFormatError extends Error {}
 
-    return dataLines
-        .map(l => l.trim())
-        .filter(l => l.length > 0)
-        .map(line => {
-            const cols = line.split(",");
-            return {
-                time:   new Date(cols[0]).getTime(),
-                open:   parseFloat(cols[1]),
-                high:   parseFloat(cols[2]),
-                low:    parseFloat(cols[3]),
-                close:  parseFloat(cols[4]),
-                volume: parseFloat(cols[5]) || 0,
-            };
-        })
-        .filter(b => !isNaN(b.close));
+/**
+ * The time column of one CSV row, as epoch milliseconds, or NaN when it is not
+ * a time at all.
+ *
+ * A number is a Unix epoch and its unit is read off its size, since nothing
+ * else in the row says it: below 1e11 it is seconds (1e11 seconds is the year
+ * 5138), below 1e14 milliseconds, below 1e17 microseconds (Binance's spot
+ * archives since 2025), else nanoseconds. An 8-digit integer from 19000101 to
+ * 21001231 is a compact YYYYMMDD date (UTC midnight), not seconds in August 1970;
+ * one that is no calendar date (20241340) is unreadable. Anything else goes to Date.parse:
+ * ISO 8601, or a bare YYYY-MM-DD (read as UTC midnight); an ISO date-time
+ * with no zone is read as UTC too.
+ */
+export function parseCsvTime(raw: string): number {
+    const v = (raw ?? "").trim().replace(/^"(.*)"$/, "$1").trim();
+    if (v === "") return NaN;
+    const compact = /^(\d{4})(\d{2})(\d{2})$/.exec(v);
+    if (compact && Number(v) >= 19000101 && Number(v) <= 21001231) {
+        const [y, m, d] = [Number(compact[1]), Number(compact[2]), Number(compact[3])];
+        const t = Date.UTC(y, m - 1, d);
+        const back = new Date(t);
+        return back.getUTCFullYear() === y && back.getUTCMonth() === m - 1 && back.getUTCDate() === d ? t : NaN;
+    }
+    if (/^-?\d+(\.\d+)?$/.test(v)) {
+        const n = Number(v);
+        const a = Math.abs(n);
+        if (a < 1e11) return Math.round(n * 1000);
+        if (a < 1e14) return Math.round(n);
+        if (a < 1e17) return Math.round(n / 1e3);
+        return Math.round(n / 1e6);
+    }
+    // An ISO date-time with no zone ("2024-03-01 09:30", "2024-03-01T09:30:00")
+    // is read as UTC, as a bare date already is: JavaScript would read it in
+    // the machine's local zone, so the same file would give different bar
+    // times on different machines.
+    const zoneless = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(:\d{2}(\.\d+)?)?)$/.exec(v);
+    if (zoneless) return Date.parse(`${zoneless[1]}T${zoneless[2]}Z`);
+    return Date.parse(v);
+}
+
+/** The bars of a data CSV's text. Throws CsvFormatError on a time it cannot read. */
+export function parseCsv(content: string): Bar[] {
+    const lines = content.trim().split(/\r?\n/);
+    // Auto-detect header row
+    const start = lines[0].toLowerCase().includes("time") ? 1 : 0;
+
+    const bars: Bar[] = [];
+    for (let i = start; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.length === 0) continue;
+        const cols = line.split(",");
+        const close = parseFloat(cols[4]);
+        // A row whose close is not a number is not a bar (an unrecognised
+        // header such as `Date,Open,...`): it has always been dropped, and is
+        // dropped before its time is looked at.
+        if (isNaN(close)) continue;
+        const time = parseCsvTime(cols[0]);
+        if (!Number.isFinite(time)) {
+            throw new CsvFormatError(
+                `line ${i + 1}: cannot read the time "${(cols[0] ?? "").trim()}". ` +
+                `Use ISO 8601 (2024-03-01T00:00:00Z), a date (2024-03-01), or Unix epoch seconds or milliseconds.`,
+            );
+        }
+        bars.push({
+            time,
+            open:   parseFloat(cols[1]),
+            high:   parseFloat(cols[2]),
+            low:    parseFloat(cols[3]),
+            close,
+            volume: parseFloat(cols[5]) || 0,
+        });
+    }
+    return bars;
+}
+
+function loadCsv(csvPath: string): Bar[] {
+    return parseCsv(fs.readFileSync(path.resolve(csvPath), "utf8"));
 }
 
 // --- Output Generators ---
@@ -254,7 +319,6 @@ function generateChartCsv(bars: Bar[], ctx: Context): string {
 function generateTradesCsv(ctx: Context): string {
     if (ctx.trades.length === 0) return "";
 
-    const INITIAL_CAPITAL = 100000;
     const header = "Trade #,Type,Signal,Date/Time,Price,Contracts,Profit,Profit %,Cum. Profit";
 
     let cumProfit = 0;
@@ -266,7 +330,10 @@ function generateTradesCsv(ctx: Context): string {
         const signal   = trade.id.replace(/^(Close|Exit)\s*/i, "").trim() || "Signal";
         const entryDt  = trade.entryTime ? new Date(trade.entryTime).toISOString() : "N/A";
         const exitDt   = new Date(trade.exitTime).toISOString();
-        const profitPct = (trade.pnl / INITIAL_CAPITAL) * 100;
+        // TradingView's per-trade "Profit %" is the return on what the entry
+        // cost, not on the account.
+        const entryValue = Math.abs(trade.entryPrice * trade.qty);
+        const profitPct = entryValue > 0 ? (trade.pnl / entryValue) * 100 : 0;
         cumProfit += trade.pnl;
 
         // Entry row — profit columns are 0 at entry
@@ -300,42 +367,38 @@ function generateTradesCsv(ctx: Context): string {
 }
 
 /**
- * Computes performance metrics from ctx.trades and returns a JSON-serialisable object.
+ * The performance summary, read off the same report Zeal Terminal and every
+ * other host get (session.ts buildPerformance), so the CLI cannot drift from
+ * them: money against the strategy's own initial capital (its
+ * `initial_capital`, else the version's default), and max drawdown as
+ * TradingView measures it (see Context.maxEquityDrawdown).
  */
-function generateSummary(ctx: Context): Record<string, number | null> {
-    const INITIAL_CAPITAL = 100000;
+export function generateSummary(ctx: Context): Record<string, number | null> {
     const trades = ctx.trades;
-
-    const netProfit    = ctx.cash - INITIAL_CAPITAL;
-    const netProfitPct = (netProfit / INITIAL_CAPITAL) * 100;
+    const capital = ctx.initialCapital;
+    const perf = buildPerformance(ctx)?.all;
 
     const winners = trades.filter(t => t.pnl > 0);
     const losers  = trades.filter(t => t.pnl < 0);
 
-    const grossProfit = winners.reduce((s, t) => s + t.pnl, 0);
-    const grossLoss   = Math.abs(losers.reduce((s, t) => s + t.pnl, 0));
+    const netProfit   = perf?.netProfit ?? 0;
+    const grossProfit = perf?.grossProfit ?? 0;
+    const grossLoss   = perf?.grossLoss ?? 0;
     const rawPF       = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? Infinity : 0);
 
+    // Averages over closed trades only, as TradingView's "Avg winning/losing trade": the report's
+    // gross loss also carries an open position's entry commission (buildPerformance).
     const winRate = trades.length > 0 ? (winners.length / trades.length) * 100 : 0;
-    const avgWin  = winners.length > 0 ? grossProfit / winners.length : 0;
-    const avgLoss = losers.length  > 0 ? grossLoss   / losers.length  : 0;
+    const avgWin  = winners.length > 0 ? winners.reduce((s, t) => s + t.pnl, 0) / winners.length : 0;
+    const avgLoss = losers.length  > 0 ? -losers.reduce((s, t) => s + t.pnl, 0) / losers.length : 0;
 
-    // Max drawdown from equity curve
-    let equity = INITIAL_CAPITAL;
-    let peak   = INITIAL_CAPITAL;
-    let maxDrawdown = 0;
-    for (const t of trades) {
-        equity += t.pnl;
-        if (equity > peak) peak = equity;
-        const dd = peak > 0 ? ((peak - equity) / peak) * 100 : 0;
-        if (dd > maxDrawdown) maxDrawdown = dd;
-    }
-
-    const fmt = (n: number, d = 2) => parseFloat(n.toFixed(d));
+    const pct = (n: number) => (capital > 0 ? (n / capital) * 100 : 0);
+    const fmt = (n: number, d = 2) => (Number.isFinite(n) ? parseFloat(n.toFixed(d)) : 0);
 
     return {
+        initial_capital:      fmt(capital),
         net_profit:           fmt(netProfit),
-        net_profit_percent:   fmt(netProfitPct),
+        net_profit_percent:   fmt(pct(netProfit)),
         gross_profit:         fmt(grossProfit),
         gross_loss:           fmt(grossLoss),
         total_closed_trades:  trades.length,
@@ -345,7 +408,8 @@ function generateSummary(ctx: Context): Record<string, number | null> {
         avg_win:              fmt(avgWin),
         avg_loss:             fmt(avgLoss),
         profit_factor:        isFinite(rawPF) ? fmt(rawPF, 3) : null,
-        max_drawdown_percent: fmt(maxDrawdown),
+        max_drawdown:         fmt(perf?.maxDrawdown ?? 0),
+        max_drawdown_percent: fmt(perf?.maxDrawdownPercent ?? 0),
     };
 }
 
@@ -367,11 +431,12 @@ function printConsoleSummary(ctx: Context, totalBars: number, scriptName: string
         const col    = profit >= 0 ? C.Green : C.Red;
 
         err(`\n${C.Bold}Performance:${C.Reset}`);
+        err(`  Initial Capital    $${(s.initial_capital as number).toFixed(2)}`);
         err(`  Net Profit         ${col}${sign}$${profit.toFixed(2)} (${sign}${pc.toFixed(2)}%)${C.Reset}`);
         err(`  Total Trades       ${s.total_closed_trades}`);
         err(`  Win Rate           ${(s.win_rate as number).toFixed(1)}%  (${s.winning_trades}W / ${s.losing_trades}L)`);
         err(`  Profit Factor      ${s.profit_factor ?? "N/A"}`);
-        err(`  Max Drawdown       ${(s.max_drawdown_percent as number).toFixed(2)}%`);
+        err(`  Max Drawdown       $${(s.max_drawdown as number).toFixed(2)} (${(s.max_drawdown_percent as number).toFixed(2)}%)`);
         err(`  Avg Win / Avg Loss $${(s.avg_win as number).toFixed(2)} / $${(s.avg_loss as number).toFixed(2)}`);
     }
 
@@ -457,8 +522,12 @@ export async function main(argv: string[] = process.argv) {
     let bars: Bar[];
     try {
         bars = loadCsv(cli.dataPath);
-    } catch {
-        console.error(`${C.Red}Error:${C.Reset} Cannot read CSV: ${cli.dataPath}`);
+    } catch (e) {
+        if (e instanceof CsvFormatError) {
+            console.error(`${C.Red}Error:${C.Reset} ${cli.dataPath}, ${e.message}`);
+        } else {
+            console.error(`${C.Red}Error:${C.Reset} Cannot read CSV: ${cli.dataPath}`);
+        }
         process.exit(1);
     }
 

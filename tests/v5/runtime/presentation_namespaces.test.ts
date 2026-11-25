@@ -218,17 +218,26 @@ describe("`session` is a CONSTANT at v1–v3 and a NAMESPACE at v5", () => {
 });
 
 describe("three of the five are v5-only", () => {
+  // `display.none` and `display.all` are v4 too (TradingView compiles
+  // `plot(close, display = display.none)` at v4,
+  // dev-docs/tv-parity/_probes/corpus98/p4_v4_display, 2026-11-14); the rest
+  // of `display.*` is v5.
   // `format` is NOT: TradingView v4 compiles `tostring(close, format.mintick)`,
   // `format.volume`, `format.percent`, `format.price` and `format.inherit`
   // (dev-docs/tv-parity/_probes/version-scope/v4-draw-fmt, 2026-11-12).
   const CASES: Array<[string, string]> = [
     ["chart", "x = chart.fg_color"],
-    ["display", "x = display.all"],
     ["font", "x = font.family_default"],
   ];
 
   it("format.* is accepted at v4 (TradingView compiles it)", () => {
     expect(() => transpile(`//@version=4\nstudy("t")\nx = tostring(close, format.price)\nplot(close)\n`)).not.toThrow();
+  });
+
+  it("display.none and display.all are accepted at v4, the rest of display.* is refused", () => {
+    expect(() => transpile(`//@version=4\nstudy("t")\nplot(close, display=display.none)\nplot(close, display=display.all)\n`)).not.toThrow();
+    expect(() => transpile(`//@version=4\nstudy("t")\nx = display.pane\n`))
+      .toThrow(/'display.pane' is not available in Pine Script v4/);
   });
 
   for (const [name, body] of CASES) {

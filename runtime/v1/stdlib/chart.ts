@@ -281,6 +281,18 @@ export function heikinashi(symbol: any): string {
   return s.startsWith(HEIKINASHI_PREFIX) ? s : HEIKINASHI_PREFIX + s;
 }
 
+/**
+ * `heikenashi(symbol)` — the older spelling of `heikinashi()`, the same function.
+ * TradingView compiles and runs it in a script with no `//@version` line (v1):
+ * captures of two "[RS]ZigZag PA Strategy" scripts calling `heikenashi(tickerid)`.
+ * Removed from v4's vocabulary with the other v1–v3 flat names (V4_REMOVED).
+ *
+ * @returns {string} The symbol, marked for Heikin-Ashi transformation.
+ */
+export function heikenashi(symbol: any): string {
+  return heikinashi(symbol);
+}
+
 /** Marker understood by Context.getSecurityData(). */
 export const HEIKINASHI_PREFIX = "heikinashi:";
 

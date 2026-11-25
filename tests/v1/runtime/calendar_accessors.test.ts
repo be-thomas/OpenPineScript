@@ -116,8 +116,11 @@ describe("called with a time, each one reads THAT instant", () => {
     expect(read("x = dayofmonth()\n", T)).toBe(17);
   });
 
-  it("na in, na out", () => {
-    expect(Number.isNaN(read("x = year(na)\n", T))).toBe(true);
+  // TradingView reads an na time as Unix time 0: year(time[1]) on bar 0 is 1970 at v1-v6
+  // (dev-docs/tv-parity/_probes/eqpnl/p_tna_v*; tests/common/calendar_na_time.test.ts).
+  it("na in, the epoch out", () => {
+    expect(read("x = year(int(na))\n", T)).toBe(1970);
+    expect(read("x = dayofweek(int(na))\n", T)).toBe(5);
   });
 });
 

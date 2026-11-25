@@ -35,6 +35,9 @@ function runPine(pineSource: string): Record<string, unknown> {
   // holding the same number was false.
   sandbox[`${OPSV2}safe_eq`] = (a: any, b: any) => (a?.valueOf?.() ?? a) == (b?.valueOf?.() ?? b);
   sandbox[`${OPSV2}safe_ne`] = (a: any, b: any) => (a?.valueOf?.() ?? a) != (b?.valueOf?.() ?? b);
+  // v1-v5 emit the na-propagating comparisons (core.ts safe_*_na); no na operands here.
+  sandbox[`${OPSV2}safe_eq_na`] = sandbox[`${OPSV2}safe_eq`];
+  sandbox[`${OPSV2}safe_ne_na`] = sandbox[`${OPSV2}safe_ne`];
   sandbox[`${OPSV2}$pick`] = (c: any, t: any, f: any) => (c ? t : f);
   
   vm.createContext(sandbox);
@@ -60,26 +63,21 @@ describe("transpiler v2 extended (v2 constraints)", () => {
   });
 
   describe("tuple destructuring restrictions", () => {
-    it("throws error when user-defined function tries to return a tuple (Single-line)", () => {
+    // v1–v3 accept a tuple-returning user function: TradingView compiles it
+    // (dev-docs/tv-parity/_probes/corpus98/p5_v{1,2,3}_tuple, 2026-11-14).
+    it("accepts a user-defined function returning a tuple (Single-line)", () => {
       const source = `//@version=2\nmyFunc(x) => [x, x + 1]\n[a, b] = myFunc(1)`;
-      // The version is named in the message so the user knows which rule rejected it.
-      assert.throws(
-        () => transpile(source),
-        /Pine Script v2 Error .*User-defined functions cannot return tuples/,
-      );
+      assert.doesNotThrow(() => transpile(source));
     });
 
-    it("throws error when user-defined function tries to return a tuple (Multi-line)", () => {
+    it("accepts a user-defined function returning a tuple (Multi-line)", () => {
       const source = `//@version=2\nmyFunc(x) =>\n    y = x + 1\n    [x, y]\n[a, b] = myFunc(1)`.trim();
-      assert.throws(
-        () => transpile(source),
-        /Pine Script v2 Error .*User-defined functions cannot return tuples/,
-      );
+      assert.doesNotThrow(() => transpile(source));
     });
 
-    it("throws error when attempting to destructure a user-defined function call", () => {
+    it("accepts destructuring a user-defined function call", () => {
       const source = `pair(v) => [v, v+1]\n[a, b] = pair(close)`.trim();
-      assert.throws(() => transpile(source), /User-defined functions cannot return tuples/);
+      assert.doesNotThrow(() => transpile(source));
     });
 
     it("throws error when destructuring a function not marked as returning a tuple in REGISTRY", () => {

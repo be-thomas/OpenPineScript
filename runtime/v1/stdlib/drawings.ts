@@ -650,14 +650,22 @@ export const table = {
         ctx: Context, position: any, columns: any, rows: any,
         bgcolor: any = null, frame_color: any = null, frame_width: any = 0,
         border_color: any = null, border_width: any = 0,
-    ) => ctx.newDrawing("table", {
-        position: v(position), columns: n(columns), rows: n(rows),
-        bgcolor: v(bgcolor), frame_color: v(frame_color), frame_width: n(frame_width),
-        border_color: v(border_color), border_width: n(border_width),
-        // Cells are sparse — a table is usually mostly empty, and a dense
-        // rows×columns allocation would be built on every bar.
-        cells: new Map<string, Record<string, any>>(),
-    }),
+    ) => {
+        // One table per position: a new one deletes the one already there (TradingView probe t03:
+        // two at top_right and one at bottom_left leave table.all.size() == 2).
+        const where = v(position);
+        for (const id of ctx.drawingIds("table")) {
+            if ((ctx as any).drawings.get(id)?.props.position === where) ctx.deleteDrawing(id);
+        }
+        return ctx.newDrawing("table", {
+            position: where, columns: n(columns), rows: n(rows),
+            bgcolor: v(bgcolor), frame_color: v(frame_color), frame_width: n(frame_width),
+            border_color: v(border_color), border_width: n(border_width),
+            // Cells are sparse — a table is usually mostly empty, and a dense
+            // rows×columns allocation would be built on every bar.
+            cells: new Map<string, Record<string, any>>(),
+        });
+    },
 
     cell: (
         ctx: Context, table_id: any, column: any, row: any, text: any = "",

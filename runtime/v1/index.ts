@@ -204,6 +204,8 @@ export function compile(jsCode: string, ctx: Context, sandbox: any) {
 
     // 2. DEFINE THE EXECUTOR (browser-safe; no node:vm)
     const main = defineMain(jsCode, sandbox);
+    // A requested context runs the same body (Context.runInContext).
+    ctx.__main = main;
 
     // 3. RETURN THE EXECUTOR
     // sandbox.opsv2_close points at the Series object that ctx.setBar() mutates,

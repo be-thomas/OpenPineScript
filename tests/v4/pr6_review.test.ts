@@ -133,10 +133,11 @@ describe("drawings are capped, oldest evicted — as Pine does", () => {
     expect(ctx.drawings.size).toBe(104);
   });
 
-  it("tables are NOT capped — Pine limits them by position, not count", () => {
-    const { ctx, exec } = build(HEAD + "t = table.new(position.top_right, 1, 1)\n");
+  it("tables are not capped by count: a new table replaces the one at its position (probe t03)", () => {
+    const { ctx, exec } = build(HEAD
+      + "t = table.new(position.top_right, 1, 1)\nt2 = table.new(position.bottom_left, 1, 1)\n");
     for (let i = 0; i < 80; i++) { ctx.setBar(i, 10, 12, 9, 11, 100); exec(); ctx.finalizeBar(); }
-    expect(ctx.drawings.size).toBe(80);
+    expect(ctx.drawings.size).toBe(2);
   });
 
   it("an explicit delete keeps the eviction queue honest", () => {

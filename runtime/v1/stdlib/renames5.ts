@@ -281,7 +281,12 @@ export const V5_RENAMES: readonly RenameSpec[] = [
  * spelling, so they are not removed — they are re-declared as functions by
  * V5_ONLY_NAMES above.
  */
-const V5_DROPPED: readonly string[] = ["iff", "input.integer", "input.resolution"];
+const V5_DROPPED: readonly string[] = [
+    "iff", "input.integer", "input.resolution",
+    // v4-only spellings added by value (see LABEL_STYLES in ./renames.ts); not
+    // probed at v5, so they stay as they were: refused.
+    "label.style_labelup", "label.style_labeldown",
+];
 
 /**
  * Every v4 spelling that is not writable at v5.

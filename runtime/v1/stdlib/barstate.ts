@@ -77,7 +77,8 @@ export function isfirst(ctx: Context): boolean {
  */
 export function isconfirmed(ctx: Context): boolean {
     // The closing execution exists on v5 and v6 only (Context.realtimeBarStates); is_confirmed is never set below that.
-    return !ctx.is_realtime || ctx.is_confirmed;
+    // Not on the live bar's load pass (Context.load_pass): computed with the history, but still forming.
+    return (!ctx.is_realtime && !ctx.load_pass) || ctx.is_confirmed;
 }
 
 /**

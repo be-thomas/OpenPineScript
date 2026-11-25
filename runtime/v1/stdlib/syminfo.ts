@@ -48,6 +48,7 @@
  * v4+, which this file does not enforce: the registry split in ./index.ts keeps
  * the namespace out of the v1–v3 view.
  */
+import { val } from "../../../utils/v2/common";
 import { Context } from "../context";
 
 /** The half of `EXCHANGE:SYMBOL` before the colon, or "" when there is none. */
@@ -56,6 +57,12 @@ function splitTickerId(tickerid: string): { prefix: string; ticker: string } {
     return colon < 0
         ? { prefix: "", ticker: tickerid }
         : { prefix: tickerid.slice(0, colon), ticker: tickerid.slice(colon + 1) };
+}
+
+/** The symbol argument of `syminfo.ticker(symbol)` / `syminfo.prefix(symbol)`, else the chart's. */
+function symbolOrChart(ctx: Context, symbol: unknown): string {
+    const s = symbol === undefined ? undefined : val(symbol);
+    return typeof s === "string" && s !== "" ? s : String(ctx.symbol);
 }
 
 export const syminfo = {
@@ -67,7 +74,9 @@ export const syminfo = {
      * split of one string.
      * @getter
      */
-    ticker: (ctx: Context): string => splitTickerId(String(ctx.symbol)).ticker,
+    // v6 also calls it as a function, `syminfo.ticker(symbol)`: the bare ticker of THAT symbol
+    // (TradingView: syminfo.ticker("XAUUSD") == "XAUUSD" on a BINANCE:BTCUSDT chart).
+    ticker: (ctx: Context, symbol?: unknown): string => splitTickerId(symbolOrChart(ctx, symbol)).ticker,
 
     /**
      * The full ticker identifier — "NASDAQ:AAPL".
@@ -127,7 +136,8 @@ export const syminfo = {
      * disagree: they are two readings of one string.
      * @getter
      */
-    prefix: (ctx: Context): string => splitTickerId(String(ctx.symbol)).prefix,
+    // Also callable with a symbol (v6), like `ticker`.
+    prefix: (ctx: Context, symbol?: unknown): string => splitTickerId(symbolOrChart(ctx, symbol)).prefix,
 
     /**
      * The futures root code, or the plain ticker when the symbol is not one.

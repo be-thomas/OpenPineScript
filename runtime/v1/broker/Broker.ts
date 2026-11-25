@@ -98,8 +98,50 @@ function isPercentType(type: unknown): boolean {
     return type === "percent" || type === percent_of_equity;
 }
 
+/**
+ * How far along `points` (segment index plus the share of that segment) the price
+ * first reaches `level`, rising to it when `up`, falling to it otherwise. 0 when
+ * the first point is already there; Infinity when it is never reached.
+ */
+function pathReach(points: number[], level: number, up: boolean): number {
+    if (Number.isNaN(level)) return Infinity;
+    if (up ? points[0] >= level : points[0] <= level) return 0;
+    for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1], b = points[i];
+        if (up ? (b > a && b >= level) : (b < a && b <= level)) return i - 1 + (level - a) / (b - a);
+    }
+    return Infinity;
+}
+
+/** What is left of the path `points` from position `at` on. */
+function restOfPath(points: number[], at: number): number[] {
+    const k = Math.min(Math.floor(at), points.length - 1);
+    const f = at - k;
+    const from = points[k] + (points[Math.min(k + 1, points.length - 1)] - points[k]) * f;
+    return [from, ...points.slice(k + 1)];
+}
+
+/** A position on `restOfPath(points, from)`, as a position on `points`. */
+function onWholePath(from: number, at: number): number {
+    if (!Number.isFinite(at)) return at;
+    const k = Math.floor(from), f0 = from - k;
+    const j = Math.floor(at), f = at - j;
+    return j === 0 ? k + f0 + f * (1 - f0) : k + j + f;
+}
+
 export class Broker {
     constructor(protected readonly ctx: Context) {}
+
+    /**
+     * The broker's order sequence: every placement or modification of a pending entry, every
+     * `strategy.exit` call and every fill takes the next number. Orders that fill at the same price
+     * on the same tick fill in this order (see processBarOrders). Kept on the context; only the order
+     * of the numbers matters, so a rolled-back tick leaving gaps is harmless.
+     */
+    protected nextSeq(): number {
+        const c = this.ctx as any;
+        return (c._orderSeq = (c._orderSeq ?? 0) + 1);
+    }
 
     protected getPendingExits(): Map<string, PendingExit> {
         const ctx = this.ctx;
@@ -250,6 +292,14 @@ export class Broker {
 
         const entries = this.getPendingEntries();
         const existing = entries.get(id);
+        const buying = dir === direction.long;
+        // `strategy.entry` is judged when the script places it (see entryFixedAtPlacement):
+        // one placed while `pyramiding` is already full on its side is not a live order.
+        if (obeysPyramiding && this.entryFixedAtPlacement() && this.pyramidingBlocks(buying, false)) {
+            entries.delete(id);
+            return;
+        }
+        const side = Math.sign(ctx.position.size);
         entries.set(id, {
             id,
             dir,
@@ -267,8 +317,35 @@ export class Broker {
             oca_name: oca_name || "",
             oca_type: oca_type || oca.none,
             exempt: !obeysPyramiding,
+            nets: obeysPyramiding && this.entryFixedAtPlacement() && side !== (buying ? -1 : 1),
+            placedEquity: equity(ctx),
+            placedSize: ctx.position.size,
+            seq: this.nextSeq(),
         });
     }
+
+    /**
+     * Whether a pending `strategy.entry` (limit or stop) is judged when the script places it,
+     * as TradingView does, rather than when it fills. TradingView, v4, BINANCE:BTCUSDT 1h
+     * (dev-docs/tv-parity/_probes/two-entries):
+     *  - placed while flat, a long stop and a short stop that both fill on one bar: the second
+     *    only closes the first trade (an order of 1 against a position of 1), it does not reverse;
+     *  - placed while short 1 (pyramiding 1), the short stop never fills, before or after the long
+     *    stop reverses the position on the same bar; the long stop is a reversal of 2.
+     * The engine sized and admitted each at its fill, so both turned into full reversals
+     * (Monthly Returns in PineScript Strategies: an extra reversal on 2026-01-12, and every
+     * trade after it drifted).
+     */
+    protected entryFixedAtPlacement(): boolean { return false; }
+
+    /**
+     * Whether a percent_of_equity entry is sized from `strategy.equity` when the script placed
+     * it (divided by its fill price), rather than from the equity at the fill. TradingView: a
+     * short stop placed on a bar closing at 78288.27 with equity 986637.30 fills at 77500 as
+     * 6.3654 at v2, v3, v4, v5 and v6 alike (dev-docs/tv-parity/_probes/reversal-sizing, runs
+     * p_stopsize_v2, p_stopsize_v3, ss4-ss6). Overridden in V2Broker; later versions inherit.
+     */
+    protected sizesFromPlacedEquity(): boolean { return false; }
 
     /**
      * Fills the queued market orders at `price`: the open of the bar after the
@@ -285,7 +362,7 @@ export class Broker {
             if (o.kind === "entry") {
                 this.entry(o.id, o.direction!, o.qty, Number.NaN, Number.NaN,
                       "", oca.none, o.comment ?? "", undefined, "", price, false, o.exempt,
-                      this.sizingPriceFor(o.placedClose));
+                      this.sizingPriceFor(o.placedClose), false, o.placedEquity);
             } else {
                 this.fillClose(o, price);
             }
@@ -303,7 +380,10 @@ export class Broker {
             // `qty` wins over `qty_percent`, as for `strategy.exit`; neither
             // closes every entry with this id.
             const want = !Number.isNaN(o.qty ?? Number.NaN) ? o.qty!
-                : !Number.isNaN(o.qty_percent ?? Number.NaN) ? held * Math.min(100, Math.max(0, o.qty_percent!)) / 100
+                // A percentage of the position is floored to the quantity step like any
+                // order size: 30% of 0.01179 BTC closes 0.00353, not 0.003537 (TradingView,
+                // v6 strategy.close(qty_percent = 30) on BINANCE:BTCUSDT, mincontract 0.00001).
+                : !Number.isNaN(o.qty_percent ?? Number.NaN) ? this.floorToMinContract(held * Math.min(100, Math.max(0, o.qty_percent!)) / 100)
                 : held;
             const take = Math.min(held, want, Math.abs(ctx.position.size));
             if (!(take > 0)) return;
@@ -312,7 +392,7 @@ export class Broker {
             // the position first in, first out, whichever entries are oldest: with
             // A (1), B (2), A (3) open, close("A") sells 1 + 2 + 1, not A's four
             // (TradingView's log, harness_strategy_pyr3 phase d).
-            this.closeEntries(take, this.toTick(this.slip(price, !isLong)), undefined, {
+            this.closeEntries(take, this.toTick(this.slip(price, !isLong)), this.closesNamedEntry() ? o.entry : undefined, {
                 id: o.id, exitId: `Close entry(s) order ${o.entry}`, exitComment: o.comment || undefined,
                 ledger: o.entry,
             });
@@ -343,6 +423,11 @@ export class Broker {
         // Nor this: the price a cash / percent-of-equity size is computed at, when
         // that is not the fill price (see `sizingPriceFor`).
         sizingPrice?: number,
+        // Nor this: a pending `strategy.entry` that was not a reversal when placed
+        // (`PendingEntry.nets`) only nets an opposite position, as `strategy.order` does.
+        nets: boolean = false,
+        // Nor this: `strategy.equity` when the script placed the order (see `defaultQty`).
+        placedEquity?: number,
     ): boolean {
         const ctx = this.ctx;
         if (!this.gated(when)) return false;
@@ -370,7 +455,7 @@ export class Broker {
             ctx.marketOrders.push({
                 kind: "entry", id, direction: dir,
                 qty: qty === undefined ? undefined : val(qty),
-                comment, exempt, placedClose: ctx.close,
+                comment, exempt, placedClose: ctx.close, placedEquity: equity(ctx),
             });
             return false;
         }
@@ -384,10 +469,16 @@ export class Broker {
 
         const isLong = dir === DIR.long;
 
-        // allow_entry_in check
-        if (rs.allow_entry_in !== "all") {
-            if (isLong && rs.allow_entry_in !== DIR.long) return false;
-            if (!isLong && rs.allow_entry_in !== DIR.short) return false;
+        // allow_entry_in: an entry in the forbidden direction opens nothing, but it closes a
+        // position open the other way ("Instead of opening a short position with 10 contracts,
+        // this command will close long entries", strategy.risk.allow_entry_in; TradingView n65 and
+        // the trade lists of other long-only strategies: the short signal closes the long at the next
+        // open and opens nothing). With no such position it does nothing.
+        if (rs.allow_entry_in !== "all" && rs.allow_entry_in !== (isLong ? DIR.long : DIR.short)) {
+            if (ctx.position.size !== 0 && (ctx.position.size > 0) !== isLong) {
+                this.closeAt(id, overridePrice !== undefined ? overridePrice : ctx.close, id, comment || undefined);
+            }
+            return false;
         }
 
         // `pyramiding`: "the maximum number of entries allowed in the same
@@ -403,7 +494,7 @@ export class Broker {
         const currentPrice = viaLimit
             ? this.toTick(modelPrice)
             : this.toTick(this.slip(modelPrice, isLong));
-        let numQty = this.floorToMinContract(qty === undefined ? this.defaultQty(sizingPrice ?? currentPrice) : val(qty));
+        let numQty = this.floorToMinContract(qty === undefined ? this.defaultQty(sizingPrice ?? currentPrice, placedEquity) : val(qty));
         if (!Number.isFinite(numQty) || numQty <= 0) return false;
 
         // max_position_size clamp
@@ -417,14 +508,14 @@ export class Broker {
             }
         }
 
-        // Whether the account can carry this order at all. Always yes before
-        // v6, which never modelled margin; V6Broker blocks what it cannot fund.
-        if (!this.admitsEntry(isLong, numQty, currentPrice)) return false;
+        // Whether the account can carry this order at all: V5Broker blocks what the
+        // declared margin cannot fund (v6 declares 100% by default); always yes before v5.
+        if (!this.admitsEntry(isLong, numQty, currentPrice, placedEquity)) return false;
 
         // 1. Reverse opposite position
         if (ctx.position.size !== 0) {
             const isCurrentLong = ctx.position.size > 0;
-            if (isLong !== isCurrentLong && exempt) {
+            if (isLong !== isCurrentLong && (exempt || nets)) {
                 // `strategy.order` against an open position is not a reversal:
                 // it takes its size off the position, oldest entry first, and
                 // only what is more than the position opens the other way. A
@@ -511,6 +602,7 @@ export class Broker {
             id, qty: numQty, opened: numQty, price: this.exactTick(currentPrice),
             bar: ctx.currentBarIndex, time: ctx.time, commission: entryFee,
             uid: `${ctx.currentBarIndex}:${ctx.filledOrderCount}`,
+            seq: this.nextSeq(),
         });
 
         // Track filled orders for intraday limit
@@ -548,7 +640,8 @@ export class Broker {
 
     /** The quantity an entry with no `qty` takes at `price`: `strategy.default_entry_qty`. */
     entryQtyAt(price: number): number {
-        return this.defaultQty(price);
+        // The equity an entry placed on this bar gets (v4+), and what this answered at every version.
+        return this.defaultQty(price, equity(this.ctx), true);
     }
 
     /**
@@ -559,7 +652,7 @@ export class Broker {
     /**
      * Whether quantities are floored to `syminfo.mincontract`. TradingView evidence: v4
      * (Adaptive Momentum Test, floor to 0.00001), v5 (_probes/v5-sizing) and v6 (_probes/sizing). Overridden in
-     * V4Broker (v5, v6 inherit); v2 and v3 were not probed and keep the unfloored size.
+     * V2Broker (every later version inherits; v2 and v3: _probes/reversal-sizing).
      */
     protected floorsToMinContract(): boolean { return false; }
 
@@ -580,12 +673,18 @@ export class Broker {
         const ctx = this.ctx;
         const m = ctx.mincontract;
         if (!this.floorsToMinContract() || !ctx.mincontractSupplied || !Number.isFinite(qty) || !(m > 0)) return qty;
-        const steps = Math.floor(qty / m + 1e-9);
+        // The quotient carries float noise RELATIVE to its size: 10000 / 0.00001 is 999999999.9999999, which an
+        // absolute 1e-9 slack floored to 9999.99999 ([RS]Spot/Binary Scalper: qty = 10000 traded as 10000).
+        const q = qty / m;
+        const near = Math.round(q);
+        // Float noise only: 1e-12 of the quotient. 1e-9 of it rounded n139's 90454.8556798 / 63260.01 /
+        // 0.00001 = 142988.99997 up to 142989 where TradingView traded 1.42988 (v6, 100% of equity).
+        const steps = Math.abs(q - near) <= Math.max(1e-9, 1e-12 * Math.abs(q)) ? near : Math.floor(q);
         // Multiply back, then trim the float noise (0.001 * 22 = 0.022000000000000002).
         return Number((steps * m).toPrecision(12));
     }
 
-    protected defaultQty(price: number): number {
+    protected defaultQty(price: number, placedEquity?: number, alwaysPlaced = false): number {
         const ctx = this.ctx;
         const meta = ctx.scriptMeta;
         const value = Number(meta?.default_qty_value ?? 1);
@@ -593,13 +692,27 @@ export class Broker {
 
         switch (meta?.default_qty_type) {
             case cash:
-                return price > 0 ? value / price : 0;
+                // The cash amount is in the strategy's currency: converted into the symbol's at the
+                // entry bar's rate (TradingView, strategy(currency = USD) on BTCUSDT with 10,000 USD
+                // per order: qty = floor(10000 / (price * USDT→USD rate)), 12 of 12 trades to the cent).
+                return price > 0 ? value / (price * ctx.accountRate()) : 0;
             case percent_of_equity:
             {
                 // TradingView sizes the order so the entry commission fits in the equity.
                 const fee = this.sizesWithCommissionRoom() && meta?.commission_type === commission.percent
                     ? 1 + Number(meta?.commission_value ?? 0) / 100 : 1;
-                return price > 0 ? (equity(ctx) * value / 100) / (price * fee) : 0;
+                // Which equity sizes the order: `strategy.equity` when the script PLACED it (its
+                // bar's close, open position marked there), divided by the price it fills at
+                // (sizesFromPlacedEquity, v2-v6). TradingView, 50% of 1,000,000 long 6.21596, a
+                // short stop placed on a bar closing at 78288.27 (equity 986637.30) that fills at
+                // 77500 on the next: the short is 6.3654 = 986637.30 * 0.5 / 77500; equity at the
+                // fill would give 6.3338 (dev-docs/tv-parity/_probes/reversal-sizing). Without a
+                // placement equity: the equity at the fill price, never the fill bar's close,
+                // which is not known yet when an order fills at its open.
+                const atFill = price > 0 ? ctx.cash + ctx.openProfitAt(price) : equity(ctx);
+                const eq = (alwaysPlaced || this.sizesFromPlacedEquity()) && placedEquity !== undefined && Number.isFinite(placedEquity)
+                    ? placedEquity : atFill;
+                return price > 0 ? (eq * value / 100) / (price * fee) : 0;
             }
             default:
                 return value;
@@ -719,10 +832,11 @@ export class Broker {
             ...ctx.marketOrders.filter(o => o.kind === "entry").map(o => o.id),
         ].filter(i => named({ id: i }));
         if (trades.length === 0 && pendingIds.length === 0) return;
+        const seq = this.nextSeq();
         const units = existing?.units ?? [];
         for (const t of trades) {
             if (this.hasUnit(units, t.uid)) continue;
-            units.push({ uid: t.uid!, id: t.id, basis: t.price, opened: t.opened, placedBar: ctx.currentBarIndex, trail_peak: Number.NaN, filled: false });
+            units.push({ uid: t.uid!, id: t.id, basis: t.price, opened: t.opened, placedBar: ctx.currentBarIndex, trail_peak: Number.NaN, filled: false, seq });
         }
         const arms = { ...(existing?.arms ?? {}) };
         for (const i of pendingIds) arms[i] ??= ctx.currentBarIndex;
@@ -743,7 +857,7 @@ export class Broker {
             // survive the re-registration, or the stop would never move and a spent
             // exit would sell again.
             trail_peak: Number.NaN,
-            units, arms,
+            units, arms, seq,
             // Set when the order is CREATED and carried across re-registration. A
             // script re-issues `strategy.exit` every bar, and restamping it here
             // would hold it one bar behind the market forever — it would never
@@ -756,10 +870,11 @@ export class Broker {
 
 
     /**
-     * May an entry of `qty` at `price` be placed? A seam for V6Broker's margin
-     * rule; every version before it admits every entry, as it always has.
+     * May an entry of `qty` at `price` be placed? A seam for V5Broker's margin
+     * rule (`placedEquity`: strategy.equity when the order was placed); v1-v4
+     * admit every entry, as they always have.
      */
-    protected admitsEntry(_isLong: boolean, _qty: number, _price: number): boolean {
+    protected admitsEntry(_isLong: boolean, _qty: number, _price: number, _placedEquity?: number): boolean {
         return true;
     }
 
@@ -787,7 +902,7 @@ export class Broker {
 
     /**
      * The margin requirement for a side, as a ratio: 25% margin is 0.25, and
-     * 0 when the script sets none. Enforced only by V6Broker; read by
+     * 0 when the script sets none. Enforced by V5Broker (v5, v6); read by
      * `strategy.margin_liquidation_price` too, so the two cannot disagree.
      */
     marginRatio(isLong: boolean): number {
@@ -862,7 +977,7 @@ export class Broker {
                 toDelete.push(id);
             } else if (filledOrder.oca_type === oca.reduce) {
                 // An order with no `qty` takes the default size, at the price it fills at.
-                const size = (o: PendingEntry) => o.qty === undefined ? this.defaultQty(price) : o.qty;
+                const size = (o: PendingEntry) => o.qty === undefined ? this.defaultQty(price, o.placedEquity) : o.qty;
                 ord.qty = Math.max(0, size(ord) - size(filledOrder));
                 if (ord.qty <= 0) toDelete.push(id);
             }
@@ -947,11 +1062,16 @@ export class Broker {
             : held > 0 ? paidOnEntry * Math.min(1, t.qty / held) : paidOnEntry;
         ctx.position.entryCommission = paidOnEntry - entryShare;
 
-        // A strategy in another currency books each closed trade, and its
-        // commission, at the exit bar's rate (1 when nothing converts).
+        // A strategy in another currency books each closed trade and its exit commission at the exit
+        // bar's rate, and the entry commission at the ENTRY bar's rate (1 when nothing converts).
+        // TradingView n105 (v4, currency = USD on BINANCE:BTCUSDT, 0.2%): short 100 at 74780.01 on
+        // 2026-11-09 (USDT->USD 0.9988) closed at 74396.01 on 11-10 (0.99873) books 8552.87 =
+        // 38400 * 0.99873 - 14956.00 * 0.9988 - 14879.20 * 0.99873; the whole net at the exit's rate
+        // gave 8553.92.
         const rate = ctx.accountRate();
-        const fee = (exitFee + entryShare) * rate;
-        const net = rate === 1 ? t.pnl - fee : (t.pnl - exitFee - entryShare) * rate;
+        const entryRate = rate === 1 ? 1 : ctx.accountRateAt(t.entry ? t.entry.time : this.entryTimeOf());
+        const fee = exitFee * rate + entryShare * entryRate;
+        const net = rate === 1 && entryRate === 1 ? t.pnl - fee : (t.pnl - exitFee) * rate - entryShare * entryRate;
 
         ctx.netProfitSum += net;
         ctx.trades.push({
@@ -977,8 +1097,9 @@ export class Broker {
         // side left both at its own fill.
         // The entry fee left cash unconverted at the entry fill, so it is given
         // back before the converted trade is booked.
-        ctx.cash += rate === 1 ? t.pnl - exitFee : net + entryShare;
+        ctx.cash += rate === 1 && entryRate === 1 ? t.pnl - exitFee : net + entryShare;
         ctx.commissionPaid += exitFee * rate;
+        ctx.markFillCash(`${t.exitId ?? ""}|${t.exitPrice}`);
     }
 
     protected entryTimeOf(): number {
@@ -1018,7 +1139,10 @@ export class Broker {
         const n = level / tick;
         // Nudge before rounding: 7334.5125/0.01 is 733451.2499999999 in binary
         // floating point, and a bare Math.ceil would take it to the wrong tick.
-        const eps = 1e-9;
+        // The nudge scales with the level: 80148.10000000002/0.01 is 8014810.000000002,
+        // an error twice a fixed 1e-9, and TradingView fills that sell limit at 80148.1
+        // (capture n51, trade 22), not a tick above.
+        const eps = Math.max(1e-9, Math.abs(n) * 1e-12);
         return this.exactTick((above ? Math.ceil(n - eps) : Math.floor(n + eps)) * tick);
     }
 
@@ -1107,7 +1231,8 @@ export class Broker {
             consider({ at: global(hit.at), rank: 0, run: () => {
                 const filled = this.entry(id, ord.dir, ord.qty, Number.NaN, Number.NaN,
                     ord.oca_name, ord.oca_type, "", undefined, "", hit.price, onLimit, ord.exempt,
-                    this.sizingPriceFor(onLimit ? limitLevel : undefined));
+                    this.sizingPriceFor(onLimit ? limitLevel : undefined),
+                    ord.nets === true && ord.placedSize === (ctx.intrabar?.startSize ?? ctx.position.size), ord.placedEquity);
                 if (filled) {
                     entries.delete(id);
                     this.applyEntryOCA(entries, ord, this.sizingPriceFor(onLimit ? limitLevel : undefined) ?? hit.price);
@@ -1219,12 +1344,87 @@ export class Broker {
     /** Matches the pending entries and exits against the whole bar. */
     protected processBarOrders(rs: any, high: number, low: number): void {
         const ctx = this.ctx;
+        // `nets` was probed for a fill on a bar that starts with the position the order
+        // was placed against (see `PendingEntry.nets`).
+        const startSize = ctx.position.size;
 
         // 1. Process Pending Entries (strategy.order)
         const entries = this.getPendingEntries();
         const filledEntryIds: string[] = [];
+        // The broker emulator's path through the bar, and where along it each trade
+        // opened on this bar was filled (by trade uid). An exit of such a trade walks
+        // only the rest of the path: the prices before the entry filled cannot close
+        // a position that did not exist yet. TradingView, a long stop entry on a bar
+        // whose low is nearer the open (open, low, high, close): the low came first,
+        // so a stop-loss below the fill but above the low does not fill on that bar;
+        // on a bar whose high is nearer the open, the low comes after the entry and
+        // the same stop-loss fills there (dev-docs/tv-parity/_probes/samebar-exit).
+        const whole = Math.abs(high - ctx.open) <= Math.abs(ctx.open - low)
+            ? [ctx.open, high, low, ctx.close] : [ctx.open, low, high, ctx.close];
+        const openedAt = new Map<string, number>();
 
-        for (const [id, ord] of entries.entries()) {
+        // In the order the bar's path reaches them, not the order they were placed: a
+        // short stop below the open fills before a long stop above it when the low comes
+        // first (_probes/two-entries, case B). Judged-at-placement versions only, as probed.
+        let pending: Array<[string, PendingEntry]> = [...entries.entries()];
+        if (this.entryFixedAtPlacement() && pending.length > 1) {
+            const reachAt = (o: PendingEntry): number => {
+                const b = o.dir === direction.long;
+                const limit = this.levelToTick(o.limit, !b);
+                const stop = this.levelToTick(o.stop, b);
+                // A stop-limit order is a limit only once its stop has triggered: the limit
+                // is looked for on the path from there, not on the whole bar.
+                if (!Number.isNaN(limit) && !Number.isNaN(stop)) {
+                    const stopAt = pathReach(whole, stop, b);
+                    if (!Number.isFinite(stopAt)) return Infinity;
+                    return onWholePath(stopAt, pathReach(restOfPath(whole, stopAt), limit, !b));
+                }
+                return Math.min(pathReach(whole, limit, !b), pathReach(whole, stop, b));
+            };
+            pending = pending.map(e => [e, reachAt(e[1])] as const)
+                .sort((x, y) => x[1] - y[1]).map(x => x[0]);
+        }
+
+        // How far along the bar's path the latest entry fill of this pass was (0: none, or at the open).
+        let fillCursor = 0;
+        // The exits of the position the bar starts with that the path reaches before any entry fill first.
+        // TradingView, n19 (v4, EVWBB): short 1 with its stop-loss at 91072.74 and a long stop entry at 91981.73
+        // on a bar that goes open, low, high: the short is stopped out at 91072.74, then the long fills.
+        if (this.entryFixedAtPlacement() && ctx.position.size !== 0 && pending.length) {
+            let firstEntryAt = Infinity;
+            for (const [, o] of pending) {
+                if (!this.livesYet(o.placedBar)) continue;
+                const b = o.dir === direction.long;
+                const lim = this.levelToTick(o.limit, !b), stp = this.levelToTick(o.stop, b);
+                firstEntryAt = Math.min(firstEntryAt, pathReach(whole, lim, !b), pathReach(whole, stp, b));
+            }
+            if (firstEntryAt > 0 && Number.isFinite(firstEntryAt)) this.fillExitsOnPath(rs, high, low, whole, openedAt, firstEntryAt);
+        }
+
+        // The exits of the position held now, for a `strategy.entry` stop or limit that fills at the same price
+        // on the same tick. TradingView fills the two in the order the script last placed them (an exit's unit
+        // for a trade filled after the call dates from that fill), and an exit that comes second still fills
+        // although the entry has closed its trade: it opens a trade the other way under the exit's id.
+        // Probe r6 exitov/01 (v5, BINANCE:BTCUSDT 1h): long 1, then Short 3 stop and exit XL stop through
+        // the market on one bar: Short called first -> Short 3 + XL 1 (pos -4); XL called first -> XL closes
+        // the long, Short opens 3 + 1 (pos -4); two shorts 1 + 2 then Long 5 before exit XS -> Long 5, XS 1,
+        // XS 2 (pos 8). n56 (v5, pyramiding): the trades its "By signals" table credits to ExitLong/ExitShort.
+        const startLong = ctx.position.size > 0;
+        type SameTick = { exitId: string; exit: PendingExit; unit: ExitUnit; hit: { price: number; kind: string }; qty: number; seq: number; done?: boolean };
+        let sameTick: SameTick[] = [];
+        if (this.entryFixedAtPlacement() && ctx.position.size !== 0 && pending.some(([, o]) => !o.exempt) && this.getPendingExits().size) {
+            const exits = this.getPendingExits();
+            sameTick = this.collectExitHits(high, low, whole, openedAt, true)
+                .filter(h => !openedAt.has(h.unit.uid))
+                .map(h => ({ exitId: h.exitId, exit: h.exit, unit: h.unit, hit: h.hit,
+                    qty: Math.min(this.reservedQty(exits, h.unit), Math.abs(ctx.position.size)),
+                    seq: Math.max(h.unit.seq ?? 0, h.exit.seq ?? 0) }));
+        }
+        const tick = Number(ctx.mintick) > 0 ? Number(ctx.mintick) : 0;
+
+        for (const [id, ord] of pending) {
+            // An OCA fill earlier in this pass may have cancelled it.
+            if (entries.get(id) !== ord) continue;
             // Check intraday filled orders limit
             if (rs.daily_filled_orders >= rs.max_intraday_filled_orders) break;
             if (!this.livesYet(ord.placedBar)) continue;
@@ -1239,7 +1439,18 @@ export class Broker {
 
             let price = Number.NaN;
             let filledOnLimit = false;
-            if (buying) {
+            // (A stop-limit keeps the whole-bar rule below: its limit after the trigger is not probed.)
+            if (fillCursor > 0 && (Number.isNaN(entryLimit) || Number.isNaN(entryStop))) {
+                // An entry filled earlier on this bar's path: this one can only fill on the path after it.
+                // [v3] QuantNomad Pivot Reversal: a short stop filled on the way down from an open at the long
+                // stop's level; the long stop, matched against the whole bar, filled too, at a price the bar
+                // had left behind (TradingView keeps the short).
+                const rest = restOfPath(whole, fillCursor);
+                const lim = Number.isNaN(entryLimit) ? Infinity : pathReach(rest, entryLimit, !buying);
+                const stp = Number.isNaN(entryStop) ? Infinity : pathReach(rest, entryStop, buying);
+                if (Number.isFinite(lim) && lim <= stp) { price = lim === 0 ? rest[0] : entryLimit; filledOnLimit = true; }
+                else if (Number.isFinite(stp)) price = stp === 0 ? rest[0] : entryStop;
+            } else if (buying) {
                 // A limit waits for the price to FALL to it, a stop for it to
                 // rise. Either way the open can have passed it already.
                 if (!Number.isNaN(entryLimit) && low <= entryLimit) {
@@ -1257,13 +1468,67 @@ export class Broker {
                 }
             }
 
+            // The exits reached at this fill's price: those placed before the entry fill first.
+            const same = Number.isNaN(price) || ord.exempt || !sameTick.length ? []
+                : sameTick.filter(h => !h.done && !h.unit.filled && Math.abs(this.toTick(h.hit.price) - this.toTick(price)) <= tick / 2);
+            const entrySeq = ord.seq ?? 0;
+            for (const h of same) {
+                if (h.seq >= entrySeq || ctx.position.size === 0 || (ctx.position.size > 0) !== startLong) continue;
+                if (!(ctx.position.entries ?? []).some(t => t.uid === h.unit.uid) || this.openQty(h.unit.id) <= 0) continue;
+                h.done = true;
+                this.fillExitHit(rs, this.getPendingExits(), h.exitId, h.exit, h.unit, h.hit, startLong);
+            }
+
             if (!Number.isNaN(price)) {
+                const before = new Set((ctx.position.entries ?? []).map((t: any) => t.uid));
                 // The fill price goes in the LAST slot now: the Pine signature owns
                 // the five before it (`limit`, `stop`, `oca_name`, `oca_type`,
                 // `comment`, `when`, `alert_message`).
-                const filled = this.entry(id, ord.dir, ord.qty, Number.NaN, Number.NaN,
+                // Placed as a reversal of a position an exit has since closed: still the size it was placed
+                // with, the reversal included (n19: the long stop placed against a short of 1 opens 2 after the
+                // short's stop-loss closed it earlier on the bar; 16 such trades of 2 in its history).
+                let qtyAt: any = ord.qty;
+                if (this.entryFixedAtPlacement() && ctx.position.size === 0 && ord.placedSize !== undefined
+                    && ord.placedSize !== 0 && (ord.placedSize > 0) !== buying && ord.placedSize === startSize) {
+                    const base = ord.qty === undefined ? this.defaultQty(this.sizingPriceFor(filledOnLimit ? entryLimit : undefined) ?? price, ord.placedEquity) : val(ord.qty);
+                    qtyAt = base + Math.abs(ord.placedSize);
+                }
+                // Placed as a reversal of a position that has changed since (a pyramided add, or an exit that
+                // filled first on this tick): the order is still the size it was placed with, its own size plus
+                // the position then, and it nets against the position it meets. n56 (v5): a long placed against a
+                // short of 0.12118 (0.12134 + 0.12118) met 0.24201 after an exit took 0.00244 and opened 0.00051;
+                // a short placed against a long of 0.24270 met 0.12378 after ExitLong took the rest.
+                const placedOpp = this.entryFixedAtPlacement() && !ord.exempt && ord.placedSize !== undefined && ord.placedSize !== 0
+                    && (ord.placedSize > 0) !== buying ? Math.abs(ord.placedSize) : 0;
+                const held = ctx.position.size !== 0 && (ctx.position.size > 0) !== buying ? Math.abs(ctx.position.size) : 0;
+                let filled: boolean;
+                if (placedOpp > 0 && held > 0 && Math.abs(held - placedOpp) > ENTRY_EPS) {
+                    const sizeAt = this.sizingPriceFor(filledOnLimit ? entryLimit : undefined);
+                    const base = ord.qty === undefined ? this.defaultQty(sizeAt ?? price, ord.placedEquity) : val(ord.qty);
+                    const total = base + placedOpp;
+                    if (!(total > 0)) filled = false;
+                    else if (total < held - ENTRY_EPS) {
+                        this.closeEntries(total, this.toTick(this.slip(price, !(ctx.position.size > 0))), undefined, { id: `Reverse for ${id}`, exitId: id });
+                        rs.daily_filled_orders++;
+                        filled = true;
+                    } else {
+                        this.closeAt(`Reverse for ${id}`, price, id);
+                        // The closing part has filled: the order is spent even if what is left is refused.
+                        if (total - held > ENTRY_EPS) this.entry(id, ord.dir, total - held, Number.NaN, Number.NaN, ord.oca_name, ord.oca_type,
+                            "", undefined, "", price, filledOnLimit, ord.exempt, sizeAt, false, ord.placedEquity);
+                        filled = true;
+                    }
+                } else filled = this.entry(id, ord.dir, qtyAt, Number.NaN, Number.NaN,
                       ord.oca_name, ord.oca_type, "", undefined, "", price, filledOnLimit, ord.exempt,
-                      this.sizingPriceFor(filledOnLimit ? entryLimit : undefined));
+                      this.sizingPriceFor(filledOnLimit ? entryLimit : undefined), ord.nets === true, ord.placedEquity);
+                if (filled) {
+                    const at0 = fillCursor > 0 && (Number.isNaN(entryLimit) || Number.isNaN(entryStop))
+                        ? onWholePath(fillCursor, pathReach(restOfPath(whole, fillCursor), filledOnLimit ? entryLimit : entryStop, filledOnLimit ? !buying : buying))
+                        : pathReach(whole, filledOnLimit ? entryLimit : entryStop, filledOnLimit ? !buying : buying);
+                    const at = Number.isFinite(at0) ? at0 : 0;
+                    if (at > fillCursor) fillCursor = at;
+                    if (at > 0) for (const t of ctx.position.entries ?? []) if (!before.has(t.uid)) openedAt.set(t.uid!, at);
+                }
                 // Only a fill spends the order and cancels or reduces its OCA
                 // group. One that `pyramiding` held back is still working: it
                 // fills if an entry closes and frees the slot while its price
@@ -1273,6 +1538,15 @@ export class Broker {
                 if (filled) {
                     filledEntryIds.push(id);
                     this.applyEntryOCA(entries, ord, this.sizingPriceFor(filledOnLimit ? entryLimit : undefined) ?? price);
+                    // The exits placed after it whose trades it closed: each still sells (buys) its trade's size.
+                    for (const h of same) {
+                        if (h.done || h.unit.filled || h.seq <= entrySeq || !(h.qty > 0)) continue;
+                        if ((ctx.position.entries ?? []).some(t => t.uid === h.unit.uid) && ctx.position.size !== 0 && (ctx.position.size > 0) === startLong) continue;
+                        h.done = true;
+                        h.unit.filled = true;
+                        this.entry(h.exitId, startLong ? direction.short : direction.long, h.qty, Number.NaN, Number.NaN,
+                            "", oca.none, "", undefined, "", h.hit.price, h.hit.kind === "limit", true);
+                    }
                 } else if (!this.pyramidingBlocks(buying, ord.exempt === true)) {
                     filledEntryIds.push(id);
                 }
@@ -1281,11 +1555,41 @@ export class Broker {
         for (const id of filledEntryIds) entries.delete(id);
 
         // 2. Process Pending Exits (strategy.exit)
+        this.fillExitsOnPath(rs, high, low, whole, openedAt, Infinity);
+    }
+
+    /**
+     * The pending exits' fills on this bar, in path order; only those reached before `before` (a position on
+     * the bar's path) when it is finite: the exits of the position the bar started with that come before an
+     * entry on the path fill first (see processBarOrders).
+     */
+    protected fillExitsOnPath(rs: any, high: number, low: number, whole: number[], openedAt: Map<string, number>, before: number): void {
+        const ctx = this.ctx;
         if (ctx.position.size === 0) return;
 
         const exits = this.getPendingExits();
         if (exits.size === 0) return;
 
+        const isLong = ctx.position.size > 0;
+        const hits = this.collectExitHits(high, low, whole, openedAt, Number.isFinite(before));
+        if (Number.isFinite(before)) { const k = hits.findIndex(h => !(h.at < before)); if (k >= 0) hits.length = k; }
+
+        for (const { exitId, exit: pendingExit, unit, hit } of hits) {
+            if (ctx.position.size === 0) return;
+            if (unit.filled || this.openQty(unit.id) <= 0) continue;
+            this.fillExitHit(rs, exits, exitId, pendingExit, unit, hit, isLong);
+        }
+    }
+
+    /**
+     * Where along the bar's path each live exit unit of the open position is reached, in path order
+     * (fillExitsOnPath). `skipTrails`: leave trailing exits out (they move their peak as they walk, so they
+     * walk once, in the main pass).
+     */
+    protected collectExitHits(high: number, low: number, whole: number[], openedAt: Map<string, number>, skipTrails: boolean):
+        Array<{ exitId: string; exit: PendingExit; unit: ExitUnit; hit: { price: number; kind: string }; at: number }> {
+        const ctx = this.ctx;
+        const exits = this.getPendingExits();
         const isLong = ctx.position.size > 0;
 
         this.armExitUnits(exits);
@@ -1298,6 +1602,8 @@ export class Broker {
         // the low), and each takes the oldest trade whatever its own.
         const hits: Array<{ exitId: string; exit: PendingExit; unit: ExitUnit; hit: { price: number; kind: string }; at: number }> = [];
         for (const [exitId, exit] of exits) {
+            // A trailing exit moves its peak as it walks: it walks once, in the main pass.
+            if (skipTrails && !(Number.isNaN(exit.trail_price) && Number.isNaN(exit.trail_points))) continue;
             // Performance: an exit with only absolute levels and no trail reads
             // nothing from its unit (`walkExit` has no side effect then either),
             // so every unit walks the bar to the same answer: once is enough. A
@@ -1318,6 +1624,14 @@ export class Broker {
                 && Number.isNaN(exit.trail_price) && Number.isNaN(exit.trail_points);
             for (const unit of exit.units ?? []) {
                 if (unit.filled || !this.livesYet(unit.placedBar) || this.openQty(unit.id) <= 0) continue;
+                const from = openedAt.get(unit.uid);
+                if (from !== undefined) {
+                    // Opened on this bar: only the path after its entry filled.
+                    const rest = restOfPath(whole, from);
+                    const path = this.walkExit(exit, unit, unit.basis, isLong, rest[0], 0, 0, 0, rest);
+                    if (path.hit) hits.push({ exitId, exit, unit, hit: path.hit, at: onWholePath(from, path.at) });
+                    continue;
+                }
                 const path = levelsFixed
                     ? (shared ??= this.walkExit(exit, unit, unit.basis, isLong, ctx.open, high, low, ctx.close))
                     : this.walkExit(exit, unit, unit.basis, isLong, ctx.open, high, low, ctx.close);
@@ -1325,12 +1639,7 @@ export class Broker {
             }
         }
         hits.sort((x, y) => x.at - y.at);
-
-        for (const { exitId, exit: pendingExit, unit, hit } of hits) {
-            if (ctx.position.size === 0) return;
-            if (unit.filled || this.openQty(unit.id) <= 0) continue;
-            this.fillExitHit(rs, exits, exitId, pendingExit, unit, hit, isLong);
-        }
+        return hits;
     }
 
     /**
@@ -1345,7 +1654,7 @@ export class Broker {
                 const armed = pendingExit.arms?.[t.id];
                 if (armed === undefined || (pendingExit.from_entry && pendingExit.from_entry !== t.id)) continue;
                 if (this.hasUnit(units, t.uid)) continue;
-                units.push({ uid: t.uid!, id: t.id, basis: t.price, opened: t.opened, placedBar: armed, trail_peak: Number.NaN, filled: false });
+                units.push({ uid: t.uid!, id: t.id, basis: t.price, opened: t.opened, placedBar: armed, trail_peak: Number.NaN, filled: false, seq: t.seq });
             }
         }
     }
@@ -1438,7 +1747,7 @@ export class Broker {
                 : pendingExit.comment_loss) || pendingExit.comment || undefined;
             // What is sold comes off the oldest trades, whatever their id;
             // only the ledger knows which id gave it up.
-            this.closeEntries(qty, executedPrice, undefined, {
+            this.closeEntries(qty, executedPrice, this.closesNamedEntry() ? unit.id : undefined, {
                 id: `Exit ${exitId}`, exitId, exitComment, ledger: unit.id,
             });
             rs.daily_filled_orders++;
@@ -1589,7 +1898,9 @@ export class Broker {
         const held = this.openQty(unit.id);
         const wants = (e: PendingExit, u: ExitUnit): number =>
             !Number.isNaN(e.qty) ? e.qty
-            : !Number.isNaN(e.qty_percent) ? u.opened * Math.min(100, Math.max(0, e.qty_percent)) / 100
+            // Floored to the minimum contract like any order quantity: TradingView, 50% of 0.01209 BTC
+            // sells 0.00604 and the full exit after it the 0.00605 left (n79, v3, mincontract 0.00001).
+            : !Number.isNaN(e.qty_percent) ? this.floorToMinContract(u.opened * Math.min(100, Math.max(0, e.qty_percent)) / 100)
             : u.opened;
         let reserved = 0;
         let own = 0;
@@ -1630,6 +1941,16 @@ export class Broker {
      * entry's own commission — TradingView's list of trades. What is left
      * re-averages: the position's price is the remaining entries'.
      */
+    /**
+     * `strategy(close_entries_rule = "ANY")`: an exit or close naming an entry closes THAT entry's
+     * trades, not the oldest ones first (FIFO, the default). TradingView, a 4-entry pyramiding
+     * strategy with "ANY": the exit of the entry opened 2026-11-18 23:00 closed it at 11-19 09:00
+     * while the entries of 11-17 stayed open until 14:00 (FIFO closed 11-17 03:00 first).
+     */
+    protected closesNamedEntry(): boolean {
+        return String(this.ctx.scriptMeta?.close_entries_rule ?? "").toUpperCase() === "ANY";
+    }
+
     protected closeEntries(
         qty: number, price: number, only: string | undefined,
         names: { id: string; exitId?: string; exitComment?: string; ledger?: string },

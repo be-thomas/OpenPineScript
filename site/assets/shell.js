@@ -15,7 +15,7 @@ export const SHORT_HOME = "~/OpenPineScript";
 
 // The package name and version `npm run opsv2` prints in its banner (package.json).
 // site/test/fidelity.mjs fails if these drift.
-export const NPM_PACKAGE = { name: "openpinescript", version: "0.1.0" };
+export const NPM_PACKAGE = { name: "openpinescript", version: "0.2.1" };
 
 const ANSI = /\x1b\[[0-9;]*m/g;
 export const stripAnsi = (s) => String(s).replace(ANSI, "");

@@ -31,6 +31,19 @@
 import { Context } from "../context";
 import { val } from "../../../utils/v2/common";
 
+/**
+ * An input.color default keeps its transparency t and comes back with alpha
+ * round(255 * ((100 - t) / 100)): t = 90 -> 26, where color.new(c, 90) itself is 25
+ * (TradingView probe u6: both report color.t = 90, but color.from_gradient(0.5, 0, 1, X, color.red)
+ * is 220, 63, 74, 45 for the input and 221, 62, 74, 45 for color.new; alpha 26 and 25 reproduce them).
+ */
+function quantizeInputColor(c: any): any {
+    if (typeof c !== "string" || !/^#[0-9a-fA-F]{8}$/.test(c)) return c;
+    const t = Math.round((1 - parseInt(c.slice(7, 9), 16) / 255) * 100);
+    const a = Math.round(((100 - t) / 100) * 255);
+    return c.slice(0, 7) + a.toString(16).padStart(2, "0");
+}
+
 const text = (x: any): string => {
     const v = val(x);
     return v === null || v === undefined ? "" : String(v);
@@ -85,7 +98,7 @@ export const input = {
     color: (ctx: Context, defval: any, title?: any, tooltip?: any, inline?: any,
             group?: any, confirm?: any, display?: any,
             active?: any) =>
-        register(ctx, defval, title, "color", { tooltip, inline, group, confirm, display, active }),
+        register(ctx, quantizeInputColor(defval), title, "color", { tooltip, inline, group, confirm, display, active }),
 
     /** v5's rename of v4's `input.resolution`. */
     timeframe: (ctx: Context, defval: any, title?: any, options?: any, tooltip?: any,

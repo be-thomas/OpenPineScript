@@ -22,7 +22,7 @@ const bars = Array.from({ length: 30 }, (_, i) => ({
 function run(version: 5 | 6, close: string) {
   const s = new Session();
   const c = s.compile(
-    `//@version=${version}\nstrategy("S", overlay = true)\n` +
+    `//@version=${version}\nstrategy("S", overlay = true, default_qty_type = strategy.fixed)\n` +
     `if bar_index == 5\n    strategy.entry("L", strategy.long)\n` +
     `if bar_index == 10\n    ${close}\n`);
   expect(c.errors).toEqual([]);

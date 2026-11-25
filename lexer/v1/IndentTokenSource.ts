@@ -131,18 +131,21 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
   const DECLARATION_OPENER_IDS = idsOf(["TYPE", "ENUM"]);
   const EXPORT_ID = (Base as unknown as Record<string, number>)["EXPORT"];
 
+  // The members below are `public` only because declaration emit cannot
+  // describe an exported anonymous class with private members (TS4094). They
+  // are internal state; nothing outside this class should touch them.
   return class IndentAwareTokenSource extends Base {
-    private pendingTokens: Token[] = [];
-    private indentStack: number[] = [0];
+    public pendingTokens: Token[] = [];
+    public indentStack: number[] = [0];
 
     /** Established by the first indent; later indents must be a multiple of it. */
-    private indentUnit: number | null = null;
+    public indentUnit: number | null = null;
     /** Inside ( ) or [ ], newlines are plain whitespace. */
-    private parenLevel: number = 0;
+    public parenLevel: number = 0;
     /** Position of each open ( or [, innermost last, for the column-0 error. */
-    private openBrackets: { line: number; column: number }[] = [];
+    public openBrackets: { line: number; column: number }[] = [];
     /** Type of the last real (non-virtual) token, for continuation detection. */
-    private lastRealToken: number = -1;
+    public lastRealToken: number = -1;
 
     /**
      * Has the logical line being read contained a block-opening token?
@@ -151,9 +154,9 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
      * continuation of this one. Reset when a new logical line begins — not when
      * a continuation is absorbed, because that is still the same line.
      */
-    private lineOpensBlock: boolean = false;
+    public lineOpensBlock: boolean = false;
     /** No real token yet on this line, or only `export`. */
-    private atLineStart: boolean = true;
+    public atLineStart: boolean = true;
 
     /**
      * Structural indentation errors, drained by createParser.
@@ -360,7 +363,7 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
     }
 
     /** Is the line that LBEG token `t` introduces flush against column 0? */
-    private startsAtColumnZero(t: Token): boolean {
+    public startsAtColumnZero(t: Token): boolean {
       const text = t.text ?? this.inputStream?.getTextFromInterval(new Interval(t.start, t.stop)) ?? "";
       const nl = Math.max(text.lastIndexOf("\n"), text.lastIndexOf("\r"));
       if (text.substring(nl + 1).length !== 0) return false;
@@ -373,12 +376,12 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
     }
 
     /** Line number of the last line an LBEG token spans. */
-    private newlinesIn(t: Token): number {
+    public newlinesIn(t: Token): number {
       const text = t.text ?? this.inputStream?.getTextFromInterval(new Interval(t.start, t.stop)) ?? "";
       return (text.match(/\n|\r(?!\n)/g) ?? []).length;
     }
 
-    private handleIndentation(indentLength: number, triggerToken: Token, isEOF = false): Token {
+    public handleIndentation(indentLength: number, triggerToken: Token, isEOF = false): Token {
       const currentIndent = this.indentStack[this.indentStack.length - 1];
 
       if (indentLength > currentIndent) {
@@ -489,7 +492,7 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
      * occur — because a leading '-' or '*' is ambiguous with a statement, and
      * over-reaching here would silently glue two statements together.
      */
-    private nextLineStartsWithOperator(): boolean {
+    public nextLineStartsWithOperator(): boolean {
       const s = this.inputStream;
       if (!s) return false;
 
@@ -526,7 +529,7 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
      * blocks by two (which TradingView rejects, and this engine has always
      * accepted) keeps being read as blocks.
      */
-    private isContinuationIndent(indentLength: number): boolean {
+    public isContinuationIndent(indentLength: number): boolean {
       if (indentLength % 4 === 0) return false;
       return this.indentUnit === null || this.indentUnit % 4 === 0;
     }
@@ -543,14 +546,14 @@ export function IndentTokenSource<TBase extends GeneratedLexerCtor>(Base: TBase,
      * A '/' is deliberately absent: a line starting with one is `//`, a
      * comment, which the blank-and-comment branch above has already handled.
      */
-    private nextLineStartsWithArithmetic(): boolean {
+    public nextLineStartsWithArithmetic(): boolean {
       const s = this.inputStream;
       if (!s) return false;
       const c = String.fromCharCode(s.LA(1));
       return c === "+" || c === "-" || c === "*" || c === "%";
     }
 
-    private createVirtualToken(type: number, text: string, original: Token): Token {
+    public createVirtualToken(type: number, text: string, original: Token): Token {
       const sourceTuple: any = [this, this.inputStream];
       return this.tokenFactory.create(
         sourceTuple,

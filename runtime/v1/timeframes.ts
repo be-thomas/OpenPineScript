@@ -151,7 +151,22 @@ export function periodIndex(t: number, spec: string): number {
   if (unit === "W") return Math.floor(weeksSinceEpoch(t) / count);
 
   const span = specSeconds(spec);
-  return Number.isFinite(span) ? Math.floor(t / (span * 1000)) : NaN;
+  return Number.isFinite(span) ? clockBucket(t, span * 1000) : NaN;
+}
+
+const DAY_MS = 86400000;
+
+/**
+ * The clock bucket of `t` for a span of `spanMs`. A span under a day restarts at
+ * 00:00 UTC each day, so one that does not divide 24h ends its last bucket early
+ * (5h: 00-05, 05-10, 10-15, 15-20, 20-24), as TradingView's do on a 24x7 symbol
+ * (popular-author capture batch 2026-11-21). For a span that divides the day it
+ * is the plain `floor(t / span)`; from a day up there is no restart to make.
+ */
+function clockBucket(t: number, spanMs: number): number {
+  if (spanMs >= DAY_MS) return Math.floor(t / spanMs);
+  const day = Math.floor(t / DAY_MS);
+  return day * Math.ceil(DAY_MS / spanMs) + Math.floor((t - day * DAY_MS) / spanMs);
 }
 
 /** One OHLCV bar — the same shape `SecurityCandle` has in context.ts. */
@@ -176,9 +191,13 @@ export interface Candle {
 export function aggregate(bars: readonly Candle[], spec: string): Candle[] {
   const out: Candle[] = [];
   let period: number | null = null;
+  // Multi-day bars count from the first bar's day, as DerivedSeries does.
+  const p = parseSpec(spec);
+  const nDay = p && p.unit === "D" && p.count > 1 ? p.count * DAY_MS : 0;
+  const anchor = bars.length ? Math.floor(bars[0].time / DAY_MS) * DAY_MS : 0;
 
   for (const bar of bars) {
-    const at = periodIndex(bar.time, spec);
+    const at = nDay ? Math.floor((bar.time - anchor) / nDay) : periodIndex(bar.time, spec);
     if (!Number.isFinite(at)) return [];
 
     if (period !== at) {
@@ -234,18 +253,29 @@ export class DerivedSeries {
    * stay on the clock; so does the first session of the series, whose start is
    * not known. Days, weeks and months are calendar buckets either way.
    */
+  /** An nD spec's span (n > 1), and the UTC day its first folded bar opened in. */
+  private readonly multiDayMs: number = 0;
+  private dayAnchor: number | undefined;
+
   constructor(private readonly spec: string, private readonly chartMs?: number) {
     const p = parseSpec(spec);
+    if (p && p.unit === "D" && p.count > 1) this.multiDayMs = p.count * DAY_MS;
     this.intraday = !!p && (p.unit === "" || p.unit === "S") && chartMs !== undefined && chartMs > 0;
     this.spanMs = this.intraday ? specSeconds(spec) * 1000 : 0;
   }
 
   /** The bucket of a bar at `t`; moves the session state on. */
   private keyOf(t: number): string {
-    if (!this.intraday) { this.prevT = t; return String(periodIndex(t, this.spec)); }
+    if (!this.intraday) {
+      this.prevT = t;
+      // Multi-day bars count from the chart's first bar, not the epoch: TradingView (probe r6 p1, BINANCE:BTCUSDT
+      // 1h from 2026-01-01) opens its 4D bars 01-01, 01-05, 01-09 (day % 4 == 2) and its 3D bars 01-01, 01-04.
+      if (this.multiDayMs > 0 && this.dayAnchor !== undefined) return String(Math.floor((t - this.dayAnchor) / this.multiDayMs));
+      return String(periodIndex(t, this.spec));
+    }
     if (this.prevT !== undefined && t - this.prevT > Math.max(this.chartMs!, this.spanMs)) this.session = t;
     this.prevT = t;
-    return this.session === null ? `c${Math.floor(t / this.spanMs)}` : `s${this.session}:${Math.floor((t - this.session) / this.spanMs)}`;
+    return this.session === null ? `c${clockBucket(t, this.spanMs)}` : `s${this.session}:${Math.floor((t - this.session) / this.spanMs)}`;
   }
 
   /** The bucket a bar at `t` WOULD be in, leaving the state alone. */
@@ -282,6 +312,7 @@ export class DerivedSeries {
     }
     for (; i < seen; i++) {
       const bar = bars[i];
+      if (i === 0) this.dayAnchor = Math.floor(bar.time / DAY_MS) * DAY_MS;
       this.saved = { session: this.session, prevT: this.prevT, curKey: this.curKey };
       const key = this.keyOf(bar.time);
       if (!Number.isFinite(this.intraday ? 0 : periodIndex(bar.time, this.spec))) { this.candles.length = 0; this.valid = false; this.upto = seen; this.anchor = undefined; return; }

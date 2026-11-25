@@ -37,7 +37,11 @@ export function marginCallSize(
     const openProfit = (mvs - moneySpent) * (size < 0 ? -1 : 1);
     const equity = cash + openProfit;
     const available = equity - mvs * ratio;
-    if (available >= 0) return 0;
+    // Float dust is not a shortfall: the admission check (V5Broker.admitsEntry) funds 100% of equity at
+    // 100% margin within 1e-9 of the equity, and TradingView did not call such a position (n139, v6:
+    // a long 0.00002 short of its margin at 100% of equity held to its exit; a long's shortfall at 100%
+    // margin is cash - qty * avg, the same at every price).
+    if (available >= -1e-9 * Math.max(1, Math.abs(equity))) return 0;
     const loss = available / ratio;
     // "TRUNCATE ... to the same decimal precision as the instrument's
     // minimum position size" — whole shares for a stock, four decimals for a
@@ -78,13 +82,29 @@ function decimalsOf(x: number): number {
  * asked and the answer was "nothing", and give a version-specific difference an
  * obvious place to land.
  */
-export class V2Broker extends Broker {}
-export class V3Broker extends V2Broker {}
-export class V4Broker extends V3Broker {
-    // TradingView evidence on v4 (dev-docs/tv-parity/_probes/version-scope/v4-sizing and the
-    // Adaptive Momentum Test run in ENGINE-BUGS.md bug 8), v5 (_probes/v5-sizing) and v6; v2/v3 have
-    // none and keep the old sizing.
+export class V2Broker extends Broker {
+    // Quantities floor to syminfo.mincontract at v2 and v3 too: a 100%-of-equity entry on
+    // BINANCE:BTCUSDT is 0.06482, not 0.0648234 (dev-docs/tv-parity/_probes/reversal-sizing,
+    // runs v2 and v3, the same sizes as v4-v6).
     protected override floorsToMinContract(): boolean { return true; }
+    /** Sizing from the equity when the order was placed: Broker.sizesFromPlacedEquity. */
+    protected override sizesFromPlacedEquity(): boolean { return true; }
+    // Sized at the ORDER price at v2-v5 as at v6 (Broker.sizesAtOrderPrice): a v3 100%-of-equity
+    // market reversal is placed equity / the placing bar's close, not / the next open -- all 223
+    // trades of a v3 RSI strategy on BINANCE:BTCUSDT 1h to the cent, 218 when sized at the open.
+    protected override sizesAtOrderPrice(): boolean { return true; }
+}
+export class V3Broker extends V2Broker {
+    // A pending strategy.entry is judged when placed at v3 as at v4-v6 (Broker.entryFixedAtPlacement):
+    // TradingView, v3 Pivot Reversal on BINANCE:BTCUSDT 1h, 2026-11-16 14:00 (open, low, high, close):
+    // short 1 with a short stop below and a long stop above, both inside the bar -- the long stop
+    // reverses and the short stop does not fill afterwards.
+    protected override entryFixedAtPlacement(): boolean { return true; }
+}
+export class V4Broker extends V3Broker {
+    // Commission room in a percent_of_equity size: TradingView evidence on v4
+    // (dev-docs/tv-parity/_probes/version-scope/v4-sizing and the Adaptive Momentum Test run in
+    // ENGINE-BUGS.md bug 8), v5 (_probes/v5-sizing) and v6; v2/v3 have none and keep the old sizing.
     protected override sizesWithCommissionRoom(): boolean { return true; }
 }
 export class V5Broker extends V4Broker {
@@ -101,56 +121,6 @@ export class V5Broker extends V4Broker {
      * strategy never traded again. v6 inherits it (its broker takes v5's rules); no v1-v4 evidence.
      */
     protected override drawdownEquity(): number { return this.ctx.cash; }
-}
-
-/**
- * v6 — the first version whose broker differs.
- *
- * MG §"strategy.exit() evaluates parameter pairs": "When both absolute (limit,
- * stop) and relative (profit, loss) parameters are given, the absolute ones
- * always win" in v5; in v6 "both levels are evaluated, and the one the price
- * hits first is used". Price reaches whichever level is NEARER the entry first,
- * so that is the one kept:
- *
- *                     long          short
- *     take-profit     lower         higher       (favourable side)
- *     stop-loss       higher        lower        (adverse side)
- *     trail start     lower         higher       (favourable side)
- *
- * The guide's own example is the sharpest check: `profit = 0, loss = 0`
- * beside 2×ATR `limit`/`stop` exits immediately at the entry price in v6,
- * because a zero distance is nearer than any ATR.
- *
- * It also enforces MARGIN, which no earlier broker does — see the section
- * below.
- *
- * The guide's remaining strategy change, trimming beyond 9000 trades, is NOT
- * here: it changes what the per-trade accessors report, not what the broker
- * does, so it is profile data read by runtime/v1/stdlib/trades.ts.
- */
-export class V6Broker extends V5Broker {
-    /**
-     * v6's pyr0, pyr3 and pooc logs are row for row those of v5, so it takes
-     * the same rules. Only the trailing stop differs: v6's own golden
-     * (harness_v6_strategy) has it follow the bar's highs intrabar.
-     */
-    /**
-     * MG §"Excess orders are trimmed": past 9000 orders "v5 raises a runtime
-     * error and halts" and v6 trims the oldest and continues
-     * (https://www.tradingview.com/pine-script-docs/migration-guides/to-pine-version-6/).
-     */
-    protected override haltsAtOrderLimit(): boolean {
-        return false;
-    }
-
-    protected override floorsToMinContract(): boolean { return true; }
-    protected override sizesWithCommissionRoom(): boolean { return true; }
-    protected override roundsCommissionTo8(): boolean { return true; }
-
-    /** Market and limit entries are sized at their order price (see `Broker.sizesAtOrderPrice`). */
-    protected override sizesAtOrderPrice(): boolean {
-        return true;
-    }
 
     // ── Margin ────────────────────────────────────────────────────────────
     //
@@ -159,23 +129,33 @@ export class V6Broker extends V5Broker {
     // Both default to 100. Entries exceeding available funds are blocked, and
     // shorts can be margin-called."
     //
-    // The 100 default is already what `strategy()` records when a script says
-    // nothing (runtime/v1/context.ts), so this class only has to ENFORCE it.
-    // No earlier broker enforces margin at all — including for a v5 script that
-    // sets it explicitly, which TradingView would margin-call. That is a v5 gap
-    // this deliberately leaves alone.
+    // `strategy()` records those defaults (0 before v6, 100 at v6: runtime/v1/context.ts),
+    // so this class only has to ENFORCE what is declared. It is enforced from v5, where
+    // a script has to declare it: TradingView, a v5 strategy with margin_long =
+    // margin_short = 100 at 100% of equity (Inside Candle Strategy, BINANCE:BTCUSDT 1h):
+    // every short is margin-called on its entry bar, e.g. 0.00964 of 0.1216 at the bar's
+    // high 81743.61 on 2026-10-15 04:00. v1-v4 brokers enforce none.
 
     /**
      * "Entries exceeding available funds are blocked." An entry needs
      * `qty * price * marginRatio` of available funds: equity, less the margin
      * a same-direction position already ties up. An opposite position is about
      * to be closed by this entry, so it ties up nothing.
+     *
+     * The equity is the one the order was PLACED with (`strategy.equity` at the
+     * placing bar's close), the price the one it fills at: TradingView probe triage
+     * r6 s1strat/01 (v6 defaults, a 100%-of-equity reversal every 7 bars on
+     * BINANCE:BTCUSDT 1h): on 2026-01-28 18:00 the short of 1.01649 at 90169.89
+     * needed 91656.7915 against 91656.785 at 17:00's close and was refused, although
+     * the equity at the fill (91656.7948) would have funded it. With this rule and the
+     * fill-price margin call (checkMarginCall) all 1852 trades match.
      */
-    protected override admitsEntry(isLong: boolean, qty: number, price: number): boolean {
+    protected override admitsEntry(isLong: boolean, qty: number, price: number, placedEquity?: number): boolean {
         const ratio = this.marginRatio(isLong);
         if (ratio === 0) return true;
         const pos = this.ctx.position;
-        const equity = this.ctx.cash + (pos.size !== 0 ? (price - pos.avgPrice) * pos.size : 0);
+        const equity = placedEquity !== undefined && Number.isFinite(placedEquity) ? placedEquity
+            : this.ctx.cash + (pos.size !== 0 ? (price - pos.avgPrice) * pos.size : 0);
         const sameDirection = pos.size !== 0 && (pos.size > 0) === isLong;
         const held = sameDirection ? Math.abs(pos.size) * price * ratio : 0;
         // A hair of tolerance, so 100% of equity at 100% margin is fundable
@@ -233,6 +213,18 @@ export class V6Broker extends V5Broker {
         const ratio = this.marginRatio(isLong);
         if (ratio === 0) return;
 
+        // An entry filled on this bar is checked first at its fill price, the first price the position
+        // meets: TradingView, a v6 100%-of-equity reversal admitted on the placing bar's equity whose fill
+        // left the funds 0.003 short liquidated one contract at the fill price itself (78424.3, the bar's
+        // open), not at the bar's low (probe triage r6 s1strat/01, 2026-04-23 01:00).
+        // Shortfalls of 0.0019, 0.0026 and 0.0063 (the probe; n139, v6, on 2026-05-03 19:00) were called there.
+        const fresh = (pos.entries ?? []).filter((e: any) => e.bar === ctx.currentBarIndex);
+        if (fresh.length) {
+            const at = fresh[fresh.length - 1].price;
+            const first = marginCallSize(ctx.cash, pos.size, pos.avgPrice, at, ratio, ctx.mincontract);
+            if (first > 0) this.liquidate(Math.min(first, Math.abs(pos.size)), at);
+            if (pos.size === 0) return;
+        }
         const price = isLong ? low : high;
         const size = marginCallSize(ctx.cash, pos.size, pos.avgPrice, price, ratio, ctx.mincontract);
         if (size === 0) return;
@@ -250,6 +242,56 @@ export class V6Broker extends V5Broker {
         this.closeEntries(qty, fill, undefined, {
             id: "Margin call", exitId: "Close position order", exitComment: "Margin call",
         });
+    }
+}
+
+/**
+ * v6 — the first version whose broker differs.
+ *
+ * MG §"strategy.exit() evaluates parameter pairs": "When both absolute (limit,
+ * stop) and relative (profit, loss) parameters are given, the absolute ones
+ * always win" in v5; in v6 "both levels are evaluated, and the one the price
+ * hits first is used". Price reaches whichever level is NEARER the entry first,
+ * so that is the one kept:
+ *
+ *                     long          short
+ *     take-profit     lower         higher       (favourable side)
+ *     stop-loss       higher        lower        (adverse side)
+ *     trail start     lower         higher       (favourable side)
+ *
+ * The guide's own example is the sharpest check: `profit = 0, loss = 0`
+ * beside 2×ATR `limit`/`stop` exits immediately at the entry price in v6,
+ * because a zero distance is nearer than any ATR.
+ *
+ * It also enforces MARGIN, which no earlier broker does — see the section
+ * below.
+ *
+ * The guide's remaining strategy change, trimming beyond 9000 trades, is NOT
+ * here: it changes what the per-trade accessors report, not what the broker
+ * does, so it is profile data read by runtime/v1/stdlib/trades.ts.
+ */
+export class V6Broker extends V5Broker {
+    /**
+     * v6's pyr0, pyr3 and pooc logs are row for row those of v5, so it takes
+     * the same rules. Only the trailing stop differs: v6's own golden
+     * (harness_v6_strategy) has it follow the bar's highs intrabar.
+     */
+    /**
+     * MG §"Excess orders are trimmed": past 9000 orders "v5 raises a runtime
+     * error and halts" and v6 trims the oldest and continues
+     * (https://www.tradingview.com/pine-script-docs/migration-guides/to-pine-version-6/).
+     */
+    protected override haltsAtOrderLimit(): boolean {
+        return false;
+    }
+
+    protected override floorsToMinContract(): boolean { return true; }
+    protected override sizesWithCommissionRoom(): boolean { return true; }
+    protected override roundsCommissionTo8(): boolean { return true; }
+
+    /** Market and limit entries are sized at their order price (see `Broker.sizesAtOrderPrice`). */
+    protected override sizesAtOrderPrice(): boolean {
+        return true;
     }
 
     protected override pairLevel(absolute: number, relative: number, isLong: boolean, favourable: boolean): number {

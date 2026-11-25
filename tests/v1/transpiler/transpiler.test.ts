@@ -40,6 +40,9 @@ function runPine(pineSource: string): Record<string, unknown> {
   sandbox.opsv2_safe_add = (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) + (Number.isNaN(Number(b)) ? 0 : Number(b));
   sandbox.opsv2_safe_eq = (a: any, b: any) => (a?.valueOf?.() ?? a) == (b?.valueOf?.() ?? b);
   sandbox.opsv2_safe_ne = (a: any, b: any) => (a?.valueOf?.() ?? a) != (b?.valueOf?.() ?? b);
+  // v1-v5 emit the na-propagating comparisons (core.ts safe_*_na); no na operands here.
+  sandbox.opsv2_safe_eq_na = sandbox.opsv2_safe_eq;
+  sandbox.opsv2_safe_ne_na = sandbox.opsv2_safe_ne;
   sandbox.opsv2_safe_sub = (a: any, b: any) => (Number.isNaN(Number(a)) ? 0 : Number(a)) - (Number.isNaN(Number(b)) ? 0 : Number(b));
   sandbox["opsv2_$pick"] = (c: any, t: any, f: any) => (c ? t : f);
 
@@ -94,18 +97,18 @@ describe("transpiler v2", () => {
   // ... [Keep output shape, literals, arithmetic, comparison tests the same] ...
 
   describe("destructuring – v2 restrictions", () => {
-    it("throws error when [a,b]=getArr() is used with a non-registry function", () => {
-      // Note: We use the exact string from your ToJsVisitor.ts
+    // A function with no definition in the script has no tuple to unpack.
+    it("throws error when [a,b]=getArr() is used with a function the script does not define", () => {
       assert.throws(
-        () => runInSandbox("[a,b]=getArr()\n", { [OPSV2 + "getArr"]: () => [1, 2] }), 
-        /User-defined functions cannot return tuples/
+        () => runInSandbox("[a,b]=getArr()\n", { [OPSV2 + "getArr"]: () => [1, 2] }),
+        /'getArr' does not return a tuple/
       );
     });
-  
-    it("throws error when [x,y,z]=triple() is used with a user-defined function", () => {
+
+    it("throws error when [x,y,z]=triple() is used with a function the script does not define", () => {
       assert.throws(
-        () => runInSandbox("[x,y,z]=triple()\n", { [OPSV2 + "triple"]: () => [10, 20, 30] }), 
-        /User-defined functions cannot return tuples/
+        () => runInSandbox("[x,y,z]=triple()\n", { [OPSV2 + "triple"]: () => [10, 20, 30] }),
+        /'triple' does not return a tuple/
       );
     });
     
@@ -139,15 +142,17 @@ describe("transpiler v2", () => {
       assert.strictEqual(v(g[OPSV2 + "b"]), 2);
     });
 
-    it("throws error on destructuring.pine because user functions cannot return tuples", () => {
+    it("throws error on destructuring.pine because pair() is not defined by the script", () => {
       assert.throws(() => runInSandbox(loadFixture("destructuring.pine"), {
         [OPSV2 + "pair"]: () => [1, 2],
         [OPSV2 + "triple"]: () => [3, 4, 5],
-      }), /User-defined functions cannot return tuples/);
+      }), /'pair' does not return a tuple/);
     });
 
-    it("throws error on array_literal.pine because user functions cannot return tuples", () => {
-      assert.throws(() => runPine(loadFixture("array_literal.pine")), /User-defined functions cannot return tuples/);
+    it("array_literal.pine: the tuple return is accepted; its undeclared 'a' is what is refused", () => {
+      // `foo()=>[1,2,3]` is a tuple-returning user function, no longer an error;
+      // `bar()=>[a,b,c]` reads names the script never declares.
+      assert.throws(() => runPine(loadFixture("array_literal.pine")), /Undeclared identifier 'a'/);
     });
   });
 
@@ -163,8 +168,10 @@ describe("transpiler v2", () => {
       assert.strictEqual(ctx.getSeries(OPSV2 + "prev", 0), 10);
     });
 
-    it("throws error on tuple assignment from user-defined function", () => {
-      assert.throws(() => runBars("pair(v)=>[v,v+1]\n[a,b]=pair(close)\n", [10]), /User-defined functions cannot return tuples/);
+    it("unpacks a tuple returned by a user-defined function", () => {
+      const ctx = runBars("pair(v)=>[v,v+1]\n[a,b]=pair(close)\n", [10]);
+      assert.strictEqual(ctx.getSeries(OPSV2 + "a", 0), 10);
+      assert.strictEqual(ctx.getSeries(OPSV2 + "b", 0), 11);
     });
   });
 });

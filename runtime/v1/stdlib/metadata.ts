@@ -437,24 +437,24 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           ref: arrays.array["mode"]
       },
       "array.variance": {
-          uses_context: false,
-          args: ["id"],
+          uses_context: true,
+          args: ["id","biased"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: arrays.array["variance"]
       },
       "array.stdev": {
-          uses_context: false,
-          args: ["id"],
+          uses_context: true,
+          args: ["id","biased"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: arrays.array["stdev"]
       },
       "array.covariance": {
-          uses_context: false,
-          args: ["id1","id2"],
+          uses_context: true,
+          args: ["id1","id2","biased"],
           is_getter: false,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -707,6 +707,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"The symbol, marked for Heikin-Ashi transformation."},
           is_value: false,
           ref: chart.heikinashi
+      },
+      "heikenashi": {
+          uses_context: false,
+          args: ["symbol"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"The symbol, marked for Heikin-Ashi transformation."},
+          is_value: false,
+          ref: chart.heikenashi
       },
       "renko": {
           uses_context: false,
@@ -1139,6 +1147,54 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
           ref: core.safe_ge
+      },
+      "safe_eq_na": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_eq_na
+      },
+      "safe_ne_na": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_ne_na
+      },
+      "safe_lt_na": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_lt_na
+      },
+      "safe_gt_na": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_gt_na
+      },
+      "safe_le_na": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_le_na
+      },
+      "safe_ge_na": {
+          uses_context: false,
+          args: ["a","b"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: core.safe_ge_na
       },
       "tostring": {
           uses_context: false,
@@ -3252,6 +3308,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: late_members.math["rphi"]
       },
+      "ta.pivot_point_levels": {
+          uses_context: true,
+          args: ["type","anchor","developing"],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: late_members.ta["pivot_point_levels"]
+      },
       "ta.max": {
           uses_context: true,
           args: ["source"],
@@ -4516,6 +4580,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: false,
           ref: strategy.position_avg_price
       },
+      "strategy.position_entry_name": {
+          uses_context: true,
+          args: [],
+          is_getter: true,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: false,
+          ref: strategy.position_entry_name
+      },
       "strategy.closedtrades": {
           uses_context: true,
           args: [],
@@ -4700,6 +4772,14 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
           is_value: true,
           ref: strategy.direction["short"]
       },
+      "strategy.direction.all": {
+          uses_context: false,
+          args: [],
+          is_getter: false,
+          returns: {"kind":"scalar","type":"any"},
+          is_value: true,
+          ref: strategy.direction["all"]
+      },
       "strategy.oca.cancel": {
           uses_context: false,
           args: [],
@@ -4814,7 +4894,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "syminfo.ticker": {
           uses_context: true,
-          args: [],
+          args: ["symbol"],
           is_getter: true,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -4870,7 +4950,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "syminfo.prefix": {
           uses_context: true,
-          args: [],
+          args: ["symbol"],
           is_getter: true,
           returns: {"kind":"scalar","type":"any"},
           is_value: false,
@@ -5287,7 +5367,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       "vwap": {
           uses_context: true,
           args: ["source","anchor","stdev_mult"],
-          is_getter: false,
+          is_getter: true,
           returns: {"kind":"series","type":"float"},
           is_value: false,
           ref: ta.vwap
@@ -5446,7 +5526,7 @@ export function getGeneratedRegistry(): Record<string, StdlibEntry> {
       },
       "tr": {
           uses_context: true,
-          args: [],
+          args: ["handle_na"],
           is_getter: true,
           returns: {"kind":"scalar","type":"float} The bar's true range."},
           is_value: false,

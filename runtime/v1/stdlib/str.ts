@@ -66,8 +66,12 @@ function formatNumber(n: number, format: string): string {
         const prefix = start === -1 ? pattern : pattern.slice(0, start);
         let end = start === -1 ? pattern.length : start;
         while (end < pattern.length && /[0#,.]/.test(pattern[end])) end++;
-        const core = start === -1 ? "" : pattern.slice(start, end);
-        const suffix = pattern.slice(end);
+        let core = start === -1 ? "" : pattern.slice(start, end);
+        let suffix = pattern.slice(end);
+        // A point with no 0/# after it, followed by literal characters, is printed as it stands after the
+        // integer part: TradingView renders str.tostring(41.69, "#.1") as "42.1" (capture n162), not "421".
+        const pt = core.indexOf(".");
+        if (pt !== -1 && suffix !== "" && !/[0#]/.test(core.slice(pt + 1))) { suffix = core.slice(pt) + suffix; core = core.slice(0, pt); }
 
         const dot = core.indexOf(".");
         const intSpec = dot === -1 ? core : core.slice(0, dot);

@@ -30,8 +30,22 @@ function gradient(
         const v = Number(val(value));
         const lo = Number(val(bottomValue));
         const hi = Number(val(topValue));
-        const from = String(val(bottomColor));
-        const to = String(val(topColor));
+        let from = String(val(bottomColor));
+        let to = String(val(topColor));
+        // An `na` endpoint is the other endpoint's colour, fully transparent
+        // (TradingView capture, popular-author batch 2026-11-21); never hex.
+        const isColor = (c: string): boolean => c.startsWith("#");
+        if (!isColor(from) && isColor(to)) from = `${to.substring(0, 7)}00`;
+        else if (!isColor(to) && isColor(from)) to = `${from.substring(0, 7)}00`;
+
+        // A fully transparent endpoint contributes no RGB: the other one's is used.
+        if (tvRounding) {
+            const alphaOf = (c: string): number => (c.length >= 9 ? parseInt(c.substring(7, 9), 16) : 255);
+            if (isColor(from) && isColor(to)) {
+                if (alphaOf(from) === 0 && alphaOf(to) !== 0) from = `${to.substring(0, 7)}00`;
+                else if (alphaOf(to) === 0 && alphaOf(from) !== 0) to = `${from.substring(0, 7)}00`;
+            }
+        }
 
         // A degenerate range has no gradient to walk; Pine answers with the top
         // colour rather than dividing by zero.
@@ -44,16 +58,26 @@ function gradient(
             const n = parseInt(hex.substring(at, at + 2), 16);
             return Number.isFinite(n) ? n : fallback;
         };
-        // TradingView truncates each RGB channel (255 * 0.25 = 63.75 -> 63)...
-        const mix = (at: number, fallback = 0): number => (tvRounding ? Math.trunc : Math.round)(
-            channel(from, at, fallback) + (channel(to, at, fallback) - channel(from, at, fallback)) * ratio,
-        );
-        // ...but interpolates transparency in Pine's 0-100 space and rounds it
-        // (70 * 0.25 = 17.5 -> 18). Alpha defaults to opaque for #RRGGBB.
-        const transp = (hex: string): number => Math.round(100 - channel(hex, 7, 255) / 2.55);
-        const t0 = transp(from);
-        const t = Math.round(t0 + (transp(to) - t0) * ratio);
-        const alpha = tvRounding ? Math.round((100 - clamp(t, 0, 100)) * 2.55) : mix(7, 255);
+        const lerp = (at: number, fallback: number): number => {
+            const c1 = channel(from, at, fallback);
+            return c1 + (channel(to, at, fallback) - c1) * ratio;
+        };
+        const a1 = channel(from, 7, 255), a2 = channel(to, 7, 255);
+        // TradingView mixes PREMULTIPLIED colours and truncates every channel, alpha included, in
+        // 0-255 space (255 * 0.25 = 63.75 -> 63; captures, popular-author batch 2026-11-21 and the
+        // P2 colour-rounding probe). Alpha is a1*(1-f) + a2*f, so two opaque endpoints can give
+        // 254.99999999999997 -> 254; each channel is (c1*(a1/255)*(1-f) + c2*(a2/255)*f) / (A/255),
+        // in exactly this float order.
+        const A = a1 * (1 - ratio) + a2 * ratio;
+        // A fully transparent result has no colour: (0, 0, 0, 0) (P2 at f = 100, probe t01 at f = 0).
+        if (tvRounding && A === 0) return "#00000000";
+        const premultiplied = tvRounding;
+        const mix = (at: number, fallback = 0): number => {
+            if (!premultiplied) return (tvRounding ? Math.trunc : Math.round)(lerp(at, fallback));
+            const c1 = channel(from, at, fallback), c2 = channel(to, at, fallback);
+            return Math.trunc((c1 * (a1 / 255) * (1 - ratio) + c2 * (a2 / 255) * ratio) / (A / 255));
+        };
+        const alpha = premultiplied ? Math.trunc(A) : mix(7, 255);
 
         return `#${toHex(mix(1))}${toHex(mix(3))}${toHex(mix(5))}${toHex(alpha)}`;
 }
@@ -77,7 +101,8 @@ const color = {
         // 1. Calculate Alpha (0-255) from Transp (0-100)
         // Pine: 100 transp = 0 Alpha (Invisible)
         // Pine: 0 transp = 255 Alpha (Opaque)
-        const alpha = Math.round((100 - clamp(t, 0, 100)) * 2.55);
+        // In doubles, as TradingView does: t = 90 -> 25, 50 -> 128, 97 -> 8.
+        const alpha = Math.round(255 * (1 - clamp(t, 0, 100) / 100));
         const alphaHex = toHex(alpha);
 
         // 2. Parse Input (Handle existing alpha)
@@ -106,9 +131,14 @@ const color = {
         const blu = Number(val(b));
         const trn = Number(val(transp));
 
-        const alpha = Math.round((100 - clamp(trn, 0, 100)) * 2.55);
-        
-        return `#${toHex(red)}${toHex(grn)}${toHex(blu)}${toHex(alpha)}`;
+        // Same doubles as color.new: transp 90 -> 25, not 26 (probe t02: from_gradient between
+        // color.rgb(.., 90) and color.rgb(.., 50) reproduces TradingView only with 25).
+        const alpha = Math.round(255 * (1 - clamp(trn, 0, 100) / 100));
+
+        // A fractional channel is truncated, as color.from_gradient's are: TradingView capture n175,
+        // color.rgb(214 + 41 * 0.7, ...) = 242.7 -> 242, 228.6 -> 228 (plot colours, every bar).
+        const ch = (v: number) => toHex(Number.isFinite(v) ? Math.trunc(clamp(v, 0, 255)) : v);
+        return `#${ch(red)}${ch(grn)}${ch(blu)}${toHex(alpha)}`;
     },
 
     /**

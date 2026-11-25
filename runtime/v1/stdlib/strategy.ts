@@ -34,7 +34,12 @@ export const commission = {
 };
 export const direction = {
     long: long,
-    short: short
+    short: short,
+    // Only meaningful to `strategy.risk.allow_entry_in`, where it allows both
+    // directions again; TradingView compiles it at v2 through v6 and reverses
+    // freely (dev-docs/tv-parity/_probes/corpus98/p2_v{2..6}_direction_all).
+    // "all" is what the broker's risk state already holds by default.
+    all: "all"
 };
 
 /**
@@ -100,6 +105,8 @@ export interface PendingExit {
     units?: ExitUnit[];
     /** Entry ids that had an order pending when the exit was called, and the bar of that first call. */
     arms?: Record<string, number>;
+    /** When the script last called it, in the broker's order sequence (see `Broker.nextSeq`). */
+    seq?: number;
 }
 
 /** One trade's share of a `strategy.exit`; see `PendingExit.units`. */
@@ -116,6 +123,8 @@ export interface ExitUnit {
     placedBar: number;
     trail_peak: number;
     filled: boolean;
+    /** When the unit was created (the exit's call, or its trade's fill), in the broker's order sequence. */
+    seq?: number;
 }
 export interface PendingEntry {
     id: string;
@@ -129,6 +138,18 @@ export interface PendingEntry {
     oca_type: string;
     /** Placed by `strategy.order`, which `pyramiding` does not bind. */
     exempt?: boolean;
+    /**
+     * True when the position was flat or on the order's own side when the script last
+     * placed it: it was not a reversal then, so a fill against a position another order
+     * opened the other way since only nets that position (see `Broker.entryFixedAtPlacement`).
+     */
+    nets?: boolean;
+    /** `strategy.equity` when the script last placed it (see `Broker.defaultQty`). */
+    placedEquity?: number;
+    /** The position size when the script last placed it: `nets` holds only while it is unchanged at the fill bar's start. */
+    placedSize?: number;
+    /** When the script last placed it, in the broker's order sequence (see `Broker.nextSeq`). */
+    seq?: number;
 }
 export interface RiskState {
     // Configured limits
@@ -179,14 +200,30 @@ export const risk = {
         state.max_position_size = val(size);
     },
 
-    allow_entry_in: (ctx: Context, dir: string) => {
+    allow_entry_in: (ctx: Context, dir: any) => {
         const state = brokerFor(ctx).getRiskState();
-        state.allow_entry_in = dir; // "long", "short", or strategy.direction.long / .short
+        // "long", "short" or "all". An input() of it (a v4 `input(defval=strategy.direction.all,
+        // options=...)`) arrives as its Series: stored as is it never equalled any direction, so the
+        // broker refused every entry and the risk state could not be cloned for a realtime tick. na is "all".
+        state.allow_entry_in = text(dir) || "all";
     }
 };
 
 // --- DAY TRANSITION & RISK SYNC ---
 
+
+/**
+ * The direction of an entry or order. `strategy.direction.all` is refused, as TradingView does
+ * at compile time (see the transpiler's `enforceOrderDirection`); here for a value that arrives
+ * through a variable, which mapped it to a short.
+ */
+function orderDirection(name: string, x: any): string {
+    const d = directionOf(x);
+    if (d === direction.all) {
+        throw new Error(`Invalid argument 'direction' in '${name}' call. Possible values: [strategy.long, strategy.short]`);
+    }
+    return d;
+}
 
 export function order(
     ctx: Context,
@@ -200,7 +237,7 @@ export function order(
     comment: string = "",
     when: any = undefined,
     alert_message: string = ""): void {
-    return brokerFor(ctx).order(text(id), directionOf(dir), qty, limit, stop, text(oca_name), text(oca_type), text(comment), when, text(alert_message));
+    return brokerFor(ctx).order(text(id), orderDirection("strategy.order", dir), qty, limit, stop, text(oca_name), text(oca_type), text(comment), when, text(alert_message));
 }
 
 
@@ -226,7 +263,7 @@ export function entry(
     // on TradingView — became a fill price.
     ): any {
     // The broker reports whether it filled; the Pine function returns nothing.
-    brokerFor(ctx).entry(text(id), directionOf(direction), qty, limit, stop, text(oca_name), text(oca_type), text(comment), when, text(alert_message));
+    brokerFor(ctx).entry(text(id), orderDirection("strategy.entry", direction), qty, limit, stop, text(oca_name), text(oca_type), text(comment), when, text(alert_message));
 }
 
 
@@ -306,6 +343,8 @@ export interface MarketOrder {
     exempt?: boolean;
     /** For an entry: the close of the bar that placed it, which sizes it (see `Broker.sizesAtOrderPrice`). */
     placedClose?: number;
+    /** For an entry: `strategy.equity` when the script placed it (see `Broker.defaultQty`). */
+    placedEquity?: number;
     /** For a close placed with `immediately`: it fills at the close of this bar, once the script has run. */
     atClose?: boolean;
 }
@@ -340,10 +379,16 @@ function equityExtremes(ctx: Context): { drawdown: number; drawdownPct: number; 
     return { drawdown, drawdownPct, runup, runupPct };
 }
 
+/**
+ * `strategy.max_drawdown` / `max_drawdown_percent` follow TradingView's own
+ * definition (realized-equity peak to intrabar trough, percent of that peak),
+ * which is not the bar-close curve the run-up still reads. See
+ * Context.maxEquityDrawdown for the evidence.
+ */
 /** @getter */
-export function max_drawdown(ctx: Context): number { return equityExtremes(ctx).drawdown; }
+export function max_drawdown(ctx: Context): number { return ctx.maxEquityDrawdown(true).drawdown; }
 /** @getter */
-export function max_drawdown_percent(ctx: Context): number { return equityExtremes(ctx).drawdownPct; }
+export function max_drawdown_percent(ctx: Context): number { return ctx.maxEquityDrawdown(true).percent; }
 /** @getter */
 export function max_runup(ctx: Context): number { return equityExtremes(ctx).runup; }
 /** @getter */
@@ -416,6 +461,22 @@ export function position_avg_price(ctx: Context): number {
 }
 
 /**
+ * `strategy.position_entry_name` — the entry id of the OPEN position, and ""
+ * while flat.
+ *
+ * TradingView reads "Lng" while a position opened by `strategy.entry("Lng", …)`
+ * is held, "Sht" for the short that reversed it, and "" after `close_all`; no
+ * other value appeared (dev-docs/tv-parity/_probes/corpus98/
+ * p6_v{4,5,6}_entry_name, 2026-11-14). With pyramiding the id is the FIRST
+ * open entry's — `Position.entryId` — which was not probed.
+ *
+ * @getter
+ */
+export function position_entry_name(ctx: Context): string {
+    return ctx.position.size === 0 ? "" : (ctx.position.entryId ?? "");
+}
+
+/**
  * `strategy.closedtrades` — how many trades have been closed.
  *
  * Also the root of the `strategy.closedtrades.*` accessors, which live in
@@ -461,9 +522,18 @@ export function grossprofit(ctx: Context): number {
     return ctx.trades.reduce((total, t) => total + Math.max(t.pnl, 0), 0);
 }
 
-/** @getter */
+/**
+ * `strategy.grossloss` also holds the entry commission the open position has paid, as `netprofit` does
+ * (`Broker.reportedNetProfit`) and as the Strategy Tester's "Gross loss" does. TradingView probes
+ * (triage r6 fin-strat, BINANCE:BTCUSDT 1h, 0.1% commission, one closed loser and one open long):
+ * v5 plots grossloss 2689.968 = closed loss 2631.103 + open commission 58.866; v6 logs
+ * grossloss = netprofit = -(closed loss + open fee), openprofit gross of fees.
+ *
+ * @getter
+ */
 export function grossloss(ctx: Context): number {
-    return ctx.trades.reduce((total, t) => total - Math.min(t.pnl, 0), 0);
+    const open = ctx.position.size === 0 ? 0 : (ctx.position.entryCommission ?? 0);
+    return ctx.trades.reduce((total, t) => total - Math.min(t.pnl, 0), 0) + open;
 }
 
 /**

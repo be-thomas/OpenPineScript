@@ -111,8 +111,11 @@ describe("Pine Script v2 Legacy Math & Environment Variables", () => {
                 'count = (close > open) + (close[1] > open[1]) + (close[2] > open[2])'
             ].join('\n');
             
-            const ctx = executePine(pine, 1);
-            assert.strictEqual(getVarValue(ctx, "count"), 1);
+            // Bars alternate bull, bear, bull: on bar 2 all three comparisons have data.
+            assert.strictEqual(getVarValue(executePine(pine, 3), "count"), 2);
+            // On bar 0, close[1] > open[1] compares na: an na bool, and the sum is na
+            // (TradingView, v2: sum(close > close[1], 20) is na through bar 19, n427).
+            assert.ok(Number.isNaN(getVarValue(executePine(pine, 1), "count")));
         });
 
         it("should track logic counting accurately across multiple bars", () => {

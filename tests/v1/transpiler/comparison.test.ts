@@ -80,7 +80,10 @@ describe("what still has to hold", () => {
   it("`na` equals nothing, including itself", () => {
     // NaN is the representation, and NaN != NaN — which is what Pine reports
     // for any comparison involving `na`, and why `na(x)` exists.
-    expect(read(5, "a = 0.0/0.0\nb = 0.0/0.0\nx = a == b")).toBe(false);
+    // v1-v5: the result is an na bool (NaN), which a condition reads as false; v6 bools are
+    // never na, so it is false there (see safe_eq_na in core.ts).
+    expect(read(5, "a = 0.0/0.0\nb = 0.0/0.0\nx = a == b")).toBeNaN();
+    expect(read(6, "a = 0.0/0.0\nb = 0.0/0.0\nx = a == b")).toBe(false);
   });
 
   it("relational operators are unaffected", () => {

@@ -30,6 +30,7 @@ import {
   declaresStaticRequests, findRequestingFunctions, insideConditionalOrLoop,
   WHEN_REMOVED, TRANSP_REMOVED, isUniqueParam, SIMPLE_LENGTH_PARAMS,
 } from "./rules";
+import type { Eq_exprContext } from "../../parser/v1/generated/PineV1Parser";
 import {
   Once_exprContext,
   Other_literalContext,
@@ -115,6 +116,23 @@ export class V6ToJsVisitor extends V5ToJsVisitor {
    */
   protected override truncatesConstIntDivision(): boolean {
     return false;
+  }
+
+  /**
+   * v6 refuses `x == na` and `x != na` at compile time; v1–v5 compile them
+   * (dev-docs/tv-parity/_probes/corpus98/p8_v6_eq_na, 2026-11-14).
+   */
+  protected override enforceNaComparison(ctx: Eq_exprContext): void {
+    if (ctx.cmp_expr().length < 2) return; // a single operand is not a comparison
+    for (const operand of ctx.cmp_expr()) {
+      if (operand.getText() === "na") {
+        throw this.err(
+          ctx,
+          `cannot compare to 'na' with '==' or '!=' (it does not behave as ` +
+          `expected). Use the na(x) function instead.`
+        );
+      }
+    }
   }
 
   /** v6's view of the stdlib. See V6_VIEW for what differs from v5's. */
@@ -361,18 +379,50 @@ export class V6ToJsVisitor extends V5ToJsVisitor {
    * The guide also names the payoff: `arr.size() != 0 and arr.first()` no
    * longer reads an empty array.
    */
+  /** MG §"Boolean values cannot be na": a comparison with an na operand is false. */
+  protected override comparisonSuffix(): string {
+    return "";
+  }
+
   override visitOr_expr(ctx: any): string {
     const operands = ctx.and_expr();
     if (operands.length === 1) return this.visit(operands[0]);
     for (const o of operands) this.enforceBoolCondition(o);
-    return `(${operands.map((o: any) => `ctx.truthy(${this.visit(o)})`).join(" || ")})`;
+    return this.lazyChain(operands, " || ");
   }
 
   override visitAnd_expr(ctx: any): string {
     const operands = ctx.eq_expr();
     if (operands.length === 1) return this.visit(operands[0]);
     for (const o of operands) this.enforceBoolCondition(o);
-    return `(${operands.map((o: any) => `ctx.truthy(${this.visit(o)})`).join(" && ")})`;
+    return this.lazyChain(operands, " && ");
+  }
+
+  /**
+   * The operands short-circuit, but the base of a history reference `(expr)[n]` in an operand
+   * that may be skipped is still written on every bar the statement runs: it is evaluated ahead
+   * of the chain and read by name inside it. TradingView capture, popular-author batch
+   * 2026-11-21, n146 (v6): `timeframe.isintraday and (timeframe.change("D") or
+   * timeframe.change("D")[1])` is true on the bar after a day starts, where the `[1]` operand
+   * was skipped (its left side was true); with the base carried over the skipped bar instead,
+   * an FVG TradingView blocks was created and 13 drawings differed (all match with this).
+   * Only the history base moves; everything else in the operand stays lazy.
+   */
+  private lazyChain(operands: any[], op: string): string {
+    const outer = this.lazyHistoryBases;
+    // The first operand always runs, unless the whole chain sits in a skippable operand already.
+    const parts = [`ctx.truthy(${this.visit(operands[0])})`];
+    const bases: string[] = outer ?? [];
+    this.lazyHistoryBases = bases;
+    try {
+      for (const o of operands.slice(1)) parts.push(`ctx.truthy(${this.visit(o)})`);
+    } finally {
+      this.lazyHistoryBases = outer;
+    }
+    const chain = `(${parts.join(op)})`;
+    // An enclosing chain writes them; otherwise write them here, ahead of the chain.
+    if (outer || bases.length === 0) return chain;
+    return `(${bases.join(", ")}, ${chain})`;
   }
 
   /**

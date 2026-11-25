@@ -111,6 +111,12 @@ function searchByField(a: any[], value: any, sortField: any, mode: "exact" | "le
 const negativeIndices = (ctx: Context): boolean =>
     ctx?.profile?.defaults.negativeArrayIndices === true;
 
+/**
+ * `stdev`, `variance` and `covariance` divide by n unless `biased = false`, at every
+ * version (TradingView capture, popular-author batch 2026-11-21: v4 and v6).
+ */
+const dividesByN = (_ctx: Context, biased: any): boolean => val(biased) !== false;
+
 const num = (x: any): number => Number(val(x));
 
 /** Finite numeric members only — `na` is excluded from every aggregate. */
@@ -121,6 +127,24 @@ function sized(size: any, initial: any): any[] {
     const n = Number(val(size)) || 0;
     if (n < 0) throw new Error(`array.new: size cannot be negative (got ${n})`);
     return new Array(n).fill(val(initial));
+}
+
+/**
+ * `array.variance` as TradingView computes it: one pass of sums, then
+ * `Σx²/d − mean·(Σx/d)` with d = n (biased) or n − 1. Not the two-pass
+ * `Σ(x − mean)²/d`, which `array.covariance` does use: so `covariance(a, a)`
+ * and `variance(a)` differ in the last bits, and a regression of a series on
+ * itself has a slope of 1 ± ulps on TradingView (probes c130 C1, exact on
+ * biased, unbiased and stdev; C2, 273/273 bars of cov, var, slope, intercept).
+ * `array.stdev` is its square root.
+ */
+function dispersion(ctx: Context, a: any[], biased: any): number {
+    const f = finite(a);
+    if (f.length < 2) return NaN;
+    let s = 0, q = 0;
+    for (const x of f) { s += x; q += x * x; }
+    const n = f.length, d = dividesByN(ctx, biased) ? n : n - 1;
+    return q / d - (s / n) * (s / d);
 }
 
 export const array = {
@@ -172,6 +196,11 @@ export const array = {
     // what keeps every version's named arguments working.
     get: (ctx: Context, id: any, index: any) => {
         const a = arr(id, "get");
+        // `array.get(id, na)` is na, not an error (TradingView capture, popular-author
+        // batch 2026-11-21, v6); `set` and the rest still reject an na index. v4 was
+        // not probed and keeps raising.
+        const at = val(index);
+        if (ctx?.profile?.version >= 5 && (at === null || at === undefined || (typeof at === "number" && Number.isNaN(at)))) return NaN;
         return a[bounds(a, index, "get", negativeIndices(ctx))];
     },
     set: (ctx: Context, id: any, index: any, value: any) => {
@@ -404,20 +433,10 @@ export const array = {
         }
         return best;
     },
-    /** Sample variance (n-1), matching `variance()` elsewhere in the stdlib. */
-    variance: (id: any) => {
-        const f = finite(arr(id, "variance"));
-        if (f.length < 2) return NaN;
-        const mean = f.reduce((s, x) => s + x, 0) / f.length;
-        return f.reduce((s, x) => s + (x - mean) ** 2, 0) / (f.length - 1);
-    },
-    stdev: (id: any) => {
-        const f = finite(arr(id, "stdev"));
-        if (f.length < 2) return NaN;
-        const mean = f.reduce((s, x) => s + x, 0) / f.length;
-        return Math.sqrt(f.reduce((s, x) => s + (x - mean) ** 2, 0) / (f.length - 1));
-    },
-    covariance: (id1: any, id2: any) => {
+    /** `biased` (default true) divides by n; false divides by n - 1. */
+    variance: (ctx: Context, id: any, biased: any = true) => dispersion(ctx, arr(id, "variance"), biased),
+    stdev: (ctx: Context, id: any, biased: any = true) => Math.sqrt(dispersion(ctx, arr(id, "stdev"), biased)),
+    covariance: (ctx: Context, id1: any, id2: any, biased: any = true) => {
         const a = finite(arr(id1, "covariance"));
         const b = finite(arr(id2, "covariance"));
         const n = Math.min(a.length, b.length);
@@ -426,7 +445,7 @@ export const array = {
         const mb = b.slice(0, n).reduce((s, x) => s + x, 0) / n;
         let acc = 0;
         for (let i = 0; i < n; i++) acc += (a[i] - ma) * (b[i] - mb);
-        return acc / (n - 1);
+        return acc / (dividesByN(ctx, biased) ? n : n - 1);
     },
 
     /** `array.join(id, separator)` — v4 spells the default separator as ",". */

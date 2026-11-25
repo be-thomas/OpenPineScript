@@ -37,7 +37,7 @@ describe("Color changes", () => {
 
   it("leaves the other colours and color.* functions alone", () => {
     expect(value(H6 + "x = color.blue\n", "x")).toBe(value5(H5 + "x = color.blue\n", "x"));
-    expect(value(H6 + "x = color.new(color.red, 50)\n", "x")).toBe("#F236457f");
+    expect(value(H6 + "x = color.new(color.red, 50)\n", "x")).toBe("#F2364580");   // alpha 128: color.new rounds 255 * (1 - t/100) (TradingView capture 2026-11-21)
   });
 });
 

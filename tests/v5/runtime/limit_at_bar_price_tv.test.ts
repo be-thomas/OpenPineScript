@@ -17,7 +17,7 @@ const bars = [
 
 function run(version: number) {
   const src = `//@version=${version}
-strategy("t", overlay = true, calc_on_order_fills = true)
+strategy("t", overlay = true, calc_on_order_fills = true, default_qty_type = strategy.fixed)
 if bar_index == 0
     strategy.entry("L", strategy.long)
 if strategy.position_size > 0 and bar_index == 1

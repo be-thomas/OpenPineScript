@@ -63,7 +63,7 @@ describe("mixed multiplicative chains", () => {
 describe("mixed comparison chains", () => {
   // Rare in real scripts, but broken the same way and for the same reason.
   it("a > b < c keeps each operator", () => {
-    expect(transpile(DECLS + "x = a > b < c\n")).toContain("opsv2_safe_lt(opsv2_safe_gt(opsv2_a, opsv2_b), opsv2_c)");
+    expect(transpile(DECLS + "x = a > b < c\n")).toContain("opsv2_safe_lt_na(opsv2_safe_gt_na(opsv2_a, opsv2_b), opsv2_c)");
   });
 
   it("a != b == c keeps each operator", () => {
@@ -71,7 +71,7 @@ describe("mixed comparison chains", () => {
     // `safe_eq` in runtime/v1/stdlib/core.ts. The nesting is what this case is
     // about, and it is still left-associative: the `!=` is the inner one.
     expect(transpile(DECLS + "x = a != b == c\n"))
-      .toContain("opsv2_safe_eq(opsv2_safe_ne(opsv2_a, opsv2_b), opsv2_c)");
+      .toContain("opsv2_safe_eq_na(opsv2_safe_ne_na(opsv2_a, opsv2_b), opsv2_c)");
   });
 });
 

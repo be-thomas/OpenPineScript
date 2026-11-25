@@ -1,10 +1,11 @@
 /**
  * Order sizing differs by version only where TradingView was probed (CLAUDE.md, version scope):
- *   percent_of_equity leaves room for commission, quantities floor to mincontract:
+ *   percent_of_equity leaves room for commission:
  *     v4 (dev-docs/tv-parity/_probes/version-scope/v4-sizing, ENGINE-BUGS bug 8), v5 (_probes/v5-sizing),
  *     v6 (_probes/sizing)
+ *   quantities floor to mincontract: the same, and v2/v3 (_probes/reversal-sizing runs v2, v3)
  *   commission rounded to 8 decimals: v6 only (_probes/sizing-precision)
- * v2 and v3 keep the older sizing: equity / price, no floor, unrounded commission.
+ * v2 and v3 keep equity / price with no commission room, and unrounded commission.
  */
 import { describe, it, expect } from "vitest";
 import { Session, type Candle } from "../../../runtime/v1/session";
@@ -35,9 +36,9 @@ describe.each([[2, false], [3, false], [4, true], [5, true], [6, true]])("v%i si
     expect(qty).toBeCloseTo(probed ? 10000 / (100 * 1.01) : 100, 9);
   });
 
-  it("mincontract floor", () => {
+  it("mincontract floor (every version from v2)", () => {
     const { qty } = run(version, "initial_capital = 10000, margin_long = 0", ", qty = 1.2345", CHART);
-    expect(qty).toBe(probed ? 1.23 : 1.2345);
+    expect(qty).toBe(1.23);
   });
 });
 

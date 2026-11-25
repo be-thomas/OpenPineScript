@@ -17,7 +17,7 @@ const bars = Array.from({ length: 12 }, (_, i) => ({
 }));
 
 const probe = (version: number, extra: string, id = '"E" + str.tostring(bar_index)') => `//@version=${version}
-strategy("S", pyramiding = 3)
+strategy("S", pyramiding = 3, default_qty_type = strategy.fixed)
 if bar_index >= 2 and bar_index <= 4
     strategy.entry(${id}, strategy.long)
 ${extra}
@@ -83,7 +83,7 @@ describe("a position that decays toward zero", () => {
   // position_size = 0 and an open trade of size 0: a size under 1e-10 is not a
   // trade. At v5 qty_percent is read against the held size, not the entered one.
   const src = `//@version=5
-strategy("S", initial_capital = 10000000)
+strategy("S", initial_capital = 10000000, default_qty_type = strategy.fixed)
 strategy.entry("Long", strategy.long, qty = 100)
 strategy.exit("A", "Long", trail_points = 50, trail_offset = 0, qty_percent = 20)
 strategy.exit("B", "Long", trail_points = 100, trail_offset = 0, qty_percent = 20)

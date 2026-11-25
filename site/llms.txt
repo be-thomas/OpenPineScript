@@ -2,6 +2,8 @@
 
 > OpenPineScript compiles TradingView Pine Script (v1 to v6) to JavaScript and runs it locally against a CSV of candles: indicators, plots and strategy backtests, offline, from a command line or inside a browser. Install: `npx openpinescript <script.pine> --data <data.csv>` (Node.js 20+), or `npm install openpinescript` for the library (`import { Session } from "openpinescript"`).
 
+OpenPineScript is an open-source TradingView alternative for running Pine Script locally. It is not affiliated with TradingView.
+
 If you are an AI agent: read the CLI guide first. It is complete and every command in it was run against the real engine.
 
 ## Docs
@@ -19,6 +21,7 @@ If you are an AI agent: read the CLI guide first. It is complete and every comma
 
 - [Source repository](https://github.com/be-thomas/OpenPineScript): README, CLI-Usage.md, conformance results against TradingView.
 - [Zeal Terminal](https://zealterminal.com): a browser charting workspace built on this engine (for humans).
+- [Community and help](https://discord.gg/rmyXDFJK2k): the Zeal Terminal Discord, for questions or a script that won't run.
 - [Interactive tutorial (learn.html)](learn.html): the engine running in a browser tab (for humans).
 
 ## Optional

@@ -168,8 +168,17 @@ export function timestamp(
     const asString = explicitString !== undefined ? explicitString
         : (typeof first === "string" && u(year) === undefined ? first : undefined);
     if (asString !== undefined) {
-        const parsed = new Date(String(asString)).getTime();
-        return Number.isFinite(parsed) ? parsed : NaN;
+        const str = String(asString).trim();
+        const d = new Date(str);
+        const parsed = d.getTime();
+        if (!Number.isFinite(parsed)) return NaN;
+        // "If no time zone is provided, GMT+0 will be used" (the manual). The platform reads a date
+        // WITH a time but no zone in the host's local zone (and a bare ISO date in UTC): re-read
+        // those fields as UTC. TradingView, timestamp("2021-01-13:05:00") is 05:00 UTC (n1, a moon
+        // cycle anchored on it marks its new moon at 08:42 UTC; the host's +05:30 put it at 14:12).
+        const zoned = /(?:Z|GMT|UTC|[+-]\d{2}:?\d{2})\s*$/i.test(str) || /(?:GMT|UTC)\s*[+-]\d/i.test(str);
+        if (zoned || /^\d{4}-\d{2}-\d{2}$/.test(str)) return parsed;
+        return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
     }
 
     // A leading STRING is a time zone; otherwise the calendar fields start at
@@ -236,8 +245,20 @@ function calendar(ctx: Context, field: keyof typeof parts, time: any, timezone: 
     const u = (x: any) => (x !== null && x !== undefined && typeof x.valueOf === "function"
         ? x.valueOf() : x);
     const raw = u(time);
-    const at = raw === undefined || raw === null ? Number(ctx?.time) : Number(raw);
-    if (!Number.isFinite(at)) return NaN;
+    const omitted = raw === undefined || raw === null;
+    let at = omitted ? Number(ctx?.time) : Number(raw);
+    if (!Number.isFinite(at)) {
+        if (omitted) return NaN;
+        // An explicit `na` time is Unix time 0 on TradingView, not na: on bar 0
+        // `year(time[1])` is 1970, `month(time[1])` 1, `dayofweek(time[1])` 5
+        // (Thursday), and `na(year(time[1]))` is false, at v1 to v6
+        // (dev-docs/tv-parity/_probes/eqpnl/p_tna_v*.pine). So the common
+        // `new_year = year(time) != year(time[1])` is TRUE on the first bar and
+        // `new_month` (January vs epoch January) is false. A monthly-returns
+        // table relies on it: its year accumulator resets on bar 0 and the year
+        // row is pushed on the last bar; with na it stayed na and no row appeared.
+        at = 0;
+    }
 
     const zone = u(timezone);
     const named = zone === undefined || zone === null ? ctx?.timezone : String(zone);
@@ -331,9 +352,11 @@ export function weekofyear(ctx: Context, time?: any, timezone?: any): number {
  * A range whose end is not after its start (e.g. "2100-0400") wraps midnight
  * and is treated as two ranges.
  */
-function parseSession(spec: string): { ranges: Array<[number, number]>; days: Set<number> | null } {
+function parseSession(spec: string): { ranges: Array<[number, number]>; days: Set<number> | null; wrapStarts: Set<number> } {
     const [rangePart, dayPart] = String(spec).split(":");
     const ranges: Array<[number, number]> = [];
+    // Starts of ranges that wrap midnight: the evening part belongs to the NEXT day's session.
+    const wrapStarts = new Set<number>();
 
     for (const chunk of rangePart.split(",")) {
         const m = /^\s*(\d{3,4})\s*-\s*(\d{3,4})\s*$/.exec(chunk);
@@ -345,13 +368,18 @@ function parseSession(spec: string): { ranges: Array<[number, number]>; days: Se
         const start = toMin(m[1]);
         const end = toMin(m[2]);
         if (end > start) ranges.push([start, end]);
-        else ranges.push([start, 1440], [0, end]); // wraps midnight
+        else { ranges.push([start, 1440], [0, end]); wrapStarts.add(start); } // wraps midnight
     }
 
+    // No day list: every day for ONE range, Monday to Friday for a comma list. TradingView (probe r6 p3, v6,
+    // BINANCE:BTCUSDT 1h): time("1", "0400-0700") and time(timeframe.period, "0400-0700") are in session on
+    // Saturday and Sunday too, "0400-0700,0900-1300" with either timeframe on weekdays only, and
+    // "0400-0700:1234567" every day (n75's session lines are na at weekends; n76's single range trades then).
+    const chunks = rangePart.split(",").filter(c => /\d/.test(c)).length;
     const days = dayPart
         ? new Set(dayPart.trim().split("").map(Number).filter(n => n >= 1 && n <= 7))
-        : null;
-    return { ranges, days };
+        : chunks > 1 ? new Set([2, 3, 4, 5, 6]) : null;
+    return { ranges, days, wrapStarts };
 }
 
 /**
@@ -430,18 +458,39 @@ export function time(
 
     if (session == null) return t;
 
-    const { ranges, days } = parseSession(String(unwrap(session)));
+    const parsed = parseSession(String(unwrap(session)));
+    const { ranges } = parsed;
     if (ranges.length === 0) return t; // unparseable spec: do not silently filter
+    // A session STRING written as one range without days ("0400-1500") is Monday to Friday before v5
+    // (the v4 -> v5 guide's "23456" fallback; v5 widened it to every day). TradingView, [RS]Spot/Binary
+    // Scalper (v2, BINANCE:BTCUSDT 1h, `time('1', '0400-1500')`): 425 trades, none on a Saturday or
+    // Sunday; the engine had 180 more there. A comma list without days is Monday-Friday at every
+    // version (parseSession). Only an explicit session argument: an omitted one is the symbol's session.
+    const days = parsed.days ?? ((ctx?.profile?.version ?? 1) < 5 ? new Set([2, 3, 4, 5, 6]) : null);
 
     // The session is a filter on the BAR, whatever time is returned for it,
     // read on the wall clock of `timezone` (else the exchange's).
     const zoneArg = unwrap(timezone);
     const zone = zoneArg == null || zoneArg === "" ? ctx?.timezone : String(zoneArg);
     const d = new Date(zonedFields(barTime, zone));
-    if (days && !days.has(d.getUTCDay() + 1)) return NaN; // Pine: 1 = Sunday
     const minuteOfDay = d.getUTCHours() * 60 + d.getUTCMinutes();
 
-    return ranges.some(([a, b]) => minuteOfDay >= a && minuteOfDay < b) ? t : NaN;
+    const range = ranges.find(([a, b]) => minuteOfDay >= a && minuteOfDay < b);
+    if (!range) return NaN;
+    // Pine: 1 = Sunday. The evening part of an overnight session ("2300-0800") opens the NEXT day's session:
+    // Sunday 23:00 trades in Monday's, Friday 23:00 in Saturday's. TradingView, Simple SMA Strategy Backtest
+    // Part 5 (v4, "2300-0800", Monday-Friday by default): it enters at Monday 00:00 from a Sunday 23:00 session.
+    const sessionDay = range[1] === 1440 && parsed.wrapStarts.has(range[0]) ? (d.getUTCDay() + 1) % 7 : d.getUTCDay();
+    if (days && !days.has(sessionDay + 1)) return NaN;
+    // An intraday timeframe's buckets are anchored at the session's start, not on the clock grid
+    // (TradingView probe t04, BINANCE:BTCUSDT 1h, 0930-1600 New York: the 10:00 bar is 09:30,
+    // the 15:00 bar 14:30; with "30" the 10:00 bar is 10:00).
+    const spanMin = _resolution == null || timeframe_bars_back != null ? NaN : specSeconds(spec) / 60;
+    if (spanMin > 0 && spanMin < 1440) {
+        const offset = (minuteOfDay - range[0]) % spanMin;
+        if (offset !== 0) return barTime - offset * 60_000 - (barTime % 60_000);
+    }
+    return t;
 }
 
 /**

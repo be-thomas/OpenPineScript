@@ -1,9 +1,13 @@
 /**
- * strategy(currency = X) on a symbol quoted in another currency: closed-trade
- * profit and commission are multiplied by the host's currency_rate in effect
- * at the exit bar. TradingView evidence (BINANCE:BTCUSDT 1h, currency USD):
+ * strategy(currency = X) on a symbol quoted in another currency: a closed trade's
+ * profit and exit commission are multiplied by the host's currency_rate in effect
+ * at the exit bar, its entry commission by the rate at the entry bar. TradingView
+ * evidence (BINANCE:BTCUSDT 1h, currency USD):
  * dev-docs/tv-parity/_probes/currency-usd-1btc/run-20261113-050337/trades.csv
- * against the rate series in _probes/currency-rate-series/run-20261113-050713.
+ * against the rate series in _probes/currency-rate-series/run-20261113-050713 and
+ * _tvdata/CURRENCY_USDT_USD__1D.csv: all 179 trades entered and closed on different
+ * days match to the cent this way (172 with the whole trade at the exit's rate), and
+ * so do n105's (v4, 0.2%: 8552.87 = 38400 * 0.99873 - 14956.00 * 0.9988 - 14879.20 * 0.99873).
  */
 import { describe, it, expect } from "vitest";
 import { Session } from "../../../runtime/v1/session";
@@ -43,12 +47,13 @@ const RATES = [
 ];
 
 describe("strategy currency conversion", () => {
-  it("books each closed trade at the rate in effect on its exit bar", () => {
+  it("books each closed trade at its exit bar's rate, the entry commission at its entry bar's", () => {
     const { ctx } = run("currency.USD", "USDT", RATES);
-    expect(ctx.trades.map((t: any) => t.pnl)).toEqual([(20 - 2) * 2, (20 - 2) * 3]);
-    expect(ctx.trades.map((t: any) => t.commission)).toEqual([4, 6]);
-    expect(ctx.netProfitSum).toBeCloseTo(36 + 54, 9);
-    expect(ctx.cash - ctx.initialCapital).toBeCloseTo(36 + 54, 9);
+    // first: entered on bar 1 (rate 1), closed on bar 3 (rate 2); second: bar 5 (2.5) to bar 7 (3)
+    expect(ctx.trades.map((t: any) => t.pnl)).toEqual([(20 - 1) * 2 - 1 * 1, (20 - 1) * 3 - 1 * 2.5]);
+    expect(ctx.trades.map((t: any) => t.commission)).toEqual([2 + 1, 3 + 2.5]);
+    expect(ctx.netProfitSum).toBeCloseTo(37 + 54.5, 9);
+    expect(ctx.cash - ctx.initialCapital).toBeCloseTo(37 + 54.5, 9);
   });
 
   it("keeps one series per (from, to) pair: a second call replaces the first", () => {

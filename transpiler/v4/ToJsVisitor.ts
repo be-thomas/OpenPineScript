@@ -26,6 +26,7 @@
  * `switch`. Both are v5. v4 adds no statement keyword at all, which is why this
  * file overrides declarations and nothing else.
  */
+import type { ParserRuleContext } from "antlr4ng";
 import type { PineVersion } from "../common/version";
 import { V3ToJsVisitor } from "../v3/ToJsVisitor";
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
@@ -96,35 +97,6 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
   }
 
   /**
-   * From v4, a user-defined function MAY return a tuple.
-   *
-   * SOURCING. From the manual's user-defined functions page: "Programmers can
-   * write functions that return multiple values or references by using a tuple
-   * as the final statement in the function's body", with
-   *
-   *     sumDiff(float val1, float val2) =>
-   *         [val1 + val2, val1 - val2]
-   *
-   *     [sum, diff] = sumDiff(math.random(), math.random())
-   *
-   * and the rule for reading one back: "the script must use a tuple declaration
-   * containing one NEW variable for each returned item. It is not possible to
-   * reassign existing tuples or to use previously declared variables within
-   * them."
-   *
-   * v1–v3 keep the refusal — `conformance/common/guards_by_version.test.ts` has
-   * always declared the guard for those three and left v4 and v5 unstated, and
-   * this is the override that was missing. Eight of TradingView's own published
-   * scripts were rejected by it, including the one on its own error-messages
-   * page about tuples.
-   *
-   * Lifting the guard is the WHOLE change: `[a, b]` already emits a JavaScript
-   * array through `visitArith_exprs`, a body's last statement is already what a
-   * function returns, and `ctx.new_vars` already unpacks a built-in's tuple.
-   */
-  protected override enforceNoTupleReturn(): void {}
-
-  /**
    * Rejects a v1–v3 spelling with the name that replaced it.
    *
    * Hooked on `visitId` rather than driven off the registry, because a missing
@@ -172,7 +144,8 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
     return parent?.constructor?.name === "Fun_callContext" && parent.id?.() === ctx;
   }
 
-  override visitId(ctx: IdContext): string {
+  override visitId(node: ParserRuleContext): string {
+    const ctx = node as IdContext;
     const text = ctx.getText();
     // A keyword argument's key is the CALLEE's parameter name, not a name this
     // script is reading, so the rename table does not apply to it. Two of
@@ -212,7 +185,8 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
    * name in different scopes are different variables and must not share an
    * initialised flag.
    */
-  override visitVar_def(ctx: Var_defContext): string {
+  override visitVar_def(node: ParserRuleContext): string {
+    const ctx = node as Var_defContext;
     this.enforceDeclarationTypes(ctx);
     const persistence = this.persistenceOf(ctx);
     if (!persistence) return super.visitVar_def(ctx as any);
@@ -221,8 +195,11 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
     // self-reference in v4 exactly as it is in v3.
     this.enforceNoSelfReference(ctx.id().getText(), ctx.arith_expr(), ctx);
 
-    const name = this.visit(ctx.id());
+    const shadowed = this.shadowPending;
+    this.shadowPending = false;
+    let name = this.visit(ctx.id());
     const value = this.visit(ctx.arith_expr());
+    if (shadowed) name = this.shadowedName(ctx.id().getText(), name);
     const key = this.getLocId(ctx as SourceLocated);
     const ip = persistence === "varip" ? ", true" : "";
 
@@ -238,7 +215,8 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
    * re-run `f()` every bar while the script says it must not, and nothing
    * downstream could detect that.
    */
-  override visitVar_defs(ctx: Var_defsContext): string {
+  override visitVar_defs(node: ParserRuleContext): string {
+    const ctx = node as Var_defsContext;
     const persistence = this.persistenceOf(ctx);
     if (!persistence) return super.visitVar_defs(ctx as any);
 
@@ -434,7 +412,8 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
    * declared, which for a compound assignment is not a formality: there is no
    * previous value to add to otherwise.
    */
-  override visitVar_assign(ctx: Var_assignContext): string {
+  override visitVar_assign(node: ParserRuleContext): string {
+    const ctx = node as Var_assignContext;
     const op = this.compoundOperatorOf(ctx);
     const target = ctx.id().getText();
     if (this.declaredInts.has(target) && !this.scopes.functionScoped.has(target)
@@ -476,7 +455,8 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
    * level it already set — so every arm of the chain returns, or does not,
    * together.
    */
-  protected override emitElseBranch(ctx: If_exprContext): string | null {
+  protected override emitElseBranch(node: ParserRuleContext): string | null {
+    const ctx = node as If_exprContext;
     if (!ctx.IF_COND_ELSE()) return null;
 
     // `( if_expr | stmts_block )`: when the else is a plain block, v1's
@@ -499,7 +479,8 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
    * same list to defer its third argument into a thunk — picks the change up
    * without knowing about it.
    */
-  protected override positionalArgs(ctx: Pos_argsContext): any[] {
+  protected override positionalArgs(node: ParserRuleContext): any[] {
+    const ctx = node as Pos_argsContext;
     return (ctx as any).pos_arg?.() ?? super.positionalArgs(ctx as any);
   }
 
@@ -519,7 +500,8 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
    * Both spellings are read, positional and keyword, because both appear in
    * TradingView's own examples.
    */
-  protected override tupleArityFromArgument(call: Fun_callContext): number | null {
+  protected override tupleArityFromArgument(node: ParserRuleContext): number | null {
+    const call = node as Fun_callContext;
     const args = call.fun_actual_args();
     if (!args) return null;
 
@@ -556,7 +538,13 @@ export class V4ToJsVisitor extends V3ToJsVisitor {
 
     const call = this.soleCall(node.arith_expr?.());
     if (!call) return null;
-    return this.scopes.tupleArity?.get(call.id().getText()) ?? null;
+    const name = call.id().getText();
+    const own = this.scopes.tupleArity?.get(name);
+    if (own !== undefined) return own;
+    // A built-in that returns a tuple: `[st, dir] = security(sym, "W", supertrend(3, 10))`.
+    const entry = this.userFunctions.has(name) ? undefined : this.registry[name];
+    if (entry?.returns.kind === "tuple" && entry.returns.itemTypes) return entry.returns.itemTypes.length;
+    return null;
   }
 
   /**

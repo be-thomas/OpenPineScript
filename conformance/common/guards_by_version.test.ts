@@ -86,9 +86,10 @@ const RULES: Rule[] = [
   {
     name: "'x == na' comparison",
     source: "y = close == na ? 1 : 0\n",
-    // The v2→v3 guide documents exactly five changes and this is not one, so
-    // v3 keeps the v1/v2 behaviour. v4/v5 unresearched.
-    expected: { 1: "guard", 2: "guard", 3: "guard" },
+    // TradingView compiles it at v1–v5, and the comparison is false on every
+    // bar; v6 refuses it at compile time (dev-docs/tv-parity/_probes/corpus98/
+    // p8_v{1..6}_eq_na, 2026-11-14).
+    expected: { 1: "accept", 2: "accept", 3: "accept", 4: "accept", 5: "accept", 6: "guard" },
     because: /compare to 'na'/,
   },
   {
@@ -118,8 +119,9 @@ const RULES: Rule[] = [
   {
     name: "user function returning a tuple",
     source: "pair(v) => [v, v + 1]\n[a, b] = pair(close)\n",
-    expected: { 1: "guard", 2: "guard", 3: "guard" },
-    because: /cannot return tuples/,
+    // TradingView compiles it at v1–v3 too (dev-docs/tv-parity/_probes/corpus98/
+    // p5_v{1,2,3}_tuple, 2026-11-14).
+    expected: { 1: "accept", 2: "accept", 3: "accept" },
   },
   {
     name: "self-referencing declaration",
@@ -262,7 +264,7 @@ describe("diagnostics name the version", () => {
   it("v1 rejections say v1, v2 rejections say v2", () => {
     // A rule every implemented version shares, so the only difference in the
     // message is the version it names.
-    const src = "y = close == na ? 1 : 0\n";
+    const src = "f(x) => f(x)\n";
 
     for (const version of IMPLEMENTED_VERSIONS) {
       const result = attempt(version, src);
