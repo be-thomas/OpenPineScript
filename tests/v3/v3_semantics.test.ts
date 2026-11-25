@@ -188,8 +188,8 @@ describe("v3 keeps the v1/v2 rules the migration guide does not change", () => {
       .toThrow(/unavailable in a study\(\) script/);
   });
 
-  it("still rejects 'x == na' — not among the five documented changes", () => {
-    expect(() => v3("y = close == na ? 1 : 0\n")).toThrow(/compare to 'na'/);
+  it("accepts 'x == na', as v1 and v2 do — TradingView compiles it (corpus98/p8_v3_eq_na)", () => {
+    expect(() => v3("y = close == na ? 1 : 0\n")).not.toThrow();
   });
 
   it("still bans 'bar_index'", () => {

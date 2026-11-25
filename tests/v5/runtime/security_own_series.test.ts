@@ -158,18 +158,33 @@ describe("request.security(calc_bars_count)", () => {
     expect(values(runHosted(""), "x")).toEqual([200, 201, 202, 203, 204, 205, 206, 207, 208, 209]);
   });
 
-  // TradingView's log (conformance/v5/parity/harness_security_cbc, BTCUSDT 5m):
-  // `request.security("60", bar_index, calc_bars_count = 50)` equals the call
-  // without it on every row. calc_bars_count has no observable effect.
-  it("calc_bars_count = 3 changes nothing: every bar is still seen", () => {
+  // TradingView probe t12: `request.security(syminfo.tickerid, "240", bar_index, calc_bars_count = 50)`
+  // is na until the last 50 requested bars, then counts 0..49 within them. The depth belongs to the
+  // (symbol, timeframe) data set: a second request for it without calc_bars_count (as in
+  // conformance/v5/parity/harness_security_cbc, where h_all sits beside h_bi) gives both the full
+  // history, which is why that harness showed "no effect".
+  it("calc_bars_count = 3 keeps the last 3 requested bars", () => {
     const r = runHosted(", calc_bars_count = 3");
-    expect(values(r, "x")).toEqual([200, 201, 202, 203, 204, 205, 206, 207, 208, 209]);
+    expect(values(r, "x")).toEqual([null, null, null, null, null, null, null, 207, 208, 209]);
     expect(r.droppedArguments).toEqual([]);
   });
 
-  it("the expression warms up from the first bar, whatever the count: sma(2) is na only on bar 0", () => {
+  it("the expression warms up from the first kept bar: sma(2) is na there", () => {
     const r = runHosted(", calc_bars_count = 3", "ta.sma(close, 2)");
-    expect(values(r, "x")).toEqual([null, 200.5, 201.5, 202.5, 203.5, 204.5, 205.5, 206.5, 207.5, 208.5]);
+    expect(values(r, "x")).toEqual([null, null, null, null, null, null, null, null, 207.5, 208.5]);
+  });
+
+  it("an unlimited request for the same symbol and timeframe lifts the limit for both", () => {
+    const s = new Session();
+    s.setChart({ symbol: "BINANCE:BTCUSDT", timeframe: "D" });
+    s.compile('//@version=5\nindicator("t")\n' +
+      'a = request.security("BINANCE:ETHUSDT", "D", close, lookahead = barmerge.lookahead_on, calc_bars_count = 3)\n' +
+      'b = request.security("BINANCE:ETHUSDT", "D", close, lookahead = barmerge.lookahead_on)\n' +
+      'plot(a, "a")\nplot(b, "b")\n');
+    s.provideData("BINANCE:ETHUSDT", "D", other);
+    const r: any = s.runHistory(dailyBars);
+    expect(values(r, "a")).toEqual([200, 201, 202, 203, 204, 205, 206, 207, 208, 209]);
+    expect(values(r, "b")).toEqual([200, 201, 202, 203, 204, 205, 206, 207, 208, 209]);
   });
 
   it("on the chart's own series too, and the argument is not reported as dropped", () => {

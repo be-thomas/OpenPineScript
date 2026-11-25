@@ -139,18 +139,20 @@ describe("security() — missing data", () => {
 });
 
 describe("security() — live-tick stability", () => {
-    it("HTF value is stable across re-ticks of the forming bar (not rolled back)", () => {
+    it("a realtime bar sees the forming HTF bar (probe t05), the same on every re-tick", () => {
         const { ctx, exec } = build(SRC, 3);
         ctx.provideSecurityData("AAPL", "D", DAILY);
         // commit two historical bars so daily[0] then daily[1] close
         ctx.setBar(TIMES[1], 5, 5, 5, 5, 1); exec(); ctx.finalizeBar();   // h=100
         ctx.setBar(TIMES[2], 5, 5, 5, 5, 1); exec(); ctx.finalizeBar();   // h=110
-        // forming bar just after the last: re-tick repeatedly; HTF value must stay 110
+        // forming bar just after the last: it is inside daily[2], which is still forming. TradingView
+        // (probe t05, lookahead_off) returns the forming bar as it is now, not the last closed one;
+        // here the host's daily[2] has close 120.
         ctx.applyTick(TIMES[2] + 1000, 5, 5, 5, 5, 1); exec();
-        assert.strictEqual(vv(ctx, "h"), 110);
+        assert.strictEqual(vv(ctx, "h"), 120);
         ctx.applyTick(TIMES[2] + 1000, 9, 9, 9, 9, 1); exec();
-        assert.strictEqual(vv(ctx, "h"), 110);
+        assert.strictEqual(vv(ctx, "h"), 120);
         ctx.applyTick(TIMES[2] + 1000, 7, 7, 7, 7, 1); exec();
-        assert.strictEqual(vv(ctx, "h"), 110);
+        assert.strictEqual(vv(ctx, "h"), 120);
     });
 });

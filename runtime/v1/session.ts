@@ -238,6 +238,12 @@ export interface SimResult {
      */
     droppedArguments: string[];
     /**
+     * `request.security` contexts this run built from the chart's own bars (`symbol@timeframe`), for want of
+     * supplied candles. They start at the chart's first bar, so a script reading their history near it sees
+     * `na` where supplied data would have values. Empty when every request had its data.
+     */
+    derivedRequests?: string[];
+    /**
      * Things the host got wrong or left unsaid that change what the script
      * computed, in words a person can act on. Empty when there are none.
      * Today: the chart's timeframe and symbol were never set (`Session.setChart`),
@@ -265,6 +271,18 @@ export interface RunOptions {
      * no callback the run does nothing extra.
      */
     onProgress?: (done: number, total: number) => void;
+    /**
+     * A realtime bar follows the candles given, as on a chart that has just loaded:
+     * they all run as confirmed history and the last one is NOT `barstate.islast`.
+     * The live bar is then run with `Session.tick(candle)`, where it is `islast`,
+     * `isrealtime` and `isnew` on its first tick, and closed with `commit()`.
+     *
+     * `last_bar_index` is the live bar's index (the history length) from the first
+     * bar on, and `last_bar_time` its open time. Pass that time as `{ time }` when
+     * the live candle is known; otherwise it is the last candle's time plus the
+     * spacing of the last two. Without this option the last candle is the last bar.
+     */
+    realtimeFollows?: boolean | { time?: number };
 }
 
 // ─── Error normalization (B4) ──────────────────────────────────────────────────
@@ -355,7 +373,14 @@ function plotToSeries(id: string, entries: (PlotData | null)[], meta: ScriptMeta
         if (d === null) return null;
         if (d.type === "candle") {
             if (!(finite(d.open) && finite(d.high) && finite(d.low) && finite(d.close))) return null;
-            if (hiddenPoint(d)) return null;
+            if (hiddenPoint(d)) {
+                // An na body with a wick or border colour still draws the candle (its outline), and TradingView
+                // exports its OHLC (n128: plotcandle(..., maincol = na, wickcolor = bordercolor = secondcol)).
+                // The body is transparent; only a candle with nothing to draw is a gap.
+                const shownColor = (c: any) => typeof c === "string" && c !== "";
+                if (!shownColor((d as any).wickcolor) && !shownColor((d as any).bordercolor)) return null;
+                return { open: d.open, high: d.high, low: d.low, close: d.close, color: "#00000000" };
+            }
             const c = pointColor(d);
             return c === undefined
                 ? { open: d.open, high: d.high, low: d.low, close: d.close }
@@ -580,7 +605,7 @@ export function riskRatios(curve: EquityPoint[], annualRatePercent: number): { s
     };
 }
 
-function buildPerformance(ctx: Ctx): Performance | null {
+export function buildPerformance(ctx: Ctx): Performance | null {
     if (ctx.scriptMeta?.kind !== "strategy") return null;
     const trades = ctx.trades;
     const capital = ctx.initialCapital;
@@ -591,10 +616,34 @@ function buildPerformance(ctx: Ctx): Performance | null {
 
     const openPL = ctx.openProfitAt(ctx.lastClose);
 
+    // The account's max drawdown is TradingView's (realized peak to intrabar
+    // trough, percent of that peak), not the closed-trade walk statsFor does
+    // for the long and short columns. See Context.maxEquityDrawdown.
+    const all = statsFor(trades, capital);
+    const dd = ctx.maxEquityDrawdown();
+    all.maxDrawdown = dd.drawdown;
+    all.maxDrawdownPercent = dd.percent;
+    const long = statsFor(trades.filter((t) => t.direction === "long"), capital);
+    const short = statsFor(trades.filter((t) => t.direction === "short"), capital);
+
+    // The commission already paid to open the position still held is in TradingView's gross
+    // loss (and so its net profit and profit factor): with an open trade the report's gross
+    // loss exceeds the closed trades' losses by exactly that entry commission (captures n5,
+    // n12, n15, n23, n55, n67, n95).
+    const openFee = ctx.position.size === 0 ? 0 : ctx.position.entryCommission ?? 0;
+    if (openFee > 0) {
+        for (const col of [all, ctx.position.size > 0 ? long : short]) {
+            col.grossLoss += openFee;
+            col.netProfit = col.grossProfit - col.grossLoss;
+            col.netProfitPercent = capital === 0 ? NaN : (col.netProfit / capital) * 100;
+            col.profitFactor = ratio(col.grossProfit, col.grossLoss);
+        }
+    }
+
     return {
-        all: statsFor(trades, capital),
-        long: statsFor(trades.filter((t) => t.direction === "long"), capital),
-        short: statsFor(trades.filter((t) => t.direction === "short"), capital),
+        all,
+        long,
+        short,
         initialCapital: capital,
         openPL,
         openTrades: ctx.position.size === 0 ? 0 : 1,
@@ -605,20 +654,48 @@ function buildPerformance(ctx: Ctx): Performance | null {
     };
 }
 
-export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | "engineVersion" | "errors" | "warnings"> {
+/**
+ * A drawing with its bar-index coordinates moved by `skipped` bars, for a run
+ * that started `skipped` bars into the chart (`calc_bars_count`). A copy: the
+ * Context's own record stays in the script's numbering.
+ */
+function withChartIndices(d: Drawing, skipped: number): Drawing {
+    const props: Record<string, any> = { ...d.props };
+    const shift = (...keys: string[]) => {
+        for (const k of keys) if (typeof props[k] === "number" && Number.isFinite(props[k])) props[k] += skipped;
+    };
+    if (d.kind === "polyline") {
+        // A chart.point carries both fields; the polyline picks one by its xloc.
+        props.points = (props.points as any[]).map((p) =>
+            typeof p?.index === "number" && Number.isFinite(p.index) ? { ...p, index: p.index + skipped } : p);
+    } else if (d.kind !== "table" && d.kind !== "linefill" && props.xloc !== "bar_time") {
+        if (d.kind === "line") shift("x1", "x2");
+        else if (d.kind === "label") shift("x");
+        else if (d.kind === "box") shift("left", "right");
+    }
+    return { ...d, bar: d.bar + skipped, props };
+}
+
+export function buildRenderModel(ctx: Ctx, pad = 0): Omit<SimResult, "protocolVersion" | "engineVersion" | "errors" | "warnings"> {
     const meta = ctx.scriptMeta;
+    // `pad`: the run started this many bars into the chart (`calc_bars_count`). The
+    // Context keeps the script's own numbering; the model is in CHART indices: plots
+    // and fills padded with na over the bars before, bar-index coordinates shifted.
+    // Times (xloc.bar_time, chart.point time) are untouched.
+    const padded = <T,>(entries: (T | null)[]): (T | null)[] => (pad > 0 ? [...new Array(pad).fill(null), ...entries] : entries);
     const series: RenderSeries[] = [];
-    for (const [id, entries] of ctx.plots) series.push(plotToSeries(id, entries, meta, paletteColor(ctx, "blue")));
+    for (const [id, entries] of ctx.plots) series.push(plotToSeries(id, padded(entries), meta, paletteColor(ctx, "blue")));
 
     const fills: SimResult["fills"] = [];
-    for (const [, entries] of ctx.fills) {
+    for (const [, fillEntries] of ctx.fills) {
+        const entries = padded(fillEntries);
         const f = entries.find((d) => d !== null);
         if (!f) continue;
         // fill(show_last): "the number of bars, from the last bar back to the
         // past, to fill on the chart". `currentBarIndex` is the count of bars the
         // run completed, so the last N start N before it.
         const showLast = [...entries].reverse().find((d) => d?.showLast !== undefined)?.showLast;
-        const firstShown = showLast === undefined ? 0 : ctx.currentBarIndex - showLast;
+        const firstShown = showLast === undefined ? 0 : ctx.currentBarIndex + pad - showLast;
         const colors = entries.map((d, i) => (d && i >= firstShown ? d.color : null));
         const distinct = new Set(colors.filter((c): c is string => c !== null));
         fills.push({
@@ -640,7 +717,7 @@ export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | 
 
     return {
         meta,
-        barsProcessed: ctx.currentBarIndex,
+        barsProcessed: ctx.currentBarIndex + pad,
         series,
         fills,
         trades: ctx.trades.slice(),
@@ -650,10 +727,11 @@ export function buildRenderModel(ctx: Ctx): Omit<SimResult, "protocolVersion" | 
         equity: ctx.equityCurve.slice(),
         // Creation order, which is the order a host should draw them in: a
         // later drawing overlaps an earlier one on TradingView too.
-        drawings: [...ctx.drawings.values()],
-        logs: ctx.logs.slice(),
+        drawings: [...ctx.drawings.values()].map((d) => (pad > 0 ? withChartIndices(d, pad) : d)),
+        logs: pad > 0 ? ctx.logs.map((l) => ({ ...l, bar: l.bar + pad })) : ctx.logs.slice(),
         alerts: [], // alertcondition: reserved (P2)
         droppedArguments: [...ctx.droppedArguments],
+        derivedRequests: [...ctx.derivedSecurities],
     };
 }
 
@@ -923,6 +1001,20 @@ export class Session {
      * `cash` moves with the first fill, so it is seeded when the script
      * declares itself and never afterwards. The next `runHistory` picks it up.
      */
+    /**
+     * The chart's visible range, in bar open times (ms): what
+     * `chart.left_visible_bar_time` and `chart.right_visible_bar_time` return.
+     * Kept for every later `runHistory` and `tick`; `clearVisibleRange()` removes it.
+     * Without one the first and last bar times answer, as before.
+     */
+    setVisibleRange(leftTimeMs: number, rightTimeMs: number): void {
+        this.visibleRange = { left: leftTimeMs, right: rightTimeMs };
+    }
+
+    clearVisibleRange(): void { this.visibleRange = null; }
+
+    private visibleRange: { left: number; right: number } | null = null;
+
     setProperties(values: Record<string, any>): void {
         Object.assign(this.propertyValues, values);
     }
@@ -972,28 +1064,61 @@ export class Session {
         // Guarded by tests/v1/runtime/lazy_rollback_points.test.ts and
         // rollback_snapshot_work.test.ts.
         const repeating = new Set<string>();
+        this.seriesLimitSeed = new Map();
         for (let attempt = 0; ; attempt++) {
             const result = this.runHistoryOnce(candles, opts, attempt < 4 ? repeating : null);
             if (result) return result;
         }
     }
 
+    /**
+     * The requests' `calc_bars_count` limits per data set, learned by a pass that found a request
+     * changing the depth another had read; the next pass starts with them (see `Context.securityFirstBar`).
+     */
+    private seriesLimitSeed = new Map<string, Map<string, number>>();
+
     /** One pass of `runHistory`; null when it must start over (see there). */
-    private runHistoryOnce(candles: Candle[], opts: RunOptions, repeating: Set<string> | null): SimResult | null {
+    private runHistoryOnce(allCandles: Candle[], opts: RunOptions, repeating: Set<string> | null): SimResult | null {
         if (!this.js) throw new Error("compile() first");
+        // `indicator(calc_bars_count = N)`: the script executes on the last N bars
+        // only. The first of them is bar_index 0, where `var` initialises
+        // (TradingView capture, popular-author batch 2026-11-21, v6). Its plots are
+        // padded with na over the bars before, so they stay aligned to the chart.
+        const cbc = this.meta?.calc_bars_count;
+        // The live bar that follows the history (`realtimeFollows`) is one of the N:
+        // TradingView probe P3 (calc_bars_count = 50, realtime chart) has bar_index 0
+        // on the 49th closed bar from the end and 49 on the live bar.
+        // A strategy's N are all closed bars: TradingView capture n51 (strategy,
+        // calc_bars_count = 5000, realtime chart) has bar_index 0 on the 5000th
+        // closed bar from the end (its logged pivot indices name those bars).
+        const cbcHist = cbc !== undefined && opts.realtimeFollows && this.meta?.kind !== "strategy" ? Math.max(1, cbc - 1) : cbc;
+        const skipped = cbcHist !== undefined && cbcHist < allCandles.length ? allCandles.length - cbcHist : 0;
+        const candles = skipped > 0 ? allCandles.slice(skipped) : allCandles;
         const ctx = new Context(this.profile);
         ctx.repeatingSites = repeating;
+        for (const [k, v] of this.seriesLimitSeed) ctx.seriesLimits.set(k, new Map(v));
         applyChart(ctx, this.chart);
         const exec = compile(this.js, ctx, Object.create(null));
         Object.assign(ctx.userInputs, this.inputValues);
         // Before the first bar: `declareScript` reads these, and it runs on it.
         Object.assign(ctx.propertyOverrides, this.propertyValues);
+        if (this.visibleRange) ctx.provideVisibleRange(this.visibleRange.left, this.visibleRange.right);
         for (const s of this.securities) ctx.provideSecurityData(s.symbol, s.resolution, s.candles);
         for (const r of this.currencyRates) ctx.provideRequestData("currency_rate", requestKey([r.from, r.to]), r.samples);
         // `last_bar_index` / `last_bar_time` are documented as known from the
         // first bar, and only the caller knows how long the run is.
         if (candles.length > 0) {
-            ctx.provideDatasetExtent(candles.length, candles[candles.length - 1].time);
+            const follows = opts.realtimeFollows;
+            if (follows) {
+                // The live bar is part of the dataset's extent from the first bar on.
+                const n = candles.length;
+                const given = typeof follows === "object" ? follows.time : undefined;
+                const step = n >= 2 ? candles[n - 1].time - candles[n - 2].time : 0;
+                ctx.provideDatasetExtent(n + 1, given ?? candles[n - 1].time + step);
+                ctx.realtimeBars = 1;
+            } else {
+                ctx.provideDatasetExtent(candles.length, candles[candles.length - 1].time);
+            }
         }
         ctx.chartAhead = candles;
         this.ctx = ctx; this.exec = exec;
@@ -1026,6 +1151,10 @@ export class Session {
             errors.push(...toEngineErrors({ ...(e as any), message: (e as any)?.message }).map((x) => ({
                 ...x, phase: "runtime" as const, bar })));
         }
+        if (ctx.seriesLimitsChanged) {
+            this.seriesLimitSeed = new Map([...ctx.seriesLimits].map(([k, v]) => [k, new Map(v)]));
+            return null;
+        }
         if (repeating && ctx.missedRepeat !== null) {
             repeating.add(ctx.missedRepeat);
             return null;
@@ -1051,22 +1180,58 @@ export class Session {
                 `results stay in ${ctx.currency} — call Session.provideCurrencyRate(${JSON.stringify(ctx.currency)}, ` +
                 `${JSON.stringify(account)}, samples)`);
         }
-        return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, ...buildRenderModel(ctx), errors,
+        this.barOffset = skipped;
+        const model = buildRenderModel(ctx, skipped);
+        for (const e of errors) if (skipped > 0 && typeof e.bar === "number") e.bar += skipped;
+        return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION, ...model, errors,
             warnings,
         };
+    }
+
+    /** Bars the last history run skipped (`calc_bars_count`): live output is offset by them. */
+    private barOffset = 0;
+
+    /**
+     * The result as it stands now, live bars included, in chart bar indices like
+     * `runHistory`'s. Run errors are not carried: they were reported by the run.
+     */
+    render(): SimResult {
+        const ctx = this.ctx;
+        if (!ctx) throw new Error("runHistory() first");
+        return { protocolVersion: PROTOCOL_VERSION, engineVersion: ENGINE_VERSION,
+            ...buildRenderModel(ctx, this.barOffset), errors: [], warnings: [] };
     }
 
     /** The forming bar's latest tick, replayed by `commit()` when no final candle is given. */
     private lastTick: Candle | null = null;
 
-    /** Live tick on the forming bar (P3). Honors calc_on_every_tick. */
-    tick(candle: Candle): RenderDelta {
+    /**
+     * Live tick on the forming bar (P3). Honors calc_on_every_tick.
+     *
+     * `loadPass: true` makes this the LOAD PASS, which TradingView runs when a chart loads with an
+     * unconfirmed last bar: the forming bar is computed once as part of the history, with
+     * `barstate.isrealtime` false, `isconfirmed` false, `isnew` true, `request.security` seeing only
+     * the requested bars that have closed (not the forming one) and `barstate.islast` false inside
+     * it. Ticks after it are the usual realtime executions (`isnew` false, forming bar, islast true).
+     * Use it for the FIRST tick after `runHistory(bars, { realtimeFollows })`, to reproduce a frame
+     * TradingView captured at load; it throws on any later tick. Default behaviour is unchanged.
+     */
+    tick(candle: Candle, opts: { loadPass?: boolean } = {}): RenderDelta {
         const ctx = this.ctx, exec = this.exec;
         if (!ctx || !exec) throw new Error("runHistory() first");
         const everyTick = this.meta?.kind !== "strategy" || this.meta?.calc_on_every_tick !== false;
-        ctx.applyTick(candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume);
+        if (opts.loadPass) {
+            if (this.lastTick) throw new Error("tick(): the load pass is the live bar's first execution");
+            ctx.applyLoadPass(candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume);
+        } else {
+            ctx.applyTick(candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume);
+        }
         this.lastTick = candle;
-        if (everyTick) exec();
+        try {
+            if (everyTick) exec();
+        } finally {
+            if (opts.loadPass) ctx.endLoadPass();
+        }
         return this.deltaForFormingBar();
     }
 
@@ -1093,7 +1258,7 @@ export class Session {
             exec();
         }
         this.lastTick = null;
-        const barIndex = ctx.currentBarIndex;
+        const barIndex = ctx.currentBarIndex + this.barOffset;
         ctx.commitBar();
         return { barIndex };
     }
@@ -1109,7 +1274,7 @@ export class Session {
             else if (d.type === "bgcolor" || d.type === "barcolor") series.push({ id, color: (d as any).color });
             else series.push({ id, value: (d as any).value });
         }
-        return { barIndex: i, time: ctx.time, provisional: true, series };
+        return { barIndex: i + this.barOffset, time: ctx.time, provisional: true, series };
     }
 }
 

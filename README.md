@@ -2,35 +2,32 @@
 
 # OpenPineScript
 
-### Run TradingView Pine Script locally — offline, unlimited, and verified against TradingView itself
+**The free, open-source Pine Script engine: run TradingView Pine Script v1–v6 locally, verified against TradingView.**<br>
+No TradingView account, no cloud, no execution quota. GPL-3.0.
 
-**Compile Pine Script to JavaScript and execute it on your own OHLCV data.**
-No TradingView account. No cloud. No execution quota. No 500 ms loop timeout.
+[![GitHub release](https://img.shields.io/github/v/release/be-thomas/OpenPineScript?style=flat-square)](https://github.com/be-thomas/OpenPineScript/releases)
+[![npm](https://img.shields.io/npm/v/openpinescript?style=flat-square)](https://www.npmjs.com/package/openpinescript)
+[![npm downloads](https://img.shields.io/npm/dm/openpinescript?style=flat-square)](https://www.npmjs.com/package/openpinescript)
+[![PyPI](https://img.shields.io/pypi/v/openpinescript?style=flat-square)](https://pypi.org/project/openpinescript/)
+[![TradingView parity](https://img.shields.io/badge/TradingView_parity-112_columns_×_2%2C474_bars-7B3FE4?style=flat-square)](docs/common/CONFORMANCE.md)
+[![Tests](https://img.shields.io/badge/tests-4%2C400%2B_passing-22C55E?style=flat-square)](docs/common/CONFORMANCE.md#testing)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue?style=flat-square)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/be-thomas/OpenPineScript?style=flat-square)](https://github.com/be-thomas/OpenPineScript/stargazers)
 
-[![TradingView parity](https://img.shields.io/badge/TradingView_parity-112_columns_×_2%2C474_bars-7B3FE4?style=for-the-badge)](docs/common/CONFORMANCE.md)
-[![Tests](https://img.shields.io/badge/tests-4%2C400%2B_passing-22C55E?style=for-the-badge)](docs/common/CONFORMANCE.md#testing)
-[![Pine Script](https://img.shields.io/badge/Pine_Script-v1_→_v6-F97316?style=for-the-badge)](#-supported-pine-script-versions)
-[![Docs](https://img.shields.io/badge/docs-be--thomas.github.io%2FOpenPineScript-0EA5E9?style=for-the-badge)](https://be-thomas.github.io/OpenPineScript/)
-[![npm](https://img.shields.io/npm/v/openpinescript?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/openpinescript)
+### [Documentation](https://be-thomas.github.io/OpenPineScript/) &nbsp;·&nbsp; [Try it in your browser (Zeal Terminal)](https://zealterminal.com) &nbsp;·&nbsp; [Releases](https://github.com/be-thomas/OpenPineScript/releases) &nbsp;·&nbsp; [Community](https://discord.gg/rmyXDFJK2k)
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
-[![Node](https://img.shields.io/badge/node-≥20-339933.svg?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Docs corpus](https://img.shields.io/badge/docs_corpus-741%2F763_compile-0EA5E9.svg?style=flat-square)](docs/common/CONFORMANCE.md#parity-763-real-scripts-from-tradingviews-docs)
+[![Zeal Terminal running a Pine Script strategy on this engine in the browser: the script in the editor, its trades on the chart and the strategy tester's results](https://raw.githubusercontent.com/be-thomas/OpenPineScript/main/images/common/zeal-demo.gif)](https://zealterminal.com)
 
-### [📖 Documentation and an interactive tutorial: **be-thomas.github.io/OpenPineScript**](https://be-thomas.github.io/OpenPineScript/)
-
-### [▶ Open Beta: try it in your browser at **zealterminal.com**](https://zealterminal.com) — no install, no CSV
-
-[Docs](https://be-thomas.github.io/OpenPineScript/) · [Try it online](#-try-it-online) · [Quick start](#-quick-start) · [Why](#-why-openpinescript) · [Parity](#-verified-against-tradingview-itself) · [Guides](#-documentation) · [FAQ](#-faq)
+<sub>Zeal Terminal, built on this engine.</sub>
 
 </div>
 
 ---
 
-**OpenPineScript is an open-source Pine Script engine.** It transpiles TradingView
+**OpenPineScript is an open-source Pine Script engine**, a TradingView
+alternative and Pine Script backtester for running Pine Script on your own machine. It transpiles TradingView
 Pine Script (`.pine`) to JavaScript and runs it against your own candles — so you
-can **backtest a Pine Script strategy offline**, run a Pine indicator in CI,
+can **backtest Pine Script offline**, run a Pine indicator in CI,
 convert Pine Script to JavaScript for embedding elsewhere, or batch-test
 thousands of scripts without touching a browser.
 
@@ -43,19 +40,20 @@ Bars processed : 506
 Plots recorded : 1
 
 Performance:
-  Net Profit         +$77.60 (+0.08%)
-  Total Trades       199
-  Win Rate           32.7%  (65W / 55L)
-  Profit Factor      1.134
-  Max Drawdown       0.10%
-  Avg Win / Avg Loss $10.10 / $10.52
+  Initial Capital    $100000.00
+  Net Profit         +$234.90 (+0.23%)
+  Total Trades       99
+  Win Rate           59.6%  (59W / 39L)
+  Profit Factor      1.47
+  Max Drawdown       $209.30 (0.21%)
+  Avg Win / Avg Loss $12.45 / $12.81
 ```
 
 <sub>One of TradingView's own documentation examples, unedited, run locally.</sub>
 
 ---
 
-## 🌲 Try it online
+## 🌲 Zeal Terminal: a free TradingView alternative built on this engine
 
 Not everyone wants to clone a repository to find out whether an engine handles
 their script. **[Zeal Terminal](https://zealterminal.com)** is a charting workspace
@@ -76,14 +74,13 @@ Paste a script, press apply, and watch it draw. The engine runs on your own
 machine, so there is no compile queue and no round trip to wait for — the same
 properties this repository gives you at the command line, with a chart attached.
 
-| | |
-|---|---|
-| 💻 **Runs in your browser** | This engine in a Web Worker. Execution is local; nothing is queued on a server. |
-| 📈 **A real chart** | Multi-pane indicators, drawings, a strategy tester, execution logs and a dockable layout. |
-| 🧮 **v1 → v5** | The same five grammars and emitters that are in this repository. |
-| 🆓 **Open Beta, free** | Get Open Beta Access with Google, and the workspace opens. |
+- **Runs Pine Script v1–v6 unchanged.** Paste a script, press Apply; an old v1 to v3 script does not need upgrading first.
+- **Local execution.** This engine in a Web Worker in your browser tab: no compile queue, no server round trip.
+- **Unlimited indicators, no ads, free.** No paid tier raises a cap.
+- **A strategy tester** with commission and slippage, with the fill rules written out on the site and in this repository.
+- **Checked against TradingView's own output.** The engine underneath is the one this repository verifies, and it is open source, GPL-3.
 
-Zeal Terminal is a separate product and its workspace is proprietary; **the engine
+Zeal Terminal is an independent project, not affiliated with TradingView, Inc. It is a separate product and its workspace is proprietary; **the engine
 underneath it is this repository, GPL-3 and public**, so the arithmetic behind
 any backtest it shows you can be read here rather than taken on trust.
 
@@ -98,6 +95,11 @@ Run any Pine script against a CSV of bars, with nothing to install (Node.js 20 o
 ```bash
 npx openpinescript my_script.pine --data candles.csv
 ```
+
+![The openpinescript CLI backtesting an EMA-cross strategy on BTCUSDT candles and printing its performance summary](https://raw.githubusercontent.com/be-thomas/OpenPineScript/main/images/common/cli-demo.gif)
+
+`candles.csv` is one bar per row, `time,open,high,low,close,volume`, with `time` as ISO 8601 or Unix epoch
+seconds or milliseconds.
 
 Use the engine from JavaScript:
 
@@ -115,8 +117,16 @@ import { Session } from "openpinescript";
 
 ## 🎯 Why OpenPineScript
 
-| | |
-|---|---|
+- **Free and open source.** GPL-3.0, with the grammar, emitter and broker emulator all in this repository: a TradingView alternative whose arithmetic you can read.
+- **No account, no quota.** Your data, your machine, your loop budget. No rate limit, no network, no execution cap.
+- **Private.** Your scripts and data stay on your machine; nothing is uploaded.
+- **Verified against TradingView.** 112 indicator, control-flow and broker columns matched **bar for bar** against TradingView's own output. Not against a spec, against the platform.
+- **Every version, v1–v6.** Each has its own grammar and emitter, so a v2 script is parsed by a parser that has never heard of `var`.
+- **JavaScript and Python.** `npm install openpinescript` / `pip install openpinescript`. Pine Script to JavaScript: emit readable JS and embed it in a worker, a server, a browser or a CI job. Pine Script in Python: a thin wrapper over the same engine.
+- **Built for automation.** JSON output, exit codes, input overrides, and a comparison mode that diffs your run against a TradingView export.
+- **4,400+ tests.** Differential testing against an independent oracle, a full version matrix, 763 real scripts from TradingView's docs, and the parity suites above.
+
+---|---|
 | 📊 **Numbers you can trust** | 112 indicator, control-flow and broker columns matched **bar for bar** against TradingView's own output. Not against a spec — against the platform. |
 | 🔌 **Completely offline** | Your data, your machine, your loop budget. No account, no quota, no rate limit, no network. |
 | 🗂️ **Six language versions** | v1 → v6, each with its own grammar and emitter, so a v2 script is parsed by a parser that has never heard of `var`. |
@@ -296,6 +306,12 @@ bar by bar against a runtime that provides the standard library.
 compiled JavaScript before running it, or call `compileScript(src)` from the
 library (`import { compileScript } from "openpinescript"`) to get it as a string.
 </details>
+
+---
+
+## 💬 Community
+
+Questions or a script that won't run? Join the [Zeal Terminal Discord](https://discord.gg/rmyXDFJK2k). I help fix Pine scripts live in a voice channel.
 
 ---
 

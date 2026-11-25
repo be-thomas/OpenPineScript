@@ -90,7 +90,11 @@ plot(p)
     expect(rows[6].q).toBe(30 + 40);
   });
 
-  it("a parameter handed a series keeps bar-indexed history", () => {
+  // On a bar the site skipped, the parameter carries the argument of its last call before it (bar 3's
+  // s[1] reads bar 0's call, bar 6's reads bar 3's): TradingView capture, popular-author batch
+  // 2026-11-21, n110 (v6), where `atr[5]` on a parameter of a function called only on pivot bars reads
+  // the previous call's argument. Was bar-indexed (20, 50), which had no TradingView evidence.
+  it("a parameter handed a series carries the argument of the site's previous call over skipped bars", () => {
     const rows = run(`//@version=6
 indicator("param")
 var float v = 0.0
@@ -102,7 +106,69 @@ if bar_index % 3 == 0
 log.info("bi={0} p={1}", bar_index, p)
 plot(p)
 `);
-    expect(rows[3].p).toBe(20);
-    expect(rows[6].p).toBe(50);
+    expect(rows[0].p).toBeNaN();   // before the site's first call: na
+    expect(rows[3].p).toBe(0);
+    expect(rows[6].p).toBe(30);
+  });
+
+  // TradingView probe triage/r5 q1 (a call every 4th bar) and triage/r2 u3 (every 3rd): an EXPRESSION
+  // argument carries like a variable one, not per call: e[5] at bar 8 is bar 0's argument (0), not na.
+  it("an expression argument carries the argument of the site's last call too", () => {
+    const rows = run(`//@version=6
+indicator("param")
+f(float e) => [e[1], e[5]]
+float p = na
+float q = na
+if bar_index % 4 == 0
+    [x, y] = f(bar_index * 10.0)
+    p := x
+    q := y
+log.info("bi={0} p={1} q={2}", bar_index, p, q)
+plot(bar_index)
+`);
+    expect(rows[4].p).toBe(0);
+    expect(rows[4].q).toBeNaN();
+    expect([rows[8].p, rows[8].q]).toEqual([40, 0]);
+    expect([rows[12].p, rows[12].q]).toEqual([80, 40]);
+  });
+
+  it("an offset that lands on a bar the site ran on reads the argument's own history", () => {
+    const rows = run(`//@version=6
+indicator("param")
+var float v = 0.0
+v := bar_index * 10
+h(float s) => s[3]
+float p = na
+if bar_index % 3 == 0
+    p := h(v)
+log.info("bi={0} p={1}", bar_index, p)
+plot(p)
+`);
+    expect(rows[3].p).toBe(0);
+    expect(rows[6].p).toBe(30);
+    expect(rows[9].p).toBe(60);
+  });
+});
+
+describe("an outer variable read with [] in a branch of the function", () => {
+  it("is recorded on every call, not only when the [] runs (TradingView probe, popular-author batch 2026-11-21)", () => {
+    const rows = run(`//@version=6
+indicator("branch")
+var int v = 0
+v := bar_index
+float out = na
+f() =>
+    float r = na
+    if bar_index % 2 == 0
+        r := v[1]
+    r
+out := f()
+log.info("bi={0} a={1} b={2} c={3} d={4}", bar_index, out, 0, 0, 0)
+plot(out)
+`);
+    // v's value on the previous call (the previous bar) at the bars the branch runs
+    expect(rows[2].a).toBe(1);
+    expect(rows[4].a).toBe(3);
+    expect(rows[6].a).toBe(5);
   });
 });

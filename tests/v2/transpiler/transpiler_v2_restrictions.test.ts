@@ -3,7 +3,7 @@
  *
  * Pine Script v2 language restrictions enforced by ToJsVisitor:
  *   - ':=' rejected on a name that was never declared
- *   - '==' / '!=' against 'na' rejected (must use na(x))
+ *   - '==' / '!=' against 'na' compiles (false on every bar); only v6 refuses it
  *   - direct recursion in user functions rejected
  *   - 'else if' is rejected at the parser layer (verified here for completeness)
  *
@@ -68,17 +68,20 @@ describe("v2 restriction: ':=' assigns only to a declared variable", () => {
 
 // ─── comparison against 'na' ────────────────────────────────────────────────
 
-describe("v2 restriction: comparison against 'na'", () => {
-    it("rejects 'x == na'", () => {
-        throws('y = close == na ? 1 : 0\n', /compare to 'na'/);
+// TradingView compiles `x == na` and `x != na` at v1–v5 and both are false on
+// every bar (dev-docs/tv-parity/_probes/corpus98/p8_v{1..5}_eq_na, 2026-11-14);
+// only v6 refuses them.
+describe("v2: comparison against 'na' compiles", () => {
+    it("accepts 'x == na'", () => {
+        ok('y = close == na ? 1 : 0\n');
     });
 
-    it("rejects 'x != na'", () => {
-        throws('y = close != na ? 1 : 0\n', /compare to 'na'/);
+    it("accepts 'x != na'", () => {
+        ok('y = close != na ? 1 : 0\n');
     });
 
-    it("rejects 'na' on the left-hand side", () => {
-        throws('y = na == close ? 1 : 0\n', /compare to 'na'/);
+    it("accepts 'na' on the left-hand side", () => {
+        ok('y = na == close ? 1 : 0\n');
     });
 
     it("allows the na(x) function", () => {
@@ -148,7 +151,7 @@ describe("v2 guards are overridable for a future v3 visitor", () => {
         // runtime/v1/stdlib/core.ts. What this case is about is the guard being
         // overridable, not the shape of the comparison.
         const js = transpileV3("y = close == na ? 1 : 0\n");
-        assert.match(js, /opsv2_safe_eq\(opsv2_close, opsv2_na\)/);
+        assert.match(js, /opsv2_safe_eq_na\(opsv2_close, opsv2_na\)/);
     });
 
     it("overriding enforceNoRecursion lets a function recurse", () => {

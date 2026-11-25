@@ -137,6 +137,13 @@ export interface ScopeInfo {
    * once and never reassigned.
    */
   inits: ReadonlyMap<string, any>;
+  /**
+   * name -> initialiser of a script-scope binding that may be a compile-time constant: the bare form, or one
+   * typed `int`/`float` (optionally `const`), never `var`/`varip`. `float x = 0.9` counts: TradingView folds
+   * `1.0 - x` like `1.0 - 0.9` (probe triage/r6 cfold p_const_fold_rules, plot h). Consulted by `constFold`,
+   * which also requires the name to be bound once and never reassigned.
+   */
+  constInits?: ReadonlyMap<string, any>;
 }
 
 /** Half-open in neither direction: both token indices are inside the scope. */
@@ -445,6 +452,7 @@ class Collector {
   readonly mayReturnTuple = new Set<string>();
   readonly staticTypes = new Map<string, string>();
   readonly inits = new Map<string, any>();
+  readonly constInits = new Map<string, any>();
 
   /** The local scopes currently open, innermost last. */
   private scopeStack: Array<Span | null> = [];
@@ -539,6 +547,13 @@ class Collector {
           if (this.fnDepth === 0 && !this.inits.has(name) && node.getChild?.(0) === node.id?.()) {
             this.inits.set(name, node.arith_expr?.());
           }
+          // A `for i = 0 to n` counter is a Var_def too, and changes every iteration: never a constant.
+          const loopVar = /For/.test(node.parentCtx?.constructor?.name ?? "") || /For/.test(node.parent?.constructor?.name ?? "");
+          if (this.fnDepth === 0 && !loopVar && !this.constInits.has(name) && !node.decl_mod?.()) {
+            const qual = node.type_qual?.()?.getText?.();
+            const type = declaredTypeOf(node);
+            if ((!qual || qual === "const") && (!type || type === "int" || type === "float")) this.constInits.set(name, node.arith_expr?.());
+          }
           if (this.fnDepth === 0 && !this.staticTypes.has(name)) {
             // Declared beats inferred: `float x = 1` is a float, whatever the
             // literal says.
@@ -624,5 +639,6 @@ export function analyseScopes(tree: ParseTree | ParserRuleContext): ScopeInfo {
     mayReturnTuple: c.mayReturnTuple,
     staticTypes: c.staticTypes,
     inits: c.inits,
+    constInits: c.constInits,
   };
 }

@@ -86,8 +86,9 @@ describe("a fractional array index is floored", () => {
       .toThrow(/Index 3 is out of bounds, array size is 1\./);
   });
 
-  it("na as an index is refused rather than floored to something", () => {
-    expect(() => build(HEAD + "xs = array.from(1.0)\nx = array.get(xs, na)\n").exec())
+  it("na as an index gives na for get (TradingView capture 2026-11-21), and is refused by set", () => {
+    expect(() => build(HEAD + "xs = array.from(1.0)\nx = array.get(xs, na)\n").exec()).not.toThrow();
+    expect(() => build(HEAD + "xs = array.from(1.0)\narray.set(xs, na, 1.0)\n").exec())
       .toThrow(/out of bounds/);
   });
 

@@ -35,7 +35,8 @@ describe("a live chart bar that ends a requested bar", () => {
     expect(val(s.tick(candle(t0 + 23 * M5, 22.5, 23, 22.5, 23)))).toBe(23);      // was frozen at 22.5
     s.commit();
     s.provideData("TEST:X", "60", [...htf(23), candle(t0 + 2 * H, 24, 24, 24, 24)]);
-    expect(val(s.tick(candle(t0 + 24 * M5, 24, 24, 24, 24)))).toBe(23);
+    // the live bar is inside the next hourly bar, still forming: it is visible (TradingView probe t05)
+    expect(val(s.tick(candle(t0 + 24 * M5, 24, 24, 24, 24)))).toBe(24);
   });
 
   it("a derived series follows the live bar too", () => {
@@ -45,7 +46,7 @@ describe("a live chart bar that ends a requested bar", () => {
     expect(val(s.tick(candle(t0 + 23 * M5, 22.5, 22.5, 22.5, 22.5)))).toBe(22.5);
     expect(val(s.tick(candle(t0 + 23 * M5, 22.5, 30, 22.5, 30)))).toBe(30);       // was frozen at 22.5
     s.commit();
-    expect(val(s.tick(candle(t0 + 24 * M5, 31, 31, 31, 31)))).toBe(30);
+    expect(val(s.tick(candle(t0 + 24 * M5, 31, 31, 31, 31)))).toBe(31);   // forming hourly bar, probe t05
   });
 });
 

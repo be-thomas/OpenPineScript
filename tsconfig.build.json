@@ -9,8 +9,9 @@
     "index.d.ts produced a file pointing at ./runtime/v1/session, which does",
     "not exist inside dist/, and the package shipped effectively untyped.",
     "",
-    "Loose settings on purpose: this emits types, it does not gate on them.",
-    "`npm test` is the gate. See scripts/common/build-dist.mjs."
+    "The type check passes with zero errors; `npm run typecheck` checks it.",
+    "The settings stay loose (strict off). `npm test` runs the behaviour",
+    "tests. See scripts/common/build-dist.mjs."
   ],
   "compilerOptions": {
     "declaration": true,

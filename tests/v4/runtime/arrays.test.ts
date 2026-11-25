@@ -98,9 +98,11 @@ describe("aggregates ignore na and return na when empty", () => {
     });
   }
 
-  it("stdev is the sample (n-1) form, matching stdev() elsewhere", () => {
+  it("stdev is the biased (n) form by default", () => {
+    // the classic data set: population standard deviation is exactly 2
+    // (TradingView v4 capture, popular-author batch 2026-11-21)
     const got = run("a = array.from(2, 4, 4, 4, 5, 5, 7, 9)\ns = array.stdev(a)\n", "s");
-    expect(got).toBeCloseTo(2.13808993, 6);
+    expect(got).toBeCloseTo(2, 9);
   });
 
   it("an empty array aggregates to na, not 0", () => {

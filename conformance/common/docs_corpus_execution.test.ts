@@ -116,8 +116,8 @@ const EXPECTED: Record<string, RegExp> = {
   // it. Pinned with the cause named rather than quietly reverting a warm-up
   // rule that TradingView's own numbers establish across two harnesses.
   "v4/v4-essential-arrays-03.pine": /In 'array\.get\(\)' function\. Index NaN is out of bounds/,
-  // The same page in its v5 spelling, failing for the same reason.
-  "v5/v5-language-arrays-06.pine": /In 'array\.get\(\)' function\. Index NaN is out of bounds/,
+  // (The same page in its v5 spelling no longer raises: `array.get(id, na)` is na from v5 on,
+  // TradingView capture, popular-author batch 2026-11-21. v4 was not probed and still raises.)
   "v5/v5-language-arrays-29.pine":  /In 'array\.set\(\)' function\. Index 3 is out of bounds/,
   "v5/v5-language-arrays-33.pine":  /array\.push: expected an array, got na/,
   // `input.int(0, "Array size")` defaults to an EMPTY array, and popping one is

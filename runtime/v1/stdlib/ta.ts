@@ -53,6 +53,18 @@ interface SarState {
 
 // --- Moving Averages ---
 
+/** Neumaier-compensated sum of f(buf[i]) for i >= start, oldest first: how TradingView sums a window. */
+function compensatedSum(buf: number[], start: number, f: (x: number) => number): number {
+    let t = 0, c = 0;
+    for (let i = start; i < buf.length; i++) {
+        const v = f(buf[i]);
+        const u = t + v;
+        c += Math.abs(t) >= Math.abs(v) ? (t - u) + v : (v - u) + t;
+        t = u;
+    }
+    return t + c;
+}
+
 /**
  * Simple Moving Average
  * @returns series float
@@ -69,45 +81,19 @@ export function sma(ctx: Context, sourceInput: any, lengthInput: any): number {
 
     // NaN is COUNTED, never summed.
     //
-    // The running sum is incremental, so one `na` in the source poisoned it
-    // permanently — `sum` became NaN and stayed NaN until the periodic heal
-    // recomputed the window, HEAL_SMA_INTERVAL (200) bars later. That is exactly
-    // what `sma(ema(close, 10), 10)` did once ema gained its warm-up: it
-    // returned na for 200 bars instead of 18.
-    //
-    // Counting instead means the window knows whether it currently holds an
-    // `na`, which is also the rule TradingView applies — ta.sma is na if any
+    // A running sum is poisoned for good by one `na` in the source (`sma(ema(close, 10), 10)` once
+    // returned na for 200 bars instead of 18). Counting instead means the window knows whether it
+    // currently holds an `na`, which is also the rule TradingView applies: ta.sma is na if any
     // value in its window is.
-    const recompute = () => {
-        state.sum = 0;
+    if (length !== state.prevLength) {
         state.nanCount = 0;
         const start = Math.max(0, state.buffer.length - length);
-        for (let i = start; i < state.buffer.length; i++) {
-            const v = state.buffer[i];
-            if (Number.isNaN(v)) state.nanCount++;
-            else state.sum += v;
-        }
-        state.counter = 0;
-    };
-
-    if (length !== state.prevLength) {
-        recompute();
+        for (let i = start; i < state.buffer.length; i++) if (Number.isNaN(state.buffer[i])) state.nanCount++;
         state.prevLength = length;
     } else {
-        // O(1) UPDATE
         if (Number.isNaN(source)) state.nanCount++;
-        else state.sum += source;
-
-        // If we have more data than the window needs, drop the trailing item.
         // The item leaving the window is at index: (Total - 1) - Length
-        if (state.buffer.length > length) {
-            const exiting = state.buffer[state.buffer.length - 1 - length];
-            if (Number.isNaN(exiting)) state.nanCount--;
-            else state.sum -= exiting;
-        }
-
-        // HEALING — bounds floating-point drift in the incremental sum.
-        if (++state.counter >= HEAL_SMA_INTERVAL) recompute();
+        if (state.buffer.length > length && Number.isNaN(state.buffer[state.buffer.length - 1 - length])) state.nanCount--;
     }
 
     if (state.buffer.length > MAX_BUFFER_SIZE) {
@@ -117,7 +103,9 @@ export function sma(ctx: Context, sourceInput: any, lengthInput: any): number {
 
     if (state.buffer.length < length) return NaN;
     if (state.nanCount > 0) return NaN;   // any 'na' in the window makes the mean na
-    return state.sum / length;
+    // TradingView sums the window afresh on every bar, oldest first, with compensation: bit-identical
+    // to its ta.sma on 299/299 bars (a running sum drifts in the last bits).
+    return compensatedSum(state.buffer, state.buffer.length - length, (x) => x) / length;
 }
 
 /**
@@ -140,7 +128,11 @@ export function ema(ctx: Context, sourceInput: any, lengthInput: any): number {
     // this silently returned nothing for a whole class of real indicators.
     //
     // rma already did exactly this; ema did not. Matching it.
-    if (isNaN(source)) return NaN;
+    //
+    // ±Infinity (x / 0 keeps its IEEE value, and na() is true for it) is skipped like na: TradingView's
+    // ema of a series that starts with x / 0 values is finite (a CCI signal line, capture n201,
+    // probe triage/r3 02_v2_divzero), where seeding with Infinity would leave it infinite for good.
+    if (!Number.isFinite(source)) return NaN;
 
     // ── WARM-UP: na until `length` samples, then seeded with their SMA ───────
     //
@@ -167,7 +159,9 @@ export function ema(ctx: Context, sourceInput: any, lengthInput: any): number {
         return state.prev;
     }
 
-    const currentEma = (source * alpha) + (state.prev * (1 - alpha));
+    // TradingView's float order is prev + alpha * (src - prev); alpha * src + (1 - alpha) * prev
+    // is the same number in exact arithmetic but differs in the last bit (299/299 bars exact).
+    const currentEma = state.prev + alpha * (source - state.prev);
     state.prev = currentEma;
     return currentEma;
 }
@@ -183,7 +177,7 @@ export function rma(ctx: Context, sourceInput: any, lengthInput: any): number {
     // Uses whatever is on the stack (e.g., ".../ta.atr/internal_rma")
     const state = ctx.getPersistentState<EmaSeedState>(() => ({ prev: undefined, seed: [] }));
 
-    if (isNaN(source)) return NaN;
+    if (!Number.isFinite(source)) return NaN;   // ±Infinity is na, as in ema
 
     // Same warm-up rule as ema — see the note there. rma is what rsi and atr are
     // built from, so their start bars were wrong for the same reason.
@@ -195,8 +189,8 @@ export function rma(ctx: Context, sourceInput: any, lengthInput: any): number {
         return state.prev;
     }
     
-    const alpha = 1 / length;
-    const currentRma = (source * alpha) + (state.prev * (1 - alpha));
+    // TradingView's float order: (prev * (length - 1) + src) / length (bit-exact on its ta.rsi and ta.atr).
+    const currentRma = (state.prev * (length - 1) + source) / length;
     state.prev = currentRma;
     return currentRma;
 }
@@ -342,7 +336,18 @@ export function trix(ctx: Context, sourceInput: any, lengthInput: any): number {
 export function rsi(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = val(lengthInput);
-    const state = ctx.getPersistentState<{ prevSrc: number | undefined }>(() => ({ prevSrc: undefined }));
+    const state = ctx.getPersistentState<{ prevSrc: number | undefined; firstY?: number; twoSeries?: boolean }>(() => ({ prevSrc: undefined }));
+    // Up to v4 `rsi(x, y)` with a SERIES y is the other overload: "If x is a series and y is a series,
+    // then x and y are considered to be 2 calculated MAs for upward and downward changes" (v4
+    // reference), rsi = 100 - 100 / (1 + x / y) -- the money flow index idiom
+    // `rsi(sum(volume * up), sum(volume * down))`. Both arrive as numbers, so the overload is told by
+    // the value: a length is a positive integer that never changes; anything else is the series y.
+    if (ctx.profile.version <= 4 && !state.twoSeries) {
+        if (Number.isNaN(length)) { if (state.firstY === undefined) return NaN; }
+        else if (!(Number.isInteger(length) && length > 0) || (state.firstY !== undefined && state.firstY !== length)) state.twoSeries = true;
+        else if (state.firstY === undefined) state.firstY = length;
+    }
+    if (state.twoSeries) return 100 - 100 / (1 + source / length);
     // avgGain and avgLoss are two independent RMAs — they need distinct frames,
     // and both must stay clear of rsi's own state above (which sits on the base
     // frame). Without isolation all three collide on one state object.
@@ -368,7 +373,12 @@ export function rsi(ctx: Context, sourceInput: any, lengthInput: any): number {
     (ctx as any).callStack.push("rsi_loss");
     const avgLoss = rma(ctx, Math.max(-change, 0), length);
     (ctx as any).callStack.pop();
-    if (avgLoss === 0) return 100;
+    // TradingView counts an average below 1e-10 as none: rsi is exactly 100 once the average loss is under
+    // 1e-10 and exactly 0 once the average gain is, where the formula still gives ~1e-9 off. ta.rma itself
+    // keeps decaying; only rsi snaps (r7_rsi_eps probe: avgGain 1.19999e-10 kept, 8.9999e-11 -> 0, and
+    // the mirrored loss side -> 100 on the same bar; n77 DemaRSI).
+    if (avgLoss < 1e-10) return 100;
+    if (avgGain < 1e-10) return 0;
     return 100 - (100 / (1 + (avgGain / avgLoss)));
 }
 
@@ -546,6 +556,7 @@ function updateMonotonicDeque(state: DequeState, sourceInput: any, lengthInput: 
         for (let i = start; i < state.buffer.length; i++) {
             const v = state.buffer[i];
             const idx = state.globalIdx - (state.buffer.length - 1 - i);
+            if (Number.isNaN(v)) continue;
             if (isMin) {
                 while (state.dequeVals.length > 0 && state.dequeVals[state.dequeVals.length - 1] >= v) { state.dequeVals.pop(); state.dequeIdxs.pop(); }
             } else {
@@ -554,18 +565,19 @@ function updateMonotonicDeque(state: DequeState, sourceInput: any, lengthInput: 
             state.dequeVals.push(v); state.dequeIdxs.push(idx);
         }
     } else {
-        if (isMin) {
-            while (state.dequeVals.length > 0 && state.dequeVals[state.dequeVals.length - 1] >= source) { state.dequeVals.pop(); state.dequeIdxs.pop(); }
-        } else {
-            while (state.dequeVals.length > 0 && state.dequeVals[state.dequeVals.length - 1] <= source) {
-                state.dequeVals.pop();
-                state.dequeIdxs.pop();
+        if (!Number.isNaN(source)) {
+            if (isMin) {
+                while (state.dequeVals.length > 0 && state.dequeVals[state.dequeVals.length - 1] >= source) { state.dequeVals.pop(); state.dequeIdxs.pop(); }
+            } else {
+                while (state.dequeVals.length > 0 && state.dequeVals[state.dequeVals.length - 1] <= source) {
+                    state.dequeVals.pop();
+                    state.dequeIdxs.pop();
+                }
             }
+            state.dequeVals.push(source);
+            state.dequeIdxs.push(state.globalIdx);
         }
-        state.dequeVals.push(source);
-        state.dequeIdxs.push(state.globalIdx);
-
-        if (state.dequeIdxs[0] <= state.globalIdx - length) {
+        while (state.dequeIdxs.length > 0 && state.dequeIdxs[0] <= state.globalIdx - length) {
             state.dequeVals.shift();
             state.dequeIdxs.shift();
         }
@@ -624,7 +636,7 @@ export function highest(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get(PREFIX + "high"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false); 
-    return windowIsWarm(state, length) ? state.dequeVals[0] : NaN;
+    return windowIsWarm(state, length) && state.dequeVals.length ? state.dequeVals[0] : NaN;
 }
 
 /**
@@ -639,7 +651,7 @@ export function lowest(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get(PREFIX + "low"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true); 
-    return windowIsWarm(state, length) ? state.dequeVals[0] : NaN;
+    return windowIsWarm(state, length) && state.dequeVals.length ? state.dequeVals[0] : NaN;
 }
 
 /**
@@ -651,7 +663,7 @@ export function highestbars(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get(PREFIX + "high"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, false);
-    return windowIsWarm(state, length) ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
+    return windowIsWarm(state, length) && state.dequeIdxs.length ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
 }
 
 /**
@@ -663,7 +675,7 @@ export function lowestbars(ctx: Context, source: any, length?: any): number {
     if (length === undefined) { length = source; source = ctx.vars.get(PREFIX + "low"); }
     const state = ctx.getPersistentState<DequeState>(() => ({ buffer: [], dequeVals: [], dequeIdxs: [], globalIdx: 0, prevLength: 0 }));
     updateMonotonicDeque(state, source, length, true);
-    return windowIsWarm(state, length) ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
+    return windowIsWarm(state, length) && state.dequeIdxs.length ? state.dequeIdxs[0] - (state.globalIdx - 1) : NaN;
 }
 
 /**
@@ -799,10 +811,15 @@ export function atr(ctx: Context, lengthInput: any): number {
  *
  * ../sessions.ts owns the boundary, shared with `session.isfirstbar`.
  *
+ * Also the bare variable `vwap` / `ta.vwap` (hlc3 as the source): a getter, as `ta.tr` is both.
+ *
+ * @getter
  * @returns series float
  */
 export function vwap(ctx: Context, sourceInput: any, anchor?: any, stdev_mult?: any): number | number[] {
-    const source = val(sourceInput);
+    // The bare variable (`vwap`, v5 `ta.vwap`) arrives with no source: "It uses hlc3 as its source
+    // series". Without this it summed `undefined` and was na on every bar.
+    const source = sourceInput === undefined ? (val(ctx.high) + val(ctx.low) + val(ctx.close)) / 3 : val(sourceInput);
     const volume = (ctx as any).volume !== undefined ? val((ctx as any).volume) : 0;
 
     const state = ctx.getPersistentState<VwapState>(() => ({ sumVol: 0, sumSrcVol: 0, sumSrc2Vol: 0 }));
@@ -1098,39 +1115,21 @@ export function dev(ctx: Context, sourceInput: any, lengthInput: any): number {
 export function variance(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = Math.floor(val(lengthInput));
-    const state = ctx.getPersistentState<StdDevState>(() => ({
-        buffer: [], sum: 0, sumSq: 0, prevLength: 0, counter: 0
-    }));
+    const state = ctx.getPersistentState<BufferState>(() => ({ buffer: [] }));
     state.buffer.push(source);
-    if (length !== state.prevLength) {
-        state.sum = 0; state.sumSq = 0;
-        const start = Math.max(0, state.buffer.length - length);
-        for (let i = start; i < state.buffer.length; i++) {
-            state.sum += state.buffer[i]; state.sumSq += state.buffer[i] * state.buffer[i];
-        }
-        state.prevLength = length; state.counter = 0;
-    } else {
-        state.sum += source; state.sumSq += source * source;
-        if (state.buffer.length > length) {
-            const removed = state.buffer[state.buffer.length - 1 - length];
-            state.sum -= removed; state.sumSq -= removed * removed;
-        }
-        if (++state.counter >= HEAL_VAR_INTERVAL) {
-            state.sum = 0; state.sumSq = 0;
-            const start = Math.max(0, state.buffer.length - length);
-            for (let i = start; i < state.buffer.length; i++) {
-                state.sum += state.buffer[i]; state.sumSq += state.buffer[i] * state.buffer[i];
-            }
-            state.counter = 0;
-        }
-    }
     if (state.buffer.length > MAX_BUFFER_SIZE) {
         const keep = length + 500;
         if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
     }
     if (state.buffer.length < length) return NaN;
-    const mean = state.sum / length;
-    return (state.sumSq / length) - (mean * mean);
+    // As TradingView: the compensated sum of squares over n, minus the square of the compensated mean.
+    // Bit-identical to its ta.variance(close, 30), ta.stdev(close, 100) and ta.stdev(close * 1000, 800)
+    // on 299/299 bars (probe triage/runs/13_t13_stdev), and it cancels as TradingView does:
+    // stdev(1e8 + bar_index % 4, 4) is 1.4142135623730951 there, not the exact sqrt(1.25)
+    // (probe triage/r4/runs/06_p_variance_cancellation). A mean-then-deviations form is off in the last digits.
+    const start = state.buffer.length - length;
+    const mean = compensatedSum(state.buffer, start, (x) => x) / length;
+    return compensatedSum(state.buffer, start, (x) => x * x) / length - mean * mean;
 }
 
 /**
@@ -1186,7 +1185,7 @@ export function percentrank(ctx: Context, sourceInput: any, lengthInput: any): n
     for (let i = start; i < state.buffer.length - 1; i++) {
         if (state.buffer[i] <= source) count++;
     }
-    return (count / length) * 100;
+    return 100 * count / length;   // TradingView's order; (count / length) * 100 differs by an ulp
 }
 
 /**
@@ -1458,7 +1457,11 @@ export function pivotlow(ctx: Context, sourceInput: any, leftbarsInput: any, rig
  * @getter
  * @returns {series float} The bar's true range.
  */
-export function tr(ctx: Context): number {
+export function tr(ctx: Context, handle_na?: any): number {
+    // The `tr` variable is `ta.tr(false)`: na on the first bar, which has no previous close; only
+    // `ta.tr(true)` falls back to high - low there. TradingView: rma(tr, n)-based ADX strategies at v2
+    // (n330), v3 (n311), v4 (n279) and v5 (n144) trade on the bar after ours otherwise, from Jan 1.
+    if (ctx.currentBarIndex < 1 && !(handle_na !== undefined && val(handle_na))) return NaN;
     const state = ctx.getPersistentState<{ prevClose: number }>(() => ({ prevClose: NaN }));
     const prevC = isNaN(state.prevClose) ? ctx.close : state.prevClose;
     state.prevClose = ctx.close;
@@ -1642,32 +1645,29 @@ export function sum(ctx: Context, sourceInput: any, lengthInput: any): number {
     const source = val(sourceInput);
     const length = Math.floor(val(lengthInput));
     const state = ctx.getPersistentState<SumState>(() => ({
-        buffer: [], sum: 0, prevLength: 0, counter: 0
+        buffer: [], sum: 0, prevLength: 0, counter: 0, nanCount: 0
     }));
     state.buffer.push(source);
+    // As in `sma`: an `na` makes the sum na only while it is inside the window. A running sum
+    // stayed NaN until the next periodic re-sum, ~200 bars (`math.sum(volume * math.sign(ta.change(close)), 20)`
+    // was na until bar ~190 instead of bar 20; TradingView's first trade off it came days earlier).
     if (length !== state.prevLength) {
-        state.sum = 0;
+        state.nanCount = 0;
         const start = Math.max(0, state.buffer.length - length);
-        for (let i = start; i < state.buffer.length; i++) state.sum += state.buffer[i];
-        state.prevLength = length; state.counter = 0;
+        for (let i = start; i < state.buffer.length; i++) if (Number.isNaN(state.buffer[i])) state.nanCount++;
+        state.prevLength = length;
     } else {
-        state.sum += source;
-        if (state.buffer.length > length) {
-            state.sum -= state.buffer[state.buffer.length - 1 - length];
-        }
-        if (++state.counter >= HEAL_SMA_INTERVAL) {
-            state.sum = 0;
-            const start = Math.max(0, state.buffer.length - length);
-            for (let i = start; i < state.buffer.length; i++) state.sum += state.buffer[i];
-            state.counter = 0;
-        }
+        if (Number.isNaN(source)) state.nanCount++;
+        if (state.buffer.length > length && Number.isNaN(state.buffer[state.buffer.length - 1 - length])) state.nanCount--;
     }
     if (state.buffer.length > MAX_BUFFER_SIZE) {
         const keep = length + 500;
         if (state.buffer.length > keep) state.buffer.splice(0, state.buffer.length - keep);
     }
     if (state.buffer.length < length) return NaN;
-    return state.sum;
+    if (state.nanCount > 0) return NaN;
+    // Summed afresh, oldest first, with compensation: the way ta.sma's window is summed (bit-exact there).
+    return compensatedSum(state.buffer, state.buffer.length - length, (x) => x);
 }
 
 /**
@@ -1718,7 +1718,8 @@ export function percentile_nearest_rank(
 
 /**
  * percentile_linear_interpolation: the value at `percentage` percentile of the
- * last `length` values, interpolating between the two straddling samples.
+ * last `length` values, interpolating between the two straddling samples
+ * (rank p/100 * n - 0.5, 0-based over the sorted window, clamped to it).
  *
  * @returns series float
  */
@@ -1740,7 +1741,10 @@ export function percentile_linear_interpolation(
     const window = state.buffer.slice(-length).filter(Number.isFinite).sort((a, b) => a - b);
     if (window.length === 0) return NaN;
 
-    const pos = (percentage / 100) * (window.length - 1);
+    // TradingView ranks sample k (0-based) at (k + 0.5) / n, so the percentile
+    // sits at p/100 * n - 0.5, clamped to the window (popular-author capture
+    // batch 2026-11-21).
+    const pos = Math.min(Math.max((percentage / 100) * window.length - 0.5, 0), window.length - 1);
     const lo = Math.floor(pos);
     const hi = Math.ceil(pos);
     if (lo === hi) return window[lo];
@@ -1812,7 +1816,7 @@ export function kc(
     // `tr` keeps its own previous close, so it must run every bar regardless of
     // which branch is taken — reading it conditionally would leave its history
     // with holes on the bars the other branch was chosen.
-    const trueRange = sub(ctx, "kc_tr", () => tr(ctx));
+    const trueRange = sub(ctx, "kc_tr", () => tr(ctx, true));
     const span = useTrueRangeInput === false ? ctx.high - ctx.low : trueRange;
     const width = sub(ctx, "kc_span", () => ema(ctx, span, length));
 
@@ -1910,7 +1914,7 @@ export function dmi(ctx: Context, diLengthInput: any, adxSmoothingInput: any): [
     const plusDM = isNaN(up) ? 0 : (up > down && up > 0 ? up : 0);
     const minusDM = isNaN(down) ? 0 : (down > up && down > 0 ? down : 0);
 
-    const trueRange = sub(ctx, "dmi_tr", () => tr(ctx));
+    const trueRange = sub(ctx, "dmi_tr", () => tr(ctx, true));
     const trur = sub(ctx, "dmi_trur", () => rma(ctx, trueRange, diLength));
 
     const plus = trur === 0 ? 0 : (100 * sub(ctx, "dmi_plus", () => rma(ctx, plusDM, diLength))) / trur;

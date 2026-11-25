@@ -39,6 +39,8 @@ import { specSeconds, periodEnd } from "../timeframes";
 /** One `security_lower_tf` call site's state: see `getHtfState`. */
 interface LtfState {
     sub: Context;
+    /** A lower-timeframe bar has been evaluated: the start is final (see Context.securityFirstBar). */
+    begun?: boolean;
     /** Index of the last lower-timeframe bar already evaluated. */
     done: number;
     /** The chart bar `out` was built for. */
@@ -206,7 +208,8 @@ export const request = {
         void ignore_invalid_symbol; void currency;
         if (typeof expression !== "function") return [];
 
-        const symbolName = String(val(symbol) ?? "");
+        // An empty symbol is the chart's own, as for request.security (stdlib/mtf.ts).
+        const symbolName = String(val(symbol) ?? "") || String(ctx.symbol);
         // "" is the chart's own timeframe, as for `request.security`.
         const requested = String(val(timeframe) ?? "");
         const tfName = requested === "" ? String(ctx.resolution) : requested;
@@ -216,6 +219,12 @@ export const request = {
         // learned — nothing else states it, and `security` faces the same problem
         // through `tupleArityFromArgument` at compile time.
         const key = `${ctx.currentCallKey()}|ltf|${symbolName}@${tfName}`;
+        // The expression is evaluated in place on each intrabar, never by running the
+        // whole script in the lower-timeframe context (Context.runInContext) as
+        // request.security does for an expression that reads the script's state: no
+        // TradingView probe covers state read through a lower-timeframe request, and the
+        // run would cost one script execution per intrabar (up to LTF_MAX_INTRABARS).
+        // Met while the script runs in a requested context, it is requested from there.
         const shape = ctx.getHtfState<{ arity: number }>(`${key}|shape`, () => {
             const probe = expression();
             return { arity: Array.isArray(probe) ? probe.length : -1 };
@@ -242,18 +251,21 @@ export const request = {
 
         const fresh = (): LtfState => ({
             sub: ctx.securitySubContext(symbolName, tfName),
-            done: ctx.securityFirstBar(symbolName, tfName, calc_bars_count, "request.security_lower_tf") - 1,
+            done: -1,
             barTime: NaN,
             out: empty(),
             data,
             len: data.length,
         });
         let st = ctx.getHtfState<LtfState>(key, fresh);
+        const firstBar = (): number => ctx.securityFirstBar(symbolName, tfName, calc_bars_count, "request.security_lower_tf", data, true) - 1;
+        if (!st.begun) st.done = firstBar();
         const open = ctx.time;
         // The chart bar runs from its open to the next bar's open.
         const close = periodEnd(open, String(ctx.resolution));
         const end = Number.isFinite(close) ? close : open + have * 1000;
         const live = ctx.is_realtime;
+        const ltfEnd = (b: any): number => { const e = periodEnd(b.time, tfName); return Number.isFinite(e) ? e : b.time + want * 1000; };
 
         // Intrabars the host supplied after this site last ran: more of the same
         // series is picked up where evaluation stopped, but a different series
@@ -263,16 +275,21 @@ export const request = {
         const committed = live && st.cpBar !== undefined && st.cpDone !== undefined ? st.cpDone + 1 : st.len;
         if (!extendsSeries(st.data, committed, data)) {
             const again = fresh();
-            Object.assign(st, again, { cp: undefined, cpDone: undefined, cpBar: undefined, sig: undefined });
+            again.done = firstBar();
+            Object.assign(st, again, { begun: false, cp: undefined, cpDone: undefined, cpBar: undefined, sig: undefined });
         }
 
         const evalInto = (out: any, from: number) => {
-            while (st.done + 1 < data.length && data[st.done + 1].time < end) {
+            // An intrabar belongs to the chart bar its CLOSE falls in, (open, end]: with an
+            // intrabar timeframe that doesn't divide the chart's (45 on 60), TradingView returns the
+            // 19:30-20:15 bar on the 20:00 chart bar (capture: HTF Auction Candle, live bar).
+            while (st.done + 1 < data.length && ltfEnd(data[st.done + 1]) <= end) {
                 const j = ++st.done;
+                st.begun = true;
                 // Every bar is evaluated, in order, so the expression's own history
                 // is complete; only those inside this chart bar are returned.
                 const v = ctx.evalSecurityBar(st.sub, data[j], expression);
-                if (data[j].time < from) continue;
+                if (ltfEnd(data[j]) <= from) continue;
                 if (arity < 0) out.push(v);
                 else for (let k = 0; k < arity; k++) out[k].push(Array.isArray(v) ? v[k] : NaN);
             }
@@ -282,7 +299,7 @@ export const request = {
             // The last intrabar this chart bar holds, as the host has it now. If
             // nothing about it changed since the last tick, the answer stands.
             let lastIdx = -1;
-            for (let j = Math.max(0, data.length - 1); j >= 0; j--) if (data[j].time < end) { lastIdx = j; break; }
+            for (let j = Math.max(0, data.length - 1); j >= 0; j--) if (ltfEnd(data[j]) <= end) { lastIdx = j; break; }
             const lb = lastIdx >= 0 ? data[lastIdx] : undefined;
             const sig = lb ? `${lastIdx}|${lb.time}|${lb.open}|${lb.high}|${lb.low}|${lb.close}|${lb.volume}` : "-";
             if (st.cpBar === open && st.sig === sig) return copyOut(st.out, arity);
@@ -290,7 +307,8 @@ export const request = {
             if (st.cpBar !== open) {
                 // A new chart bar: what came before it is final. Take the rollback
                 // point before this bar's first intrabar.
-                while (st.done + 1 < data.length && data[st.done + 1].time < open) {
+                while (st.done + 1 < data.length && ltfEnd(data[st.done + 1]) <= open) {
+                    st.begun = true;
                     ctx.evalSecurityBar(st.sub, data[++st.done], expression);
                 }
                 st.cp = st.sub.checkpoint();

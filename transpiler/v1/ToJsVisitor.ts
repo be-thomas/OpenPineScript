@@ -78,6 +78,7 @@ import {
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
 import { BASE_REGISTRY, REGISTRY, UNIMPLEMENTED_BUILTINS } from "../../runtime/v1/stdlib";
 import { ScopeInfo, analyseScopes } from "../common/passes/ScopeAnalysis";
+import { constFold } from "../common/passes/TypeRules";
 
 /**
  * Anything carrying a source position. Structural rather than
@@ -192,6 +193,13 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
    * subclass so every version shares one counter.
    */
   protected fnDepth = 0;
+  /**
+   * Script-scope variables the function being emitted reads with `[]`, and the
+   * deepest offset each is read at. Each call of the function records them on
+   * entry (`Context.outerHistory`), so the history counts CALLS of the function
+   * and not just the calls on which the `[]` happens to run.
+   */
+  protected outerReads: Map<string, number> | null = null;
 
   /**
    * The user function whose body is being emitted, if any.
@@ -240,6 +248,27 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   protected seriesKey(jsName: string): string {
     const fn = this.fnScope[this.fnScope.length - 1];
     return fn ? `${fn}$${jsName}` : jsName;
+  }
+
+  /**
+   * Inner declarations that shadow an OUTER variable of the same name, and read
+   * it in their own initialiser (`s = s + 1` in an `if` body over a script-level
+   * `s`). Emitted under a fresh JavaScript name — a `let` of the same name would
+   * make the initialiser's read of the outer a temporal-dead-zone error, and
+   * would share the outer's series — from the declaration to the end of its
+   * block. pine name → emitted name.
+   */
+  protected shadowNames: Map<string, string> = new Map();
+  /** Set by the v3+ declaration check; consumed by the very next declaration emitted. */
+  protected shadowPending = false;
+  private shadowCounter = 0;
+
+  /** The emitted name of a declaration that is a shadow, registered for the rest of its block. */
+  protected shadowedName(pineName: string, emitted: string): string {
+    this.shadowPending = false;
+    const renamed = `${emitted}$sh${this.shadowCounter++}`;
+    this.shadowNames.set(pineName, renamed);
+    return renamed;
   }
 
   /** Depth of for-loop bodies currently being emitted. */
@@ -316,6 +345,8 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   protected scopes: ScopeInfo = {
     declared: new Map(), mutated: new Set(), booleans: new Set(),
     functions: new Set(), bound: new Set(), functionScoped: new Set(),
+    scopesOf: new Map(), tupleArity: new Map(), mayReturnTuple: new Set(),
+    staticTypes: new Map(), inits: new Map(),
   };
 
   /** Prefix every diagnostic with the version that rejected the code. */
@@ -341,7 +372,7 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   protected getLocId(ctx: SourceLocated): string {
     const line = ctx.start?.line || 0;
     const col = ctx.start?.column || 0;
-    return `@L${line}:C${col}`;
+    return `@L${line}:C${col}${this.expansionSuffix}`;
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -362,24 +393,38 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   // See docs/common/VERSIONS.md for the source of each rule.
   // ───────────────────────────────────────────────────────────────────────
 
-  /** '==' / '!=' against 'na' silently misbehaves — require the na(x) function. */
-  protected enforceNaComparison(ctx: Eq_exprContext): void {
-    if (ctx.cmp_expr().length < 2) return; // a single operand is not a comparison
-    for (const operand of ctx.cmp_expr()) {
-      if (operand.getText() === "na") {
-        throw this.err(
-          ctx,
-          `cannot compare to 'na' with '==' or '!=' (it does not behave as ` +
-          `expected). Use the na(x) function instead.`
-        );
-      }
-    }
-  }
+  /**
+   * `x == na` and `x != na` compile at v1–v5 and are false on EVERY bar, na
+   * bars and value bars alike — `na(x)` is what toggles. `safe_eq` / `safe_ne`
+   * already return false when either side is na
+   * (dev-docs/tv-parity/_probes/corpus98/p8_v{1..5}_eq_na, BINANCE:BTCUSDT 1h,
+   * 2026-11-14). v6 refuses the comparison at compile time; see V6ToJsVisitor.
+   */
+  protected enforceNaComparison(_ctx: Eq_exprContext): void {}
 
   /** User-defined functions cannot recurse — reject direct self-reference. */
   protected enforceNoRecursion(name: string, body: ParseTree, ctx: SourceLocated): void {
     if (this.callsFunction(body, name)) {
       throw this.err(ctx, `recursion is not allowed; function '${name}' refers to itself.`);
+    }
+  }
+
+  /**
+   * `strategy.direction.all` is only for `strategy.risk.allow_entry_in`: TradingView refuses
+   * it as the direction of `strategy.entry` / `strategy.order` at v2 to v6
+   * (dev-docs/tv-parity/_probes/dirall, runs v2-v4; compile check at v5 and v6). The
+   * runtime refuses the same value when it arrives through a variable.
+   */
+  protected enforceOrderDirection(name: string, ctx: Fun_callContext): void {
+    const aa = ctx.fun_actual_args?.();
+    const pos = aa?.pos_args();
+    let arg: any = pos ? this.positionalArgs(pos)[1] : undefined;
+    if (!arg) {
+      const kw = aa?.kw_args()?.kw_arg().find((a: any) => ["direction", "long"].includes(a.id().getText()));
+      arg = kw ? (kw.arith_expr() ?? kw.arith_exprs()) : undefined;
+    }
+    if (arg?.getText?.().replace(/[()]/g, "") === "strategy.direction.all") {
+      throw this.err(ctx, `Invalid argument 'direction' in '${name}' call. Possible values: [strategy.long, strategy.short]`);
     }
   }
 
@@ -409,6 +454,16 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
    * parameter can be series or tuple", v4 release notes, May 2020), and before
    * that a bracketed list is not admitted as an argument at all.
    */
+  /**
+   * Names the IMPORTING script (and the libraries between it and this one)
+   * binds. A library is emitted inside the importer's scope, so a script-level
+   * `color = …` stands in front of the `color` namespace there too: a library's
+   * `color.new(color.teal, 50)` read the script's variable ("Cannot read
+   * properties of undefined (reading 'opsv2_teal')", TradingView/RelativeValue
+   * under a script declaring `color`). Set by `compileLibrary`.
+   */
+  outerNames: Set<string> = new Set();
+
   protected tupleArityFromArgument(_call: Fun_callContext): number | null {
     return null;
   }
@@ -425,10 +480,22 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     return call.id().getText();
   }
 
-  /** User-defined functions cannot return tuples. */
-  protected enforceNoTupleReturn(ctx: SourceLocated, detail = ""): void {
-    throw this.err(ctx, `User-defined functions cannot return tuples.${detail}`);
-  }
+  /**
+   * User-defined functions MAY return tuples, at every version.
+   *
+   * TradingView compiles `f(x) => [x, x * 2]` and `[a, b] = f(close)` at v1,
+   * v2 and v3 and the values are right on every bar
+   * (dev-docs/tv-parity/_probes/corpus98/p5_v{1,2,3}_tuple, BINANCE:BTCUSDT 1h,
+   * 2026-11-14). This used to refuse at v1–v3 on the assumption that v4 added
+   * them. The call sites still go through here, so the seam stays.
+   *
+   * The manual's rule for reading one back: "the script must use a tuple
+   * declaration containing one NEW variable for each returned item." Lifting
+   * the guard is the whole change: `[a, b]` already emits a JavaScript array
+   * through `visitArith_exprs`, a body's last statement is already what a
+   * function returns, and `ctx.new_vars` already unpacks a tuple.
+   */
+  protected enforceNoTupleReturn(_ctx: SourceLocated, _detail = ""): void {}
 
   /**
    * Does this subtree reference `name` as a bare identifier?
@@ -491,8 +558,19 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     // which TradingView states are the same language.
     this.scopes = analyseScopes(ctx as any);
     this.securityFunctions = this.collectSecurityFunctions(ctx);
+    this.lazySecurityParams = this.collectLazySecurityParams(ctx);
+    this.inputGlobals = new Map();
+    this.inlinableGlobals = this.collectInlinableGlobals(ctx);
+    this.collectContextState(ctx);
 
-    const stmts = ctx.stmt().map((s) => {
+    // `import` statements first, wherever they are written: a function above the
+    // import may call into the library (TradingView compiles and runs a v5 script
+    // whose `import … as ROI` follows the functions calling `ROI.f()`). Imports
+    // exist from v5; earlier grammars have no `import_stmt`, so nothing moves.
+    const all = ctx.stmt();
+    const isImport = (s: any): boolean => Boolean(s.import_stmt?.());
+    const ordered = [...all.filter(isImport), ...all.filter((s) => !isImport(s))];
+    const stmts = ordered.map((s) => {
       this.globalPrelude = [];
       try {
         const js = this.visit(s);
@@ -592,7 +670,7 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     node: ParseTree,
   ): 'study' | 'indicator' | 'strategy' | 'library' | undefined {
     if (isRule(node, "Fun_callContext")) {
-      const name = node.id().getText();
+      const name = (node as Fun_callContext).id().getText();
       if (name === "study" || name === "strategy") return name;
     }
     const count = node.getChildCount();
@@ -666,11 +744,24 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
    * lets one name carry several definitions, so the call site has to be able to
    * choose between them. Identical here, where a name has exactly one body.
    */
-  protected callFunctionName(pineName: string, _ctx: Fun_callContext): string {
+  protected callFunctionName(pineName: string, _ctx: ParserRuleContext): string {
     return this.funcName(pineName);
   }
 
   visitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
+    const outerLazy = this.currentLazyParams;
+    this.currentLazyParams = this.lazySecurityParams.get(ctx.id().getText()) ?? null;
+    try { return this.emitFun_def_singleline(ctx); } finally { this.currentLazyParams = outerLazy; }
+  }
+
+  protected emitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
+    const outerShadows = this.shadowNames;
+    this.shadowNames = new Map(outerShadows);
+    try { return this.emitFunDefSingleline(ctx); }
+    finally { this.shadowNames = outerShadows; }
+  }
+
+  private emitFunDefSingleline(ctx: Fun_def_singlelineContext): string {
     const name = this.definitionFunctionName(ctx.id().getText());
     const params = this.visit(ctx.fun_head());
     this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_singleline(), ctx);
@@ -683,13 +774,24 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
 
     this.fnDepth++;
     this.fnScope.push(name);
+    this.outerReads = new Map();
     let body: string;
-    try { body = this.singleLineBody(ctx.fun_body_singleline().local_stmt_singleline()); }
-    finally { this.fnDepth--; this.fnScope.pop(); }   // a guard deeper in the body throws
-    return `function ${name}${params} {\n  ${body};\n}${this.paramNamesAssignment(name, ctx.fun_head())}`;
+    let prologue: string;
+    try {
+      body = this.singleLineBody(ctx.fun_body_singleline().local_stmt_singleline());
+      prologue = this.outerReadsPrologue();
+    }
+    finally { this.fnDepth--; this.fnScope.pop(); this.outerReads = null; }   // a guard deeper in the body throws
+    return `function ${name}${params} {\n  ${prologue}${body};\n}${this.paramNamesAssignment(name, ctx.fun_head())}`;
   }
 
   visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
+    const outerLazy = this.currentLazyParams;
+    this.currentLazyParams = this.lazySecurityParams.get(ctx.id().getText()) ?? null;
+    try { return this.emitFun_def_multiline(ctx); } finally { this.currentLazyParams = outerLazy; }
+  }
+
+  protected emitFun_def_multiline(ctx: Fun_def_multilineContext): string {
     const name = this.definitionFunctionName(ctx.id().getText());
     const params = this.visit(ctx.fun_head());
     this.enforceNoRecursion(ctx.id().getText(), ctx.fun_body_multiline(), ctx);
@@ -703,10 +805,22 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
 
     this.fnDepth++;
     this.fnScope.push(name);
+    this.outerReads = new Map();
     let body: string;
-    try { body = this.visit(ctx.fun_body_multiline()); }
-    finally { this.fnDepth--; this.fnScope.pop(); }   // a guard deeper in the body throws
+    try {
+      body = this.visit(ctx.fun_body_multiline());
+      const prologue = this.outerReadsPrologue();
+      if (prologue) body = body.replace(/^\{\n/, `{\n${prologue}`);
+    }
+    finally { this.fnDepth--; this.fnScope.pop(); this.outerReads = null; }   // a guard deeper in the body throws
     return `function ${name}${params} ${body}${this.paramNamesAssignment(name, ctx.fun_head())}`;
+  }
+
+  /** The entry code that records each outer variable the function reads with `[]`; empty if none. */
+  private outerReadsPrologue(): string {
+    if (!this.outerReads || this.outerReads.size === 0) return "";
+    return [...this.outerReads].map(([js, max]) =>
+      `try { ctx.outerHistory(${js}, ${max}); } catch (e) { if (!(e instanceof ReferenceError)) throw e; }\n`).join("");
   }
 
   /**
@@ -861,6 +975,13 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   }
 
   visitLocal_stmts_list(ctx: Local_stmts_listContext): string {
+    const outerShadows = this.shadowNames;
+    this.shadowNames = new Map(outerShadows);
+    try { return this.emitLocalStmtsList(ctx); }
+    finally { this.shadowNames = outerShadows; }
+  }
+
+  private emitLocalStmtsList(ctx: Local_stmts_listContext): string {
     // FLATTENED, because a comma-separated line is several statements and not
     // one — the same rule `singleLineBody` quotes. The block's value is its
     // last CONTENT, which is not the same node as its last LINE:
@@ -892,8 +1013,16 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   // Handle: x = 1
   visitVar_def(ctx: Var_defContext): string {
     const pineName = ctx.id().getText();
-    const name = this.visit(ctx.id());
-    const value = this.visit(ctx.arith_expr());
+    const shadowed = this.shadowPending;
+    this.shadowPending = false;
+    let name = this.visit(ctx.id());
+    // Read before the shadow is registered: the initialiser sees the OUTER one.
+    let value = this.visit(ctx.arith_expr());
+    // Records whether the host overrode this input, for a use inside security().
+    if (!shadowed && this.inputGlobals.get(pineName) === ctx) {
+      value = `ctx.markInput("${pineName}", ${value})`;
+    }
+    if (shadowed) name = this.shadowedName(pineName, name);
 
     // Self-referencing declaration — `s = nz(s[1]) + close`, the canonical v1/v2
     // way to carry state across bars (spec/v2.md §4.1).
@@ -909,11 +1038,13 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     // redeclaration error.
     const key = this.seriesKey(name);
 
-    if (this.hoisted.has(pineName)) {
+    // The prologue declares SCRIPT-scope names only: a declaration inside a
+    // function body is local to the call, whatever the script around it holds.
+    if (!shadowed && this.fnDepth === 0 && this.hoisted.has(pineName)) {
       return `${name} = ctx.new_var("${key}", ${value})`;
     }
 
-    if (this.referencesIdentifier(ctx.arith_expr(), pineName)) {
+    if (!shadowed && this.referencesIdentifier(ctx.arith_expr(), pineName)) {
       return `let ${name};\n${name} = ctx.new_var("${key}", ${value})`;
     }
 
@@ -1462,9 +1593,18 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
       const helper = this.operatorBefore(ctx as any, i) === "==" ? "safe_eq" : "safe_ne";
-      out = `opsv2_${helper}(${out}, ${parts[i]})`;
+      out = `opsv2_${helper}${this.comparisonSuffix()}(${out}, ${parts[i]})`;
     }
     return out;
+  }
+
+  /**
+   * v1-v5: a comparison with an `na` operand is an na bool, not false (`safe_gt_na` and
+   * friends in core.ts carry the TradingView evidence). V6ToJsVisitor overrides this: v6
+   * bools are never na.
+   */
+  protected comparisonSuffix(): string {
+    return "_na";
   }
 
   visitCmp_expr(ctx: Cmp_exprContext): string {
@@ -1473,12 +1613,13 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     let out = parts[0];
     for (let i = 1; i < parts.length; i++) {
       const helper = { "<": "safe_lt", ">": "safe_gt", "<=": "safe_le", ">=": "safe_ge" }[this.operatorBefore(ctx as any, i)];
-      out = `opsv2_${helper}(${out}, ${parts[i]})`;
+      out = `opsv2_${helper}${this.comparisonSuffix()}(${out}, ${parts[i]})`;
     }
     return out;
   }
 
   visitAdd_expr(ctx: Add_exprContext): string {
+    if (ctx.mult_expr().length > 1) { const folded = this.foldExactConst(ctx); if (folded !== null) return folded; }
     const parts = ctx.mult_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
     
@@ -1500,6 +1641,7 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   }
 
   visitMult_expr(ctx: Mult_exprContext): string {
+    if (ctx.unary_expr().length > 1) { const folded = this.foldExactConst(ctx); if (folded !== null) return folded; }
     const parts = ctx.unary_expr().map((e) => this.visit(e));
     if (parts.length === 1) return parts[0];
     let out = parts[0];
@@ -1531,6 +1673,18 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
       }
     }
     return `(${left} ${op} ${right})`;
+  }
+
+  /**
+   * A constant `+ - *` expression folded as TradingView's compiler does (see `constFold`): `1.0 - 0.9` emits 0.1.
+   * v6 only, the version the TradingView evidence covers; null leaves the expression to the normal path.
+   */
+  protected foldExactConst(ctx: ParserRuleContext): string | null {
+    if (this.version < 6) return null;
+    const v = constFold(ctx, this.scopes);
+    if (v === null || !Number.isFinite(v)) return null;
+    const lit = Object.is(v, -0) ? "-0" : String(v);
+    return v < 0 ? `(${lit})` : lit;
   }
 
   /** v1 through v5 truncate; see emitMultOp. */
@@ -1624,11 +1778,290 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
    * statement to hoist to, or it sits in a `security` argument (evaluated in
    * the other context).
    */
+  // ───────────────────────────────────────────────────────────────────────
+  // Globals read inside a security() expression
+  //
+  // `src = input(close)`, `m = close * 2`, `e = ema(close, 3)` are top-level
+  // `let`s computed once per CHART bar. A security() expression is a thunk the
+  // runtime runs in the REQUESTED timeframe's sub-context, where only the
+  // built-ins follow the swap: a global read there was the chart's value, and
+  // `src[1]` was the chart's previous bar. TradingView computes the whole
+  // expression on the requested timeframe (probes:
+  // dev-docs/tv-parity/_probes/security-globals).
+  //
+  // So a single-assignment global read lexically inside the expression is
+  // replaced by its defining expression, which then runs in the sub-context.
+  //
+  // Not covered: a user function BODY called from the expression that reads a
+  // global directly keeps the chart value (the body is emitted once, not per
+  // call site). Pass the global as an argument: `f(src)` is inlined.
+  // ───────────────────────────────────────────────────────────────────────
+
+  /** name → the expression an identifier of that name is replaced by. */
+  protected inlinableGlobals: ReadonlyMap<string, any> = new Map();
+  /** >0 while the expression argument of a security() call is being emitted. */
+  protected securityExprDepth = 0;
+  /** >0 while an inlined global's expression is being emitted. */
+  protected inlineDepth = 0;
+  /** Inlinable globals declared by an input call that reads a series (`input(close)`), by declaration. */
+  protected inputGlobals: ReadonlyMap<string, any> = new Map();
+  /** Globals being expanded right now (cycle guard). */
+  private expandingGlobals = new Set<string>();
+  /**
+   * `~L<line>:C<col>` of every identifier being expanded, outermost first.
+   * Appended to every call id and history key emitted for the expansion
+   * (getLocId), so two reads of one global in a thunk are two sites with their
+   * own state rather than one site advanced twice per bar. Sits after the
+   * `@L:C` that `Context.call` and `locateError` read, before a library tag.
+   */
+  protected expansionSuffix = "";
+
+  protected visitSecurityExpression(e: ParseTree): string {
+    this.securityExprDepth++;
+    try { return this.visit(e); } finally { this.securityExprDepth--; }
+  }
+
+  /** The replacement for a read of an inlinable global, or null to emit it as is. */
+  protected inlineGlobal(ctx: IdContext): string | null {
+    if (this.securityExprDepth === 0) return null;
+    const name = ctx.getText();
+    const def = this.inlinableGlobals.get(name);
+    if (!def || this.expandingGlobals.has(name)) return null;
+    // `src(...)` calls a function; a keyword argument's name is not a read.
+    const parent: any = (ctx as any).parent;
+    if (isRule(parent, "Fun_callContext") && parent.id?.() === ctx) return null;
+    if (this.isKeywordArgumentName(ctx)) return null;
+    // A parameter or local of an enclosing scope with this name wins.
+    const at = ctx.start?.tokenIndex ?? -1;
+    if (this.scopes.scopesOf.get(name)?.some(sp => sp !== null && at >= sp.start && at <= sp.stop)) return null;
+
+    const outerSuffix = this.expansionSuffix;
+    this.expansionSuffix += `~L${ctx.start?.line || 0}:C${ctx.start?.column || 0}`;
+    this.expandingGlobals.add(name);
+    this.inlineDepth++;
+    try {
+      const js = this.visit(def);
+      // A bare identifier stays one: `src[1]` then reads `close`'s own history.
+      // Anything else becomes a series of its own, as the global was, so that
+      // `m[1]` and `f(m)` (whose `x[1]` needs a series argument) have history.
+      const inlined = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(js)
+        ? js : `ctx.new_var("opsv2_inl_${this.anonCounter++}", ${js})`;
+      if (!this.inputGlobals.has(name)) return inlined;
+      // An input the host overrode keeps its value: read the global itself
+      // (`name` is in `expandingGlobals` here, so this visit does not inline).
+      return `(ctx.inputOverridden("${name}") ? ${this.visit(ctx)} : ${inlined})`;
+    } finally {
+      this.inlineDepth--;
+      this.expandingGlobals.delete(name);
+      this.expansionSuffix = outerSuffix;
+    }
+  }
+
+  /**
+   * Top-level `name = expr` bindings a security() expression may replace by
+   * `expr`: not var/varip, not a tuple, bound once at script scope, never `:=`, not reading itself, and `expr`
+   * free of if/for/while/switch and of calls that register something or have
+   * effects (inputs, requests, plots, drawings, strategy orders).
+   *
+   * An input whose default reads a series (`input(close)`,
+   * `input.source(hl2, "s")`) is replaced by that default while the host has
+   * not overridden it: re-running the call in the sub-context would register a
+   * second, phantom input. An overridden one is read as the global (see
+   * `inlineGlobal`, `Context.markInput`). An input with a constant default
+   * (`input(-2.0)`, `input(2 * 3)`) holds the same value on every timeframe,
+   * override included, and is left alone.
+   *
+   * Every version (dev-docs/tv-parity/_probes/security-globals, runs v1-v6: at v1,
+   * `m[1]` with `m = close * 2` is 2 * the 240 bar's close[1], as at v2).
+   *
+   * Nothing that creates or returns a reference (`array.*`, `map.*`, `matrix.*`,
+   * `.new`, `.copy`, generic calls) is inlined: the sub-context would build its
+   * own copy each bar and miss what the script does to the global.
+   */
+  protected collectInlinableGlobals(root: ParseTree): Map<string, any> {
+    const candidates = new Map<string, any>();
+    const repeated = new Set<string>();
+    const walk = (n: any, nested: boolean): void => {
+      if (!n) return;
+      if (isRule(n, "Var_defContext") && !nested && !n.decl_mod?.()
+          && !isRule(n.parent, "For_exprContext") && !isRule(n.parent, "Export_stmtContext")) {
+        const name = n.id().getText();
+        if (candidates.has(name)) repeated.add(name);
+        else candidates.set(name, n);
+      }
+      const inner = nested
+        || isRule(n, "Fun_def_singlelineContext") || isRule(n, "Fun_def_multilineContext")
+        || isRule(n, "Local_stmts_multilineContext") || isRule(n, "Local_stmt_singlelineContext");
+      const count = n.getChildCount?.() ?? 0;
+      for (let i = 0; i < count; i++) walk(n.getChild(i), inner);
+    };
+    walk(root, false);
+
+    const out = new Map<string, any>();
+    const inputs = new Map<string, any>();
+    for (const [name, def] of candidates) {
+      // `mutated` is script scope only: a `:=` on a same-named local or
+      // parameter in a function does not count.
+      if (repeated.has(name) || this.scopes.mutated.has(name)) continue;
+      // Exactly one script-scope binding. Same-named parameters and locals are
+      // fine here; `inlineGlobal` checks whether one is in scope at the use.
+      const bindings = this.scopes.scopesOf.get(name);
+      if (!bindings || bindings.filter(b => b === null).length !== 1) continue;
+      let expr: any = def.arith_expr();
+      const input = this.inputDefault(expr);
+      if (input === "constant") continue;
+      if (input) expr = input;
+      if (this.referencesIdentifier(expr, name) || !this.isInlinableExpression(expr)) continue;
+      out.set(name, expr);
+      if (input) inputs.set(name, def);
+    }
+    this.inputGlobals = inputs;
+    return out;
+  }
+
+  /**
+   * For `input(X, ...)` / `input.source(X, ...)`: the node of X, or "constant"
+   * when X reads no series (no identifier or call). Null when `expr` is not
+   * such a call.
+   */
+  private inputDefault(expr: any): any {
+    let n = expr;
+    while (n && !isRule(n, "Fun_callContext") && n.getChildCount?.() === 1) n = n.getChild(0);
+    if (!isRule(n, "Fun_callContext") || n.call_suffix?.()?.length) return null;
+    const callee = n.id().getText();
+    if (callee !== "input" && callee !== "input.source") return null;
+    const aa = n.fun_actual_args?.();
+    const pos = aa?.pos_args();
+    let arg: any = pos ? this.positionalArgs(pos)[0] : undefined;
+    if (!arg) {
+      const kw = aa?.kw_args()?.kw_arg().find((a: any) => a.id().getText() === "defval");
+      arg = kw ? (kw.arith_expr() ?? kw.arith_exprs()) : undefined;
+    }
+    if (!arg) return "constant"; // nothing to inline: leave the input alone
+    return this.readsSeries(arg) ? arg : "constant";
+  }
+
+  /** Whether `node` contains an identifier or a call, i.e. is not a compile-time constant. */
+  private readsSeries(node: any): boolean {
+    if (!node) return false;
+    if (isRule(node, "IdContext") || isRule(node, "Fun_callContext")) return true;
+    const count = node.getChildCount?.() ?? 0;
+    for (let i = 0; i < count; i++) if (this.readsSeries(node.getChild(i))) return true;
+    return false;
+  }
+
+
+  private isInlinableExpression(node: any): boolean {
+    if (!node) return true;
+    const kind = node.constructor?.name;
+    // An `if` / `switch` EXPRESSION is a value like any other (emitted as an IIFE); its arms are checked below
+    // like the rest. Loops, and `var`/`varip` declarations inside an arm (state of their own), are not inlined.
+    if (kind === "For_exprContext" || kind === "For_in_exprContext" || kind === "While_exprContext") return false;
+    if ((kind === "Var_defContext" || kind === "Var_defsContext") && node.decl_mod?.()) return false;
+    if (kind === "Var_assignContext") return false;
+    if (kind === "Fun_callContext") {
+      const callee: string = node.id().getText();
+      if (/^(input|security|request\.|strategy\.|plot|alert|bgcolor|barcolor|fill$|hline$|label\.|line\.|box\.|table\.|linefill\.|polyline\.|log\.|runtime\.)/.test(callee)
+          || /^(array|map|matrix)\.|\.(new|copy)\b/.test(callee)) return false;
+      if (node.type_args?.()) return false;
+    }
+    const count = node.getChildCount?.() ?? 0;
+    for (let i = 0; i < count; i++) if (!this.isInlinableExpression(node.getChild(i))) return false;
+    return true;
+  }
+
   /**
    * User functions called (directly or through another user function) from
    * inside a `security` call's arguments. Filled by visitPine_script.
    */
   protected securityFunctions: ReadonlySet<string> = new Set();
+
+  /**
+   * Parameters a user function reads ONLY inside a `security()` expression, by function name.
+   *
+   *     f(_sym, _res, _src, _off) => security(_sym, _res, _src[_off], lookahead = barmerge.lookahead_on)
+   *     maHTF = f(syminfo.tickerid, "W", hma(close, 20), 1)
+   *
+   * TradingView computes the ARGUMENT `hma(close, 20)` on the requested timeframe (capture
+   * "Strategy Template", BINANCE:BTCUSDT 1h: the plotted value is the weekly hma(high, 20)[1] to
+   * the last digit). Passed as a value it was the chart's hma, read inside the sub-context. Such a
+   * parameter is handed over as a thunk (`emitLazyArgs`) and evaluated where the expression runs
+   * (`Context.lazySeries`). A parameter also read outside the expression keeps the plain value:
+   * evaluating the argument in both places would run its calls twice per bar.
+   */
+  protected lazySecurityParams: ReadonlyMap<string, ReadonlySet<string>> = new Map();
+  protected lazyParamOrder = new Map<string, string[]>();
+  /** The lazy parameters of the function definition being emitted (null outside one). */
+  protected currentLazyParams: ReadonlySet<string> | null = null;
+
+  protected collectLazySecurityParams(root: ParseTree): Map<string, Set<string>> {
+    const isSecurity = (n: any) =>
+      isRule(n, "Fun_callContext") && /(^|\.)security$|^request\.security/.test(n.id?.()?.getText?.() ?? "");
+    const defs = new Map<string, any[]>();
+    const findDefs = (n: any): void => {
+      if (!n) return;
+      if (isRule(n, "Fun_def_singlelineContext") || isRule(n, "Fun_def_multilineContext")) {
+        const k = n.id().getText(); defs.set(k, [...(defs.get(k) ?? []), n]); return;
+      }
+      for (let i = 0; i < (n.getChildCount?.() ?? 0); i++) findDefs(n.getChild(i));
+    };
+    findDefs(root);
+    const out = new Map<string, Set<string>>();
+    for (const [name, list] of defs) {
+      if (list.length !== 1) continue; // overloads: not worth the ambiguity
+      const def = list[0];
+      let params: string[];
+      try { params = this.paramNames(def.fun_head()); } catch { continue; }
+      if (!params.length) continue;
+      const inside = new Map<string, number>(), outside = new Map<string, number>();
+      const exprNodes = new Set<any>(); // the expression arguments of the security calls in the body
+      const walk = (n: any, inExpr: boolean): void => {
+        if (!n || n === def.fun_head()) return;
+        if (exprNodes.has(n)) inExpr = true;
+        if (isRule(n, "IdContext")) {
+          const t = n.getText(), parent: any = n.parent;
+          const callee = isRule(parent, "Fun_callContext") && parent.id?.() === n;
+          const kwName = isRule(parent, "Kw_argContext") && parent.id?.() === n;
+          if (!callee && !kwName && params.includes(t)) { const m = inExpr ? inside : outside; m.set(t, (m.get(t) ?? 0) + 1); }
+        }
+        if (isSecurity(n) && !inExpr) {
+          const aa = n.fun_actual_args?.();
+          const pos = aa?.pos_args?.();
+          if (pos) { const e = this.positionalArgs(pos)[2]; if (e) exprNodes.add(e); }
+          for (const a of aa?.kw_args?.()?.kw_arg?.() ?? []) if (a.id().getText() === "expression") exprNodes.add(a.arith_expr?.() ?? a.arith_exprs?.());
+        }
+        for (let i = 0; i < (n.getChildCount?.() ?? 0); i++) walk(n.getChild(i), inExpr);
+      };
+      for (let i = 0; i < def.getChildCount(); i++) walk(def.getChild(i), false);
+      const lazy = new Set(params.filter(p => (inside.get(p) ?? 0) > 0 && !(outside.get(p) ?? 0)));
+      if (lazy.size) { out.set(name, lazy); this.lazyParamOrder.set(name, params); }
+    }
+    return out;
+  }
+
+  /**
+   * The arguments of a call to a function with lazy security parameters (see
+   * `collectLazySecurityParams`): those positions are emitted as thunks, compiled as a security
+   * expression (they run in the requested context); the rest exactly as `visitFun_actual_args`.
+   */
+  protected emitLazyArgs(ctx: Fun_callContext, lazy: ReadonlySet<string>, params: string[]): string {
+    const aa = ctx.fun_actual_args();
+    if (!aa) return "";
+    const parts: string[] = [];
+    const pos = aa.pos_args();
+    if (pos) this.positionalArgs(pos).forEach((e: any, i: number) => {
+      parts.push(lazy.has(params[i]) ? `() => (${this.visitSecurityExpression(e)})` : this.visit(e));
+    });
+    const kw = aa.kw_args();
+    if (kw) {
+      const entries = kw.kw_arg().map((a: any) => {
+        if (!lazy.has(a.id().getText()) || !a.arith_expr()) return this.visit(a);
+        return `${this.visit(a.id())}: () => (${this.visitSecurityExpression(a.arith_expr())})`;
+      });
+      parts.push(`{ ${entries.join(", ")} }`);
+    }
+    return parts.join(", ");
+  }
 
   protected collectSecurityFunctions(root: ParseTree): Set<string> {
     const isSecurity = (n: any) =>
@@ -1658,6 +2091,136 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     return found;
   }
 
+  // ───────────────────────────────────────────────────────────────────────
+  // Requested expressions that read the script's own STATE
+  //
+  // `var firstLow = low`, `trend := 1` under an `if`: a global whose value is
+  // the result of the script's history, not of one expression. TradingView runs
+  // that history in the REQUESTED context: `request.security("ETH", "", firstLow)`
+  // on a BTC chart is ETH's first low, with ETH's own `var` state and `:=` updates
+  // (probe dev-docs/tv-parity/_probes/triage/r4, p_n53). Inlining (above) cannot
+  // express it: the state is built by statements all over the script.
+  //
+  // So such a call's thunk is marked `ctx.inContext(...)`, and the runtime runs
+  // the whole script in the requested context for each requested bar, taking the
+  // expression's value where that run reaches the call (Context.evalSecurityBar).
+  // A call that reads no such state keeps the plain thunk: nothing changes, and
+  // nothing costs more, for it.
+  // ───────────────────────────────────────────────────────────────────────
+
+  /** Script-scope variables whose value is built from the script's own history in a context. */
+  protected contextStateGlobals: ReadonlySet<string> = new Set();
+  /** User functions whose body reads one of `contextStateGlobals` (directly or through another). */
+  protected contextStateFunctions: ReadonlySet<string> = new Set();
+
+  /** The script-scope name an identifier reads: `s` for `s.c`. */
+  private rootName(text: string): string {
+    const dot = text.indexOf(".");
+    return dot < 0 ? text : text.slice(0, dot);
+  }
+
+  /** Whether an identifier is a parameter or local of an enclosing function/block rather than the global. */
+  private shadowedAt(name: string, idNode: any): boolean {
+    const at = idNode.start?.tokenIndex ?? -1;
+    return this.scopes.scopesOf.get(name)?.some(sp => sp !== null && at >= sp.start && at <= sp.stop) === true;
+  }
+
+  /** The user function a call names, if any (`f(...)`, or a method `x.f(...)`). */
+  private userCallee(call: any): string | null {
+    const text: string = call.id?.()?.getText?.() ?? "";
+    if (this.userFunctions.has(text)) return text;
+    const last = text.slice(text.lastIndexOf(".") + 1);
+    return last !== text && this.userFunctions.has(last) ? last : null;
+  }
+
+  /**
+   * Whether `node` reads context state: a global in `state` (not shadowed), a
+   * call to a function in `fns`, or an inlinable global whose definition does.
+   */
+  private readsContextState(node: any, state: ReadonlySet<string>, fns: ReadonlySet<string>, seen = new Set<string>()): boolean {
+    if (!node) return false;
+    if (isRule(node, "Fun_callContext")) {
+      const callee = this.userCallee(node);
+      if (callee && fns.has(callee)) return true;
+    }
+    if (isRule(node, "IdContext")) {
+      const parent: any = node.parent;
+      const isCallee = isRule(parent, "Fun_callContext") && parent.id?.() === node;
+      if (!isCallee && !this.isKeywordArgumentName(node)) {
+        const name = this.rootName(node.getText());
+        if (!this.shadowedAt(name, node)) {
+          if (state.has(name)) return true;
+          const def = this.inlinableGlobals.get(name);
+          if (def && !seen.has(name)) {
+            seen.add(name);
+            if (this.readsContextState(def, state, fns, seen)) return true;
+          }
+        }
+      }
+      return false;
+    }
+    const count = node.getChildCount?.() ?? 0;
+    for (let i = 0; i < count; i++) if (this.readsContextState(node.getChild(i), state, fns, seen)) return true;
+    return false;
+  }
+
+  protected collectContextState(root: ParseTree): void {
+    const defs = new Map<string, any[]>();
+    const fnDefs = new Map<string, any>();
+    const walk = (n: any, nested: boolean): void => {
+      if (!n) return;
+      if ((isRule(n, "Var_defContext") || isRule(n, "Var_defsContext")) && !nested
+          && !isRule(n.parent, "For_exprContext") && !isRule(n.parent, "Export_stmtContext")) {
+        const ids: any[] = isRule(n, "Var_defContext") ? [n.id()] : (n.ids_array?.()?.id?.() ?? []);
+        for (const id of ids) {
+          const name = id?.getText?.();
+          if (!name) continue;
+          if (!defs.has(name)) defs.set(name, []);
+          defs.get(name)!.push(n);
+        }
+      }
+      if (isRule(n, "Fun_def_singlelineContext") || isRule(n, "Fun_def_multilineContext")) {
+        const name = n.id?.()?.getText?.();
+        if (name) fnDefs.set(name, n);
+      }
+      const inner = nested
+        || isRule(n, "Fun_def_singlelineContext") || isRule(n, "Fun_def_multilineContext")
+        || isRule(n, "Local_stmts_multilineContext") || isRule(n, "Local_stmt_singlelineContext");
+      const count = n.getChildCount?.() ?? 0;
+      for (let i = 0; i < count; i++) walk(n.getChild(i), inner);
+    };
+    walk(root, false);
+
+    const state = new Set<string>();
+    const fns = new Set<string>();
+    for (const [name, list] of defs) {
+      // Reassigned with `:=` (or `+=`): its value depends on which branches ran, in that context.
+      if (this.scopes.mutated.has(name)) { state.add(name); continue; }
+      // `var x = low`: the first bar's value, held. `var x = 0` never reassigned is a constant.
+      if (list.some(d => d.decl_mod?.() && this.readsSeries(d.arith_expr?.()))) state.add(name);
+    }
+    // Everything computed from that state: a function reading it, a global defined from it
+    // that is not inlined (a tuple, a call that cannot be re-run in place).
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const [name, def] of fnDefs) {
+        if (!fns.has(name) && this.readsContextState(def, state, fns)) { fns.add(name); grew = true; }
+      }
+      for (const [name, list] of defs) {
+        if (state.has(name) || this.inlinableGlobals.has(name)) continue;
+        if (list.some(d => this.readsContextState(d.arith_expr?.(), state, fns))) { state.add(name); grew = true; }
+      }
+    }
+    this.contextStateGlobals = state;
+    this.contextStateFunctions = fns;
+  }
+
+  /** Whether a requested expression must be evaluated by running the script in the requested context. */
+  protected needsContextRun(expr: ParseTree): boolean {
+    if (this.contextStateGlobals.size === 0 && this.contextStateFunctions.size === 0) return false;
+    return this.readsContextState(expr, this.contextStateGlobals, this.contextStateFunctions);
+  }
+
   protected hoistBuiltinHistory(ctx: Sqbr_exprContext, base: string): { tmp: string; key: string } | null {
     if (!this.globalPrelude) return null;
     if (!/^ctx\.call\("[A-Za-z_][A-Za-z0-9_.]*@L\d+:C\d+", (?:ctx\.builtin\("[A-Za-z0-9_.]+"\)|[A-Za-z0-9_$.]+)\)$/.test(base)) return null;
@@ -1677,10 +2240,26 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     return { tmp, key };
   }
 
+  /**
+   * Collects the `(expr)[n]` bases met inside a v6 `and`/`or` operand that may be skipped, so the
+   * chain writes them before it short-circuits (null outside such an operand). See the v6 visitor.
+   */
+  protected lazyHistoryBases: string[] | null = null;
+
   // --- Series Access with ID Tagging ---
+  /** Records `base[n]` in a function body when `base` is a script-scope variable, see `outerReads`. */
+  private noteOuterRead(ctx: Sqbr_exprContext, base: string): void {
+    if (!this.outerReads || this.fnDepth === 0) return;
+    const name = ctx.atom().id?.()?.getText();
+    if (!name || !this.scopes.declared.has(name) || this.scopes.functionScoped.has(name)) return;
+    const text = ctx.arith_expr()?.getText() ?? "";
+    const offset = /^\d+$/.test(text) ? Number(text) : 1000;
+    this.outerReads.set(base, Math.max(this.outerReads.get(base) ?? 0, offset));
+  }
+
   visitSqbr_expr(ctx: Sqbr_exprContext): string {
     const base = this.visit(ctx.atom());
-    const idxExpr = ctx.arith_expr(0);
+    const idxExpr = ctx.arith_expr();
 
     if (idxExpr) {
       const index = this.visit(idxExpr);
@@ -1701,7 +2280,14 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
       // `barstate.islast[1]` are ordinary Pine, so this reached real scripts.
       const isSimpleId = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(base);
 
+      // An inlined global (see `inlineGlobal`) is already a named series.
+      const inlined = /^ctx\.new_var\("(opsv2_inl_\d+)", /.exec(base);
+      if (inlined) return `ctx.get(${base}, ${index}, "${inlined[1]}")`;
+      const lazyRead = /^ctx\.lazySeries\("(opsv2_lazy_[^"]+)", [A-Za-z_$][A-Za-z0-9_$]*\)$/.exec(base);
+      if (lazyRead) return `ctx.get(${base}, ${index}, "${lazyRead[1]}")`;
+
       if (isSimpleId) {
+        this.noteOuterRead(ctx, base);
         // Standard variable history lookup: close[1]
         // We pass the base string as the exact key (e.g., "opsv2_close") 
         // because Context.vars registers them under this exact name.
@@ -1735,6 +2321,12 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
           if (!hasCall(ctx.atom())) return `ctx.get(ctx.new_var(${anonId}, ${base}), ${index}, ${anonId})`;
           return `ctx.get(${hoisted}, ${index}, ${anonId})`;
         }
+        // v6 lazy `and`/`or`: a base inside an operand that may be skipped is written ahead of the
+        // chain (see `lazyHistoryBases`) and read here by name.
+        if (this.lazyHistoryBases) {
+          this.lazyHistoryBases.push(`ctx.new_anon(${anonId}, ${base})`);
+          return `ctx.get(null, ${index}, ${anonId})`;
+        }
         // v5/v6 — and v2-v4 where the hoist is not legal (UNVERIFIED on
         // TradingView there): the series is bar-indexed and carries its last
         // value over bars the expression did not run on (an `if`/`for` body).
@@ -1747,9 +2339,17 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   // --- Atoms ---
   visitAtom(ctx: AtomContext): string {
     if (ctx.fun_call()) return this.visit(ctx.fun_call()!);
-    if (ctx.id()) return this.visit(ctx.id()!);
+    if (ctx.id()) {
+      const js = this.visit(ctx.id()!);
+      const t = ctx.id()!.getText();
+      // A lazy security parameter read in the expression: evaluate the caller's thunk here, in the
+      // requested context, as a series of its own so `p[n]` has that context's history.
+      if (this.securityExprDepth > 0 && this.currentLazyParams?.has(t) && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(js))
+        return `ctx.lazySeries("opsv2_lazy_${this.fnScope[this.fnScope.length - 1] ?? ""}_${t}", ${js})`;
+      return js;
+    }
     if (ctx.literal()) return this.visit(ctx.literal()!);
-    if (ctx.LPAR()) return "(" + this.visit(ctx.arith_expr(0)!) + ")";
+    if (ctx.LPAR()) return "(" + this.visit(ctx.arith_expr()!) + ")";
     return "";
   }
 
@@ -1766,6 +2366,9 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     // v2: strategy.* requires strategy() context (rejected under study()).
     if (originalName.startsWith("strategy.")) {
       this.enforceStrategyContext(originalName, ctx);
+    }
+    if (originalName === "strategy.entry" || originalName === "strategy.order") {
+      this.enforceOrderDirection(originalName, ctx);
     }
 
     // security(): its 3rd arg is an expression evaluated in the HTF context, so it
@@ -1797,6 +2400,11 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     if (!this.registry[originalName]
         && !this.userFunctions.has(originalName)
         && originalName in REGISTRY) {
+      // A v1-v3 name that this version removed is not "added later": TradingView's v4
+      // says "Could not find function or function reference 'heikenashi'" (probe r6 p2).
+      if (this.version >= 4 && originalName in BASE_REGISTRY) {
+        throw this.err(ctx, `Could not find function or function reference '${originalName}'.`);
+      }
       throw this.err(
         ctx,
         `'${originalName}' is not available in Pine Script v${this.version}. ` +
@@ -1825,7 +2433,10 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
         : this.visit(ctx.id());
 
     // 1. Just parse the arguments normally. NO manual 'ctx' injection!
-    const args = ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
+    //    Except a parameter only a security() expression reads: a thunk (collectLazySecurityParams).
+    const lazy = isUserDefined ? this.lazySecurityParams.get(originalName) : undefined;
+    const args = lazy ? this.emitLazyArgs(ctx, lazy, this.lazyParamOrder.get(originalName) ?? [])
+      : ctx.fun_actual_args() ? this.visit(ctx.fun_actual_args()!) : "";
 
     // 2. Generate Deterministic ID (e.g., "sma@L4:C8").
     //
@@ -1874,8 +2485,8 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     const pos = aa?.pos_args();
     const exprs = pos ? this.positionalArgs(pos) : [];
     const parts = exprs.map((e, i) => {
-      const js = this.visit(e);
-      return i === 2 ? `() => (${js})` : js; // positional `expression`
+      if (i !== 2) return this.visit(e);
+      return this.securityThunk(e); // positional `expression`
     });
 
     const kwArgs = aa?.kw_args();
@@ -1883,9 +2494,10 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
       const entries = kwArgs.kw_arg().map(a => {
         const key = this.visit(a.id());
         const valueCtx = a.arith_expr() ?? a.arith_exprs()!;
-        const js = this.visit(valueCtx);
         // The same deferral rule, applied to the keyword spelling.
-        const deferred = a.id().getText() === "expression" ? `() => (${js})` : js;
+        const deferred = a.id().getText() === "expression"
+          ? this.securityThunk(valueCtx)
+          : this.visit(valueCtx);
         return `${key}: ${deferred}`;
       });
       parts.push(`{ ${entries.join(", ")} }`);
@@ -1893,6 +2505,12 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
 
     const argsPart = parts.length ? `, ${parts.join(", ")}` : "";
     return `ctx.call(${callId}, ${transpiledName}${argsPart})`;
+  }
+
+  /** The deferred `expression` of a security call; see `needsContextRun`. */
+  protected securityThunk(e: ParseTree): string {
+    const thunk = `() => (${this.visitSecurityExpression(e)})`;
+    return this.needsContextRun(e) ? `ctx.inContext(${thunk})` : thunk;
   }
 
   /** Emit a study()/strategy() directive as a metadata declaration. */
@@ -2135,6 +2753,9 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
   visitId(ctx: IdContext): string {
     const text = ctx.getText();
 
+    const inlined = this.inlineGlobal(ctx);
+    if (inlined !== null) return inlined;
+
     // An UNKNOWN NAMESPACE is an error, not an undefined read.
     //
     // Pine has no user-defined dotted names before v5, so every dotted
@@ -2202,7 +2823,7 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
         // back the getter function itself, which then reached request.security
         // as its own source text.
         const root = text.slice(0, text.indexOf("."));
-        if (this.scopes.bound.has(root) || this.scopes.declared.has(root)) {
+        if (this.scopes.bound.has(root) || this.scopes.declared.has(root) || this.outerNames.has(root)) {
             const read = `ctx.builtin(${JSON.stringify(text)})`;
             const member = this.registry[text];
             if (member && member.is_getter && !this.isKeywordArgumentName(ctx)) {
@@ -2212,7 +2833,7 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
         }
         transpiledName = text.split('.').map(p => `${this.PREFIX}${p}`).join('.');
     } else {
-        transpiledName = `${this.PREFIX}${text}`;
+        transpiledName = this.shadowNames.get(text) ?? `${this.PREFIX}${text}`;
     }
 
     // 2. THE GETTER CHECK
@@ -2237,6 +2858,18 @@ export class V1ToJsVisitor extends AbstractParseTreeVisitor<string> {
     // requested a symbol named "function tickerid() { … }", got `na` for every
     // bar, and the strategy gated on `low == l` never entered. `ticker` has the
     // same shape and is not affected: nothing else claims that key.
+    // `vwap` (v1-v4) and `ta.vwap` (v5, v6) are also VARIABLES: "Volume Weighted Average Price. It uses
+    // hlc3 as its source series." The registry key is the function, so a bare read emitted the function
+    // object, which every arithmetic and `ema(vwap, 1)` turned into na (EVWMA VWAP Cross [QuantNomad], v4:
+    // TradingView plots ema(vwap, 1), the engine plotted nothing and never traded). Read it as vwap(hlc3).
+    if ((text === "vwap" || text === "ta.vwap") && this.registry[text] && !this.isKeywordArgumentName(ctx)
+        && !this.scopes.declared.has(text) && !this.scopes.bound.has(text)) {
+      const parent: any = (ctx as any).parent;
+      if (!(isRule(parent, "Fun_callContext") && parent.id?.() === ctx)) {
+        const at = this.getLocId(ctx);
+        return `ctx.call("${text}${at}", ctx.builtin(${JSON.stringify(text)}), ctx.call("hlc3${at}", ctx.builtin("hlc3")))`;
+      }
+    }
     const asVariable = this.variableSpelling(text);
     if (asVariable && !this.isKeywordArgumentName(ctx)
         && !this.scopes.declared.has(text) && !this.scopes.bound.has(text)) {

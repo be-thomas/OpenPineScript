@@ -140,3 +140,15 @@ describe("v4 tostring(x, format)", () => {
       .toBe("0.12%|price73750|inherit73750|1,234.5");
   });
 });
+
+describe("a point with no digit after it, then literal text", () => {
+  // TradingView capture n162: str.tostring(41.69, "#.1") is "42.1" (the point is literal), not "421".
+  it("prints the point after the rounded integer part", () => {
+    expect(run(0.01, [["41.69", q("#.1"), "42.1"], ["58.31", q("#.1"), "58.1"]]))
+      .toEqual(["42.1", "58.1"]);
+  });
+  it("other patterns are unchanged", () => {
+    expect(run(0.01, [["41.69", q("#.#"), "41.7"], ["41.69", q("#.00"), "41.69"], ["41.69", q("#"), "42"]]))
+      .toEqual(["41.7", "41.69", "42"]);
+  });
+});

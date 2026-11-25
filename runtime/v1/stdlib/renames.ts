@@ -72,6 +72,11 @@ const INPUT_TYPES: RenameSpec[] = [
   // so it is declared by value, the way `plot.style_cross` is. v5 turns the
   // same spelling into a FUNCTION, which V5_ONLY_NAMES installs over this.
   { to: "input.color", value: "color" },
+  // `input.time` is the same kind of v4 constant: TradingView v4 compiles
+  // `input(defval = timestamp(...), type = input.time)` and returns the
+  // timestamp (dev-docs/tv-parity/_probes/corpus98/p1_v4_input_time, 2026-11-14).
+  // v5's `input.time()` function takes over the spelling via V5_ONLY_NAMES.
+  { to: "input.time", value: "time" },
 ];
 
 /**
@@ -87,6 +92,19 @@ const PLOT_STYLES: RenameSpec[] = [
   // function won. v4 removes the ambiguity by renaming the style, so the v4
   // spelling CAN be given a value even though the v3 one cannot.
   { to: "plot.style_cross", value: "cross" },
+];
+
+/**
+ * v4 also spells two label styles without the underscore, and draws the same
+ * shapes as `label.style_label_up` / `label.style_label_down` (TradingView
+ * drawing styles "lup" / "ldn", dev-docs/tv-parity/_probes/corpus98/
+ * p3_v4_label_styles, 2026-11-14). By value, because the underscore forms are
+ * v4-only keys and so not in the v1–v3 view an alias would inherit from. v5/v6
+ * were not probed: V5_DROPPED keeps them refused there.
+ */
+const LABEL_STYLES: RenameSpec[] = [
+  { to: "label.style_labelup", value: "label_up" },
+  { to: "label.style_labeldown", value: "label_down" },
 ];
 
 /** hline styles, same shape: `dotted` → `hline.style_dotted`. */
@@ -196,6 +214,9 @@ export const V4_ONLY_NAMES: readonly string[] = [
     //   "max_bars_back function to control series variables internal history
     //    buffer sizes" and "functions for explicit type casting" (June 2019)
     "random", "todegrees", "toradians", "round_to_mintick",
+    // v4–v6 by probe (dev-docs/tv-parity/_probes/corpus98/p6_v{4,5,6}_entry_name,
+    // 2026-11-14); v2 and v3 were not probed and keep refusing it.
+    "strategy.position_entry_name",
     "time_close", "time_tradingday", "max_bars_back", "int",
 
     // The May-2021 colour batch. Every other member of it — color.rgb,
@@ -248,6 +269,7 @@ export const V4_RENAMES: readonly RenameSpec[] = [
   ...COLORS,
   ...INPUT_TYPES,
   ...PLOT_STYLES,
+  ...LABEL_STYLES,
   ...HLINE_STYLES,
   ...WEEKDAYS,
   ...TIMEFRAME,
@@ -281,6 +303,9 @@ export const V4_REMOVED: readonly string[] = (() => {
   // in three of TradingView's own v4 examples — and does not become
   // `ticker.new` until v5.
   removed.delete("tickerid");
+
+  // `heikenashi`, the older spelling of `heikinashi`, is known only at v1 (chart.ts).
+  removed.add("heikenashi");
   return [...removed];
 })();
 

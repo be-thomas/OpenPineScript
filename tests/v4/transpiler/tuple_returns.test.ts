@@ -1,5 +1,5 @@
 /**
- * A user-defined function that returns a tuple — v4 onward.
+ * A user-defined function that returns a tuple.
  *
  * SOURCING. From the manual's user-defined functions page, under "Functions
  * that return multiple results":
@@ -21,12 +21,12 @@
  * reassign existing tuples or to use previously declared variables within
  * them."
  *
- * ── Why v4 and not earlier ──────────────────────────────────────────────────
+ * ── Which versions ──────────────────────────────────────────────────────────
  *
- * conformance/common/guards_by_version.test.ts has always declared this guard
- * for v1, v2 and v3 and left v4 and v5 unstated. The refusal was simply never
- * lifted, and it rejected eight of TradingView's own published scripts — among
- * them the example on its error-messages page ABOUT tuples.
+ * v4 onward by the manual, and v1–v3 as well by probe: TradingView compiles it
+ * at v1, v2 and v3 (dev-docs/tv-parity/_probes/corpus98/p5_v{1,2,3}_tuple,
+ * 2026-11-14). The refusal rejected eight of TradingView's own published
+ * scripts — among them the example on its error-messages page ABOUT tuples.
  */
 import { describe, it, expect } from "vitest";
 import { transpile, compileScript } from "../../../transpiler/common";
@@ -48,7 +48,7 @@ function read(src: string, name: string): any {
 }
 
 describe("a tuple body, read back by a tuple declaration", () => {
-  for (const v of [4, 5]) {
+  for (const v of [1, 2, 3, 4, 5]) {
     const SUMDIFF = "sumDiff(a, b) =>\n    [a + b, a - b]\n[s, d] = sumDiff(7.0, 3.0)\n";
 
     it(`v${v}: both values arrive`, () => {
@@ -214,17 +214,32 @@ describe("a METHOD CHAIN destructured", () => {
   });
 });
 
-describe("v1 to v3 still refuse it", () => {
+describe("v1 to v3 accept it too", () => {
+  // TradingView compiles a tuple-returning user function at v1, v2 and v3, and
+  // the values are right on every bar
+  // (dev-docs/tv-parity/_probes/corpus98/p5_v{1,2,3}_tuple, 2026-11-14).
   for (const v of [1, 2, 3]) {
-    it(`v${v}: the definition is refused`, () => {
+    it(`v${v}: the definition is accepted and both values arrive`, () => {
       const src = head(v) + "pair(v) => [v, v + 1]\n[a, b] = pair(close)\n";
-      expect(() => transpile(src)).toThrow(/cannot return tuples/);
+      expect(() => transpile(src)).not.toThrow();
+      expect(read(src, "a")).toBe(11);
+      expect(read(src, "b")).toBe(12);
+    });
+
+    it(`v${v}: a multi-line body with locals, as in the probe`, () => {
+      const src = head(v) + "dirmov(len) =>\n    up = change(high)\n    down = -change(low)\n    [up, down]\n" +
+        "[u, d] = dirmov(14)\nf(x) => [x, x * 2]\n[p, q] = f(close)\n";
+      expect(read(src, "q")).toBe(22);
+    });
+
+    it(`v${v}: the arity is still checked against the definition`, () => {
+      const src = head(v) + "trio(x) =>\n    [x, x, x]\n[a, b] = trio(1.0)\n";
+      expect(() => transpile(src)).toThrow(/'trio' returns 3 values, but you provided 2/);
+    });
+
+    it(`v${v}: a function whose last statement is not a tuple is refused`, () => {
+      const src = head(v) + "single(x) =>\n    x * 2\n[a, b] = single(1.0)\n";
+      expect(() => transpile(src)).toThrow(/'single' does not return a tuple/);
     });
   }
-
-  it("...and the refusal names the rule, not the arity", () => {
-    // A version that forbids the form must not first complain about a count.
-    const src = head(3) + "trio(x) =>\n    [x, x, x]\n[a, b] = trio(1.0)\n";
-    expect(() => transpile(src)).toThrow(/cannot return tuples/);
-  });
 });

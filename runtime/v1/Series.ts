@@ -94,7 +94,16 @@ export class Series<T = any> {
         return this.update(val);
     }
 
+    /**
+     * Set while a `request.security` expression runs (Context.evalSecurityBar) on the chart's own
+     * built-in series (open ... time): reads go to the requested context's series instead. A function
+     * parameter bound to the chart's `high` before the call (`f(_s) => request.security(tf, _s[1])`,
+     * `f(high)`) is then the requested timeframe's, as TradingView evaluates it (probe r6 p1).
+     */
+    public redirect: Series<T> | null = null;
+
     public get(offset: number): T | null {
+        if (this.redirect !== null) return this.redirect.get(offset);
         // Target Bar = Current - Offset
         const targetBarIndex = this.ctx.currentBarIndex - offset;
         const internalIndex = targetBarIndex - this.startBarIndex;
@@ -143,6 +152,7 @@ export class Series<T = any> {
      * Allows "series + 1" to work if T is number.
      */
     public valueOf(): T | null {
+        if (this.redirect !== null) return this.redirect.valueOf();
         return this._val;
     }
 

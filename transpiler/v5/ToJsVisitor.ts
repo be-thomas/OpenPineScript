@@ -55,7 +55,7 @@ import { branchTupleWidths } from "../common/passes/ScopeAnalysis";
 import type { StdlibEntry } from "../../runtime/v1/stdlib/metadata";
 import { V5_VIEW } from "../../runtime/v1/stdlib";
 import { V5_RENAMES, V5_REMOVED } from "../../runtime/v1/stdlib/renames5";
-import type { ParseTree } from "antlr4ng";
+import type { ParseTree, ParserRuleContext } from "antlr4ng";
 import { parse as parseV5 } from "../../parser/v5";
 import {
   declarationName, dynamicRequestsSetting, hasIndicatorOutput,
@@ -149,7 +149,7 @@ export function numericTypeOf(text: string): "int" | "float" | null {
   return /^[-+*%\d\s]+$/.test(text) ? "int" : null;
 }
 
-interface FnOverload {
+export interface FnOverload {
   /** Fewest arguments a call may pass — parameters without a default. */
   min: number;
   /** Most — every parameter. */
@@ -472,6 +472,25 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    */
   protected libraryMethods: Map<string, string> = new Map();
 
+  /** The exported methods' receivers and signatures, by name, across the imported libraries. */
+  protected libraryMethodSigs: Map<string, Array<{ receiver: string; sig: FnOverload }>> = new Map();
+
+  /**
+   * Does an imported library's method `name` take `receiverType` and `argCount`
+   * arguments (the receiver included in the signature)? A method is chosen by
+   * its first parameter's type and its parameter list, so a library's
+   * `push(array<Pattern> this, Pattern p, int max)` is not the call
+   * `xs.push(x)` on another array. An unknown type or count keeps the old answer.
+   */
+  protected libraryTakes(name: string, receiverType: string | null, argCount: number | null): boolean {
+    if (!this.libraryMethods.has(name)) return false;
+    const sigs = this.libraryMethodSigs.get(name);
+    if (!sigs || sigs.length === 0) return true;
+    return sigs.some(o =>
+      (receiverType === null || receiverTakes(normaliseType(o.receiver), normaliseType(receiverType)))
+      && (argCount === null || (argCount + 1 >= o.sig.min && argCount + 1 <= o.sig.max)));
+  }
+
   /**
    * Sources for `import`, keyed by the path a script writes.
    *
@@ -573,7 +592,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * The same reasoning, and the same shape, as `collectFunctionNames` in the v1
    * base.
    */
-  override visitPine_script(ctx: Pine_scriptContext): string {
+  override visitPine_script(node: ParserRuleContext): string {
+    const ctx = node as Pine_scriptContext;
     this.collectDeclarations(ctx);
     this.enforceEditorRules(ctx);
     const js = super.visitPine_script(ctx as any);
@@ -820,7 +840,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     );
   }
 
-  override visitId(ctx: IdContext): string {
+  override visitId(node: ParserRuleContext): string {
+    const ctx = node as IdContext;
     const text = ctx.getText();
 
     // A keyword argument's key is the callee's parameter name, not a name this
@@ -854,7 +875,13 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     // Only where the binding is IN SCOPE. `isReceiverName` is a flat set, so a
     // parameter called `high` in one function made the bare `high` of every
     // other function a read of a variable that was never declared there.
-    if (this.nameScope && !text.includes(".") && this.isReceiverName(text)
+    //
+    // Never a keyword argument's KEY: it names the callee's parameter, whatever
+    // the library calls its own locals. A library function with a parameter
+    // named `stop` emitted `strategy.entry(id, dir, stop = entry)` as
+    // `{ opsv2_$lib$st$stop: … }`, which no parameter answers: the stop was
+    // dropped and the order filled at market.
+    if (this.nameScope && !text.includes(".") && !isKeywordArgumentName(ctx) && this.isReceiverName(text)
         && this.visibleAt(text, ctx as any)) {
       return this.localName(text);
     }
@@ -943,7 +970,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * guard is skipped too, deliberately — a field is not a script-scope
    * variable, and `p.x` is declared by `type Point`, not by an `=` statement.
    */
-  override visitVar_assign(ctx: Var_assignContext): string {
+  override visitVar_assign(node: ParserRuleContext): string {
+    const ctx = node as Var_assignContext;
     const text = ctx.id().getText();
     const dot = text.indexOf(".");
 
@@ -981,7 +1009,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * but present in the runtime union — reports "added in a later version",
    * which is exactly backwards for `[a, b, c] = bb(close, 20, 2)` at v5.
    */
-  override visitVar_defs(ctx: Var_defsContext): string {
+  override visitVar_defs(node: ParserRuleContext): string {
+    const ctx = node as Var_defsContext;
     const callee = this.firstCallee(ctx.arith_expr());
     if (callee) this.enforceRenamedInV5(callee, ctx);
     // Destructured locals shadow globals of their names, as visitVar_def's do.
@@ -1211,7 +1240,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
         if (!own || this.scopes.mayReturnTuple?.has(innerName)) return;
       }
     }
-    if (name === "ta.vwap" || name === "vwap") {
+    if (name === "ta.vwap" || (name === "vwap" && !this.userFunctions.has("vwap"))) {
       const args = call.fun_actual_args();
       const kw = (args?.kw_args()?.kw_arg() ?? []).map(k => k.id().getText());
       const given = this.argumentCount(args ?? null);
@@ -1245,57 +1274,21 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   }
 
   /**
-   * v5's declaration rule reads the initialiser the way the language does:
+   * v5's declaration rule reads the initialiser the way the language does
+   * (`valueReadsName`, with `readsDottedRoots` on):
    *
    *   - `x = arr.last().x` and `float y = verts.get(i).y` read a FIELD called
    *     `x`/`y` off a value. A field after a dot is not the variable.
    *   - `result = if cond` + a branch that declares its own `result` reads
    *     that branch's local, not the one being declared.
    */
-  protected override enforceNoSelfReference(name: string, value: ParseTree, ctx: SourceLocated): void {
-    const reads = (node: any): boolean => {
-      if (!node) return false;
-      if (isRule(node, "Call_suffixContext")) {
-        const args = node.fun_actual_args?.();
-        return args ? reads(args) : false;
-      }
-      if (isRule(node, "IdContext")) {
-        // A dotted id: only its FIRST part names a variable, and only when
-        // that part is not a namespace, type, enum or library — in
-        // `position = position.middle_center` the variable does not exist yet,
-        // so the dotted name is the namespace's.
-        const text = node.getText();
-        if (text.includes(".") && this.isQualifierRoot(text.split(".")[0])) return false;
-        return text.split(".")[0] === name && !isRule(node.parent, "Kw_argContext");
-      }
-      if (isRule(node, "Fun_callContext")) {
-        // The callee is a function name, in its own namespace; its arguments
-        // and any suffixes' arguments are read.
-        const args = node.fun_actual_args?.();
-        const callee = node.id?.()?.getText?.() ?? "";
-        const receiverRead = callee.includes(".") && callee.split(".")[0] === name
-          && !this.isQualifierRoot(name);
-        return receiverRead || (args ? reads(args) : false)
-          || (node.call_suffix?.() ?? []).some((s: any) => reads(s));
-      }
-      if (isRule(node, "Local_stmts_multilineContext")) {
-        const declares = (node.local_stmts_list?.()?.local_stmt_multiline?.() ?? [])
-          .some((l: any) => (l.local_stmt_content?.() ?? []).some((c: any) => c.var_def?.()?.id?.()?.getText?.() === name));
-        if (declares) return false;
-      }
-      for (let i = 0; i < (node.getChildCount?.() ?? 0); i++) if (reads(node.getChild(i))) return true;
-      return false;
-    };
-    if (!reads(value)) return;
-    throw this.err(
-      ctx,
-      `'${name}' cannot reference itself in its own declaration. Declare it ` +
-      `first (e.g. '${name} = 0.0'), then assign with ':='.`,
-    );
-  }
+  protected override readsDottedRoots(): boolean { return true; }
+
+  /** v5 and v6 compile a shadow whatever the outer initialiser is (corpus98/p7_v5_shadow, p7_v6_shadow). */
+  protected override refusesShadowOfConstant(): boolean { return false; }
 
   /** Is `root` a namespace, user type, enum or library alias — a qualifier, not a variable? */
-  protected isQualifierRoot(root: string): boolean {
+  protected override isQualifierRoot(root: string): boolean {
     return this.namespaceRoots.has(root) || this.userTypes.has(root)
       || this.userEnums.has(root) || this.importAliases.has(root);
   }
@@ -1329,7 +1322,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     return null;
   }
 
-  protected override destructuringCallee(call: Fun_callContext): string {
+  protected override destructuringCallee(node: ParserRuleContext): string {
+    const call = node as Fun_callContext;
     const suffixes = ((call as any).call_suffix?.() ?? []) as Call_suffixContext[];
     for (let i = suffixes.length - 1; i >= 0; i--) {
       if (suffixes[i].LPAR()) return suffixes[i].id().getText().split(".").pop()!;
@@ -1408,7 +1402,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     }
 
     const owner = this.libraryMethods.get(method);
-    if (owner !== undefined) {
+    if (owner !== undefined && this.libraryTakes(method, receiverType, this.argumentCount(ctx.fun_actual_args?.() ?? null))) {
       const fn = `${this.libraryNamespace(owner)}[${JSON.stringify(method)}]`;
       return `ctx.call("${method}${at}", ${fn}, ${receiver}${tail})`;
     }
@@ -1452,7 +1446,12 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     const root = name.slice(0, dot);
     const tail = name.slice(dot + 1);
 
-    if (this.userTypes.has(root)) return this.emitTypeCall(root, tail, ctx);
+    // A type named like a built-in namespace (`type str`) answers `new` and
+    // `copy`; every other member is still the built-in's (`str.tostring`).
+    if (this.userTypes.has(root)
+        && !((tail !== "new" && tail !== "copy") && name in this.registry)) {
+      return this.emitTypeCall(root, tail, ctx);
+    }
 
     // `Weekday.MONDAY.to_int()` — a method called on an enum MEMBER.
     const enumFields = this.userEnums.get(root);
@@ -1678,7 +1677,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     // local one so a script can shadow a library's method, which is the same
     // precedence every other name follows.
     const owner = this.libraryMethods.get(name);
-    if (owner !== undefined) {
+    if (owner !== undefined && this.libraryTakes(
+      name, this.typeOfPath(receiver, fields), this.argumentCount(ctx.fun_actual_args?.() ?? null))) {
       const fn = `${this.libraryNamespace(owner)}[${JSON.stringify(name)}]`;
       return `ctx.call(${callId}, ${fn}, ${target}${tail})`;
     }
@@ -1705,7 +1705,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       }
     }
     const owner = this.libraryMethods.get(method);
-    if (owner !== undefined) {
+    if (owner !== undefined && this.libraryTakes(method, receiverType, this.argumentCount(ctx.fun_actual_args?.() ?? null))) {
       const fn = `${this.libraryNamespace(owner)}[${JSON.stringify(method)}]`;
       return `ctx.call("${method}${at}", ${fn}, ${receiver}${tail})`;
     }
@@ -1794,12 +1794,14 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     finally { this.emittingOverload = previous; this.enclosingDefinition = enclosing; this.localTypes.pop(); }
   }
 
-  override visitFun_def_singleline(ctx: Fun_def_singlelineContext): string {
+  override visitFun_def_singleline(node: ParserRuleContext): string {
+    const ctx = node as Fun_def_singlelineContext;
     return this.withOverload(ctx, () => super.visitFun_def_singleline(ctx as any))
       + this.afterDefinition(ctx.id().getText());
   }
 
-  override visitFun_def_multiline(ctx: Fun_def_multilineContext): string {
+  override visitFun_def_multiline(node: ParserRuleContext): string {
+    const ctx = node as Fun_def_multilineContext;
     return this.withOverload(ctx, () => super.visitFun_def_multiline(ctx as any))
       + this.afterDefinition(ctx.id().getText());
   }
@@ -1886,10 +1888,11 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     });
   }
 
-  protected override callFunctionName(pineName: string, ctx: Fun_callContext): string {
+  protected override callFunctionName(pineName: string, node: ParserRuleContext): string {
+    const ctx = node as Fun_callContext;
     this.checkEnumArguments(pineName, ctx);
 
-    if (this.overloadTotal(pineName) < 2) return super.callFunctionName(pineName, ctx);
+    if (this.overloadTotal(pineName) < 2) return super.callFunctionName(pineName, node);
     const overloads = this.functionOverloads.get(pineName) ?? [];
 
     const args = ctx.fun_actual_args();
@@ -1969,7 +1972,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    *
    * v3 and v4 are untouched: nothing in either archive lifts the rule there.
    */
-  protected override securityRestrictsMutableArgs(ctx: Fun_callContext): boolean {
+  protected override securityRestrictsMutableArgs(node: ParserRuleContext): boolean {
+    const ctx = node as Fun_callContext;
     return ctx.id().getText() === "request.security_lower_tf";
   }
 
@@ -2099,7 +2103,8 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
   // ── Declarations: type, method, export, import ────────────────────────────
 
   /** v5's `stmt` gained four alternatives; the base knows two. */
-  override visitStmt(ctx: StmtContext): string {
+  override visitStmt(node: ParserRuleContext): string {
+    const ctx = node as StmtContext;
     if (ctx.import_stmt()) return this.visit(ctx.import_stmt()!);
     if (ctx.export_stmt()) return this.visit(ctx.export_stmt()!);
     if (ctx.type_def_stmt()) return this.visit(ctx.type_def_stmt()!);
@@ -2374,6 +2379,17 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
         }
       }
     }
+    // A declaration whose receiver fits but whose parameter list does not is
+    // not this call: `this.push(p)` inside `method push(array<P> this, P p,
+    // int max)` is `array.push`, not the method itself.
+    if (receiverType !== null && argCount !== null && sigs.length > 0) {
+      const want = normaliseType(receiverType);
+      const taking = sigs.filter(o => receiverTakes(normaliseType(o.receiver), want));
+      if (taking.length > 0
+          && !taking.some(o => argCount + 1 >= o.sig.min && argCount + 1 <= o.sig.max)) {
+        return LIBRARY_METHOD;
+      }
+    }
     if (sigs.length < 2) return null;
 
     // The receiver counts as an argument: a method's signature includes it.
@@ -2496,7 +2512,12 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     const owner = this.libraryMethods.get(name);
     const fallback = owner !== undefined
       ? `${this.libraryNamespace(owner)}[${JSON.stringify(name)}].apply(null, args)`
-      : `ctx.builtinMethod(${JSON.stringify(`${name}@dispatch`)}, args[0], ${JSON.stringify(name)}, ...args.slice(1))`;
+      // The id is a call-site SUFFIX: builtinMethod appends it to `array.get`,
+      // and everything before the first `@` is the registry key. `get@dispatch`
+      // made that key `array.getget`, which no entry answers, so the built-in
+      // was called without its Context and `array.get` read the index as the
+      // array ("expected an array, got number").
+      : `ctx.builtinMethod("@dispatch", args[0], ${JSON.stringify(name)}, ...args.slice(1))`;
     // No `__params` of its own: keyword arguments reach it as a bundle, and it
     // binds them by the CHOSEN overload's names (Context.callPicked). Giving it
     // one overload's names dropped every keyword the others spell differently.
@@ -2544,7 +2565,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       // Declared but never evaluated: a block's last statement is still
       // `return <name>` when the block is emitted.
       const name = this.visit(ctx.id());
-      return this.hoisted.has(ctx.id().getText()) ? `${name} = undefined` : `let ${name} = undefined`;
+      return this.fnDepth === 0 && this.hoisted.has(ctx.id().getText()) ? `${name} = undefined` : `let ${name} = undefined`;
     }
     return super.visitVar_def(ctx);
   }
@@ -2689,11 +2710,13 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
    * describes (evaluated per call, only when the argument is absent).
    */
   /** v5 parameters are a rule of their own, and may carry a default. */
-  protected override paramNames(ctx: Fun_headContext): string[] {
+  protected override paramNames(node: ParserRuleContext): string[] {
+    const ctx = node as Fun_headContext;
     return ctx.fun_param().map((p) => p.id().getText());
   }
 
-  override visitFun_head(ctx: Fun_headContext): string {
+  override visitFun_head(node: ParserRuleContext): string {
+    const ctx = node as Fun_headContext;
     const params = ctx.fun_param();
     if (params.length === 0) return "()";
 
@@ -2753,12 +2776,15 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       );
     }
 
-    const { js, exports, types, methods, members, enums } =
+    const { js, exports, types, methods, methodSigs, members, enums } =
       this.compileLibrary(path, alias, source, ctx);
     this.importAliases.set(alias, path);
     this.libraryExports.set(path, exports);
     for (const [name, fields] of types) this.libraryTypeFields.set(`${path}::${name}`, fields);
-    for (const name of methods) this.libraryMethods.set(name, alias);
+    for (const name of methods) {
+      this.libraryMethods.set(name, alias);
+      this.libraryMethodSigs.set(name, [...(this.libraryMethodSigs.get(name) ?? []), ...(methodSigs.get(name) ?? [])]);
+    }
     for (const [name, fields] of enums) this.libraryEnums.set(`${alias}.${name}`, fields);
 
     return [
@@ -2841,6 +2867,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     exports: Set<string>;
     types: Map<string, string[]>;
     methods: Set<string>;
+    methodSigs: Map<string, Array<{ receiver: string; sig: FnOverload }>>;
     members: string[];
     enums: Map<string, string[]>;
   } {
@@ -2869,6 +2896,7 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
       nameScope: `${this.nameScope}${LIBRARY_MARK}${alias}$`,
       libraryChain: [...this.libraryChain, path],
     });
+    inner.outerNames = new Set([...this.outerNames, ...this.scopes.bound, ...this.scopes.declared.keys()]);
     const js = inner.visit(parsed.tree);
 
     if (!inner.declaresLibrary) {
@@ -2906,7 +2934,10 @@ export class V5ToJsVisitor extends V4ToJsVisitor {
     const members = [...inner.exportedNames].map(name =>
       `${JSON.stringify(name)}: ${inner.exportedMemberJs(name, types, enums)}`);
 
-    return { js, exports: inner.exportedNames, types, methods, members, enums };
+    const methodSigs = new Map<string, Array<{ receiver: string; sig: FnOverload }>>();
+    for (const name of methods) methodSigs.set(name, inner.methodSignatures.get(name) ?? []);
+
+    return { js, exports: inner.exportedNames, types, methods, methodSigs, members, enums };
   }
 
   /**

@@ -5,6 +5,9 @@ OpenPineScript compiles TradingView Pine Script (v1 to v6) to JavaScript and run
 a CSV of candles. No network, no TradingView account. Every command and output below was run against
 the real engine on `AAPL.csv`, the sample file (506 daily AAPL bars, 2015-02-17 to 2017-02-16).
 
+OpenPineScript is an open-source TradingView alternative for running Pine Script locally. It is not affiliated with TradingView.
+Questions or a script that won't run? Community help is on the [Zeal Terminal Discord](https://discord.gg/rmyXDFJK2k).
+
 Follow the steps in order. Do not invent flags: the full list is in section 3, and unknown flags are
 silently ignored (they do not error), so a misspelt flag fails quietly.
 
@@ -85,7 +88,7 @@ Behaviour of the output flags:
 
 - If NO `--out-*` and NO `--compare-*` flag is given: strict JSON goes to stdout, the human summary to stderr.
 - If ANY `--out-*` flag is given: stdout carries one confirmation line per file; the JSON is NOT printed.
-- `--out-trades` / `--out-summary` on an indicator prints `⚠ Warning: --out-trades requested but no trades were recorded. Is this an indicator rather than a strategy?` and exits 0. (For `--out-trades` no file is written. `--out-summary` still writes a file, but its numbers are meaningless for an indicator: `net_profit` reads 900000 because of the hard-coded capital described in section 6.)
+- `--out-trades` / `--out-summary` on an indicator prints `⚠ Warning: --out-trades requested but no trades were recorded. Is this an indicator rather than a strategy?` and exits 0. (For `--out-trades` no file is written. `--out-summary` still writes a file, with zero trades and zero profit.)
 - A flag with a missing value (`--out-chart` as the last argument) is silently ignored.
 - Unknown flags are silently ignored.
 
@@ -98,9 +101,12 @@ Behaviour of the output flags:
 - A header row is skipped only if the first line contains the text `time` (any case). Any other
   header (`Date,Open,...`) is not recognised as one, but it is dropped anyway because its close is not
   a number: rows whose close cannot be parsed are discarded.
-- `time` is parsed with JavaScript `new Date(value)`: use ISO 8601 (`2024-03-01T00:00:00Z`) or
-  `YYYY-MM-DD`. Unix epoch numbers (`1709251200`) are NOT supported: the run crashes with
-  `Critical error: RangeError: Invalid time value`.
+- `time` may be ISO 8601 (`2024-03-01T00:00:00Z`; a date-time with no zone, such as `2024-03-01 09:30`, is
+  read as UTC), a date (`2024-03-01`, or compact `20240301`; read as UTC midnight), or a
+  Unix epoch number. The epoch's unit is read off its size: seconds (`1709251200`), milliseconds
+  (`1709251200000`, what most exchange APIs return), micro- or nanoseconds.
+- A `time` that is none of these exits 1 before the run, naming the line:
+  `Error: data.csv, line 3: cannot read the time "03/02/2024". Use ISO 8601 (2024-03-01T00:00:00Z), a date (2024-03-01), or Unix epoch seconds or milliseconds.`
 - `volume` may be blank or 0. Columns after the 6th are ignored (the sample AAPL file has extra columns).
 - A file with no valid rows exits 1: `Error: CSV has no valid data rows.`
 - There is no timeframe flag: the engine treats the bars as they come. The sample data is daily.
@@ -188,12 +194,10 @@ if ta.crossunder(fast, slow)
     strategy.close("Long")
 ```
 
-IMPORTANT: always declare `initial_capital=100000` in `strategy(...)`. The CLI computes
-`net_profit` as `cash - 100000` with 100000 hard-coded, while the engine's default starting capital is
-1,000,000 (TradingView's default). Without the declaration this script reports
-`net_profit: 899995.84` (+900%) for trades that really lost money. The trade list and
-`gross_profit`, `gross_loss`, `win_rate`, `profit_factor` are not affected; `net_profit` and
-`net_profit_percent` are.
+Money is measured against the strategy's own starting capital: its `initial_capital`, or, without one,
+TradingView's default for the script's version (1,000,000 at v5; 100,000 at v2, v3, v4 and v6). The summary
+prints it as `Initial Capital` and writes it as `initial_capital`, and every percentage is of it except
+the drawdown's (below).
 
 ### 6.1 All three files in one run
 
@@ -215,11 +219,12 @@ Bars processed : 506
 Plots recorded : 2
 
 Performance:
+  Initial Capital    $100000.00
   Net Profit         $-416.00 (-0.42%)
   Total Trades       10
   Win Rate           40.0%  (4W / 6L)
   Profit Factor      0.826
-  Max Drawdown       1.44%
+  Max Drawdown       $1524.00 (1.52%)
   Avg Win / Avg Loss $493.00 / $398.00
 
 Script Inputs:
@@ -239,19 +244,21 @@ Header `Trade #,Type,Signal,Date/Time,Price,Contracts,Profit,Profit %,Cum. Profi
 ```
 Trade #,Type,Signal,Date/Time,Price,Contracts,Profit,Profit %,Cum. Profit
 1,Entry Long,Long,2015-04-13T00:00:00.000Z,128.3700,100,0.00,0.00,0.00
-1,Exit Long,Close Long,2015-05-11T00:00:00.000Z,127.3900,100,-98.00,-0.10,-98.00
+1,Exit Long,Close Long,2015-05-11T00:00:00.000Z,127.3900,100,-98.00,-0.76,-98.00
 2,Entry Long,Long,2015-05-22T00:00:00.000Z,131.6000,100,0.00,0.00,-98.00
-2,Exit Long,Close Long,2015-06-11T00:00:00.000Z,129.1800,100,-242.00,-0.24,-340.00
+2,Exit Long,Close Long,2015-06-11T00:00:00.000Z,129.1800,100,-242.00,-1.84,-340.00
 ```
 
 Orders fill on the NEXT bar's open (the entry above is the open of 2015-04-13, the bar after the
-crossover). `Profit %` is `profit / 100000 * 100`. Only trades that are CLOSED appear: a position still
+crossover). `Profit %` is the trade's return on what it cost to enter, `profit / (entry price * contracts) * 100`, as
+TradingView's trade list shows it. Only trades that are CLOSED appear: a position still
 open on the last bar is not in the file. The file is written only when the run had at least one trade or an open position.
 
 ### 6.3 `results/summary.json`
 
 ```json
 {
+  "initial_capital": 100000,
   "net_profit": -416,
   "net_profit_percent": -0.42,
   "gross_profit": 1972,
@@ -263,12 +270,18 @@ open on the last bar is not in the file. The file is written only when the run h
   "avg_win": 493,
   "avg_loss": 398,
   "profit_factor": 0.826,
-  "max_drawdown_percent": 1.44
+  "max_drawdown": 1524,
+  "max_drawdown_percent": 1.52
 }
 ```
 
 All keys are numbers; `profit_factor` is `null` when there are winners and no losers. Values are
-rounded to 2 decimals (3 for `profit_factor`).
+rounded to 2 decimals (3 for `profit_factor`). `net_profit_percent` is of `initial_capital`.
+`max_drawdown` is TradingView's: on every bar, the fall from the highest realized equity so far (initial
+capital plus closed-trade profit) to that bar's realized equity plus the open position's profit at the
+bar's worst price (its low when long, its high when short). `max_drawdown_percent` is the largest such fall
+as a percentage of the peak it fell from, so it can come from a different, smaller drawdown than
+`max_drawdown`.
 
 ### 6.4 `results/chart.csv`
 
@@ -308,6 +321,7 @@ openpinescript examples/sma_cross.pine --data AAPL.csv 2>/dev/null
     }
   ],
   "performance": {
+    "initial_capital": 100000,
     "net_profit": -416,
     "net_profit_percent": -0.42,
     "gross_profit": 1972,
@@ -319,7 +333,8 @@ openpinescript examples/sma_cross.pine --data AAPL.csv 2>/dev/null
     "avg_win": 493,
     "avg_loss": 398,
     "profit_factor": 0.826,
-    "max_drawdown_percent": 1.44
+    "max_drawdown": 1524,
+    "max_drawdown_percent": 1.52
   }
 }
 ```
@@ -483,6 +498,6 @@ cat results/summary.json                                                        
 head results/trades.csv                                                                    # the trades
 ```
 
-Checklist before you report a result: the script starts with `//@version=5` or `6`; a strategy declares
-`initial_capital=100000`; the CSV's first column is ISO dates; you read the exit code; you did not trust
-a flag you did not find in section 3.
+Checklist before you report a result: the script starts with `//@version=5` or `6`; you know the
+strategy's starting capital (`initial_capital` in the summary); the CSV's first column is a time (ISO dates
+or epoch numbers); you read the exit code; you did not trust a flag you did not find in section 3.

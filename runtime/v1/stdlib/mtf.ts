@@ -21,6 +21,8 @@ interface HtfState {
     sub: Context;   // isolated bar loop for the HTF expression
     done: number;   // index of the last HTF bar already evaluated
     last: number;   // last computed HTF value (aligned to the chart)
+    begun?: boolean;   // an HTF bar has been evaluated: the start is final
+    newAt?: number;    // chart bar_index on which a requested bar was last evaluated (gaps_on)
 }
 
 function unwrap(x: any): any {
@@ -59,20 +61,34 @@ export function security(
     const symbolInput = symbol;
     const resolutionInput = resolution;
     const lookaheadInput = lookahead;
-    void gaps; void ignore_invalid_symbol; void currency;
+    void ignore_invalid_symbol; void currency;
+    const gapsOn = unwrap(gaps) === "barmerge.gaps_on" || unwrap(gaps) === true;
     if (typeof expression !== "function") return NaN; // malformed call
 
     // Explicit argument wins; otherwise the version's default. v1/v2 default to
     // lookahead_on, v3+ to lookahead_off (docs/common/VERSIONS.md D3.1).
     const mode = resolveLookahead(lookaheadInput, ctx);
 
-    const symbolName = String(unwrap(symbolInput));
+    // An empty symbol (an `input.symbol("")` left blank) is the chart's own: TradingView probe triage r6
+    // s1ind/01 (BINANCE:BTCUSDT 1h): request.security("", "D", close) equals the chart symbol's request on
+    // all 300 bars, where the engine asked a host for a symbol named "" and stayed na.
+    const rawSymbol = unwrap(symbolInput);
+    const symbolName = rawSymbol === "" || rawSymbol == null || (typeof rawSymbol === "number" && Number.isNaN(rawSymbol))
+        ? String(ctx.symbol) : String(rawSymbol);
     // "timeframe (series string) ... An empty string is interpreted as the
     // current chart's timeframe." It is NOT a request for external data: with
     // the empty string as the key the request waited for a series no host
     // could name, and the script's values stayed `na` on every bar.
     const requested = String(unwrap(resolutionInput));
     const resolutionName = requested === "" ? String(ctx.resolution) : requested;
+
+    // The script running in a requested context (Context.runInContext) meets this
+    // call there: the call that run is for hands its value back; any other is
+    // requested from that context below.
+    const path = ctx.currentCallKey();
+    const key = `${path}|${symbolName}@${resolutionName}`;
+    const own = ctx.contextRunSite(key, expression);
+    if (own) return own.value;
 
     const data = ctx.getSecurityData(symbolName, resolutionName, mode === "on");
     if (!data || data.length === 0) {
@@ -85,15 +101,17 @@ export function security(
     // and each is its own series: TradingView's log has a loop over "5", "15"
     // and "60" return three different closes, where one shared state returned
     // the first context's value for all three.
-    const key = `${ctx.currentCallKey()}|${symbolName}@${resolutionName}`;
     const st = ctx.getHtfState<HtfState>(key, () => ({
         // The sub-context inherits the profile — the HTF expression is the
         // same script, under the same language version — and reports the
         // requested timeframe and symbol.
         sub: ctx.securitySubContext(symbolName, resolutionName),
-        done: ctx.securityFirstBar(symbolName, resolutionName, calc_bars_count, "request.security") - 1,
+        done: -1,
         last: NaN,
     }));
+    // Where the history starts depends on the other requests for this data set, which may not
+    // have run yet on the first bar (see securityFirstBar), so it stays open until a bar is evaluated.
+    if (!st.begun) st.done = ctx.securityFirstBar(symbolName, resolutionName, calc_bars_count, "request.security", data) - 1;
 
     const t = ctx.time;
 
@@ -135,6 +153,8 @@ export function security(
 
     const lowerTf = !sameContext && specSeconds(resolutionName) < specSeconds(String(ctx.resolution));
 
+    // Read only by an expression marked `inContext` (Context.evalSecurityBar).
+    const site = { key, path };
     while (st.done + 1 < data.length) {
         const j = st.done + 1;
         const visible = mode === "on" || sameContext
@@ -147,16 +167,33 @@ export function security(
                 // opened inside the chart bar, with its full values.
                 ? (lowerTf && ctx.profile.version < 5 ? data[j].time < chartClose : ends(j) <= chartClose)
                 : j + 1 < data.length && data[j + 1].time <= t;
-        if (!visible) break;
+        // On a REALTIME chart bar the forming requested bar is visible too, with the
+        // values it has so far (TradingView capture, Market Matrix: on the live bar
+        // request.security("D", close) with lookahead_off reads the live tick's close
+        // and the daily context's barstate.islast is true). It stays provisional below.
+        const formingLive = !visible && ctx.is_realtime && !lowerTf && data[j].time <= t;
+        if (!visible && !formingLive) break;
         // On a LIVE chart bar, a requested bar that ends with it (or is still
         // forming under lookahead_on) may still change before the chart bar
         // does: the host keeps updating it. Evaluate it provisionally, rolled back
         // each tick like the main script, and commit it only once the chart bar
         // it ends on is over. Historical bars are never provisional.
         const provisional = ctx.is_realtime && ends(j) > t;
-        st.last = ctx.evalSecurityBar(st.sub, data[j], expression, provisional);
+        st.begun = true;
+        st.last = ctx.evalSecurityBar(st.sub, data[j], expression, provisional, site);
+        st.newAt = ctx.currentBarIndex;
         if (provisional) break;
         st.done = j;
     }
+    // barmerge.gaps_on: "requested data is merged with possible gaps (na values)" -- the value is
+    // returned only on the chart bar where a new requested bar was evaluated, na on the others.
+    // Keyed by bar, so a recalculation of the same bar (calc_on_order_fills) returns it again.
+    if (gapsOn && st.newAt !== ctx.currentBarIndex) return gapValue(st.last);
     return st.last;
+}
+
+/** The na a gaps_on request returns between requested bars, shaped like its value (tuples element-wise). */
+function gapValue(v: any): any {
+    if (Array.isArray(v)) return v.map(gapValue);
+    return typeof v === "number" ? NaN : typeof v === "boolean" ? false : null;
 }

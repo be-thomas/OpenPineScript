@@ -4,7 +4,7 @@ import { Series, SeriesSnapshot } from "./Series";
 import { REGISTRY, viewFor } from "./stdlib";
 import { legacyFromGradient } from "./stdlib/color";
 import { MATRIX_TAG } from "./stdlib/matrix";
-import { DerivedSeries, canonicalTimeframe, periodIndex, specSeconds } from "./timeframes";
+import { DerivedSeries, canonicalTimeframe, periodEnd, periodIndex, specSeconds } from "./timeframes";
 import { processPendingOrders, MarketOrder } from "./stdlib/strategy";
 import { brokerFor } from "./broker";
 import { V6_ONLY_PARAMS, V6_POSITIONAL } from "./stdlib/renames6";
@@ -81,6 +81,18 @@ export interface EquityPoint {
     equity: number;
     /** Unrealized P&L of the position held at this bar's close; 0 while flat. */
     openPL: number;
+    /**
+     * Unrealized P&L of that position at the bar's adverse extreme (its low
+     * when long, its high when short); 0 while flat. The trough TradingView's
+     * max drawdown measures. See Context.maxEquityDrawdown.
+     */
+    worstOpenPL?: number;
+    /**
+     * When the position changed during the bar: [realized cash, worst equity] for each stretch of the bar's
+     * price path between fills, in path order. Visited instead of `worstOpenPL`, so a dip before an
+     * intrabar fill is measured with the position held then, and the prices before an entry filled are not.
+     */
+    phases?: [number, number][];
 }
 
 /** One entry still open inside a position. See Position.entries. */
@@ -96,6 +108,8 @@ export interface OpenEntry {
     commission: number;
     /** Identifies the trade for as long as it lives: the bar and the fill's order count. */
     uid?: string;
+    /** When it filled, in the broker's order sequence (Broker.nextSeq): its exits' units are created then. */
+    seq?: number;
 }
 
 export interface Position {
@@ -284,6 +298,8 @@ export interface ScriptMeta {
     shorttitle: string;
     overlay: boolean;
     precision?: number;          // study only
+    /** `indicator(calc_bars_count = N)`: the script runs on the last N bars only. */
+    calc_bars_count?: number;
     pyramiding?: number;         // strategy only
     calc_on_every_tick?: boolean; // strategy only
     calc_on_order_fills?: boolean; // strategy only
@@ -300,6 +316,8 @@ export interface ScriptMeta {
      */
     initial_capital?: number;
     default_qty_type?: string;
+    /** `strategy(close_entries_rule)`: "FIFO" (the default) or "ANY". */
+    close_entries_rule?: string;
     default_qty_value?: number;
     commission_type?: string;
     commission_value?: number;
@@ -376,6 +394,34 @@ interface RuntimeSnapshot {
  * A function that carries no value is dropped rather than stringified: the
  * render model has no reading for one, and a source dump is worse than a gap.
  */
+/**
+ * The Pine position a call id ends in: `@L<line>:C<col>`, then any number of
+ * `~L<line>:C<col>` segments, then optionally `@<library>`. Scanned rather than
+ * matched by one regex: `(?:~L\d+:C\d+)*` overflowed the regex engine's stack
+ * on the long chain a script importing several libraries produces.
+ */
+export function parseCallPosition(id: string): RegExpExecArray | null {
+    const start = /@L(\d+):C(\d+)/g;
+    const segment = /~L\d+:C\d+/y;
+    let m: RegExpExecArray | null;
+    while ((m = start.exec(id))) {
+        let end = m.index + m[0].length;
+        for (;;) {
+            segment.lastIndex = end;
+            const seg = segment.exec(id);
+            if (!seg) break;
+            end += seg[0].length;
+        }
+        if (end === id.length) { (m as any)[3] = undefined; return m; }
+        if (id[end] === "@" && end + 1 < id.length && !/[\n\r\u2028\u2029]/.test(id.slice(end + 1))) {
+            m[3] = id.slice(end + 1);
+            return m;
+        }
+        start.lastIndex = m.index + 1;
+    }
+    return null;
+}
+
 function plainValue(v: any): any {
     if (v instanceof Series) return v.valueOf();
     if (Array.isArray(v)) return v.map(plainValue);
@@ -614,6 +660,9 @@ export class Context {
     /** The series the running user call was handed as arguments: a parameter's history stays bar-indexed. */
     private argSeries: any[] = [];
     private frameArgs: any[][] = [];
+    /** The running user function's parameter names (its `__params`), to tell `p[n]` on a parameter from `close[n]`. */
+    private paramNames: string[] | null = null;
+    private frameParamNames: (string[] | null)[] = [];
 
     /** A series key in the frame that is running — the plain name at script scope. */
     private scoped(name: string): string {
@@ -1011,6 +1060,9 @@ export class Context {
         // Pine's default is 50 drawings of each kind, raised by
         // `max_polylines_count` and friends on the declaration statement.
         polyline: 50,
+        // Linefills follow `max_lines_count` (declaration, below), default 50: TradingView probes
+        // t09 (max_lines_count = 100: 101 linefills kept) and t10 (no argument: 50), and the
+        // popular-author batch 2026-11-21 (500 declared, 1225 created, the count saws 500..505).
         linefill: 50,
     };
 
@@ -1106,6 +1158,18 @@ export class Context {
         if (order) {
             const at = order.indexOf(key);
             if (at >= 0) order.splice(at, 1);
+        }
+
+        // A linefill is the space between two lines: delete one and every fill
+        // attached to it goes too (TradingView capture, popular-author batch
+        // 2026-11-21).
+        if (drawing.kind === "line") {
+            for (const [fillId, fill] of [...this.drawings]) {
+                if (fill.kind === "linefill"
+                    && (String(fill.props.line1) === key || String(fill.props.line2) === key)) {
+                    this.deleteDrawing(fillId);
+                }
+            }
         }
     }
 
@@ -1480,6 +1544,14 @@ export class Context {
     /** True only during a realtime bar's closing execution (`Session.commit`); see `barstate.isconfirmed`. */
     public is_confirmed: boolean = false;
     public is_last: boolean = false;
+    /**
+     * The live bar's first execution, made with the history when the chart loads (`Session.tick` with
+     * `loadPass`). TradingView computes the forming bar there as part of history: `barstate.isrealtime`
+     * and `isconfirmed` false, `isnew` true, `request.security` (higher timeframe, lookahead off) sees
+     * only the requested bars that have closed, and `barstate.islast` inside that context is false.
+     * Every later tick is the usual realtime one (probe triage/r5 p1_load_pass_htf).
+     */
+    public load_pass: boolean = false;
 
     // 5. Strategy State (Public)
     public position: Position = { size: 0, avgPrice: 0 };
@@ -1599,6 +1671,11 @@ export class Context {
     // (symbol, resolution) pairs requested but not yet supplied — the session layer
     // fulfils these via the data-request pull protocol.
     public requestedSecurities: Set<string> = new Set();
+    /**
+     * Requests answered by folding the chart's own bars into a higher timeframe (`symbol@timeframe`, as
+     * requestedSecurities): they have no history before the chart's first bar, where TradingView's do.
+     */
+    public derivedSecurities: Set<string> = new Set();
 
     /**
      * The language profile this script runs under. Drives version-dependent
@@ -1681,6 +1758,7 @@ export class Context {
         this.marketOrders = [];
         this.filledOrderCount = 0;
         this.equityCurve = [];
+        this.resetDrawdownWalk();
         this.positionRunup = 0;
         this.positionDrawdown = 0;
         this.maxContractsHeld = 0;
@@ -1707,6 +1785,7 @@ export class Context {
         // 8. Reset MTF eval state (keep provided securityData — it's supplied input)
         this.htfStates.clear();
         this.requestedSecurities.clear();
+        this.derivedSecurities.clear();
         this.chartBars = [];
         this.chartAhead = null;
         this.derivedSeries.clear();
@@ -1762,6 +1841,9 @@ export class Context {
             const n = Number(arg(name));
             if (arg(name) !== undefined && Number.isFinite(n) && n > 0) {
                 this.drawingLimits[kind] = Math.floor(n);
+                // Linefills follow max_lines_count (TradingView: 500 kept with max_lines_count = 500,
+                // probes P1/P1b; 104 kept, saw 100..105, with max_lines_count = 100, Breakout Confluence Score).
+                if (kind === 'line') this.drawingLimits.linefill = Math.floor(n);
             }
         }
 
@@ -1777,6 +1859,9 @@ export class Context {
             this.scriptMeta = {
                 kind, title, shorttitle, overlay,
                 precision: arg('precision') !== undefined ? Number(arg('precision')) : undefined,
+                // indicator() here, strategy() below (capture n51); v4's study() was not probed.
+                ...(kind === 'indicator' && Number.isFinite(Number(arg('calc_bars_count'))) && Number(arg('calc_bars_count')) > 0
+                    ? { calc_bars_count: Math.floor(Number(arg('calc_bars_count'))) } : {}),
             };
         } else {
             const num = (name: string, fallback?: number): number | undefined => {
@@ -1791,6 +1876,8 @@ export class Context {
             this.scriptMeta = {
                 kind, title, shorttitle, overlay,
                 pyramiding: arg('pyramiding') !== undefined ? Number(arg('pyramiding')) : 0,
+                ...(Number.isFinite(Number(arg('calc_bars_count'))) && Number(arg('calc_bars_count')) > 0
+                    ? { calc_bars_count: Math.floor(Number(arg('calc_bars_count'))) } : {}),
                 calc_on_every_tick: Boolean(arg('calc_on_every_tick')),
                 calc_on_order_fills: Boolean(arg('calc_on_order_fills')),
                 currency: arg('currency') !== undefined ? String(arg('currency')) : undefined,
@@ -1798,14 +1885,23 @@ export class Context {
                 // costs, 100% margin, orders filled on the next bar's open.
                 // The constants' own values, as `strategy.fixed` and friends
                 // evaluate to — so a host comparing against them matches.
-                default_qty_type: str('default_qty_type') ?? 'strategy.fixed',
-                default_qty_value: num('default_qty_value', 1),
+                // v6 without default_qty_type: percent_of_equity, 100 unless default_qty_value says
+                // otherwise. TradingView's report shows "100 % of equity" for all six v6 strategy captures
+                // declaring no size (n13, n76, n127, n128, n138, n139) and every v1-v5 one "1 Quantity";
+                // probes r6 p3: no argument trades 100% of equity, default_qty_value = 10 alone 10% of
+                // equity. An explicit type without a value keeps 1 (unprobed).
+                ...(this.profile.version >= 6 && arg('default_qty_type') === undefined
+                    ? { default_qty_type: 'strategy.percent_of_equity', default_qty_value: num('default_qty_value', 100) }
+                    : { default_qty_type: str('default_qty_type') ?? 'strategy.fixed', default_qty_value: num('default_qty_value', 1) }),
                 commission_type: str('commission_type') ?? 'commission.percent',
                 commission_value: num('commission_value', 0),
                 slippage: num('slippage', 0),
-                margin_long: num('margin_long', 100),
-                margin_short: num('margin_short', 100),
+                // v6 defaults both to 100; before v6 the default is 0, no margin at all (the
+                // migration guide), so only a script that declares it is margin-called.
+                margin_long: num('margin_long', this.profile.version >= 6 ? 100 : 0),
+                margin_short: num('margin_short', this.profile.version >= 6 ? 100 : 0),
                 process_orders_on_close: Boolean(arg('process_orders_on_close')),
+                close_entries_rule: str('close_entries_rule'),
                 ...(this.profile.version >= 6 && declared('calc_on_every_history_tick') !== undefined
                     ? { calc_on_every_history_tick: Boolean(declared('calc_on_every_history_tick')) }
                     : {}),
@@ -1922,10 +2018,34 @@ export class Context {
         }
 
         // Return user override if it exists, otherwise return the default
+        // The bounds constrain what a USER sets. The script's own default is taken as written even
+        // outside them: TradingView ran `input(0, minval = 1)` as 0 (v2 Chaikin Volatility strategy,
+        // BINANCE:BTCUSDT 1h: its `x > Trigger` signals flip at 0, not at 1), and `input(20, maxval=0)` as 20
+        // (Combo Backtest 123 Reversal & CMOabs, v4: all 240 trades follow LowBand = 20; clamped, 51 trades).
         const raw = currentId in this.userInputs ? this.userInputs[currentId] : plainValue(defval);
-        const result = Context.constrainInput(raw, { ...plainMeta, defval: plainValue(defval) });
+        const result = currentId in this.userInputs
+            ? Context.constrainInput(raw, { ...plainMeta, defval: plainValue(defval) })
+            : Context.constrainInput(raw, { ...plainMeta, minval: undefined, maxval: undefined, defval: plainValue(defval) });
         this.inputMemo[n] = { defval, title, type, meta, userSet, userVal, result };
         return result;
+    }
+
+    /** Whether the host overrode each input a script marked with `markInput`, by the global's name. */
+    private overriddenInputs: Record<string, boolean> = {};
+
+    /**
+     * `name = input(...)`, for a global a security() expression may inline:
+     * remembers whether the input just registered was set by the host. Returns
+     * `value` unchanged.
+     */
+    public markInput(name: string, value: any): any {
+        this.overriddenInputs[name] = INPUT_IDS[this.inputCounter - 1] in this.userInputs;
+        return value;
+    }
+
+    /** Read from a security() sub-context too: the chart's context is the one that ran the input. */
+    public inputOverridden(name: string): boolean {
+        return (this.main ?? this).overriddenInputs[name] === true;
     }
 
     /** `registerInput`'s last answer for each input, by its position in the run. */
@@ -2083,6 +2203,9 @@ export class Context {
             this.frameSeq = ++this.frameSeqCounter;
             this.frameArgs.push(this.argSeries);
             this.argSeries = args.filter((a) => a && typeof a.get === "function" && typeof a.id === "string");
+            this.frameParamNames.push(this.paramNames);
+            this.paramNames = Array.isArray((fn as any).__params) ? (fn as any).__params : null;
+            if (args.length) this.noteCallBar();
         }
 
         // A BUILT-IN reached again on one bar overwrites that bar's slot
@@ -2294,6 +2417,7 @@ export class Context {
                 this.seriesScope = this.seriesScopes.pop()!;
                 this.frameSeq = this.frameSeqs.pop()!;
                 this.argSeries = this.frameArgs.pop()!;
+                this.paramNames = this.frameParamNames.pop() ?? null;
             }
             this.callStack.pop();
         }
@@ -2320,7 +2444,7 @@ export class Context {
     private locateError(e: unknown, id: string): void {
         if (e === null || typeof e !== "object") return;
         const err = e as { pine?: PineLocation };
-        const at = /@L(\d+):C(\d+)(?:@(.+))?$/.exec(id);
+        const at = parseCallPosition(id);
         if (!at) return;
         if (!err.pine) {
             err.pine = { line: Number(at[1]), col: Number(at[2]), ...(at[3] ? { library: at[3] } : {}) };
@@ -2372,6 +2496,12 @@ export class Context {
     private entries: Map<string, any> = new Map();
 
     public builtin(name: string): any {
+        // A colour constant reads the profile's palette, as the sandbox's own
+        // `color.lime` does (createStdlib): this path is taken when the script binds
+        // a name `color`, and read core.ts's fallback (#CDDC39) where TradingView
+        // draws v6's color.lime as #00E676.
+        const palette = this.profile.defaults.palette;
+        if (palette && Object.prototype.hasOwnProperty.call(palette, name)) return palette[name];
         return this.entryFor(name)?.ref;
     }
 
@@ -2725,6 +2855,16 @@ export class Context {
      * `(close + 0)[3]`: bar-indexed, carrying its last value over the bars the
      * expression was not evaluated on. See `Series.updateCarry`.
      */
+    /**
+     * A lazy security parameter read inside the `security()` expression (transpiler:
+     * `collectLazySecurityParams`): `arg` is the caller's argument as a thunk, run here, in the
+     * requested context, and kept as a series of that context. A plain value (a v5 default
+     * parameter, or a caller the transpiler did not rewrite) is taken as is.
+     */
+    public lazySeries(name: string, arg: any): Series {
+        return this.new_anon(name, typeof arg === "function" ? arg() : arg);
+    }
+
     public new_anon(name: string, val: any): Series {
         const key = this.scoped(name);
         let series = this.vars.get(key);
@@ -2757,8 +2897,10 @@ export class Context {
             //     [price, currency] = security(sym, "D", [close, syminfo.currency])
             //
             // where the second element is a string and came out `na`.
+            // So do references: a user-defined type instance, map or matrix returned in a
+            // tuple (`[ok, line] = inspect(...)`) was Number()'d into na.
             if (typeof unwrapped === "string" || typeof unwrapped === "boolean"
-                || Array.isArray(unwrapped)) {
+                || Array.isArray(unwrapped) || (typeof unwrapped === "object" && unwrapped !== null)) {
                 return this.new_var(name, unwrapped);
             }
 
@@ -2845,6 +2987,14 @@ export class Context {
      * Universal History Accessor (Called by transpiled code: [])
      */
     public get(target: any, offset: number, id: string): number {
+        // `x[na]` reads the current bar (TradingView capture, popular-author batch
+        // 2026-11-21, v6): an na offset is 0, whether it arrives as a number or a Series.
+        // v5 shares the rule; v4 and earlier were not probed and keep their old reading.
+        if (this.profile.version < 5) { /* unchanged */ }
+        else if (typeof offset !== "number") {
+            const o = offset !== null && offset !== undefined && typeof (offset as any).valueOf === "function" ? (offset as any).valueOf() : offset;
+            offset = typeof o === "number" && !Number.isNaN(o) ? o : 0;
+        } else if (offset !== offset) offset = 0;
         // Case A: Series Object (Duck Typing check for speed)
         // Case B: Raw Number (Expression) -> Fallback to Local History Lookup
         //
@@ -2852,10 +3002,24 @@ export class Context {
         // needs it again: re-resolving it by name repeated the scoped map
         // search on every na history read, float and int series included.
         const series = target && typeof target.get === 'function' ? target : this.findSeries(id);
+        // A parameter: the argument was an expression (no series of its own), or a
+        // series that is not a built-in's. Its history is the value this call SITE
+        // was handed on its previous calls, not the caller variable's bar history.
+        //
+        // A BUILT-IN series handed as the argument (`f(high)`, then `h[i]`) carries the same way: capture
+        // n152 (v6, a 1-D k-means called every 10th bar reading `h[i]`/`l[i]` up to 179 bars back) gives
+        // TradingView's zone centres exactly only when high/low carry like the user series argument
+        // does; reading them per bar gave other centres. `close[n]` written in the body stays per bar
+        // (fn-history probe), so the built-in counts only when `id` names one of the parameters.
+        const param = this.seriesScope !== "" && (series
+            ? series === target && this.argSeries.includes(series) && (this.isUserArgSeries(series) || this.namesParam(id))
+            : target !== undefined && target !== null && typeof target !== 'object');
         // The call-site path returns here too, but through the bool rule below.
-        const found = series && series === target && this.seriesScope !== "" && this.isOuterUserSeries(series)
-            ? this.callSiteHistory(series, offset)
-            : series ? series.get(offset) : NaN;
+        const found = param
+            ? this.paramHistory(series ?? target, offset, id, series)
+            : series && series === target && this.seriesScope !== "" && this.isOuterUserSeries(series)
+                ? this.callSiteHistory(series, offset)
+                : series ? series.get(offset) : NaN;
 
         // v6, MG §"Boolean values cannot be na": "`[]` on a bool variable on
         // the first bar returns false in v6, not na." A bool series is
@@ -2867,9 +3031,9 @@ export class Context {
         // variable — is covered too. Gated on the profile flag, so v1–v5 keep
         // their `na`. History past the start reads back as null from a Series
         // and NaN from the fallback, so both count as "ran out".
-        if (this.profile.defaults.boolsCanBeNa === false && series
+        if (this.profile.defaults.boolsCanBeNa === false && (series || param)
             && (found === null || found === undefined || (typeof found === "number" && Number.isNaN(found)))
-            && typeof series.get(0) === "boolean") {
+            && typeof (series ? series.get(0) : target) === "boolean") {
             return false as any;
         }
         return found;
@@ -2886,31 +3050,159 @@ export class Context {
             && !this.argSeries.includes(series);
     }
 
+    /** `id` (`<frame>$opsv2_<name>`, as the emitter writes a history read) names a parameter of the running function. */
+    private namesParam(id: string): boolean {
+        const params = this.paramNames;
+        if (!params || typeof id !== "string") return false;
+        const name = id.slice(id.lastIndexOf("$") + 1);
+        return params.some(p => name === "opsv2_" + p);
+    }
+
+    /** An argument series that belongs to the script, not a built-in's bar series. */
+    private isUserArgSeries(series: any): boolean {
+        const id = series.id;
+        return typeof id === "string" && !BASE_SERIES.has(id) && !id.startsWith("opsv2_builtin_hist_");
+    }
+
     /**
-     * `v[n]` on a variable from outside the running function. TradingView keeps
-     * a history of it per CALL SITE, recorded only when that call runs
-     * (Pine Logs, dev-docs/tv-parity/_probes/fn-history): `[n]` is its value at
-     * the n-th previous call of this site, not on the n-th previous bar. Before
-     * that many calls it is na. The probe's first calls (bars 0, 0) log na, and
-     * the next ones read the value the variable had at those first calls.
+     * The bars this call SITE ran on (the frame just opened), as flat [first, last] runs, so a
+     * parameter's history can tell a bar the site skipped from one it ran on (`paramHistory`).
+     * Only sites handed an argument keep it; runs older than 5,000 bars (the most history
+     * Pine can read) are dropped.
      */
-    private callSiteHistory(series: any, offset: number): any {
-        const key = `${this.seriesScope}|hist|${series.id}`;
+    private noteCallBar(): void {
+        const key = `${this.seriesScope}|calls`;
+        let runs = this.states.get(key) as number[] | undefined;
+        if (!runs) this.states.set(key, runs = []);
+        const bar = this.currentBarIndex, n = runs.length;
+        if (n && runs[n - 1] >= bar) return;
+        if (n && runs[n - 1] === bar - 1) runs[n - 1] = bar;
+        else runs.push(bar, bar);
+        if (runs.length > 64 && runs[1] < bar - 5001) {
+            let k = 0;
+            while (k < runs.length && runs[k + 1] < bar - 5001) k += 2;
+            runs.splice(0, k);
+        }
+    }
+
+    /** The last bar at or before `want` this site ran on, or -1 (none recorded). */
+    private lastCallBar(want: number): number {
+        const runs = this.states.get(`${this.seriesScope}|calls`) as number[] | undefined;
+        if (!runs) return -1;
+        for (let k = runs.length - 2; k >= 0; k -= 2) {
+            if (runs[k] <= want) return Math.min(runs[k + 1], want);
+        }
+        return -1;
+    }
+
+    /**
+     * `p[n]` on a function PARAMETER: what this call SITE was handed, as it was AT THE CALL, at its
+     * last call at or before the bar n bars back (carried over the bars the site did not run; na
+     * before its first call). TradingView capture, popular-author batch 2026-11-21: `f(close * 2)`
+     * is not na, and `f(v)` with `v` reassigned after the call reads the argument, not `v`'s
+     * end-of-bar value. Capture n110 (v6): `atr[5]` and `avgVol[2..8]` on parameters of functions
+     * called only on pivot bars read the PREVIOUS call's argument; all 7 levels' prices reproduce to
+     * the last digit. TradingView probes triage/r5 q1 (a call every 4th bar: variable AND expression
+     * arguments both carry) and triage/r2 u3 (every 3rd bar). Where the site ran on that bar, a series
+     * argument is its own bar history (tests/v6/runtime/fn_callsite_history_tv.test.ts).
+     */
+    private paramHistory(arg: any, offset: number, id: string, fallback: any): any {
+        offset = Context.plainOffset(offset);
+        const key = `${this.seriesScope}|phist|${id}`;
         let rec = this.states.get(key);
-        if (!rec) this.states.set(key, rec = { seq: -1, vals: [], max: 0 });
-        // The deepest offset this site has asked for: older entries can never be read.
+        if (!rec) this.states.set(key, rec = { seq: -1, bars: [], vals: [], max: 0 });
         if (offset > rec.max) rec.max = offset;
-        // Once per call: a second `v[k]` in the same call must not push again.
         if (rec.seq !== this.frameSeq) {
             rec.seq = this.frameSeq;
-            rec.vals.push(series.get(0));
-            // Trimmed in batches, not per call. The record is cloned on every realtime tick and
-            // every calc_on_order_fills re-run, so it must not grow with the chart.
-            const keep = rec.max + 1;
-            if (rec.vals.length > 2 * keep + 16) rec.vals.splice(0, rec.vals.length - keep);
+            const value = arg && typeof arg.get === "function" ? arg.get(0) : arg;
+            const last = rec.bars.length - 1;
+            if (last >= 0 && rec.bars[last] === this.currentBarIndex) rec.vals[last] = value;
+            else { rec.bars.push(this.currentBarIndex); rec.vals.push(value); }
+            // Trimmed in batches, as callSiteHistory's record is. One entry more than the deepest
+            // offset: the last call at or before bar - max can be that far back.
+            if (rec.bars.length > 2 * (rec.max + 2) + 16) {
+                const drop = rec.bars.length - (rec.max + 2);
+                rec.bars.splice(0, drop);
+                rec.vals.splice(0, drop);
+            }
         }
-        const at = rec.vals.length - 1 - offset;
-        return at >= 0 ? rec.vals[at] : NaN;
+        const want = this.currentBarIndex - offset;
+        // The record holds only the calls where a `[]` ran (trimmed to the deepest offset read so far).
+        const at = (bar: number): number => {
+            for (let i = rec.bars.length - 1; i >= 0 && rec.bars[i] >= bar; i--) if (rec.bars[i] === bar) return i;
+            return -1;
+        };
+        const hit = at(want);
+        if (hit >= 0) return rec.vals[hit];
+        const cb = this.lastCallBar(want);
+        if (cb === want) return fallback ? fallback.get(offset) : NaN;
+        if (cb < 0) return NaN;
+        const prev = at(cb);
+        if (prev >= 0) return rec.vals[prev];
+        return fallback ? fallback.get(this.currentBarIndex - cb) : NaN;
+    }
+
+    /**
+     * Called on entry to a user function for each outer variable it reads with
+     * `[]`: records the variable once per CALL, so `v[n]` in a branch the call
+     * does not take still counts that call (TradingView probe, popular-author
+     * batch 2026-11-21, v6; v5 shares it). v4 and earlier were not probed: unchanged.
+     */
+    public outerHistory(series: any, maxOffset: number): void {
+        if (this.profile.version >= 5 && series && typeof series.get === "function" && this.seriesScope !== "" && this.isOuterUserSeries(series)) {
+            this.callSiteHistory(series, maxOffset);
+        }
+    }
+
+    /**
+     * `v[n]` on a variable from outside the running function. TradingView keeps
+     * a history of it per CALL SITE, recorded only when that call runs, and
+     * indexed by BAR with the value CARRIED over the bars the site did not run
+     * (the parameter rule, `paramHistory`): `v[n]` is the value `v` had at this
+     * site's last call at or before the bar n bars back, na before its first call.
+     * Pine Logs: dev-docs/tv-parity/_probes/fn-history (offset 1: the first calls
+     * log na, the next ones read the value at those first calls) and
+     * triage/r4 p_n33 (offsets 2..5 on sites called every 7th/11th bar: every
+     * offset reads the previous call's value, 18 of 18 lines; the n-th-previous-
+     * CALL reading gave 15 wrong lines).
+     */
+    private callSiteHistory(series: any, offset: number): any {
+        offset = Context.plainOffset(offset);
+        const key = `${this.seriesScope}|hist|${series.id}`;
+        let rec = this.states.get(key);
+        if (!rec) this.states.set(key, rec = { seq: -1, bars: [], vals: [], max: 0 });
+        // The deepest offset this site has asked for: older entries can never be read.
+        if (offset > rec.max) rec.max = offset;
+        // Once per call: a second `v[k]` in the same call must not record again.
+        if (rec.seq !== this.frameSeq) {
+            rec.seq = this.frameSeq;
+            const value = series.get(0);
+            const last = rec.bars.length - 1;
+            if (last >= 0 && rec.bars[last] === this.currentBarIndex) rec.vals[last] = value;
+            else { rec.bars.push(this.currentBarIndex); rec.vals.push(value); }
+            // Trimmed in batches, not per call. The record is cloned on every realtime tick and
+            // every calc_on_order_fills re-run, so it must not grow with the chart. One entry more
+            // than the deepest offset: the last call at or before bar - max can be that far back.
+            if (rec.bars.length > 2 * (rec.max + 2) + 16) {
+                const drop = rec.bars.length - (rec.max + 2);
+                rec.bars.splice(0, drop);
+                rec.vals.splice(0, drop);
+            }
+        }
+        const want = this.currentBarIndex - offset;
+        for (let i = rec.bars.length - 1; i >= 0; i--) if (rec.bars[i] <= want) return rec.vals[i];
+        return NaN;
+    }
+
+    /**
+     * A history offset as a plain number. `v[n]` with `n` a series (a v4 `input()` or a
+     * variable) arrives as the Series object; stored as a record's `max` it made the state
+     * uncloneable, so every realtime tick threw DataCloneError.
+     */
+    private static plainOffset(offset: any): number {
+        if (typeof offset === "number") return offset;
+        const v = offset && typeof offset.get === "function" ? offset.get(0) : Number(offset);
+        return typeof v === "number" ? v : Number(v);
     }
 
     /** The series registered under `name`, this frame's instance first. */
@@ -2964,6 +3256,10 @@ export class Context {
         this.new_var("opsv2_volume", volume);
         this.new_var("opsv2_bar_index", this.currentBarIndex);
 
+        // The position the bar starts with, for the drawdown of a bar whose fills change it (sampleEquity).
+        if (this.scriptMeta?.kind === "strategy" && this.barStartState.bar !== this.currentBarIndex)
+            this.barStartState = { bar: this.currentBarIndex, size: this.position.size, avg: this.position.avgPrice, cash: this.cash, n: this.trades.length };
+
         // 4. Fill the market orders the previous bar placed.
         //
         // This is the only moment that is both AFTER this bar's open is known
@@ -3001,7 +3297,7 @@ export class Context {
      * the bar's price path (segment index plus the share of it covered) the
      * last fill was, and the price there. Null otherwise.
      */
-    public intrabar: { cursor: number; price: number } | null = null;
+    public intrabar: { cursor: number; price: number; startSize: number } | null = null;
 
     /** The most times one bar is re-run after fills; TradingView's own limit is unknown. */
     private static readonly MAX_FILL_RERUNS = 100;
@@ -3025,7 +3321,7 @@ export class Context {
     ): void {
         this.setBar(time, open, high, low, close, volume, true);
         const broker = brokerFor(this);
-        this.intrabar = { cursor: 0, price: open };
+        this.intrabar = { cursor: 0, price: open, startSize: this.position.size };
         let base: RuntimeSnapshot | null = null;
         try {
             const settle = (): boolean => {
@@ -3084,7 +3380,7 @@ export class Context {
         // values. The scan below is a few typeof checks and no allocation.
         let needsUnwrapping = false;
         for (const k in data) {
-            const v = data[k];
+            const v: unknown = data[k];
             if (v instanceof Series || Array.isArray(v) || typeof v === "function") {
                 needsUnwrapping = true;
                 break;
@@ -3099,7 +3395,21 @@ export class Context {
         return out as T;
     }
 
+    /**
+     * Is the output call being made by an imported library's own top-level code?
+     * Its call id carries the import's location tag after the position
+     * (`plot@L182:C0@ta@TVrv`), and no user frame is open around it. Such plots
+     * are the library's demo and not the importing script's outputs: TradingView's
+     * capture of a script importing TradingView/ta/7 (which imports
+     * TradingView/RelativeValue/2, both with top-level plots) lists only the
+     * script's own plots.
+     */
+    private isLibraryTopLevelOutput(): boolean {
+        return this.callStack.length === 1 && /@L\d+:C\d+@/.test(this.callStack.top ?? "");
+    }
+
     public registerPlot(data: PlotData) {
+        if (this.isLibraryTopLevelOutput()) return;
         data = this.plainPlotData(data);
         // 1. Get the Unique Call ID (Storage Key)
         // This ensures that "plot(close)" and "plot(open)" don't overwrite each other
@@ -3138,6 +3448,7 @@ export class Context {
     }
 
     public registerFill(id1: any, id2: any, options: { color?: string, title?: string, [k: string]: any } = {}) {
+        if (this.isLibraryTopLevelOutput()) return;
         // See `plainPlotData`: a plot id reaches here as a Series whenever the
         // script stored it in a variable, which is the documented way to use
         // `fill()` at all.
@@ -3213,11 +3524,17 @@ export class Context {
         // fills the same order. `immediately` changes nothing there: every
         // market order already fills on the placing bar. Below v6 a close
         // placed with `immediately` fills here too.
+        // The bar's intrabar extreme was reached BEFORE anything fills at its close: only the position held
+        // until then can have been under water at it (TradingView's max drawdown, n4: an entry at the close
+        // of a bar whose high is 5.43 above it does not draw down by that).
+        const before = this.scriptMeta?.kind === "strategy"
+            ? { size: this.position.size, avg: this.position.avgPrice, cash: this.cash, n: this.trades.length, newComm: this.newEntryCommission() }
+            : null;
         if (this.marketOrders.length > 0) brokerFor(this).fillAtClose();
         // After them: TradingView filled a scale-out market order at the close first and
         // then the stop that took the rest (see `Broker.fillBreachedExitsAtClose`).
         brokerFor(this).fillBreachedExitsAtClose();
-        this.sampleEquity();
+        this.sampleEquity(before ?? undefined);
         this.currentBarIndex++;
     }
 
@@ -3254,23 +3571,198 @@ export class Context {
      * script asked for no other currency, or the host supplied no series, so
      * nothing converts and nothing throws.
      *
-     * TradingView converts each closed trade at the exit bar's rate
-     * (_probes/currency-usd-1btc). Open profit converted at the current bar's
-     * rate, and sizing (percent_of_equity, cash qty) left unconverted, are
-     * unverified against TradingView.
+     * TradingView converts each closed trade at the exit bar's rate, its entry
+     * commission at the entry bar's (_probes/currency-usd-1btc, Broker.recordTrade).
+     * A cash order size converts at the entry bar's rate (Broker.defaultQty). Open
+     * profit converted at the current bar's rate, and percent_of_equity sizing left
+     * unconverted, are unverified against TradingView.
      */
     accountRate(): number {
+        return this.accountRateAt(this.time);
+    }
+
+    /** `accountRate` on the bar at `time` (an entry's, for the commission it paid: Broker.recordTrade). */
+    accountRateAt(time: number): number {
         const to = this.scriptMeta?.currency;
         if (!to || to === this.currency) return 1;
         const samples = this.getRequestData("currency_rate", `${this.currency}|${to}`);
         if (!samples) return 1;
         for (let i = samples.length - 1; i >= 0; i--) {
-            if (samples[i].time <= this.time) return Number.isFinite(samples[i].value) ? samples[i].value : 1;
+            if (samples[i].time <= time) return Number.isFinite(samples[i].value) ? samples[i].value : 1;
         }
         return 1;
     }
 
-    private sampleEquity() {
+    /**
+     * Max drawdown as TradingView's Strategy Tester reports it ("Max drawdown"
+     * in the performance summary, `strategy.max_drawdown` and
+     * `strategy.max_drawdown_percent` in Pine): on every bar, the fall from
+     * the highest REALIZED equity so far (initial capital plus closed-trade
+     * P&L) to that bar's realized equity plus the open position's P&L at the
+     * bar's adverse extreme (low when long, high when short). The percentage
+     * is of that realized peak, maximized on its own.
+     *
+     * Matched to the cent on TradingView (BINANCE:BTCUSDT 1h: an EMA cross at
+     * v5 on default capital and on 10,000 / 100% of equity, and a three-trade
+     * script at v4, v5 and v6 where the percent and the amount come from
+     * different drawdowns; tests/common/max_drawdown_tv.test.ts). Neither the
+     * closed-trade curve nor bar-close equity gives TradingView's figures.
+     *
+     * `withCurrentBar` adds the bar in progress, which has no equity sample
+     * yet, for the Pine getters read while a bar runs. The walk over the
+     * sampled curve is cached and extended, so a script reading
+     * `strategy.max_drawdown` on every bar stays linear.
+     */
+    maxEquityDrawdown(withCurrentBar = false): { drawdown: number; percent: number } {
+        const curve = this.equityCurve;
+        if (this.drawdownWalk.len > curve.length) this.resetDrawdownWalk();
+        const c = this.drawdownWalk;
+        const visit = (w: { peak: number; drawdown: number; percent: number }, realized: number, worst: number) => {
+            // worst = +Infinity: a peak-only point (drawdownPhases: fillCash)
+            if (worst === Infinity && Number.isFinite(realized)) { if (realized > w.peak) w.peak = realized; return; }
+            if (!Number.isFinite(realized) || !Number.isFinite(worst)) return;
+            if (realized > w.peak) w.peak = realized;
+            const dd = w.peak - worst;
+            if (dd > w.drawdown) w.drawdown = dd;
+            if (w.peak > 0 && (dd / w.peak) * 100 > w.percent) w.percent = (dd / w.peak) * 100;
+        };
+        for (; c.len < curve.length; c.len++) {
+            const p = curve[c.len];
+            // A bar whose fills changed the position: each stretch of its path with the position held then,
+            // the entry commission paid at a fill seen as a flat moment before it (drawdownPhases).
+            if (p.phases) { for (const [realized, worst] of p.phases) visit(c, realized, worst); continue; }
+            // A bar the position was held through: its cash, the commissions already paid. Adding the open
+            // entries' commission back (an earlier reading) raised the peak after a partial take-profit:
+            // n3 (v6, pooc, qty_percent closes) 168.34 where TradingView reports 168.05; without it 168.05.
+            const realized = p.equity - p.openPL;
+            visit(c, realized, realized + (p.worstOpenPL ?? p.openPL));
+        }
+        if (!withCurrentBar) return { drawdown: c.drawdown, percent: c.percent };
+        const w = { peak: c.peak, drawdown: c.drawdown, percent: c.percent };
+        // The bar in progress has no phases yet: an entry filled on it is seen flat before its commission
+        // (as drawdownPhases does), and its adverse price is the path after the fill. A FORMING bar (live
+        // ticks, the load pass) has no emulated path: its real ticks came in an order the candle does not
+        // tell, and TradingView's report counts its extreme so far (n157: a stop filled on the live bar at
+        // 62529.9, max drawdown 480.38 = that bar's low 62049.52 against it).
+        const forming = this.committedSnapshot !== null;
+        const size = this.position.size;
+        visit(w, this.cash + (forming ? 0 : this.newEntryCommission()),
+            this.cash + this.openProfitAt(forming ? (size > 0 ? this.low : this.high) : this.adverseSinceEntry(size)));
+        return { drawdown: w.drawdown, percent: w.percent };
+    }
+
+    /**
+     * maxEquityDrawdown's walk over the first `len` points of equityCurve.
+     * Reset wherever the curve is cleared or rolled back.
+     */
+    private drawdownWalk = { len: 0, peak: -Infinity, drawdown: 0, percent: 0 };
+    private resetDrawdownWalk() { this.drawdownWalk = { len: 0, peak: -Infinity, drawdown: 0, percent: 0 }; }
+
+    /**
+     * The bar's most adverse price for the open position. A position opened on this bar
+     * counts only the part of the bar's path after its fill (open, nearer extreme, other
+     * extreme, close, as the broker walks it): the prices before it filled are not its
+     * drawdown (TradingView n28, n35: a long stop entry on a bar whose low came first does not draw
+     * down to that low). The sampled curve gets the same from drawdownPhases; this serves the bar in
+     * progress (`strategy.max_drawdown` read while it runs).
+     */
+    private adverseSinceEntry(size: number): number {
+        const whole = size > 0 ? this.low : this.high;
+        if (size === 0 || this.position.entryBarIndex !== this.currentBarIndex) return whole;
+        const fill = this.position.entries?.[0]?.price;
+        if (fill === undefined || !Number.isFinite(fill)) return whole;
+        const path = Math.abs(this.high - this.open) <= Math.abs(this.open - this.low)
+            ? [this.open, this.high, this.low, this.close] : [this.open, this.low, this.high, this.close];
+        let k = -1;
+        if (path[0] === fill) k = 0;
+        else for (let i = 1; i < path.length && k < 0; i++) {
+            const a = path[i - 1], b = path[i];
+            if ((fill - a) * (fill - b) <= 0) k = i;
+        }
+        if (k < 0) return whole;
+        const rest = [fill, ...path.slice(k)];
+        return size > 0 ? Math.min(...rest) : Math.max(...rest);
+    }
+
+    private barStartState = { bar: -1, size: 0, avg: NaN, cash: 0, n: 0 };
+
+    /**
+     * The cash right after each closing fill of the bar in progress, by the trade count it left.
+     * A bar with several closing fills before its close (a reversal and then a margin call) passes
+     * through realized equity the bar-start and after-fills states do not show: TradingView's
+     * drawdown peak is the cash right after the reversal (n138: 145651.49, where the margin call
+     * that followed on the same bar left 145645.57). drawdownPhases offers each one as a peak.
+     */
+    private fillCash: { bar: number; n: number; cash: number; fill: string }[] = [];
+    public markFillCash(fill: string) {
+        const n = this.trades.length, bar = this.currentBarIndex;
+        // A re-ticked bar records its fills again: drop what an earlier tick (or bar) left.
+        this.fillCash = this.fillCash.filter((m) => m.bar === bar && m.n < n);
+        // One order closing several entries is one fill: only the cash after all of them counts.
+        if (this.fillCash.at(-1)?.fill === fill) this.fillCash.pop();
+        this.fillCash.push({ bar, n, cash: this.cash, fill });
+    }
+
+    /**
+     * The bar's [realized cash, worst equity] stretches when fills changed the position during it (see
+     * EquityPoint.phases), or undefined when one position was held through the whole bar.
+     *
+     * The broker emulator's path is open, the nearer extreme, the other, close. A fill splits it at the
+     * first point the path reaches the fill price: before it the bar-start position is held, after it
+     * the new one. Fills at the close come after the whole path. TradingView: an entry at the close of a
+     * bar whose high is 5.43 above it does not draw down by that (n4); a long stop entry on a bar whose
+     * low came first does not draw down to that low (n28, n35).
+     */
+    private drawdownPhases(B: { size: number; avg: number; cash: number; n: number; newComm: number }): [number, number][] | undefined {
+        type St = { size: number; avg: number; cash: number; n: number };
+        const S: St = this.barStartState.bar === this.currentBarIndex ? this.barStartState : B;
+        const E: St = { size: this.position.size, avg: this.position.avgPrice, cash: this.cash, n: this.trades.length };
+        const same = (a: St, b: St) => a.size === b.size && (a.size === 0 || a.avg === b.avg) && a.cash === b.cash && a.n === b.n;
+        const intrabar = !same(S, B), atClose = !same(B, E);
+        if (!intrabar && !atClose) return undefined;
+        const rate = this.accountRate();
+        const eq = (st: St, p: number) => st.cash + (st.size === 0 ? 0 : (p - st.avg) * st.size * rate);
+        const worstOn = (st: St, pts: number[]) => Math.min(...pts.map((p) => eq(st, p)));
+        const { open, high, low, close } = this;
+        const path = Math.abs(high - open) <= Math.abs(open - low) ? [open, high, low, close] : [open, low, high, close];
+        const phases: [number, number][] = [];
+        if (intrabar) {
+            // The price of the fill that changed the position: the newest entry when one opened on this bar,
+            // else the newest trade's exit.
+            const ent = this.position.entries;
+            const newest = ent?.length ? ent[ent.length - 1] : undefined;
+            const price = B.size !== 0 && newest && newest.bar === this.currentBarIndex ? newest.price
+                : B.n > S.n ? this.trades[B.n - 1]?.exitPrice : NaN;
+            let k = -1;
+            if (Number.isFinite(price)) for (let i = 1; i < path.length && k < 0; i++)
+                if (Math.min(path[i - 1], path[i]) <= price && price <= Math.max(path[i - 1], path[i])) k = i - 1;
+            if (k < 0) phases.push([B.cash, worstOn(B, path)]);
+            else {
+                phases.push([S.cash, worstOn(S, [...path.slice(0, k + 1), price])]);
+                // Each closing fill before the last one: realized equity the bar passed through (a peak only).
+                for (const m of this.fillCash) if (m.bar === this.currentBarIndex && m.n > S.n && m.n < B.n) phases.push([m.cash, Infinity]);
+                // Flat for a moment at the fill: what the closed trades realized, before the new entry's
+                // commission is paid (TradingView's peak at a reversal, n55).
+                if (B.n > S.n && B.newComm > 0) phases.push([B.cash + B.newComm, B.cash + B.newComm]);
+                phases.push([B.cash, worstOn(B, [price, ...path.slice(k + 1)])]);
+            }
+        } else phases.push([B.cash, worstOn(B, path)]);
+        if (atClose) {
+            const c = this.newEntryCommission() - B.newComm;
+            if (E.n > B.n && c > 0) phases.push([E.cash + c, E.cash + c]);
+            phases.push([E.cash, eq(E, close)]);
+        }
+        return phases;
+    }
+
+    /** Entry commission paid on this bar by the entries still open that filled on it. */
+    private newEntryCommission(): number {
+        let c = 0;
+        for (const e of this.position.entries ?? []) if (e.bar === this.currentBarIndex) c += e.commission;
+        return c;
+    }
+
+    private sampleEquity(beforeCloseFills?: { size: number; avg: number; cash: number; n: number; newComm: number }) {
         if (this.scriptMeta?.kind !== "strategy") return;
 
         if (Number.isNaN(this.firstClose)) this.firstClose = this.close;
@@ -3278,7 +3770,11 @@ export class Context {
 
         const size = this.position.size;
         const openPL = this.openProfitAt(this.close);
-        this.equityCurve.push({ time: this.time, equity: this.cash + openPL, openPL });
+        // The bar's most adverse price since the position's entry (see adverseSinceEntry), and, when fills
+        // changed the position during the bar, the stretches of its path (drawdownPhases), which take over.
+        const worstOpenPL = this.openProfitAt(this.adverseSinceEntry(size));
+        const phases = beforeCloseFills ? this.drawdownPhases(beforeCloseFills) : undefined;
+        this.equityCurve.push({ time: this.time, equity: this.cash + openPL, openPL, worstOpenPL, ...(phases ? { phases } : {}) });
 
         if (size === 0) {
             this.positionRunup = 0;
@@ -3331,6 +3827,24 @@ export class Context {
         this.is_realtime = true;
         this.is_last = true;
         this.setBar(time, open, high, low, close, volume);
+    }
+
+    /**
+     * `applyTick` for the live bar's load pass (see `load_pass`): the same rollback baseline, so the
+     * next tick is the bar's second execution (`isnew` false), but this one reads as history.
+     * `endLoadPass` follows the execution.
+     */
+    public applyLoadPass(time: number, open: number, high: number, low: number, close: number, volume: number) {
+        this.applyTick(time, open, high, low, close, volume);
+        this.is_realtime = false;
+        this.is_history = true;
+        this.load_pass = true;
+    }
+
+    public endLoadPass() {
+        this.load_pass = false;
+        this.is_realtime = true;
+        this.is_history = false;
     }
 
     /**
@@ -3431,6 +3945,7 @@ export class Context {
         this.cash = s.cash;
         this.trades = structuredClone(s.trades);
         this.equityCurve.length = s.equityLen;
+        if (this.drawdownWalk.len > s.equityLen) this.resetDrawdownWalk();
         this.positionRunup = s.positionRunup;
         this.positionDrawdown = s.positionDrawdown;
         this.maxContractsHeld = s.maxContractsHeld;
@@ -3512,6 +4027,8 @@ export class Context {
     }
 
     public getRequestData(kind: string, key: string): RequestSample[] | undefined {
+        // A requested context reads what the host gave the chart's (see `runInContext`).
+        if (this.main) return this.main.getRequestData(kind, key);
         return this.requestData.get(`${kind}::${key}`);
     }
 
@@ -3640,7 +4157,7 @@ export class Context {
      * inside.
      */
     public isOwnChartSeries(symbol: string, resolution: string): boolean {
-        if (this.securityData.has(this.secKey(symbol, resolution))) return false;
+        if ((this.main ?? this).securityData.has(this.secKey(symbol, resolution))) return false;
         if (!this.isChartSymbol(symbol)) return false;
         const want = specSeconds(resolution);
         const have = specSeconds(String(this.resolution));
@@ -3662,11 +4179,78 @@ export class Context {
      * ahead of it there, while the 1-minute lower-timeframe context starts at the
      * chart's first bar.)
      */
-    public securityFirstBar(_symbol: string, _resolution: string, _calcBarsCount: any, _fname: string): number {
-        return 0;
+    public securityFirstBar(
+        symbol: string, resolution: string, calcBarsCount: any, fname: string,
+        data?: readonly { time: number }[], lower = false,
+    ): number {
+        const root: Context = this.main ?? this;
+        let first = 0;
+        // `indicator(calc_bars_count = N)` is different: the requested context starts
+        // where the chart's run does. TradingView capture (Crypto Market RSI Heatmap,
+        // calc_bars_count = 100, BTCUSDT 1h): request.security("BINANCE:ETHUSDT", "",
+        // ta.rsi(close, 14)) on the live bar equals an RSI seeded 98 bars before the
+        // last closed bar (the chart's bar_index 0), to the last digit; with ETH's full
+        // history it is 2.4e-3 off. Same-timeframe evidence only.
+        //
+        // A request at the chart's own timeframe starts there too, with or without
+        // calc_bars_count: TradingView probe p_n53 (dev-docs/tv-parity/_probes/triage/r4,
+        // BTCUSDT 1h chart from 2026-01-01): request.security("BINANCE:ETHUSDT",
+        // timeframe.period, [firstLow, flips]) with `var firstLow = low` is ETH's low
+        // of the chart's first bar, 2971.15, and the flip count equals one started
+        // there on all 300 captured bars, although ETH has years of hourly bars before.
+        // A higher timeframe does not (see below: 6,983 hourly bars ahead of a 5m chart).
+        const own = root.securityData.get(root.secKey(symbol, resolution));
+        const chartFirst = root.chartBars[0]?.time;
+        const want = specSeconds(resolution), have = specSeconds(String(root.resolution));
+        const sameTf = !lower && Number.isFinite(want) && want === have;
+        if ((root.scriptMeta?.calc_bars_count || sameTf) && own && Number.isFinite(chartFirst)) {
+            const k = own.findIndex((b) => b.time >= chartFirst);
+            if (k > 0) first = k;
+        }
+
+        // A request's own `calc_bars_count = N` (TradingView probes t12, r2 u1/u2, r3 v3): the
+        // data set keeps only its last N bars, counted back from the newest bar the chart's last
+        // bar sees (a lower timeframe: the newest intrabar inside it, live ones included). The
+        // depth belongs to the (symbol, timeframe) data set, not to the call: it is the largest of
+        // its requests' limits, and no limit at all if any request has none.
+        if (data && data.length > 0) {
+            const n = Math.floor(Number(calcBarsCount != null && typeof calcBarsCount.valueOf === "function" ? calcBarsCount.valueOf() : calcBarsCount));
+            const dataSet = root.secKey(symbol, resolution);
+            const sites = root.seriesLimits.get(dataSet) ?? new Map<string, number>();
+            root.seriesLimits.set(dataSet, sites);
+            // A lower timeframe keeps at most 100,000 intrabars whatever the requests ask
+            // (TradingView capture, a logistic-regression SuperTrend, 1-minute intrabars on 1h: its
+            // probability labels match with the last 100,000 intrabars and with no other count, 60k..200k).
+            const cap = (d: number) => lower ? Math.min(Context.LTF_MAX_INTRABARS, d) : d;
+            const before = sites.size > 0 ? cap(Math.max(...sites.values())) : undefined;
+            sites.set(`${fname}|${this.currentCallKey()}`, Number.isFinite(n) && n > 0 ? n : Infinity);
+            const depth = cap(Math.max(...sites.values()));
+            // A request found AFTER another already read the data set with a different depth: the
+            // run starts again with every request known (Session.runHistory).
+            if (before !== undefined && before !== depth) root.seriesLimitsChanged = true;
+            if (Number.isFinite(depth)) {
+                const lastTime = root.lastBarTime;
+                const bound = lower ? periodEnd(lastTime, String(root.resolution)) : lastTime;
+                let last = data.length - 1;
+                if (Number.isFinite(bound)) while (last >= 0 && (lower ? data[last].time >= bound : data[last].time > bound)) last--;
+                first = Math.max(first, last - depth + 1);
+            }
+        }
+        return first;
     }
 
+    /** The most intrabars a lower-timeframe data set keeps (`securityFirstBar`). */
+    public static LTF_MAX_INTRABARS = 100_000;
+
+    /** Per (symbol, timeframe) data set, per request site: the request's `calc_bars_count` (Infinity: none). */
+    public seriesLimits = new Map<string, Map<string, number>>();
+    /** A request changed the depth of a data set another had already read; see `securityFirstBar`. */
+    public seriesLimitsChanged = false;
+
     public getSecurityData(symbol: string, resolution: string, lookaheadOn = false): SecurityCandle[] | undefined {
+        // A request made from a requested context (a nested request, or one met while the
+        // script runs there) reads the chart's data sets: the sub-context holds none.
+        if (this.main) return this.main.getSecurityData(symbol, resolution, lookaheadOn);
         // Host-supplied data always wins: it is real data for the context the
         // script asked for, and a derivation is only ever a fallback.
         //
@@ -3675,10 +4259,12 @@ export class Context {
         // periods of their own length is the identity only while every bar
         // sits on its period's boundary, and a feed with its own session
         // offset does not.
-        const candles = this.securityData.get(this.secKey(symbol, resolution))
-            ?? (this.isOwnChartSeries(symbol, resolution)
-                ? this.chartBars
-                : this.deriveSecurityData(symbol, resolution, lookaheadOn));
+        let candles = this.securityData.get(this.secKey(symbol, resolution))
+            ?? (this.isOwnChartSeries(symbol, resolution) ? this.chartBars : undefined);
+        if (!candles) {
+            candles = this.deriveSecurityData(symbol, resolution, lookaheadOn);
+            if (candles) this.derivedSecurities.add(this.secKey(symbol, resolution));
+        }
         if (!candles) return candles;
         // heikinashi(tickerid) marks the symbol rather than wrapping the series,
         // which is how Pine models it — so the transform belongs here, at the
@@ -3695,7 +4281,7 @@ export class Context {
 
     /** Records a (symbol, resolution) the script needs but hasn't been given. */
     public requestSecurity(symbol: string, resolution: string): void {
-        this.requestedSecurities.add(this.secKey(symbol, resolution));
+        (this.main ?? this).requestedSecurities.add(this.secKey(symbol, resolution));
     }
 
     /**
@@ -3727,7 +4313,116 @@ export class Context {
             sub.isin = this.isin; sub.currentContract = this.currentContract;
         }
         sub.symbol = chart ? this.symbol : symbol;
+        // The script's inputs have the chart's values in every context: a context run
+        // (`runInContext`) executes the input calls again there.
+        sub.userInputs = (this.main ?? this).userInputs;
+        // A request made from this context evaluates its own expression in its own sub-context.
+        sub.__sandbox = (this.main ?? this).__sandbox;
         return sub;
+    }
+
+    // ── Running the script in a requested context ───────────────────────────
+    //
+    // A requested expression that reads the script's own state (`var` globals,
+    // `:=` updates, a function reading them) is marked by the emitter with
+    // `inContext`. TradingView evaluates that state in the REQUESTED context, each
+    // (symbol, timeframe, call) with its own copy fed by the requested bars
+    // (probe dev-docs/tv-parity/_probes/triage/r4, p_n53: request.security of
+    // ETH on a BTC chart returns ETH's own `var firstLow = low`). So for each
+    // requested bar the whole script runs in the sub-context, whose `vars` and
+    // call-site state are that copy, and the expression is taken where that run
+    // reaches the call. Plots, drawings and logs of that run land in the
+    // sub-context and are never output.
+
+    /** The compiled script body, set by `compile` (runtime/v1/index.ts) on the chart's context. */
+    public __main: (() => any) | null = null;
+
+    /**
+     * Set on a sub-context while the script runs in it for one requested bar:
+     * the call whose expression is wanted (its call-site key with symbol and
+     * timeframe, and the bare call path), and what the run found there.
+     */
+    public contextRun: {
+        key: string; path: string;
+        hit: boolean; value: any;
+        pathHit: boolean; pathValue: any;
+    } | null = null;
+
+    /** Marks a requested expression to be evaluated by running the script in the requested context. */
+    public inContext<T extends () => any>(thunk: T): T {
+        (thunk as any).__inContext = true;
+        return thunk;
+    }
+
+    /**
+     * A request call met while the script runs in a requested context
+     * (`contextRun` set). The call the run is for returns its expression's value,
+     * in this run's scope, to `runInContext`, and the same value to the script so
+     * the run can go on; that answer is returned here as `{ value }`. Any other
+     * request returns null: it is requested from this context like any request
+     * (TradingView probe pr33-review/04_p3-nested, v5, BTCUSDT 1h: with `w` a weekly
+     * request and `cnt := w`, `request.security("240", cnt)` equals `w` on all 300
+     * bars, where the weekly call read as `close` in the 240 context gave the 240 close).
+     */
+    public contextRunSite(key: string, expression: () => any): { value: any } | null {
+        const run = this.contextRun;
+        if (!run) return null;
+        if (key === run.key) {
+            const v = Context.securityValue(expression());
+            if (!run.hit) { run.hit = true; run.value = v; }
+            return { value: v };
+        }
+        if (!run.pathHit && this.currentCallKey() === run.path) {
+            // The same call with a context computed differently in this context
+            // (`timeframe.period` reads the requested one here).
+            const v = Context.securityValue(expression());
+            run.pathHit = true; run.pathValue = v;
+            return { value: v };
+        }
+        return null;
+    }
+
+    /**
+     * Runs the script on `sub`'s current bar and returns the value of the call
+     * `site` asks for. A run that does not reach the call (it sits under a
+     * condition false in this context) answers the chart's thunk, read in `sub`.
+     */
+    private runInContext(sub: Context, site: { key: string; path: string }, thunk: () => any): any {
+        const root = this.main ?? this;
+        const main = root.__main!;
+        const outer = sub.contextRun;
+        const run = sub.contextRun = { key: site.key, path: site.path, hit: false, value: undefined, pathHit: false, pathValue: undefined };
+        // The same body takes the same rollback points: a call the chart's run knows to
+        // repeat is the one that repeats here, and one found here starts the run over
+        // knowing it, as on the chart (`repeatingSites`, Session.runHistory).
+        sub.repeatingSites = root.repeatingSites;
+        try {
+            main();
+        } catch (e) {
+            if (sub.missedRepeat !== null && root.missedRepeat === null) root.missedRepeat = sub.missedRepeat;
+            throw e;
+        } finally {
+            sub.contextRun = outer;
+        }
+        return run.hit ? run.value : run.pathHit ? run.pathValue : thunk();
+    }
+
+    /** A requested expression's value as `request.security` returns it; see `evalSecurityBar`. */
+    public static securityValue(r: any): any {
+        const unwrap = (x: any) =>
+            (x !== null && x !== undefined && typeof x.valueOf === "function") ? x.valueOf() : x;
+        const num = unwrap(r);
+        // A TUPLE expression — `security(sym, "D", [close, open])`, v4,
+        // May 2020 — comes back as an array, and a STRING expression
+        // (`syminfo.currency`) as a string. `Number()` turned both into
+        // NaN, so the tuple form silently produced `na` for every element.
+        if (Array.isArray(num)) return num.map(unwrap);
+        if (typeof num === "string") return num;
+        // A user-defined type (or a collection) comes back as the object itself:
+        // Number() made every UDT result na (TradingView capture, Market Matrix:
+        // a `HtfSnap` returned from request.security("D", ...) is not na there).
+        if (num !== null && typeof num === "object") return num;
+        return Number(num);
     }
 
     /** Stable key for the current call site (used for per-`security()` HTF state). */
@@ -3746,7 +4441,10 @@ export class Context {
      * sub-context, by rebinding the VM's global series (open/high/.../close) and
      * `ctx` to the sub-context for the duration of the thunk. Restores on exit.
      */
-    public evalSecurityBar(sub: Context, bar: SecurityCandle, thunk: () => any, provisional = false): any {
+    public evalSecurityBar(
+        sub: Context, bar: SecurityCandle, thunk: () => any, provisional = false,
+        site?: { key: string; path: string },
+    ): any {
         const sb = this.__sandbox;
         if (!sb) return NaN;
         const P = "opsv2_";
@@ -3762,6 +4460,12 @@ export class Context {
         sb[P + "close"] = sub.vars.get(P + "close");
         sb[P + "volume"] = sub.vars.get(P + "volume");
         sb[P + "time"] = sub.vars.get(P + "time");
+        // The chart's series objects themselves follow too, for a reference taken before the swap.
+        const redirected: Array<[Series<any>, Series<any> | null]> = [];
+        for (const k of ["open", "high", "low", "close", "volume", "time"] as const) {
+            const m = (saved as any)[k], t = sb[P + k];
+            if (m instanceof Series && t instanceof Series && m !== t) { redirected.push([m, m.redirect]); m.redirect = t; }
+        }
         try {
             // A provisional bar is a forming bar of the sub-context: rolled back to
             // the state before it on every evaluation (`applyTick`), and committed
@@ -3769,22 +4473,19 @@ export class Context {
             const forming = provisional || sub.committedSnapshot !== null;
             if (forming) sub.applyTick(bar.time, bar.open, bar.high, bar.low, bar.close, bar.volume);
             else sub.setBar(bar.time, bar.open, bar.high, bar.low, bar.close, bar.volume);
-            const r = thunk();
-            const unwrap = (x: any) =>
-                (x !== null && x !== undefined && typeof x.valueOf === "function") ? x.valueOf() : x;
-            const num = unwrap(r);
+            // A request made while the script already runs in a requested context
+            // (`this.contextRun` set) evaluates its expression in place in its own
+            // sub-context: a run inside a run is not modelled (no TradingView evidence),
+            // and two state-reading requests would otherwise start each other's runs without end.
+            const r = site && (thunk as any).__inContext === true && (this.main ?? this).__main && !this.contextRun
+                ? this.runInContext(sub, site, thunk) : thunk();
+            const out = Context.securityValue(r);
             if (provisional) { /* stays forming */ }
             else if (forming) sub.commitBar();
             else sub.finalizeBar();
-
-            // A TUPLE expression — `security(sym, "D", [close, open])`, v4,
-            // May 2020 — comes back as an array, and a STRING expression
-            // (`syminfo.currency`) as a string. `Number()` turned both into
-            // NaN, so the tuple form silently produced `na` for every element.
-            if (Array.isArray(num)) return num.map(unwrap);
-            if (typeof num === "string") return num;
-            return Number(num);
+            return out;
         } finally {
+            for (const [m, was] of redirected) m.redirect = was;
             sb.ctx = saved.ctx;
             sb[P + "open"] = saved.open; sb[P + "high"] = saved.high; sb[P + "low"] = saved.low;
             sb[P + "close"] = saved.close; sb[P + "volume"] = saved.volume; sb[P + "time"] = saved.time;

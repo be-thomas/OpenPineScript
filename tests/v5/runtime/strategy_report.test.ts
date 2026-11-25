@@ -279,8 +279,11 @@ describe("order size", () => {
     '    strategy.entry("Long", strategy.long)\n' +
     'if ta.crossunder(fast, slow)\n' +
     '    strategy.close("Long")\n',
-    { candles: bars(300) },
+    { candles: CS },
   );
+  const CS = bars(300);
+  // A market entry is sized at its ORDER price, the close of the bar that placed it (v3 capture, v6 probe):
+  const placedClose = (t: { entryTime: number }) => CS[CS.findIndex(c => c.time === t.entryTime) - 1].close;
 
   it("is one contract when the script declares nothing", () => {
     expect(sized("").trades.every(t => t.qty === 1)).toBe(true);
@@ -291,17 +294,17 @@ describe("order size", () => {
     expect(r.trades.every(t => t.qty === 7)).toBe(true);
   });
 
-  it("turns a cash amount into contracts at the fill price", () => {
+  it("turns a cash amount into contracts at the order price", () => {
     const r = sized(', default_qty_type = strategy.cash, default_qty_value = 5000');
-    for (const t of r.trades) expect(t.qty).toBeCloseTo(5000 / t.entryPrice, 6);
+    for (const t of r.trades) expect(t.qty).toBeCloseTo(5000 / placedClose(t), 6);
   });
 
-  it("sizes a percentage against the equity at the fill", () => {
+  it("sizes a percentage of the equity at the order price", () => {
     const r = sized(', default_qty_type = strategy.percent_of_equity, default_qty_value = 50');
     // Half the account, so the first trade's notional is about half of the
     // starting capital — and every later one moves with the equity.
     const first = r.trades[0];
-    expect(first.qty * first.entryPrice).toBeCloseTo(10000 * 0.5, 2);
+    expect(first.qty * placedClose(first)).toBeCloseTo(10000 * 0.5, 2);
     expect(new Set(r.trades.map(t => t.qty.toFixed(6))).size).toBeGreaterThan(1);
   });
 
@@ -340,7 +343,8 @@ describe("the properties panel", () => {
     // but nothing enforces it, there are no margin calls, and a slider that
     // changes no number in the report is worse than no slider.
     expect(compiled.properties.some(p => p.key.startsWith("margin_"))).toBe(false);
-    expect(compiled.meta!.margin_long).toBe(100);
+    // v5's default is 0 -- no margin -- per the v6 migration guide; v6 defaults to 100.
+    expect(compiled.meta!.margin_long).toBe(0);
   });
 
   it("reports what the script declared, so a reset button has something to restore", () => {

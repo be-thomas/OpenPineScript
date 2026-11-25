@@ -263,12 +263,28 @@ const V4_FORMAT: Record<string, StdlibEntry> = {
     tostring: V5_NAMESPACE_REGISTRY["str.tostring"],
 };
 
+/**
+ * `display.none` and `display.all` at v4. TradingView v4 compiles
+ * `plot(close, display = display.none)` and `display = display.all`, and the
+ * script outputs carry display 0 and 15, which are v5's values
+ * (dev-docs/tv-parity/_probes/corpus98/p4_v4_display, 2026-11-14). Only these
+ * two were probed; the rest of `display.*` stays v5.
+ */
+const V4_DISPLAY: Record<string, StdlibEntry> = Object.fromEntries(
+    ["display.none", "display.all"].map(key => {
+        const entry = V5_NAMESPACE_REGISTRY[key];
+        if (!entry) throw new Error(`stdlib: ${key} is missing from the registry`);
+        return [key, entry];
+    }),
+);
+
 export const V4_VIEW: Record<string, StdlibEntry> = {
     ...without(BASE_REGISTRY, V4_REMOVED),
     ...without(V4_NAMESPACE_REGISTRY, CAST_KEYS),
     ...V4_REGISTRY,
     ...V4_CASTS,
     ...V4_FORMAT,
+    ...V4_DISPLAY,
 };
 
 export const V5_REGISTRY: Record<string, StdlibEntry> =

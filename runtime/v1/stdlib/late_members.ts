@@ -49,7 +49,89 @@ export const math = {
 /** The running extreme of one call site, kept across bars. */
 type Record = { best: number };
 
+/** One `ta.pivot_point_levels` call site: the period in progress and the levels of the last one. */
+type PivotState = { started: boolean; o: number; h: number; l: number; c: number; levels: number[] | null };
+
+/**
+ * The eleven levels `[P, R1, S1, R2, S2, R3, S3, R4, S4, R5, S5]` of one pivot type, from a
+ * period's high, low, close and open (`o`, DM's input) and the next period's open (`next`, Woodie's).
+ * TradingView's "Pivot Points Standard" formulas; a level a type does not define is na.
+ */
+function pivotLevels(type: string, h: number, l: number, c: number, o: number, next: number): number[] {
+    const out = new Array(11).fill(NaN);
+    const r = h - l;
+    const set = (...v: number[]) => v.forEach((x, i) => { out[i] = x; });
+    switch (type) {
+        case "Traditional": {
+            const p = (h + l + c) / 3;
+            set(p, p * 2 - l, p * 2 - h, p + r, p - r, p * 2 + (h - 2 * l), p * 2 - (2 * h - l),
+                p * 3 + (h - 3 * l), p * 3 - (3 * h - l), p * 4 + (h - 4 * l), p * 4 - (4 * h - l));
+            break;
+        }
+        case "Fibonacci": {
+            const p = (h + l + c) / 3;
+            set(p, p + 0.382 * r, p - 0.382 * r, p + 0.618 * r, p - 0.618 * r, p + r, p - r);
+            break;
+        }
+        case "Woodie": {
+            const p = (h + l + next * 2) / 4;
+            const r3 = h + 2 * (p - l), s3 = l - 2 * (h - p);
+            set(p, p * 2 - l, p * 2 - h, p + r, p - r, r3, s3, r3 + r, s3 - r);
+            break;
+        }
+        case "Classic": {
+            const p = (h + l + c) / 3;
+            set(p, p * 2 - l, p * 2 - h, p + r, p - r, p + 2 * r, p - 2 * r, p + 3 * r, p - 3 * r);
+            break;
+        }
+        case "DM": {
+            const x = o === c ? h + l + 2 * c : c > o ? 2 * h + l + c : 2 * l + h + c;
+            set(x / 4, x / 2 - l, x / 2 - h);
+            break;
+        }
+        case "Camarilla": {
+            const p = (h + l + c) / 3;
+            const r5 = (h / l) * c;
+            set(p, c + 1.1 * r / 12, c - 1.1 * r / 12, c + 1.1 * r / 6, c - 1.1 * r / 6, c + 1.1 * r / 4, c - 1.1 * r / 4,
+                c + 1.1 * r / 2, c - 1.1 * r / 2, r5, c - (r5 - c));
+            break;
+        }
+        default:
+            throw new Error(`ta.pivot_point_levels: unknown type "${type}" (Traditional, Fibonacci, Woodie, Classic, DM or Camarilla).`);
+    }
+    return out;
+}
+
 export const ta = {
+  /**
+   * `ta.pivot_point_levels(type, anchor, developing = false)`: the pivot levels of the
+   * period that ended when `anchor` last became true, as an 11-element array
+   * `[P, R1, S1, R2, S2, R3, S3, R4, S4, R5, S5]` (na where the type has no such level).
+   * A period runs from one anchor bar (inclusive) to the next. With `developing`, the
+   * levels are those of the period in progress, recomputed on every bar. na throughout
+   * until a period has ended.
+   *
+   * @returns {array<float>} A new array on every call.
+   */
+  pivot_point_levels: (ctx: Context, type: any, anchor: any, developing: any = false): number[] => {
+    const kind = String(val(type));
+    // TradingView RE10128 (probe r6 p1_pivot_types_b, bar 0).
+    if (val(developing) === true && kind === "Woodie") {
+      throw new Error('The `developing` parameter of the `ta.pivot_point_levels()` cannot be `true` when `type` is "Woodie".');
+    }
+    const st = ctx.getPersistentState<PivotState>(() => ({ started: false, o: NaN, h: NaN, l: NaN, c: NaN, levels: null }));
+    const o = Number(val((ctx as any).open)), h = Number(val((ctx as any).high));
+    const l = Number(val((ctx as any).low)), c = Number(val((ctx as any).close));
+    if (st.started && Boolean(val(anchor))) {
+      st.levels = pivotLevels(kind, st.h, st.l, st.c, st.o, o);
+      st.started = false;
+    }
+    if (!st.started) { st.started = true; st.o = o; st.h = h; st.l = l; st.c = c; }
+    else { st.h = Math.max(st.h, h); st.l = Math.min(st.l, l); st.c = c; }
+    if (val(developing) === true) return pivotLevels(kind, st.h, st.l, st.c, st.o, st.o);
+    return st.levels ? st.levels.slice() : new Array(11).fill(NaN);
+  },
+
   /**
    * The highest value `source` has held since the script began.
    *

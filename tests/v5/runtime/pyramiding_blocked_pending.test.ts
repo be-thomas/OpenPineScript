@@ -4,9 +4,11 @@
  * no entry had been made. So a stop entry that came due while the position was
  * at its pyramiding limit vanished -- and took its OCA partner with it.
  *
- * Kept pending is a choice, not a documented TradingView behaviour; the
- * question is put to TradingView in
- * conformance/v5/parity/harness_strategy_exit_mix.pine.
+ * TradingView answers the rest (dev-docs/tv-parity/_probes/two-entries, p_pyr, v4-v6):
+ * an entry PLACED while pyramiding is already full on its side is not a live
+ * order at all, so it never fills, even once the position that blocked it is gone
+ * (Broker.entryFixedAtPlacement). The OCA case below still holds: there the
+ * partner is an entry on the other side.
  */
 import { describe, it, expect } from "vitest";
 import { Session } from "../../../runtime/v1/session";
@@ -27,10 +29,10 @@ function run(version: number, body: string, bars: any[]) {
 }
 
 describe.each([5, 6])("pending entry blocked by pyramiding, v%i", (version) => {
-  it("stays pending and fills once the position that blocked it is closed", () => {
-    // L fills at bar 2's open. B's stop (105) is reached on bar 4 while L is
-    // open and pyramiding = 1, so it cannot fill. L is closed (queued bar 6,
-    // sold at bar 7's open); B's stop is reached again on bar 8, and fills there.
+  it("placed while blocked, never fills, even after the position that blocked it is closed", () => {
+    // L fills at bar 2's open, so B (placed on bar 2, with L open and pyramiding = 1) is not live.
+    // Its stop (105) is reached on bar 4 and, after L is closed (queued bar 6, sold at bar 7's open),
+    // again on bar 8: no fill either time.
     const bars = mk(12, (i) => i === 4 || i === 8 ? [100, 110, 99, 100] : flat(i));
     const r = run(version, `
 if bar_index == 1
@@ -41,7 +43,7 @@ if bar_index == 6
     strategy.close("L")
 `, bars);
     expect(r.trades).toHaveLength(1);
-    expect(r.position.entries.map((e: any) => [e.id, e.price, e.bar])).toEqual([["B", 105, 8]]);
+    expect(r.position.size).toBe(0);
   });
 
   it("does not cancel its OCA partner while it is blocked", () => {

@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Session } from "../../../runtime/v1/session";
+import { Context } from "../../../runtime/v1/context";
 
 const T0 = Date.UTC(2024, 0, 1);
 const HOUR = 3_600_000;
@@ -113,23 +114,78 @@ describe("ignore_invalid_timeframe", () => {
 });
 
 describe("calc_bars_count", () => {
-  // TradingView's log (conformance/v5/parity/harness_security_cbc, BTCUSDT 5m):
-  // `request.security_lower_tf("1", bar_index, calc_bars_count = 200)` equals
-  // the call without it on every row, same size and same first element. It
-  // has no observable effect, and is accepted rather than dropped.
-  it("changes nothing: every chart bar still gets its intrabars", () => {
+  // TradingView probes r2 u2 / r3 v3: the request gets only the last N intrabars, counted back from
+  // the newest; but when another request for the same symbol and timeframe has no calc_bars_count,
+  // both get everything (conformance/v5/parity/harness_security_cbc has such a sibling, l_all, which
+  // is why it showed "no effect").
+  it("keeps the last N intrabars: chart bars before them get none", () => {
     const r = run('c = request.security_lower_tf(syminfo.tickerid, "15", close, calc_bars_count = 6)\n' +
       'plot(array.size(c), "n")\nplot(array.size(c) > 0 ? array.sum(c) : -1, "sum")\n');
     expect(r.droppedArguments).toEqual([]);
+    expect(values(r, "n")).toEqual([0, 0, 2, 4]);
+    expect(values(r, "sum")).toEqual([-1, -1, 21, 54]);
+  });
+
+  it("the expression warms up from the first kept intrabar", () => {
+    const r = run('a = request.security_lower_tf(syminfo.tickerid, "15", ta.sma(close, 2), calc_bars_count = 6)\n' +
+      'plot(array.size(a) > 0 ? array.get(a, 0) : -1, "first")\n');
+    // intrabar 10 is the first kept: sma(2) is na there
+    expect(values(r, "first")).toEqual([-1, -1, null, 11.5]);
+  });
+
+  it("changes nothing when another request for the same data set has no limit", () => {
+    const r = run('c = request.security_lower_tf(syminfo.tickerid, "15", close, calc_bars_count = 6)\n' +
+      'd = request.security_lower_tf(syminfo.tickerid, "15", close)\n' +
+      'plot(array.size(c), "n")\nplot(array.size(d), "m")\nplot(array.size(c) > 0 ? array.sum(c) : -1, "sum")\n');
     expect(values(r, "n")).toEqual([4, 4, 4, 4]);
+    expect(values(r, "m")).toEqual([4, 4, 4, 4]);
     expect(values(r, "sum")).toEqual([6, 22, 38, 54]);
   });
 
-  it("the expression warms up from the first intrabar, whatever the count", () => {
-    const r = run('a = request.security_lower_tf(syminfo.tickerid, "15", ta.sma(close, 2), calc_bars_count = 6)\n' +
-      'plot(array.size(a) > 0 ? array.get(a, 0) : -1, "first")\n');
-    // sma(2) is na only at the very first intrabar.
-    expect(values(r, "first")).toEqual([null, 3.5, 7.5, 11.5]);
+  it("the largest limit of the data set's requests wins", () => {
+    const r = run('c = request.security_lower_tf(syminfo.tickerid, "15", close, calc_bars_count = 6)\n' +
+      'd = request.security_lower_tf(syminfo.tickerid, "15", close, calc_bars_count = 9)\n' +
+      'plot(array.size(c), "n")\nplot(array.size(d), "m")\n');
+    expect(values(r, "n")).toEqual([0, 1, 4, 4]);
+    expect(values(r, "m")).toEqual([0, 1, 4, 4]);
+  });
+});
+
+describe("the intrabar cap", () => {
+  // A lower-timeframe data set keeps at most Context.LTF_MAX_INTRABARS (100,000) intrabars, counted
+  // back from the newest, whatever the requests ask (TradingView capture, a logistic-regression
+  // SuperTrend on 1h with 1-minute intrabars). Lowered to 6 here so 16 intrabars show it.
+  const withCap = <T,>(f: () => T): T => {
+    const was = Context.LTF_MAX_INTRABARS;
+    Context.LTF_MAX_INTRABARS = 6;
+    try { return f(); } finally { Context.LTF_MAX_INTRABARS = was; }
+  };
+
+  it("a request without calc_bars_count gets only the capped depth", () => {
+    const r = withCap(() => run('c = request.security_lower_tf(syminfo.tickerid, "15", close)\nplot(array.size(c), "n")\n'));
+    expect(values(r, "n")).toEqual([0, 0, 2, 4]);
+  });
+
+  it("combines with calc_bars_count as the smaller", () => {
+    const r = withCap(() => run('c = request.security_lower_tf(syminfo.tickerid, "15", close, calc_bars_count = 9)\n' +
+      'd = request.security_lower_tf(syminfo.tickerid, "15", close, calc_bars_count = 3)\n' +
+      'plot(array.size(c), "n")\nplot(array.size(d), "m")\n'));
+    expect(values(r, "n")).toEqual([0, 0, 2, 4]);
+    expect(values(r, "m")).toEqual([0, 0, 2, 4]);
+  });
+
+  it("a sibling request whose depth only differs before the cap does not restart the run forever", () => {
+    // limits 9 and none are both 6 once capped: the "depth changed" check compares capped values.
+    const r = withCap(() => run('c = request.security_lower_tf(syminfo.tickerid, "15", close, calc_bars_count = 9)\n' +
+      'd = request.security_lower_tf(syminfo.tickerid, "15", close)\n' +
+      'plot(array.size(c), "n")\nplot(array.size(d), "m")\n'));
+    expect(values(r, "n")).toEqual([0, 0, 2, 4]);
+    expect(values(r, "m")).toEqual([0, 0, 2, 4]);
+  });
+
+  it("the cap does not apply to a higher timeframe request", () => {
+    const r = withCap(() => run('h = request.security(syminfo.tickerid, "15", close, calc_bars_count = 9)\nplot(h, "h")\n'));
+    expect(r.errors ?? []).toEqual([]);
   });
 });
 

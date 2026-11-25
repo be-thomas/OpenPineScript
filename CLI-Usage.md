@@ -12,6 +12,22 @@ npx openpinescript <script.pine> --data <data.csv> [flags]
 
 `script.pine` and `--data` are always required. All other flags are optional. With no output or comparison flags, a formatted summary is printed to the terminal and nothing is written to disk.
 
+### The data CSV
+
+One bar per row, oldest first, columns in this order: `time,open,high,low,close,volume`. A header row is optional.
+
+```csv
+time,open,high,low,close,volume
+2026-10-29T16:00:00Z,81778.01,81971.00,81185.66,81269.56,1070.35
+1793293200000,81269.56,81269.56,80670.93,80891.82,794.12
+```
+
+`time` may be ISO 8601 (a date-time with no zone, such as `2026-10-29 16:00`, is read as UTC), a date (`2026-10-29`, read as UTC midnight), or a Unix epoch number in seconds or milliseconds (micro- and nanoseconds are recognised too; the unit is read off the number's size). A time that is none of these stops the run with the line number and the value it could not read.
+
+### Starting capital
+
+Net profit and every percentage in the summary are measured against the strategy's own starting capital: `strategy(initial_capital = ...)`, or TradingView's default for the script's version when it declares none (1,000,000 at v5; 100,000 at v2, v3, v4 and v6). The summary shows it as `Initial Capital`.
+
 ---
 
 ## Output flags
@@ -99,6 +115,7 @@ npx openpinescript strategy.pine --data data.csv --out-summary ./results/summary
 
 ```json
 {
+  "initial_capital": 100000,
   "net_profit": 4821.00,
   "net_profit_percent": 4.82,
   "gross_profit": 7200.00,
@@ -110,6 +127,7 @@ npx openpinescript strategy.pine --data data.csv --out-summary ./results/summary
   "avg_win": 300.00,
   "avg_loss": 169.93,
   "profit_factor": 3.028,
+  "max_drawdown": 3420.00,
   "max_drawdown_percent": 3.17
 }
 ```

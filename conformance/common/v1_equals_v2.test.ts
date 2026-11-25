@@ -142,7 +142,7 @@ const V2_ONLY = CANDIDATES.filter(f => usesReassignment(read(f)));
 
 /** Erase call-site line/column tags so two line-shifted emissions compare equal. */
 function normaliseLocIds(js: string): string {
-  return js.replace(/@L\d+:C\d+/g, "@L<n>:C<n>");
+  return js.replace(/[@~]L\d+:C\d+/g, "@L<n>:C<n>");
 }
 
 describe("corpus inventory", () => {
